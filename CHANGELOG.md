@@ -27,6 +27,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - `docs/reference/hooks.md`：Stop hook 補 `### Fail-open 情況` 段
 - `docs/reference/hooks.md`：TeammateIdle 補 `### Timeout` 段（30 秒上限說明）
 - `docs/guides/contributing.md`：移除廢棄的「不主動提 Dag 概念」條目
+- `hooks/verify_completion.py`：`systemMessage` prefix 統一為「立希 (Taki)」，
+  與 `teammate_quality_check.py` 的人設化訊息一致
 
 ### Planned (v0.1)
 

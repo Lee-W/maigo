@@ -125,19 +125,19 @@ def main() -> None:
     cmd = shlex.split(custom_cmd) if custom_cmd else detect_test_command(cwd)
 
     if cmd is None:
-        emit("approve", "verify_completion：偵測不到 test 設定，跳過（no-op）")
+        emit("approve", "立希 (Taki)：偵測不到 test 設定，跳過（no-op）")
 
     known = read_known_failures(claude_dir / "known-test-failures")
     exit_code, output = run_command(cmd, cwd)
 
     if exit_code == 0:
-        emit("approve", f"verify_completion：`{' '.join(cmd)}` 通過")
+        emit("approve", f"立希 (Taki)：`{' '.join(cmd)}` 通過")
 
     fatal_match = FATAL_MARKER_RE.search(output)
     if fatal_match:
         emit(
             "block",
-            f"verify_completion：`{' '.join(cmd)}` 出現 {fatal_match.group(1)}（import / collection 錯，不是 test 失敗）。先修這個。",
+            f"立希 (Taki)：`{' '.join(cmd)}` 出現 {fatal_match.group(1)}（import / collection 錯，不是 test 失敗）。先修這個。",
         )
 
     actual = extract_failures(output)
@@ -147,19 +147,19 @@ def main() -> None:
         details = "\n".join(f"  - {f}" for f in sorted(new_failures))
         emit(
             "block",
-            f"verify_completion：`{' '.join(cmd)}` exit {exit_code}，{len(new_failures)} 個新失敗：\n{details}\n\n（已知失敗已忽略；要忽略新失敗，加到 .claude/known-test-failures）",
+            f"立希 (Taki)：`{' '.join(cmd)}` exit {exit_code}，{len(new_failures)} 個新失敗：\n{details}\n\n（已知失敗已忽略；要忽略新失敗，加到 .claude/known-test-failures）",
         )
 
     if actual and not new_failures:
         emit(
             "approve",
-            f"verify_completion：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
+            f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
         )
 
     tail = output[-OUTPUT_TAIL_CHARS:] if len(output) > OUTPUT_TAIL_CHARS else output
     emit(
         "block",
-        f"verify_completion：`{' '.join(cmd)}` exit {exit_code}，無法 parse failure 名稱。Raw tail:\n{tail}",
+        f"立希 (Taki)：`{' '.join(cmd)}` exit {exit_code}，無法 parse failure 名稱。Raw tail:\n{tail}",
     )
 
 
