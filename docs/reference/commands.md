@@ -1,0 +1,95 @@
+# Commands Reference
+
+Maigo 提供三個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+本頁是 quick reference。
+
+## `/maigo:go` — 開發新功能 / 修 bug
+
+順序版工作流，5 個 stage 全跑：
+
+```
+/maigo:go <任務描述>
+```
+
+| Stage | Agent | 做什麼 |
+|-------|-------|--------|
+| 1 | Raana | 探索 codebase 找相關位置、慣例 |
+| 2 | Tomori | 寫 `/tmp/maigo/<repo>/plan.md` |
+| 3 | (user) | 確認 plan、回 open questions |
+| 4 | Anon | 按 plan 實作 |
+| 5 | Soyo | review（依 `strict-review` skill） |
+| 6 | Taki | 跑 test / lint / type check |
+
+**失敗處理：** 任何 stage 卡關 → 回 Anon 修正。同條 must-fix / failure 連續 3 次卡關才停下。
+
+## `/maigo:team` — 並行版的 /maigo:go
+
+跟 `/maigo:go` 同流程，但 step 5 和 step 6（Soyo + Taki）並行跑：
+
+```
+/maigo:team <任務描述>
+/maigo:team --force-sequential <任務描述>
+```
+
+### Trade-off
+
+| 模式 | Wall clock | 白做工風險 |
+|------|-----------|-----------|
+| `/maigo:go` | 100% | 0（Soyo 擋下就不跑 test） |
+| `/maigo:team` | ~60-70% | 中（Soyo 擋下時 Taki 可能已跑完） |
+
+多數情況淨值正。高風險變更（重構、scope 大）建議用 `/maigo:go` 順序版。
+
+### 合流邏輯
+
+| Soyo | Taki | 處理 |
+|------|------|------|
+| APPROVED | PASS | 完成 |
+| APPROVED | FAIL | 回 Anon 修 test failure（review 不重跑） |
+| NEEDS_CHANGES / BLOCKED | PASS | 回 Anon 修 must-fix，修完**重跑 Soyo + Taki** |
+| NEEDS_CHANGES / BLOCKED | FAIL | 兩邊一起修，重跑 |
+
+## `/maigo:review` — Review 既有變更
+
+Anon 不上場，只有 Raana → Tomori → Soyo → Taki：
+
+```
+/maigo:review https://github.com/org/repo/pull/123    # GitHub PR（需要 gh CLI）
+/maigo:review feature/email-validation                 # 本地 branch（vs main）
+/maigo:review HEAD~3..HEAD                             # commit range
+/maigo:review                                          # 預設目前 branch vs main
+```
+
+| Stage | Agent | 做什麼 |
+|-------|-------|--------|
+| 1 | Raana | 抓 diff + 周邊 context（用 `gh pr view`、`gh pr diff` 或 `git diff`） |
+| 2 | Tomori | **寫 `/tmp/maigo/<repo>/review-rubric.md`**（不是實作計畫，是 reviewer 對照基準） |
+| 3 | Soyo | 拿 rubric 對 diff 嚴格 review |
+| 4 | Taki | checkout 變更，跑 test / lint / type check |
+
+### 為什麼需要 rubric
+
+沒有對照基準的 review = 憑感覺。
+有 rubric 後 Soyo 可以逐條對照「期待行為 / 應涵蓋 edge case / 可接受 trade-off」，
+避免「自己當下覺得不錯就 approve」這種偷懶 review。
+
+### 內部 vs 外部 PR 改法粒度
+
+| Context | Soyo 給的 must-fix |
+|---------|-------------------|
+| 內部 PR（你 own 的 code） | 具體改法 + 為什麼 |
+| 外部 PR（別人的 code） | 方向 + 為什麼；exact code 是 author 的事 |
+
+詳見 `skills/strict-review/SKILL.md` 的 "Adapting per context" 表。
+
+## 場景對照
+
+| 想做什麼 | 用哪個 |
+|---------|--------|
+| 加新 feature / 修 bug | `/maigo:go` |
+| 同上但想省牆鐘時間 | `/maigo:team` |
+| Review 同事的 PR | `/maigo:review <pr-url>` |
+| 上線前最後一道把關自己的 branch | `/maigo:review` |
+| 摸新專案 / onboarding | 直接呼叫 `Raana` |
+| 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
+| Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |
