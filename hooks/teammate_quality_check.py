@@ -17,8 +17,8 @@ def emit(decision: str, reason: str) -> None:
 
 
 def check_tomori(out: str) -> None:
-    if not re.search(r"\.maigo/(plan|review-rubric)\.md", out):
-        emit("block", "燈 (Tomori) 的輸出沒提到 .maigo/plan.md 或 .maigo/review-rubric.md。把計畫寫進檔案再回報。")
+    if not re.search(r"/tmp/maigo/[^/\s]+/(plan|review-rubric)\.md", out):
+        emit("block", "燈 (Tomori) 的輸出沒提到 /tmp/maigo/<repo>/plan.md 或 /tmp/maigo/<repo>/review-rubric.md。把計畫寫進那個檔案再回報。")
     if not re.search(r"##\s+(Goal|Steps|Rubric|Acceptance|目標|步驟|期待|對照)", out):
         emit("block", "燈 (Tomori) 的輸出缺少計畫結構（## Goal / ## Steps / ## Rubric / ## Acceptance / 目標 / 步驟）。")
     emit("approve", "燈 (Tomori) 計畫結構齊全")

@@ -28,7 +28,9 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 - **看周邊**：diff 涉及檔案的呼叫關係（被誰用、用了誰）、同檔案 / 同 module 既有的寫法慣例
 - 回報：變更摘要 + 周邊 context + 既有慣例
 
-### 2. 燈 (Tomori) — 寫 review rubric 到 `.maigo/review-rubric.md`
+### 2. 燈 (Tomori) — 寫 review rubric 到 `/tmp/maigo/<repo>/review-rubric.md`
+
+（`<repo>` = `basename "$PWD"`；目錄不存在請先 `mkdir -p`）
 
 從 PR description / commit message / linked issue / 變更本身，萃取出 reviewer 的**對照基準**：
 
@@ -56,12 +58,11 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 
 ### 3. 爽世 (Soyo) — 拿 rubric 對 diff 做嚴格 review
 
-依 `agents/Soyo.md` 的標準操作（預設 BLOCKED、8 項 checklist、要 evidence、不接受 TODO 規避）。
+依 `skills/strict-review/SKILL.md` 操作（預設 BLOCKED、9 項 checklist、要 evidence、不接受 TODO 規避）。
 
-**加碼這版的特例：**
+**這條 command 加碼：**
 - 每條 must-fix 要對應 rubric 的哪一條（acceptance / edge case / trade-off）
-- 對「不是你 own 的 code」（例：外部貢獻），改法可給「方向 + 為什麼」而非 exact 程式碼
-- 對「你 own 的 code」（內部 PR），照常給具體改法
+- 內部 / 外部 PR 改法粒度的差異，見 SKILL.md 的 "Adapting per context" 表格
 
 ### 4. 立希 (Taki) — 跑驗證
 
@@ -82,7 +83,7 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 <變更摘要 + 周邊 context 一段>
 
 ## Rubric（燈）
-<rubric 摘要——詳見 .maigo/review-rubric.md>
+<rubric 摘要——詳見 /tmp/maigo/<repo>/review-rubric.md>
 
 ## Verdict（爽世）
 APPROVE | REQUEST_CHANGES | BLOCKED
