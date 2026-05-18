@@ -4,6 +4,7 @@
 Agent 與 command 缺欄位或格式錯誤會讓 Claude Code 載不到該 agent/command，
 是最容易在 PR 階段沒人發現、上線才炸的錯誤。pre-commit 階段擋下。
 """
+
 from __future__ import annotations
 
 import sys

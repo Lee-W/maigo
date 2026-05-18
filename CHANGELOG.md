@@ -7,6 +7,32 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `LICENSE` — MIT license，著作權人 Wei Lee
+- `docs/reference/agents.md` — 五位 agent 的 model tier 選擇邏輯
+- `.gitignore` 補 Python tooling 路徑（`__pycache__/`、`*.pyc`、`.venv/`、`.pytest_cache/`、`.ruff_cache/`）
+- `CHANGELOG.md` 補 `### Planned (v0.1)` 子段（CI + tests 計畫）
+
+### Fixed
+
+- `hooks/teammate_quality_check.py`：Soyo block message 「八項」→「9 項」
+- `commands/review.md`：三處過時 `` `/maigo` `` 引用改為 `` `/maigo:go` ``
+- `docs/reference/skills.md`：移除寫死行數的脆弱行數註解，改為文字說明
+- `scripts/validate_plugin.py`：`plugin.json` 必填欄位檢查加入 `license`
+
+### Changed
+
+- `hooks/verify_completion.py`：`500` magic number 改成具名常數 `OUTPUT_TAIL_CHARS`
+- `docs/reference/hooks.md`：Stop hook 補 `### Fail-open 情況` 段
+- `docs/reference/hooks.md`：TeammateIdle 補 `### Timeout` 段（30 秒上限說明）
+- `docs/guides/contributing.md`：移除廢棄的「不主動提 Dag 概念」條目
+
+### Planned (v0.1)
+
+- GitHub Actions CI（跑 `validate_plugin.py` + `pre-commit run --all-files` + `pytest`）
+- `tests/` for hook scripts (`teammate_quality_check.py`, `verify_completion.py`) 與 validators
+
 ## [0.0.1] — 2026-05-18
 
 Initial scaffold. Plugin maps **MyGO!!!!!** members to dev roles, with focus on

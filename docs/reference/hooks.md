@@ -31,6 +31,10 @@ agent 跑完輸出送回 orchestrator 時觸發。
 - malformed input（沒 `teammate_role` 或 `teammate_output`）→ approve
 - input 不是有效 JSON → approve
 
+### Timeout
+
+30 秒上限。hook 只做 regex match，理論上毫秒級完成；30 秒為保護性上限，不應在正常情況被觸發。
+
 ### 加新規格
 
 編輯 `hooks/teammate_quality_check.py`，在 `ROLE_HANDLERS` 字典加一個新 mapping，
@@ -80,6 +84,12 @@ message 強調「這不是 test fail，是 import 錯」。
 
 預設 90 秒（hook 自身 timeout 120 秒，留 30 秒 buffer）。
 編輯 `TEST_TIMEOUT_SEC` 常數可調。
+
+### Fail-open 情況
+
+- 偵測不到任何專案類型（沒有 `uv.lock` / `pyproject.toml` / `package.json` / `Cargo.toml` / `go.mod`）→ approve（no-op）
+- `.claude/skip-test-verification` 存在 → approve 並記錄原因
+- stdin JSON 解析失敗或無 `cwd` 欄位 → fallback 到 `os.getcwd()`，照常嘗試偵測；如果偵測不到還是會 no-op approve
 
 ## 觀察 hook 行為
 

@@ -4,7 +4,7 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 
 # /maigo:review
 
-對**既有的**變更做嚴格 review。跟 `/maigo` 不同，這裡沒有實作環節——
+對**既有的**變更做嚴格 review。跟 `/maigo:go` 不同，這裡沒有實作環節——
 變更已經寫好了，要做的是**判斷它對不對**。
 
 ## 使用
@@ -101,9 +101,9 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 <一句話總結>
 ```
 
-## 與 `/maigo` 的差異
+## 與 `/maigo:go` 的差異
 
-| 項目 | `/maigo` | `/maigo:review` |
+| 項目 | `/maigo:go` | `/maigo:review` |
 |------|---------|---------------|
 | Anon 上場 | 是（核心） | 不上場 |
 | 燈的產出 | 實作計畫 (`plan.md`) | review rubric (`review-rubric.md`) |

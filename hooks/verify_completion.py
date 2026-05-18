@@ -9,6 +9,7 @@
 - `test-command` — 覆寫 test 指令（第一行非空非註解）
 - `known-test-failures` — 已知失敗名單（一行一個），不擋這些
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ import sys
 from pathlib import Path
 
 TEST_TIMEOUT_SEC = 90
+OUTPUT_TAIL_CHARS = 500  # chars to include in block message
 # Match `Foo:` with a colon to reduce false positives from incidental mentions
 FATAL_MARKER_RE = re.compile(r"\b(ImportError|ModuleNotFoundError|SyntaxError):")
 
@@ -65,7 +67,11 @@ def detect_test_command(cwd: Path) -> list[str] | None:
 def run_command(cmd: list[str], cwd: Path) -> tuple[int, str]:
     try:
         proc = subprocess.run(
-            cmd, cwd=str(cwd), capture_output=True, timeout=TEST_TIMEOUT_SEC, check=False
+            cmd,
+            cwd=str(cwd),
+            capture_output=True,
+            timeout=TEST_TIMEOUT_SEC,
+            check=False,
         )
         out = (proc.stdout + proc.stderr).decode("utf-8", errors="replace")
         return proc.returncode, out
@@ -145,9 +151,12 @@ def main() -> None:
         )
 
     if actual and not new_failures:
-        emit("approve", f"verify_completion：{len(actual)} 個失敗全在 known-test-failures 名單，放行")
+        emit(
+            "approve",
+            f"verify_completion：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
+        )
 
-    tail = output[-500:] if len(output) > 500 else output
+    tail = output[-OUTPUT_TAIL_CHARS:] if len(output) > OUTPUT_TAIL_CHARS else output
     emit(
         "block",
         f"verify_completion：`{' '.join(cmd)}` exit {exit_code}，無法 parse failure 名稱。Raw tail:\n{tail}",

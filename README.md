@@ -73,6 +73,7 @@ claude --plugin-dir /path/to/maigo
 - [Commands reference](docs/reference/commands.md) — 三個命令的完整流程、合流邏輯、場景對照
 - [Hooks reference](docs/reference/hooks.md) — TeammateIdle / Stop hook 完整行為與設定
 - [Skills reference](docs/reference/skills.md) — skill 機制與目前 catalog（`strict-review`）
+- [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
 - [CHANGELOG](CHANGELOG.md) — 版本歷史
 

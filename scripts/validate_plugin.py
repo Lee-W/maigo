@@ -12,6 +12,7 @@ Exit 0 = 全綠；Exit 1 = 至少一項失敗。
 - validate_frontmatter — 快、窄、給 pre-commit 用
 - validate_plugin     — 全面、慢一點、給 first-time install / 升版本前用
 """
+
 from __future__ import annotations
 
 import ast
@@ -70,7 +71,7 @@ def check_plugin_json() -> CheckResult:
     except json.JSONDecodeError as e:
         r.fail(f"JSON 解析失敗：{e}")
         return r
-    for key in ("name", "version", "description"):
+    for key in ("name", "version", "description", "license"):
         if not data.get(key):
             r.fail(f"缺欄位 `{key}`")
     return r
@@ -229,7 +230,9 @@ def check_skill_crossrefs() -> CheckResult:
             for m in ref_re.finditer(text):
                 skill = m.group(1)
                 if skill not in available:
-                    r.fail(f"{path.relative_to(ROOT)} 引用了不存在的 skill: skills/{skill}")
+                    r.fail(
+                        f"{path.relative_to(ROOT)} 引用了不存在的 skill: skills/{skill}"
+                    )
     return r
 
 

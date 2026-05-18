@@ -62,7 +62,6 @@ python3 scripts/validate_plugin.py
 3. **Hook 防禦深度**。重要規格在多層擋（agent prompt + skill + hook validator + Stop hook），讓 orchestrator 偷雞跳關時還有最後一道。
 4. **Artefact 寫到 `/tmp/maigo/<repo>/`**，不要污染使用者 repo。
 5. **agent 個性與 process 解耦**——人設、語氣 → agent 檔；做事方法 → skill 或 command。
-6. **不主動提 Dag 概念**（這是專案的命名 / 寫作風格決定，不寫進 prompt）。
 
 ## 專案結構
 
