@@ -1,0 +1,4 @@
+.claude/local/
+.maigo/plan.local.md
+.DS_Store
+*.log

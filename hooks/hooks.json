@@ -1,0 +1,16 @@
+{
+  "description": "Maigo 強制執行 hooks——擋住偷雞、確保各 agent 輸出符合規格。",
+  "hooks": {
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/teammate_quality_check.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
