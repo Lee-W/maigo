@@ -92,7 +92,7 @@ Maigo 在這個基礎上做了三件事：
 - 把焦點窄化到「reviewer 真的會擋」的 `strict-review` 流程
 - 簡化掉暫時用不到的元件（Graphify、personal-kb、`/analyze`、`/explain` 等）
 
-如果你需要更完整的工程級 multi-agent orchestration（含並行 review、知識圖譜整合、跨專案記憶），
+如果你需要更完整的工程級 multi-agent orchestration（含知識圖譜整合、跨專案記憶），
 直接用 agent-flow 會更合適。
 
 ## License

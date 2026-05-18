@@ -20,6 +20,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - `commands/review.md`：三處過時 `` `/maigo` `` 引用改為 `` `/maigo:go` ``
 - `docs/reference/skills.md`：移除寫死行數的脆弱行數註解，改為文字說明
 - `scripts/validate_plugin.py`：`plugin.json` 必填欄位檢查加入 `license`
+- `README.md` Acknowledgments：移除「並行 review」這項與 agent-flow 的差異描述，
+  與 `/maigo:team`（並行 Soyo + Taki）的存在矛盾
 
 ### Changed
 
