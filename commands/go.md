@@ -2,6 +2,8 @@
 description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手、爽世擋、立希驗。
 ---
 
+<!-- mkdocs-include-start -->
+
 # /maigo:go
 
 > 「It's MyGO!!!!!」——輪到我了。

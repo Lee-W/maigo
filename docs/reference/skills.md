@@ -32,7 +32,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 
 | Skill | Owner agent | Consumers | 摘要 |
 |-------|-------------|-----------|------|
-| [`strict-review`](../../skills/strict-review/SKILL.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
+| [`strict-review`](../skills/strict-review.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
 
 ## skill 檔案規格
 

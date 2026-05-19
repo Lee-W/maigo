@@ -1,0 +1,19 @@
+[project]
+name = "maigo"
+version = "0.0.1"
+description = "MyGO!!!!! 驅動的通用開發 agent flow。大家一起迷失吧。"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+
+[dependency-groups]
+dev = ["pytest>=9.0.0", "pre-commit"]
+docs = ["mkdocs-material>=9", "mkdocs-include-markdown-plugin>=6"]
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = ["-q"]
+pythonpath = ["."]
+
+[tool.uv.pip]
+# Synchroonize with scripts/ci/prek/upgrade_important_versions.py
+exclude-newer = "4 days"

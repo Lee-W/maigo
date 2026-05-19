@@ -1,0 +1,45 @@
+site_name: Maigo
+site_description: "MyGO!!!!! 驅動的通用開發 agent flow。大家一起迷失吧。"
+site_url: https://lee-w.github.io/maigo/
+repo_url: https://github.com/Lee-W/maigo
+repo_name: Lee-W/maigo
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+plugins:
+  - search
+  - include-markdown
+
+nav:
+  - Home: index.md
+  - Reference:
+      - Agents: reference/agents.md
+      - Commands: reference/commands.md
+      - Hooks: reference/hooks.md
+      - Skills: reference/skills.md
+  - Guides:
+      - Contributing: guides/contributing.md
+  - Agents (source):
+      - Raana: agents/raana.md
+      - Tomori: agents/tomori.md
+      - Anon: agents/anon.md
+      - Soyo: agents/soyo.md
+      - Taki: agents/taki.md
+  - Commands (source):
+      - /maigo:go: commands/go.md
+      - /maigo:team: commands/team.md
+      - /maigo:review: commands/review.md
+  - Skills (source):
+      - strict-review: skills/strict-review.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - toc

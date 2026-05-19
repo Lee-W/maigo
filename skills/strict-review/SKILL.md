@@ -3,6 +3,8 @@ name: strict-review
 description: This skill should be used when performing code review on a diff (whether implemented by another agent or an external PR), enforcing a strict reviewer stance, applying a mandatory 9-item checklist, demanding evidence, and giving specific改法 instead of vague critique.
 ---
 
+<!-- mkdocs-include-start -->
+
 # Strict Review
 
 **Owner Agent**: Soyo (Reviewer)

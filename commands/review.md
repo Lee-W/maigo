@@ -2,6 +2,8 @@
 description: 對 PR / branch / commit range 做嚴格 review——樂奈看 context、燈寫對照基準、爽世挑問題、立希跑 verify。愛音不上場。
 ---
 
+<!-- mkdocs-include-start -->
+
 # /maigo:review
 
 對**既有的**變更做嚴格 review。跟 `/maigo:go` 不同，這裡沒有實作環節——

@@ -91,6 +91,12 @@ maigo/
 └── README.md
 ```
 
+## 注意事項
+
+### HTML comment marker 與 agent loader
+
+Agent / command / skill source 檔內含 `<!-- mkdocs-include-start -->` HTML comment marker，用於 mkdocs include-markdown frontmatter 處理。markdown comment 不會被 render，但會出現在 Claude Code agent loader 餵給 LLM 的 system prompt 內。HTML comment 通常不影響 LLM 行為，但若日後 agent 表現異常，此處可作為調查方向之一。
+
 ## 報 bug / 提 idea
 
 issue 模板還沒寫；先寫一個簡短的 repro / 期待行為即可。

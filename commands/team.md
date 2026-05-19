@@ -2,6 +2,8 @@
 description: 跟 /maigo:go 一樣的流程，但 Soyo + Taki 並行跑。Wall-clock 省 ~30%；fallback 用 --force-sequential。
 ---
 
+<!-- mkdocs-include-start -->
+
 # /maigo:team
 
 跟 `/maigo:go` 同一條工作流，差別在最後審查 + 驗證階段**並行**。
