@@ -1,0 +1,55 @@
+name: Bump version
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump-version:
+    if: ${{ github.repository == 'Lee-W/maigo' && !startsWith(github.event.head_commit.message, 'bump:') }}
+    runs-on: ubuntu-latest
+    name: "Bump version and update CHANGELOG with commitizen"
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - id: bump
+        run: |
+          old_sha="$(git rev-parse HEAD)"
+          uv run cz --no-raise 21 bump --yes
+
+          if [ "$(git rev-parse HEAD)" = "$old_sha" ]; then
+            echo "No bump-eligible commits found, skipping release."
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
+          git push --follow-tags
+          echo "version=$(uv run cz version -p)" >> "$GITHUB_OUTPUT"
+          echo "tag=$(uv run cz version -p --tag)" >> "$GITHUB_OUTPUT"
+      - name: Build changelog excerpt for release notes
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: uv run cz changelog --dry-run "${NEW_VERSION}" > .changelog.md
+      - name: Create GitHub Release
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION_TAG: ${{ steps.bump.outputs.tag }}
+        run: gh release create "${NEW_VERSION_TAG}" --notes-file .changelog.md
