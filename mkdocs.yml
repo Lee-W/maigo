@@ -40,6 +40,7 @@ nav:
       - /maigo:retro: commands/retro.md
   - Skills (source):
       - strict-review: skills/strict-review.md
+      - airflow-aware: skills/airflow-aware.md
   - Changelog: changelog.md
 
 markdown_extensions:
