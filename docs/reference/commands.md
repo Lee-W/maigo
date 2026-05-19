@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供三個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供六個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -103,6 +103,36 @@ Orchestrator 推斷 type / name，AskUserQuestion 確認後才寫檔。
 
 → 完整 storage spec、types 說明、entry 範例：[Memory reference](memory.md)
 
+## `/maigo:memory` — 列當前跨專案記憶
+
+列出記憶層目前儲存的跨專案偏好 / 慣例 / 反饋。**read-only，不寫任何檔。**
+
+```
+/maigo:memory             # 列全部
+/maigo:memory convention  # 只列 convention type
+/maigo:memory user        # 只列 user type
+/maigo:memory feedback
+/maigo:memory reference
+```
+
+若記憶層尚未建立，會印友善訊息並引導使用者用 `/maigo:remember` 建立第一筆。
+
+→ [Memory reference](memory.md)
+
+## `/maigo:retro` — Session 結束時把學到的事存進記憶
+
+session 快結束時，`/maigo:retro` 從對話 context 撈出偏好 / 約定 / 教訓候選，**逐筆** AskUserQuestion 確認，使用者接受後寫入記憶層。
+
+**寫檔機制 reuse `/maigo:remember`**——retro spec 本身不重複寫一份 storage / rollback / 同 slug 衝突處理，全部指向 remember 的步驟 5 + 6。
+
+orchestrator 判斷兩條路徑：
+- **同 session**：直接從對話 context 撈候選，逐筆 propose。
+- **跨 session fallback**：context 不存在時先問使用者「剛剛做了什麼」，再從回覆撈候選跑同流程。
+
+→ [/maigo:remember](../commands/remember.md)
+
+→ [Memory reference](memory.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -114,3 +144,5 @@ Orchestrator 推斷 type / name，AskUserQuestion 確認後才寫檔。
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
 | Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |
+| 看現在記了什麼跨專案偏好 | `/maigo:memory` |
+| Session 結束想沉澱學到的事 | `/maigo:retro` |

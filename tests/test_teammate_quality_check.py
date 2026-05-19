@@ -153,6 +153,47 @@ class TestCheckTaki:
 
 
 # ---------------------------------------------------------------------------
+# check_anon
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAnon:
+    def _run(self, text: str, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_anon(text)
+        return json.loads(capsys.readouterr().out.strip())
+
+    def test_no_file_path_blocks(self, capsys):
+        result = self._run("改好了\n", capsys)
+        assert result["decision"] == "block"
+        assert "file path" in result["reason"] or "檔案路徑" in result["reason"]
+
+    def test_with_py_path_approves(self, capsys):
+        result = self._run("我動了 hooks/foo.py\n", capsys)
+        assert result["decision"] == "approve"
+
+    def test_with_md_path_approves(self, capsys):
+        result = self._run("更新了 docs/reference/hooks.md\n", capsys)
+        assert result["decision"] == "approve"
+
+    def test_hedge_language_does_not_block(self, capsys):
+        result = self._run(
+            "可能要先確認 X 是否需要再動。我改了 commands/retro.md\n", capsys
+        )
+        assert result["decision"] == "approve"
+
+    def test_no_memory_header_does_not_block(self, capsys):
+        result = self._run("我改了 hooks/check.py\n", capsys)
+        assert result["decision"] == "approve"
+
+    def test_url_with_md_does_not_approve(self, capsys):
+        result = self._run(
+            "詳見 https://example.com/doc.md，未改任何本地檔案\n", capsys
+        )
+        assert result["decision"] == "block"
+
+
+# ---------------------------------------------------------------------------
 # main() dispatch
 # ---------------------------------------------------------------------------
 
@@ -209,4 +250,16 @@ class TestMain:
         with pytest.raises(SystemExit):
             tqc.main()
         result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+    def test_anon_role_dispatches(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        payload = {
+            "teammate_role": "Anon",
+            "teammate_output": "我改了 hooks/teammate_quality_check.py",
+        }
+        result = run_hook_main(tqc, payload, monkeypatch, capsys)
         assert result["decision"] == "approve"

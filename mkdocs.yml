@@ -36,6 +36,8 @@ nav:
       - /maigo:team: commands/team.md
       - /maigo:review: commands/review.md
       - /maigo:remember: commands/remember.md
+      - /maigo:memory: commands/memory.md
+      - /maigo:retro: commands/retro.md
   - Skills (source):
       - strict-review: skills/strict-review.md
   - Changelog: changelog.md

@@ -23,10 +23,10 @@ agent 跑完輸出送回 orchestrator 時觸發。
 | **Taki** | `exit <number>` 模式 | 「沒貼 exit code」 |
 | **Taki** | `PASS` 或 `FAIL` 之一 | 「沒給最終 verdict」 |
 | **Taki** | **不能包含** `should work` / `looks good` / `應該可以` / `看起來沒問題` 等 hedge 語 | 「verifier 只能拿 exit code 講話」 |
+| **Anon** | 至少一個 file path reference（regex 抓 `*.py` / `*.md` / `*.yml` / `*.yaml` / `*.json` / `*.toml` / `*.txt` / `*.sh` / `*.cfg`）| 「沒看到檔案路徑 reference」 |
 
 ### 不檢查的角色
 
-- **Anon** — implementer 透過 plan 取得 context、不直接讀記憶；輸出規格較鬆，預設通過
 - 不在已知名單的角色 → 預設通過
 
 ### Fail-open 情況

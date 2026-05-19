@@ -78,6 +78,22 @@ def check_soyo(out: str) -> None:
     emit("approve", f"爽世 (Soyo) 輸出符合規格 (verdict={verdict})")
 
 
+_URL_RE = re.compile(r"https?://\S+")
+FILE_PATH_RE = re.compile(r"[\w./-]+\.(py|md|yml|yaml|json|toml|txt|sh|cfg)\b")
+
+
+def check_anon(out: str) -> None:
+    stripped = _URL_RE.sub("", out)
+    if not FILE_PATH_RE.search(stripped):
+        emit(
+            "block",
+            "愛音 (Anon) 的輸出沒看到任何檔案路徑 reference。"
+            "implementer 必須具體指出動過哪個檔，不能只回『改好了』。"
+            "格式例：`hooks/teammate_quality_check.py`、`tests/test_*.py`。",
+        )
+    emit("approve", "愛音 (Anon) 輸出含 file path reference")
+
+
 def check_taki(out: str) -> None:
     if not re.search(r"exit\s+[0-9]+", out):
         emit(
@@ -121,6 +137,9 @@ ROLE_HANDLERS = {
     "Taki": check_taki,
     "verifier": check_taki,
     "Verifier": check_taki,
+    "Anon": check_anon,
+    "implementer": check_anon,
+    "Implementer": check_anon,
 }
 
 
