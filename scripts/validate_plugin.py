@@ -22,6 +22,9 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _frontmatter import parse_frontmatter  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -40,24 +43,6 @@ class CheckResult:
     @property
     def passed(self) -> bool:
         return not self.errors
-
-
-def parse_frontmatter(text: str) -> dict[str, str] | None:
-    if not text.startswith("---\n"):
-        return None
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return None
-    body = text[4:end]
-    keys: dict[str, str] = {}
-    for line in body.splitlines():
-        if not line or line.startswith((" ", "\t")):
-            continue
-        if ":" not in line:
-            continue
-        k, _, v = line.partition(":")
-        keys[k.strip()] = v.strip()
-    return keys
 
 
 def check_plugin_json() -> CheckResult:
@@ -236,6 +221,49 @@ def check_skill_crossrefs() -> CheckResult:
     return r
 
 
+def check_version_sync() -> CheckResult:
+    """plugin.json version must equal pyproject.toml [project].version.
+
+    Commitizen bumps both via `version_files`, but a manual edit to one
+    without the other silently desyncs. This catches that.
+    """
+    r = CheckResult("plugin.json ↔ pyproject.toml version sync")
+    plugin_path = ROOT / "plugin.json"
+    pyproject_path = ROOT / "pyproject.toml"
+    if not plugin_path.is_file() or not pyproject_path.is_file():
+        r.note("plugin.json 或 pyproject.toml 不存在，跳過")
+        return r
+    try:
+        plugin_ver = json.loads(plugin_path.read_text(encoding="utf-8")).get("version")
+    except json.JSONDecodeError as exc:
+        r.fail(f"plugin.json 解析失敗：{exc}")
+        return r
+    # Minimal pyproject [project].version parser (avoid tomllib import cost for one field)
+    pyproject_ver = None
+    in_project = False
+    for line in pyproject_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_project = stripped == "[project]"
+            continue
+        if in_project and stripped.startswith("version"):
+            _, _, raw = stripped.partition("=")
+            pyproject_ver = raw.strip().strip('"').strip("'")
+            break
+    if plugin_ver is None:
+        r.fail("plugin.json 沒有 `version` 欄位")
+        return r
+    if pyproject_ver is None:
+        r.fail("pyproject.toml [project] 找不到 `version`")
+        return r
+    if plugin_ver != pyproject_ver:
+        r.fail(
+            f"版本不一致：plugin.json=`{plugin_ver}` vs "
+            f"pyproject.toml=`{pyproject_ver}`。執行 `cz bump` 或手動同步。"
+        )
+    return r
+
+
 CHECKS: list[Callable[[], CheckResult]] = [
     check_plugin_json,
     check_hooks_json,
@@ -245,6 +273,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_hook_scripts,
     check_pre_commit_config,
     check_skill_crossrefs,
+    check_version_sync,
 ]
 
 

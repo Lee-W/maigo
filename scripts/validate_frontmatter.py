@@ -10,29 +10,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _frontmatter import parse_frontmatter  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_REQUIRED = {"name", "description", "model", "tools"}
 COMMAND_REQUIRED = {"description"}
-
-
-def parse_frontmatter(text: str) -> dict[str, str] | None:
-    """Return flat key→value dict from frontmatter, or None if missing/malformed."""
-    if not text.startswith("---\n"):
-        return None
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return None
-    body = text[4:end]
-    keys: dict[str, str] = {}
-    for line in body.splitlines():
-        # Skip nested / continuation lines
-        if not line or line.startswith((" ", "\t")):
-            continue
-        if ":" not in line:
-            continue
-        k, _, v = line.partition(":")
-        keys[k.strip()] = v.strip()
-    return keys
 
 
 def check_file(path: Path, required: set[str], expect_name_match: bool) -> list[str]:

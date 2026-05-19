@@ -12,6 +12,26 @@ from tests.conftest import run_hook_main
 
 
 # ---------------------------------------------------------------------------
+# check_raana
+# ---------------------------------------------------------------------------
+
+
+class TestCheckRaana:
+    def test_with_memory_header_approves(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_raana("## Loaded memory entries\n（無相關 entry）\n")
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+    def test_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_raana("some exploration notes without header\n")
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "Loaded memory entries" in result["reason"]
+
+
+# ---------------------------------------------------------------------------
 # check_tomori
 # ---------------------------------------------------------------------------
 
@@ -31,15 +51,28 @@ class TestCheckTomori:
 
     def test_path_and_heading_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
-            tqc.check_tomori("/tmp/maigo/myrepo/plan.md\n## Goal\n## Steps\n")
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "/tmp/maigo/myrepo/plan.md\n## Goal\n## Steps\n"
+            )
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
 
     def test_chinese_headings_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
-            tqc.check_tomori("/tmp/maigo/myrepo/plan.md\n## 目標\n## 步驟\n")
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "/tmp/maigo/myrepo/plan.md\n## 目標\n## 步驟\n"
+            )
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
+
+    def test_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori("/tmp/maigo/myrepo/plan.md\n## Goal\n## Steps\n")
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "Loaded memory entries" in result["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -66,14 +99,25 @@ class TestCheckSoyo:
         assert result["decision"] == "block"
 
     def test_approved_with_checklist_approves(self, capsys):
-        result = self._run("APPROVED\n[x] all good\n[x] verified\n", capsys)
+        result = self._run(
+            "## Loaded memory entries\n（無相關 entry）\n"
+            "APPROVED\n[x] all good\n[x] verified\n",
+            capsys,
+        )
         assert result["decision"] == "approve"
 
     def test_blocked_with_checklist_and_must_fix_approves(self, capsys):
         result = self._run(
-            "BLOCKED\n[x] done\n[ ] pending\nmust-fix: broken import\n", capsys
+            "## Loaded memory entries\n（無相關 entry）\n"
+            "BLOCKED\n[x] done\n[ ] pending\nmust-fix: broken import\n",
+            capsys,
         )
         assert result["decision"] == "approve"
+
+    def test_missing_memory_header_blocks(self, capsys):
+        result = self._run("APPROVED\n[x] all good\n[x] verified\n", capsys)
+        assert result["decision"] == "block"
+        assert "Loaded memory entries" in result["reason"]
 
     def test_blocked_with_checklist_without_must_fix_blocks(self, capsys):
         result = self._run("BLOCKED\n[x] done\n[ ] pending\n", capsys)
@@ -121,7 +165,10 @@ class TestMain:
     ):
         payload = {
             "teammate_role": "Tomori",
-            "teammate_output": "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n",
+            "teammate_output": (
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n"
+            ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
         assert result["decision"] == "approve"
@@ -133,7 +180,10 @@ class TestMain:
     ):
         payload = {
             "teammate_role": "planner",
-            "teammate_output": "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n",
+            "teammate_output": (
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n"
+            ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
         assert result["decision"] == "approve"

@@ -12,8 +12,11 @@ agent 跑完輸出送回 orchestrator 時觸發。
 
 | Agent | 必須包含 | 違反時的 block message |
 |-------|---------|----------------------|
+| **Raana** | `## Loaded memory entries` 段（即使無相關 entry 也要明寫「（無相關 entry）」）| 「缺 memory 載入回報」 |
+| **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Tomori** | 提到 `/tmp/maigo/<repo>/plan.md` 或 `/tmp/maigo/<repo>/review-rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
+| **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Soyo** | verdict 字串：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED` | 「沒下 verdict」 |
 | **Soyo** | checklist 項目：`[x]` / `[X]` / `[ ]` | 「沒 checklist」 |
 | **Soyo** | 非 APPROVED 時：`must-fix` / `改法` / `evidence` / `待補` 之一 | 「擋下卻沒列 must-fix」 |
@@ -23,7 +26,7 @@ agent 跑完輸出送回 orchestrator 時觸發。
 
 ### 不檢查的角色
 
-- **Raana** / **Anon** — MVP 階段未設規格，預設通過
+- **Anon** — implementer 透過 plan 取得 context、不直接讀記憶；輸出規格較鬆，預設通過
 - 不在已知名單的角色 → 預設通過
 
 ### Fail-open 情況

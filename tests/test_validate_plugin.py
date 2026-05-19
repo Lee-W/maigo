@@ -242,6 +242,53 @@ class TestCheckPluginJsonAllMissing:
 
 
 # ---------------------------------------------------------------------------
+# check_version_sync — plugin.json ↔ pyproject.toml
+# ---------------------------------------------------------------------------
+
+
+class TestCheckVersionSync:
+    def _write(
+        self, tmp_path: Path, plugin_ver: str | None, pyproject_ver: str | None
+    ) -> None:
+        if plugin_ver is not None:
+            (tmp_path / "plugin.json").write_text(
+                json.dumps({"version": plugin_ver}), encoding="utf-8"
+            )
+        if pyproject_ver is not None:
+            (tmp_path / "pyproject.toml").write_text(
+                f'[project]\nname = "x"\nversion = "{pyproject_ver}"\n',
+                encoding="utf-8",
+            )
+
+    def test_versions_match_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(tmp_path, "1.2.3", "1.2.3")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_version_sync()
+        assert result.passed
+
+    def test_versions_differ_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(tmp_path, "1.2.3", "1.2.4")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_version_sync()
+        assert not result.passed
+        assert "1.2.3" in str(result.errors)
+        assert "1.2.4" in str(result.errors)
+
+    def test_missing_pyproject_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(tmp_path, "1.2.3", None)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_version_sync()
+        assert result.passed
+        assert any("跳過" in n for n in result.notes)
+
+
+# ---------------------------------------------------------------------------
 # main() happy-path integration (M-1)
 # ---------------------------------------------------------------------------
 

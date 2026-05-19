@@ -17,7 +17,28 @@ def emit(decision: str, reason: str) -> None:
     sys.exit(0)
 
 
+MEMORY_HEADER_RE = re.compile(r"##\s+Loaded memory entries", re.IGNORECASE)
+
+
+def require_memory_header(out: str, role_zh: str) -> None:
+    """Memory-reader agent 必須在輸出含 `## Loaded memory entries` 段。
+
+    沒有相關 entry 也要明說「（無相關 entry）」——避免 silent skip。
+    """
+    if not MEMORY_HEADER_RE.search(out):
+        emit(
+            "block",
+            f"{role_zh} 的輸出缺少 `## Loaded memory entries` 段。即使沒相關 entry，也要顯式寫出「（無相關 entry）」，不能 silent skip 跨專案記憶層。",
+        )
+
+
+def check_raana(out: str) -> None:
+    require_memory_header(out, "樂奈 (Raana)")
+    emit("approve", "樂奈 (Raana) 輸出含 memory 載入回報")
+
+
 def check_tomori(out: str) -> None:
+    require_memory_header(out, "燈 (Tomori)")
     if not re.search(r"/tmp/maigo/[^/\s]+/(plan|review-rubric)\.md", out):
         emit(
             "block",
@@ -32,6 +53,7 @@ def check_tomori(out: str) -> None:
 
 
 def check_soyo(out: str) -> None:
+    require_memory_header(out, "爽世 (Soyo)")
     verdict_match = re.search(r"\b(APPROVED|NEEDS_CHANGES|BLOCKED)\b", out)
     if not verdict_match:
         emit(
@@ -87,6 +109,9 @@ def check_taki(out: str) -> None:
 
 
 ROLE_HANDLERS = {
+    "Raana": check_raana,
+    "explorer": check_raana,
+    "Explorer": check_raana,
     "Tomori": check_tomori,
     "planner": check_tomori,
     "Planner": check_tomori,
