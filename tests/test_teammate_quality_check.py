@@ -158,7 +158,5 @@ class TestMain:
         monkeypatch.setattr("sys.stdin", io.StringIO("not json at all"))
         with pytest.raises(SystemExit):
             tqc.main()
-        import json
-
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"

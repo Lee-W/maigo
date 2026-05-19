@@ -11,8 +11,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 - `LICENSE` — MIT license，著作權人 Wei Lee
 - `docs/reference/agents.md` — 五位 agent 的 model tier 選擇邏輯
-- `.gitignore` 補 Python tooling 路徑（`__pycache__/`、`*.pyc`、`.venv/`、`.pytest_cache/`、`.ruff_cache/`）
-- `CHANGELOG.md` 補 `### Planned (v0.1)` 子段（CI + tests 計畫）
+- `.gitignore` 補 Python tooling 路徑（`__pycache__/`、`*.pyc`、`.venv/`、`.pytest_cache/`、`.ruff_cache/`、`/site/`）
+- `pyproject.toml` + `uv.lock` — uv 專案設定，`requires-python = ">=3.13"`、pytest 9 native `[tool.pytest]` 語法
+- `tests/` — pytest unit test suite（62 tests，涵蓋 `hooks/teammate_quality_check.py`、`hooks/verify_completion.py`、`scripts/validate_plugin.py`）
+- `.github/workflows/ci.yml` — uv-based CI（pre-commit + `validate_plugin.py` + pytest，單 3.13）
+- `.github/workflows/docs.yml` — Material for MkDocs build + `actions/deploy-pages` 部署
+- `mkdocs.yml`、`docs/index.md`、`docs/changelog.md` — 文件站基底（站點：<https://lee-w.github.io/maigo/>）
+- `docs/agents/*.md`、`docs/commands/*.md`、`docs/skills/strict-review.md` — include-markdown shim，把 plugin source 帶進文件站
+- 9 個 source 檔（5 agents + 3 commands + strict-review skill）加 `<!-- mkdocs-include-start -->` marker
 
 ### Fixed
 
@@ -31,11 +37,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - `docs/guides/contributing.md`：移除廢棄的「不主動提 Dag 概念」條目
 - `hooks/verify_completion.py`：`systemMessage` prefix 統一為「立希 (Taki)」，
   與 `teammate_quality_check.py` 的人設化訊息一致
-
-### Planned (v0.1)
-
-- GitHub Actions CI（跑 `validate_plugin.py` + `pre-commit run --all-files` + `pytest`）
-- `tests/` for hook scripts (`teammate_quality_check.py`, `verify_completion.py`) 與 validators
+- `README.md`：加 CI badge、Docs URL；Python prerequisites 從 `3.9+` 改為 `3.13+`（對齊 `pyproject.toml requires-python`）
 
 ## [0.0.1] — 2026-05-18
 
