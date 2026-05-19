@@ -6,13 +6,25 @@ requires-python = ">=3.13"
 license = {text = "MIT"}
 
 [dependency-groups]
-dev = ["pytest>=9.0.0", "pre-commit"]
+dev = ["pytest>=9.0.0", "pre-commit", "commitizen>=4.16"]
 docs = ["mkdocs-material>=9", "mkdocs-include-markdown-plugin>=6"]
 
 [tool.pytest]
 testpaths = ["tests"]
 addopts = ["-q"]
 pythonpath = ["."]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "uv"
+version_files = [
+  'plugin.json:"version"',
+  '.pre-commit-config.yaml:rev:.+Commitizen',
+]
+version_scheme = "semver"
+tag_format = "v$version"
+annotated_tag = true
+update_changelog_on_bump = true
 
 [tool.uv.pip]
 # Synchroonize with scripts/ci/prek/upgrade_important_versions.py

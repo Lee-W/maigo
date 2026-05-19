@@ -1,4 +1,11 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.16.2 # automatically updated by Commitizen
+    hooks:
+      - id: commitizen
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
