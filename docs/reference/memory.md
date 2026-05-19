@@ -45,6 +45,7 @@ Slug 規則：lowercase + hyphen + ASCII only。
 name: <人類可讀標題，不必跟檔名相同>
 description: <一句話，給 reader agent 判斷相關性用>
 type: user | feedback | convention | reference
+triggers: [<skill-name>, ...]   # optional；只有 type: convention 適用
 ---
 ```
 
@@ -53,6 +54,12 @@ type: user | feedback | convention | reference
 | `name` | 人類可讀標題，可以有中文、空格 |
 | `description` | 一句話摘要；reader 用這句話決定要不要讀全文 |
 | `type` | 見下方 Types 說明 |
+| `triggers` | optional；skill name list；只 `type: convention` 適用 |
+
+**`triggers` 載入行為**：Soyo 啟動時，對每個 `type: convention` entry 的 `triggers` list，
+逐一嘗試讀 `skills/<name>/SKILL.md`——存在就附加為 base 9 項 checklist 之後的 item 10+；
+不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續後續 entry。
+其他 type（`user` / `feedback` / `reference`）的 `triggers` 欄位無聲忽略。
 
 ## Types 解釋 + 範例
 
@@ -72,6 +79,25 @@ type: convention
 
 不要為了 coverage 數字用假的 mock 把 business logic 測掉。
 ```
+
+convention entry 也可以透過 `triggers` 欄位觸發額外 domain skill 載入（v1.1 新增）：
+
+```markdown
+---
+name: Airflow DAG 慣例
+description: 這個專案的 Airflow DAG 寫法與版本控制規範
+type: convention
+triggers: [review-airflow]
+---
+
+DAG 檔案放 `dags/` 目錄，每個 DAG 一個檔案。
+使用 `@dag` decorator 而非直接建立 `DAG` 物件。
+task dependency 用 `>>` operator，不用 `set_upstream/set_downstream`。
+```
+
+Soyo 載入這個 entry 時，會額外讀 `skills/review-airflow/SKILL.md`，
+把其中的 checklist 附加為 item 10+ 一起跑。
+skill 不存在 → log「triggered skill `review-airflow` 找不到，忽略」，不 crash。
 
 ### `user` — 使用者個人偏好
 

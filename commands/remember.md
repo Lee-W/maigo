@@ -50,16 +50,25 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
    - 確認 `~/.config/maigo/memory/<slug>.md` **不存在**
    - 若已存在 → 見下方「同 slug 已存在」處理
 
-5. **AskUserQuestion** 一次問完三件事：
-   - 確認或修改 **type**（列出推斷的 type 及理由）
-   - 確認或修改 **name**
-   - 要不要編輯 **body**？（預設 body = 從 input 提煉的一句話 + 原 input 當補充；使用者可直接接受或提供新版）
+5. **AskUserQuestion**：
+
+   - **共同三題（所有 type）**：
+     - 確認或修改 **type**（列出推斷的 type 及理由）
+     - 確認或修改 **name**
+     - 要不要編輯 **body**？（預設 body = 從 input 提煉的一句話 + 原 input 當補充；使用者可直接接受或提供新版）
+
+   - **第四題（僅 `type: convention`）**：
+     - 要 tag triggered skills 嗎？（optional，list，例：`review-airflow`）。預設空，直接 Enter 略過
+     - 非空 → frontmatter 加 `triggers: [...]`；空 → 不加 `triggers` 欄位
+     - 此欄位只對 `type: convention` 有效；其他 type 不詢問、不寫入
 
 6. 使用者確認後：
 
    a. `mkdir -p ~/.config/maigo/memory/`
 
    b. 寫 `~/.config/maigo/memory/<slug>.md`：
+
+      （`triggers` 行只在 `type: convention` 且使用者第四題回非空時加進 frontmatter）
 
       ```markdown
       ---
@@ -71,6 +80,12 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
       <body 內容>
       ```
 
+      若 `type: convention` 且使用者填了 triggers，在 `type:` 行後加一行：
+
+      ```markdown
+      triggers: [<skill-name>, ...]
+      ```
+
    c. 更新 `~/.config/maigo/memory/MEMORY.md`：
       - 若不存在 → 建立，含一行說明 + 第一個 entry
       - 若已存在 → append 一行 `- [<name>](<slug>.md) — <description>`
@@ -79,7 +94,7 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
 
 ## 失敗 / 中斷處理（rollback 規則）
 
-- **使用者在 AskUserQuestion 階段打斷 / 取消**：不寫任何檔（包含 MEMORY.md）；回報「未寫入，已取消」。
+- **使用者在 AskUserQuestion 階段打斷 / 取消**（包含第四題 triggered skills 詢問階段）：不寫任何檔（包含 MEMORY.md）；回報「未寫入，已取消」。
 
 - **寫 entry 檔成功但更新 MEMORY.md 失敗**：把已寫的 entry 檔 unlink，回報失敗；不留半成品（atomic-ish）。
 

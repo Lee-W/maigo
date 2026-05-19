@@ -64,6 +64,40 @@ Every review must walk through every item. Output explicitly marks `[x]` or `[ ]
 
 If any item is `[ ]`, verdict stays at NEEDS_CHANGES or BLOCKED.
 
+## Domain skill composition
+
+Base checklist（上方 9 項）是通用流程，適用所有 review。
+Domain skill 提供針對特定技術棧或專案慣例的**額外 checklist**，附加為 item 10+。
+
+### 為什麼需要 domain skill
+
+不同專案有不同的領域規範——Airflow DAG 的寫法、Commitizen 版本管理、特定框架的慣例等。
+把這些塞進 base checklist 會讓通用 process 膨脹；
+分成 domain skill 可以「按需載入」，只在相關專案跑，不影響其他 review。
+
+### 觸發機制
+
+cross-project memory entry（`type: convention`）的 frontmatter 可以帶 `triggers` 欄位：
+
+```yaml
+---
+name: Airflow DAG 慣例
+description: 這個專案的 Airflow DAG 寫法與版本控制規範
+type: convention
+triggers: [review-airflow]
+---
+```
+
+Soyo 載入該 entry 時：
+
+1. 讀 `triggers` list 的每個 `<name>`
+2. 嘗試 read `skills/<name>/SKILL.md`
+3. 存在 → 把內容附加為 item 10+，一起跑 review
+4. 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續做 base 9 項
+
+**注意**：只有 `type: convention` 的 entry 適用 `triggers`——
+`user` / `feedback` / `reference` type 的 triggers 欄位無聲忽略。
+
 ## Must-fix format: problem + specific改法 + reason
 
 Bad must-fix:
