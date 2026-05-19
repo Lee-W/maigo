@@ -75,6 +75,7 @@ claude --plugin-dir /path/to/maigo
 ## 文件
 
 - [Commands reference](docs/reference/commands.md) — 三個命令的完整流程、合流邏輯、場景對照
+- [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
 - [Hooks reference](docs/reference/hooks.md) — TeammateIdle / Stop hook 完整行為與設定
 - [Skills reference](docs/reference/skills.md) — skill 機制與目前 catalog（`strict-review`）
 - [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
@@ -96,7 +97,7 @@ Maigo 在這個基礎上做了三件事：
 - 把焦點窄化到「reviewer 真的會擋」的 `strict-review` 流程
 - 簡化掉暫時用不到的元件（Graphify、personal-kb、`/analyze`、`/explain` 等）
 
-如果你需要更完整的工程級 multi-agent orchestration（含知識圖譜整合、跨專案記憶），
+如果你需要更完整的工程級 multi-agent orchestration（含知識圖譜整合），
 直接用 agent-flow 會更合適。
 
 ## License

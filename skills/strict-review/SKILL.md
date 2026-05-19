@@ -34,6 +34,20 @@ These do **not** count as convincing:
 - "test 都過了" (test itself may be missing the case)
 - "符合 convention" (without pointing at the reference file)
 
+### Memory is input, not waiver
+
+Cross-project memory entries (`~/.config/maigo/memory/`) can inform what counts
+as a convention vs. a real bug. They cannot:
+
+- Replace any of the 9 mandatory checklist items
+- Lower the must-fix threshold ("user previously accepted X" is not evidence)
+- Override evidence demands ("user prefers Y" needs a memory entry of type
+  `convention`, not `feedback`, to count as a convention claim)
+
+If memory says "user prefers integration tests" → that's a `convention` entry;
+treat as part of checklist item 4. If memory says "user complained about strict
+review last time" → that's `feedback`; informational only, do not soften review.
+
 ## The 9-item mandatory checklist
 
 Every review must walk through every item. Output explicitly marks `[x]` or `[ ]` per item.

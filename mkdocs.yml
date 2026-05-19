@@ -22,6 +22,7 @@ nav:
       - Commands: reference/commands.md
       - Hooks: reference/hooks.md
       - Skills: reference/skills.md
+      - Memory: reference/memory.md
   - Guides:
       - Contributing: guides/contributing.md
   - Agents (source):
@@ -34,6 +35,7 @@ nav:
       - /maigo:go: commands/go.md
       - /maigo:team: commands/team.md
       - /maigo:review: commands/review.md
+      - /maigo:remember: commands/remember.md
   - Skills (source):
       - strict-review: skills/strict-review.md
   - Changelog: changelog.md

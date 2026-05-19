@@ -82,6 +82,27 @@ Anon 不上場，只有 Raana → Tomori → Soyo → Taki：
 
 詳見 `skills/strict-review/SKILL.md` 的 "Adapting per context" 表。
 
+## `/maigo:remember` — 寫入跨專案記憶
+
+把一句話的偏好 / 慣例 / 反饋存進記憶層（`~/.config/maigo/memory/`）。
+Orchestrator 推斷 type / name，AskUserQuestion 確認後才寫檔。
+
+```
+/maigo:remember <自然語言描述>
+```
+
+例：
+
+```
+/maigo:remember 以後 review 要記得我偏好 integration test 而非 mock
+/maigo:remember 我的 commit message 一律用 Conventional Commits
+```
+
+這是 Maigo 第一個需要 multi-turn 互動的命令：orchestrator 問、使用者答、確認後才寫。
+命令只動 `~/.config/maigo/memory/`，不碰 repo。
+
+→ 完整 storage spec、types 說明、entry 範例：[Memory reference](memory.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
