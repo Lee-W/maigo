@@ -159,6 +159,7 @@ message 強調「這不是 test fail，是 import 錯」。
 
 - 偵測不到任何專案類型（沒有 `uv.lock` / `pyproject.toml` / `package.json` / `Cargo.toml` / `go.mod`）→ approve（no-op）
 - `.claude/skip-test-verification` 存在 → approve 並記錄原因
+- **本次 session 無未提交的檔案修改**（read-only session）→ approve，跳過 test 驗證。偵測方式：`git status --porcelain` 回傳 exit 0 且 stdout 為空；`returncode != 0`（非 git repo 等）→ fail-open，照常跑 test
 - stdin JSON 解析失敗或無 `cwd` 欄位 → fallback 到 `os.getcwd()`，照常嘗試偵測；如果偵測不到還是會 no-op approve
 
 ## 觀察 hook 行為

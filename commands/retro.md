@@ -33,16 +33,21 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 2. **逐筆** propose（一次一筆，不要一口氣全列）：
 
    - 印一段「候選 #i / N」摘要：原始 context 引用 + orchestrator 推斷的 type / name / description。
-   - **AskUserQuestion** 問使用者：「要存這筆嗎？」選項：
-     - `存`（接受 → 進入步驟 3）
-     - `修改`（使用者調整 type / name / body 後存）
-     - `跳過`（不存，進下一筆）
-     - `結束 retro`（停止，已存的保留）
+   - **先判斷目的地**（印在摘要裡）：
+     - `個人 memory`：使用者的偏好、workflow 習慣、跨 session 記憶的事實
+     - `maigo 文件缺口`：描述的是「maigo 如何工作 / maigo 的某個慣例 / 實作規範」
+       → 應進 maigo 的 source file（例：`docs/reference/memory.md`、`CONTRIBUTING.md`），而不是寫進個人 memory
+   - 依目的地調整問法：
+     - **個人 memory** → **AskUserQuestion**「要存這筆嗎？」選項：`存` / `修改` / `跳過` / `結束 retro`
+     - **maigo 文件缺口** → **AskUserQuestion**「要更新 maigo 文件嗎？」選項：
+       `更新 maigo 文件`（orchestrator 直接 Edit 指定 source file）/ `改存 personal memory` / `跳過` / `結束 retro`
 
 3. 使用者選「存」或「修改」→ **reuse `/maigo:remember` 流程步驟 5（AskUserQuestion 確認三題）
    與步驟 6（寫檔 + 更新 MEMORY.md + rollback）**。
    觸發點：把 retro 候選當作 `/maigo:remember` 的 input 自然語言，
    從步驟 2（推斷 type）開始走，一路走完步驟 6。
+
+   使用者選「更新 maigo 文件」→ orchestrator 直接 Edit 目標 source file，完成後印「已更新 `<file>`」，不寫 memory。
 
 4. 該筆寫完 → 回到步驟 2 的下一筆候選。
 
@@ -71,6 +76,7 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 
 - **一次只 propose 一筆**——不要一次列五筆讓使用者勾選；逐筆問，使用者答完才下一筆。
   （理由：勾選 UI 鼓勵草率回答；逐筆強迫使用者真的看過。）
+- **目的地優先**——每筆 propose 前先判斷「個人 memory vs maigo 文件缺口」；把 maigo 本身的規則/慣例/實作規範存成個人 memory，是把 plugin 知識放錯地方。
 - **不延伸推斷**——只用使用者實際講過 / context 浮現的東西，不要「補充使用者可能也想存的」。
 - **不複製 `/maigo:remember` 的寫檔 spec**——指向它就好。寫檔 / index / rollback / 同 slug 處理都遵照 remember 的步驟 6 + 「失敗 / 中斷處理」段。
 - **不 delegate 給 Tomori 或 Anon**——orchestrator 自己跑。

@@ -56,6 +56,8 @@ triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
 | `type` | 見下方 Types 說明 |
 | `triggers` | optional；skill name list；只 `type: project` 適用 |
 
+> **Frontmatter 必須是扁平結構**：不支援巢狀鍵（如 `metadata.type`）。所有欄位直接放在 `---` 最上層；巢狀結構會被 parser 讀不到，`validate_memory.py` 回報 "missing field"。
+
 **`triggers` 載入行為**：Soyo 啟動時，對每個 `type: project` entry 的 `triggers` list，
 逐一嘗試讀 `skills/<name>/SKILL.md`——存在就附加為 base 9 項 checklist 之後的 item 10+；
 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續後續 entry。
