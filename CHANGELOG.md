@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.3.0 (2026-05-20)
+
+### Feat
+
+- add /maigo:fix command, pr-context-cache skill, review --mode flag
+
+### Fix
+
+- skip test verification when no uncommitted file modifications
+
 ## v0.2.0 (2026-05-20)
 
 ### Feat
