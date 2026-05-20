@@ -64,7 +64,7 @@ REPO_RULES: list[dict] = [
             },
         ],
     },
-    # 之後加 commitizen-aware、其他 project 只在這裡加條目
+    # 新增 project：在此 append 一個 dict，參見 docs/reference/hooks.md 的 Add New Project Entry
 ]
 
 # ---------------------------------------------------------------------------

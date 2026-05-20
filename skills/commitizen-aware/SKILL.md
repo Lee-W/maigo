@@ -19,7 +19,7 @@ at session start when a commitizen repo is detected.
 It mirrors and supplements the repo's own `AGENTS.md`, condensed for agent context.
 
 It can also be triggered manually via a memory entry with `triggers: [commitizen-aware]`
-(see [Memory-triggered skill loading](https://github.com/Lee-W/maigo/blob/main/docs/reference/skills.md#memory-triggered-skill-載入)).
+(see [Memory-triggered skill loading](https://github.com/Lee-W/maigo/blob/main/docs/reference/skills.md)).
 
 Once loaded, treat every convention as background — do not re-read each task.
 
