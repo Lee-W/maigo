@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.5.0 (2026-05-20)
+
+### Feat
+
+- **skills**: add commit-message skill for durable commit log style
+- **airflow-aware**: add uv.lock drift and Core/SDK symmetry rules
+
 ## v0.4.0 (2026-05-20)
 
 ### Feat
