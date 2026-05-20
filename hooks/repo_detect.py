@@ -48,6 +48,22 @@ REPO_RULES: list[dict] = [
             ),
         },
     },
+    {
+        "name": "commitizen-tools-commitizen",
+        "skill": "commitizen-aware",
+        "detectors": [
+            {"type": "git_remote", "pattern": "commitizen-tools/commitizen"},
+            {
+                "type": "file_structure",
+                "all_of": ["commitizen/__init__.py"],
+                "any_of": [
+                    "commitizen/cli.py",
+                    "commitizen/commands/__init__.py",
+                    "commitizen/bump.py",
+                ],
+            },
+        ],
+    },
     # 之後加 commitizen-aware、其他 project 只在這裡加條目
 ]
 

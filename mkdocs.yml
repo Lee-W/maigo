@@ -44,6 +44,7 @@ nav:
   - Skills (source):
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
+      - commitizen-aware: skills/commitizen-aware.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
   - Changelog: changelog.md
