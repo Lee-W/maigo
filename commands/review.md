@@ -19,9 +19,33 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 
 不給參數 → 預設 `HEAD` 對 `main`（review 你目前 branch 的所有變更）。
 
+**模式（optional）：**
+
+```
+/maigo:review --mode=design-preview <target>     # 只看設計層，不查 evidence
+/maigo:review --mode=compliance-only <target>    # 只查 convention/safety/magic/TODO/bloat
+/maigo:review <target>                            # 預設 full mode（9 項全跑）
+```
+
+| Mode | Soyo checklist | Taki 跑驗證？ | 適用場景 |
+|------|----------------|---------------|----------|
+| `full`（預設） | 9 項全跑 | ✅ | 一般 PR review |
+| `design-preview` | 只跑 1 + 4 | ❌ skip | 早期設計討論、介面預審 |
+| `compliance-only` | 只跑 4 / 5 / 6 / 7 / 8 | ✅ | 安全 audit、規範對焦 |
+
+## Mode 旗標處理
+
+Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
+- 把 mode 名稱寫進 review-rubric.md 開頭 `<!-- mode: <mode-name> -->` 註解，讓 Soyo / Taki 啟動時讀得到
+- Soyo 收到 prompt 時被明確告知 checklist subset（mirror `skills/strict-review/SKILL.md` 「Adapting per context」表的寫法——standard 9 項保持，只是把不在 subset 的項在輸出表標 `[—]` 而非 `[x]` / `[ ]`，附 reason「skipped by mode=<name>」）
+- mode = `design-preview` → 不啟動 Taki stage；最終報告 Verification 段註記「Skipped (mode=design-preview)」
+- mode = `compliance-only` → 正常啟動 Taki stage（與 full mode 相同）
+
 ## 流程
 
 ### 1. 樂奈 (Raana) — 抓變更 + 周邊 context
+
+**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：第一次 fetch 後 cache 到 `/tmp/maigo/<repo>/review-rubric.md` 開頭的 `<!-- pr-context-cache:start v1 -->` 段。後續 re-review 偵測同一段且 diff sha 未變 → 跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。
 
 - **取 diff**：
   - GitHub PR → `gh pr view <num/url> --json title,body,additions,deletions`、`gh pr diff <num/url>`
@@ -66,7 +90,11 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 - 每條 must-fix 要對應 rubric 的哪一條（acceptance / edge case / trade-off）
 - 內部 / 外部 PR 改法粒度的差異，見 SKILL.md 的 "Adapting per context" 表格
 
+**Mode-aware：** orchestrator 傳給 Soyo 的 prompt 必須明示 mode 與對應 checklist subset。Soyo 輸出 checklist 表時：mode subset 內的項照常 `[x]` / `[ ]`；不在 subset 內的項標 `[—]`，附 `skipped by mode=<name>`。
+
 ### 4. 立希 (Taki) — 跑驗證
+
+**若 mode=design-preview → 不啟動本 stage，最終報告 Verification 段標「Skipped (mode=design-preview)」。**
 
 - **checkout 變更**：
   - PR → `gh pr checkout <num/url>`

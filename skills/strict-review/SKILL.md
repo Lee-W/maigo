@@ -170,6 +170,9 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 | External PR (someone else's code) | Give direction + reason; exact code is the author's call |
 | Hotfix under deadline | Still run full checklist; document any deliberate skips in plan |
 | Test-only change | Skip items 5/7/8/9; keep 1/2/3/4/6 |
+| `/maigo:review --mode=design-preview` | Run items 1 + 4 only; mark 2/3/5/6/7/8/9 as `[—]` with reason `skipped by mode=design-preview` |
+| `/maigo:review --mode=compliance-only` | Run items 4/5/6/7/8; mark 1/2/3/9 as `[—]` with reason `skipped by mode=compliance-only` |
+| `/maigo:fix` (quick-fix mode) | Run items 1/4/5/7; mark 2/3/6/8/9 as `[—]` with reason `skipped by mode=quick-fix` |
 
 ## What this skill does NOT cover
 

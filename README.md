@@ -11,7 +11,7 @@ Docs: https://lee-w.github.io/maigo/
 Maigo 是一套以 **MyGO!!!!!** 五位團員為人設的多 agent 通用開發工作流（Claude Code plugin）。
 
 工程師日常都是迷子——debug 卡關、refactor 找不到入口、PR 不知道該怎麼拆。
-Maigo 把五位團員的性格特質映射到開發角色，讓你即使迷路也能被帶回正軌。
+Maigo 把五位團員的性格特質映射到開發角色，讓你即使迷失也能被帶回正軌。
 
 ## 角色映射
 
