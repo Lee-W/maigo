@@ -74,17 +74,14 @@ claude --plugin-dir /path/to/maigo
 
 ## 文件
 
+- [Getting Started](docs/guides/getting-started.md) — 第一次裝 Maigo 的 5 分鐘入門
 - [Commands reference](docs/reference/commands.md) — 三個命令的完整流程、合流邏輯、場景對照
 - [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
-- [Hooks reference](docs/reference/hooks.md) — TeammateIdle / Stop hook 完整行為與設定
+- [Hooks reference](docs/reference/hooks.md) — SessionStart / TeammateIdle / Stop hook 完整行為與設定
 - [Skills reference](docs/reference/skills.md) — skill 機制與目前 catalog（`strict-review`）
 - [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
 - [CHANGELOG](CHANGELOG.md) — 版本歷史
-
-## Status
-
-`v0.0.1` — 初始骨架。歡迎一起迷路。
 
 ## Acknowledgments
 
