@@ -72,7 +72,7 @@ Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 convention entry 時
 詳見 [`memory.md` frontmatter schema](memory.md#entry-frontmatter-schema) 與
 [`strict-review/SKILL.md` Domain skill composition 段](../skills/strict-review.md#domain-skill-composition)。
 
-## 加新 skill 的 checklist
+## Add New Skill Checklist
 
 1. `mkdir skills/<new-name>/`
 2. 寫 `skills/<new-name>/SKILL.md`（記得 frontmatter `name` 跟目錄名一樣）

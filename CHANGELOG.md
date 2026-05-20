@@ -5,6 +5,14 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Feat
+
+- add /maigo:describe-pr command + github-title-description skill
+- add repo-detect SessionStart hook + airflow-aware contributor skill
+- add Anon hook check + /maigo:memory + /maigo:retro
+- add domain skill composition mechanism
 
 Initial scaffold. Plugin maps **MyGO!!!!!** members to dev roles, with focus on
 a genuinely strict reviewer (Soyo).

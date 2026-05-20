@@ -20,6 +20,7 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 | 改 hook 行為 | `hooks/<name>.py` |
 | 加 hook | 寫 script + 在 `hooks/hooks.json` 註冊 |
 | 加 skill | 見 [skills.md](../reference/skills.md) 的「加新 skill checklist」 |
+| 為某個 project 加自動載入知識（project-aware） | 兩步：在 `hooks/repo_detect.py` 的 `REPO_RULES` 加 entry + 建對應 `skills/<name>/SKILL.md`。詳見 [hooks.md 加新 project entry](../reference/hooks.md#add-new-project-entry) |
 
 ## 提交前
 

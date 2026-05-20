@@ -24,6 +24,7 @@ nav:
       - Skills: reference/skills.md
       - Memory: reference/memory.md
   - Guides:
+      - Getting Started: guides/getting-started.md
       - Contributing: guides/contributing.md
   - Agents (source):
       - Raana: agents/raana.md

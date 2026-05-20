@@ -1,7 +1,74 @@
 # Hooks Reference
 
-Maigo 註冊兩個 hook，定義在 `hooks/hooks.json`。
+Maigo 註冊三個 hook，定義在 `hooks/hooks.json`。
 只要 plugin 載入就自動生效，使用者不用設定。
+
+## SessionStart — `hooks/repo_detect.py`
+
+session 開啟時觸發。偵測目前 repo 是否命中已知 project，若命中就 emit
+systemMessage 要求 agent 載入對應的 project-aware skill；未命中則 silent
+approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo 的慣例知識
+（命名、測試模式、PR 規範等），不用使用者手動引用。
+
+### 偵測流程
+
+1. 讀 stdin JSON 取 `cwd`（缺欄位 → fallback `os.getcwd()`）
+2. 對 `REPO_RULES` 內每個 rule，依序跑其 `detectors`
+3. **任一** detector 命中即視為 rule 命中（OR 邏輯）
+4. 命中 → emit `approve` + systemMessage（要求載入 `skills/<skill>/SKILL.md`）
+5. 全部未命中 → emit `approve` + 空 systemMessage（silent）
+
+### 目前 registry
+
+| Project | Skill | Detector 條件 |
+|---------|-------|--------------|
+| `apache-airflow` | `airflow-aware` | git remote 含 `apache/airflow`，**或** `airflow/__init__.py` 存在且 `airflow/models/dag.py` / `airflow/dag.py` 至少有一個 |
+
+### Detector 類型
+
+| `type` | 參數 | 命中條件 |
+|--------|------|---------|
+| `git_remote` | `pattern: <substring>` | `git config --get remote.origin.url` 輸出含 `pattern` |
+| `file_structure` | `all_of: [paths]` / `any_of: [paths]` | `all_of` 全部存在 **且**（若有 `any_of`）至少一個存在 |
+
+### Fail-open 情況
+
+- stdin JSON 解析失敗 → 視為空 dict，仍 fallback `os.getcwd()` 繼續跑
+- 個別 detector 拋例外（`subprocess.TimeoutExpired` / `FileNotFoundError` / `OSError`）→ skip 該 detector，繼續下一個
+- 個別 rule `match_rule` 拋例外 → skip 該 rule，繼續下一個
+- 頂層 unhandled exception → stderr 印一行，emit 空 approve
+
+### Timeout
+
+5 秒上限（`hooks/hooks.json` 設定），單個 git subprocess 內部另設 3 秒上限
+（`GIT_TIMEOUT_SEC`）。偵測都是本機檔案或 git config 讀取，毫秒級完成；5 秒
+為保護性上限。
+
+### Add New Project Entry
+
+擴充偵測範圍走兩步：
+
+1. **加 registry entry** — 編輯 `hooks/repo_detect.py` 的 `REPO_RULES` list，
+   append 一個 dict：
+   ```python
+   {
+       "name": "<project-name>",
+       "skill": "<skill-name>",  # 對應 skills/<skill-name>/SKILL.md
+       "detectors": [
+           {"type": "git_remote", "pattern": "<org>/<repo>"},
+           # 可選：加 file_structure detector 當備援
+           {"type": "file_structure",
+            "all_of": ["<sentinel-file>"],
+            "any_of": ["<alt-file-1>", "<alt-file-2>"]},
+       ],
+   }
+   ```
+2. **建對應 skill** — 依 [skills.md 加新 skill 的 checklist](skills.md#add-new-skill-checklist) 建 `skills/<skill-name>/SKILL.md`。
+   skill 內容定位為「knowledge layer」（contributor 慣例），參考 `skills/airflow-aware/SKILL.md` 結構：
+   開頭寫 `**Loaded by**: repo-detect hook (SessionStart) when <project> is detected`，
+   後接 When to apply / 命名 / 環境 / 測試 / PR 等子段。
+
+完成後跑 `python3 scripts/validate_plugin.py` 確認 skill cross-ref 通過（check #8 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。
 
 ## TeammateIdle — `hooks/teammate_quality_check.py`
 
