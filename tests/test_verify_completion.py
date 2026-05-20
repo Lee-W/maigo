@@ -153,6 +153,66 @@ class TestDetectTestCommand:
 
 
 # ---------------------------------------------------------------------------
+# has_git_modifications
+# ---------------------------------------------------------------------------
+
+
+class TestHasGitModifications:
+    def test_clean_repo_returns_false(self, tmp_path: Path):
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=tmp_path,
+            capture_output=True,
+            env={
+                **__import__("os").environ,
+                "GIT_AUTHOR_NAME": "t",
+                "GIT_AUTHOR_EMAIL": "t@t",
+                "GIT_COMMITTER_NAME": "t",
+                "GIT_COMMITTER_EMAIL": "t@t",
+            },
+        )
+        assert verify_completion.has_git_modifications(tmp_path) is False
+
+    def test_untracked_file_returns_true(self, tmp_path: Path):
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
+        (tmp_path / "new.py").write_text("x = 1")
+        assert verify_completion.has_git_modifications(tmp_path) is True
+
+    def test_staged_file_returns_true(self, tmp_path: Path):
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
+        f = tmp_path / "f.py"
+        f.write_text("x = 1")
+        subprocess.run(["git", "add", "f.py"], cwd=tmp_path, capture_output=True)
+        assert verify_completion.has_git_modifications(tmp_path) is True
+
+    def test_non_git_dir_fails_open(self, tmp_path: Path):
+        # tmp_path has no git repo → git status fails → fail-open (True)
+        assert verify_completion.has_git_modifications(tmp_path) is True
+
+    def test_git_not_found_fails_open(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        import subprocess
+
+        original_run = subprocess.run
+
+        def raise_not_found(*args, **kwargs):
+            if args and args[0][0] == "git":
+                raise FileNotFoundError
+            return original_run(*args, **kwargs)
+
+        monkeypatch.setattr(subprocess, "run", raise_not_found)
+        assert verify_completion.has_git_modifications(tmp_path) is True
+
+
+# ---------------------------------------------------------------------------
 # main() integration
 # ---------------------------------------------------------------------------
 

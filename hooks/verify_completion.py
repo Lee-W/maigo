@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 TEST_TIMEOUT_SEC = 90
+GIT_TIMEOUT_SEC = 5
 OUTPUT_TAIL_CHARS = 500  # chars to include in block message
 # Match `Foo:` with a colon to reduce false positives from incidental mentions
 FATAL_MARKER_RE = re.compile(r"\b(ImportError|ModuleNotFoundError|SyntaxError):")
@@ -30,6 +31,26 @@ def emit(decision: str, reason: str) -> None:
     payload = {"decision": decision, "reason": reason, "systemMessage": reason}
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
     sys.exit(0)
+
+
+def has_git_modifications(cwd: Path) -> bool:
+    """Return True if there are uncommitted changes (staged, unstaged, or untracked).
+
+    Fail-open: returns True on any error so tests still run when uncertain.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(cwd),
+            capture_output=True,
+            timeout=GIT_TIMEOUT_SEC,
+            check=False,
+        )
+        if result.returncode != 0:
+            return True  # not a git repo or other error — fail-open
+        return bool(result.stdout.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return True
 
 
 def read_config_line(path: Path) -> str | None:
@@ -116,6 +137,9 @@ def main() -> None:
 
     cwd = Path(data.get("cwd") or os.getcwd()).resolve()
     claude_dir = cwd / ".claude"
+
+    if not has_git_modifications(cwd):
+        emit("approve", "立希 (Taki)：本次 session 無未提交的檔案修改，跳過 test 驗證")
 
     skip_reason = read_config_line(claude_dir / "skip-test-verification")
     if skip_reason is not None:
