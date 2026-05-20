@@ -164,6 +164,65 @@ class TestRepoDetect:
         result = _run({"cwd": str(tmp_path)}, monkeypatch, capsys)
         assert result["decision"] == "approve"
 
+    def test_airflow_seeds_skip_test_verification(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path: Path,
+    ):
+        """偵測到 airflow → 寫 .claude/skip-test-verification 並在 message 提及。"""
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **kw: _fake_git_result("https://github.com/apache/airflow.git"),
+        )
+        result = _run({"cwd": str(tmp_path)}, monkeypatch, capsys)
+
+        seeded = tmp_path / ".claude" / "skip-test-verification"
+        assert seeded.is_file()
+        content = seeded.read_text(encoding="utf-8")
+        # First non-comment line is what verify_completion reads as the skip reason
+        first_payload = next(
+            line for line in content.splitlines() if line.strip() and not line.startswith("#")
+        )
+        assert "airflow" in first_payload.lower()
+        assert ".claude/skip-test-verification" in result["systemMessage"]
+
+    def test_airflow_seeds_do_not_overwrite_existing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path: Path,
+    ):
+        """已存在的 .claude/skip-test-verification 不會被覆寫，message 也不提它。"""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = claude_dir / "skip-test-verification"
+        existing.write_text("user-custom reason\n", encoding="utf-8")
+
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **kw: _fake_git_result("https://github.com/apache/airflow.git"),
+        )
+        result = _run({"cwd": str(tmp_path)}, monkeypatch, capsys)
+
+        assert existing.read_text(encoding="utf-8") == "user-custom reason\n"
+        assert "skip-test-verification" not in result["systemMessage"]
+        assert "airflow-aware" in result["systemMessage"]
+
+    def test_non_airflow_repo_does_not_seed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path: Path,
+    ):
+        """非 airflow repo 不會建立 .claude/ 或寫入任何種子檔。"""
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **kw: _fake_git_result("https://github.com/some/other-repo.git"),
+        )
+        _run({"cwd": str(tmp_path)}, monkeypatch, capsys)
+        assert not (tmp_path / ".claude" / "skip-test-verification").exists()
+
 
 # ---------------------------------------------------------------------------
 # Fake subprocess helpers

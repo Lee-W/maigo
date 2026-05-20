@@ -43,7 +43,7 @@ This skill is an onramp — a condensed version of `AGENTS.md` formatted for age
 It is not a replacement. Any time a convention here conflicts with what `AGENTS.md` says,
 follow `AGENTS.md`. See the [Read AGENTS.md first](#read-agentsmd-first) section above.
 
-### 2. Naming — Dag (prose) vs DAG (code)
+### 2. Naming — Dag (prose) vs `DAG` (code)
 
 In **prose and documentation**, use `Dag` (title case): "the Dag will run at midnight".
 
@@ -81,6 +81,16 @@ prek run --all-files
 Scratch scripts go in `dev/` — not in repo root or `scripts/`.
 
 Note: `prek` is the runner currently specified by upstream. It is compatible with the same hooks as `pre-commit`.
+
+#### `verify_completion` in this repo
+
+`repo_detect` writes `.claude/skip-test-verification` on first detection so the
+Stop-hook does not try to run a host-side `uv run pytest` (which pulls `jpype1`
+→ cmake `FindJava` and fails on machines without a JDK; the 90s timeout also
+cannot cover any Airflow subproject's suite). To re-enable verification for a
+focused area, delete that file or replace it with a targeted
+`.claude/test-command` such as
+`uv run --project airflow-core pytest tests/unit/<path>/test_<file>.py`.
 
 ### 4. Code style — Ruff + Mypy
 

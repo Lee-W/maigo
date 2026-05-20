@@ -31,6 +31,22 @@ REPO_RULES: list[dict] = [
             },
         ],
         # "match" 欄位目前被忽略；match_rule 固定跑「任一 detector 命中即觸發」邏輯
+        #
+        # claude_config_seeds：偵測命中時 write-once 進 .claude/。檔案若已存在
+        # 不會覆寫，使用者隨時可手動編輯或刪除以改變行為。Airflow 預設跳過
+        # verify_completion 的 test 驗證，因為 host 端無法跑（要 Breeze container
+        # 或 `uv run --project <PROJECT> pytest <PATH>`），而 hook 90s timeout
+        # 也不夠 Airflow 任何 subproject 的 test suite 跑完。
+        "claude_config_seeds": {
+            "skip-test-verification": (
+                "# Auto-written by maigo repo_detect for apache/airflow.\n"
+                "# Airflow tests run via Breeze or `uv run --project <PROJECT> pytest <PATH>`;\n"
+                "# bare `uv run pytest` on the host pulls jpype1 → cmake FindJava and fails.\n"
+                "# To re-enable verification, delete this file or replace with a targeted\n"
+                "# command in .claude/test-command (e.g. `uv run --project airflow-core pytest tests/unit/...`).\n"
+                "airflow checkout: run tests manually via Breeze or `uv run --project <PROJECT>`\n"
+            ),
+        },
     },
     # 之後加 commitizen-aware、其他 project 只在這裡加條目
 ]
@@ -116,6 +132,32 @@ def match_rule(cwd: str, rule: dict) -> tuple[bool, str]:
     return False, ""
 
 
+def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
+    """Write seed files into .claude/ if absent. Return list of newly-written filenames.
+
+    Never overwrites — once a file exists (user-edited or written by a prior session)
+    it is treated as authoritative.
+    """
+    written: list[str] = []
+    if not seeds:
+        return written
+    claude_dir = Path(cwd) / ".claude"
+    try:
+        claude_dir.mkdir(exist_ok=True)
+    except OSError:
+        return written
+    for name, content in seeds.items():
+        target = claude_dir / name
+        if target.exists():
+            continue
+        try:
+            target.write_text(content, encoding="utf-8")
+            written.append(name)
+        except OSError:
+            continue
+    return written
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -139,11 +181,15 @@ def main() -> None:
             if matched:
                 name = rule["name"]
                 skill = rule["skill"]
+                written = seed_claude_config(cwd, rule.get("claude_config_seeds", {}))
                 msg = (
                     f"偵測到 {name} repo（依據：{detector_desc}）。"
                     f"請讀取 skills/{skill}/SKILL.md，"
                     f"本 session 內執行任何 skill 時套用其中的慣例。"
                 )
+                if written:
+                    files = ", ".join(f".claude/{f}" for f in written)
+                    msg += f" 已寫入 {files}（要覆寫請手動編輯）。"
                 emit("approve", msg)
 
         # No rule matched — silent approve
