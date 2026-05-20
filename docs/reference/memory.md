@@ -181,8 +181,52 @@ spec: https://www.conventionalcommits.org/
 |------|------|
 | `/maigo:remember` | orchestrator 互動式命令，推斷 type / name、確認後寫檔 |
 | 手改 | 直接編輯 `~/.config/maigo/memory/` 內的 markdown 檔案 |
+| `## Memory propose`（Soyo / Anon） | agent 在 turn 末 propose；orchestrator 確認後才寫 |
 
-**Agent 不自動寫 memory**（v0 設計決策）。
+**Agent 不自動寫 memory**——只能 propose；寫入仍由 orchestrator + user confirm 觸發（v1）。
+
+### v1 propose（Soyo / Anon 即時 propose）
+
+Soyo 或 Anon 在 turn 輸出末尾加 `## Memory propose` 段，格式如下：
+
+```markdown
+## Memory propose
+
+- **type**: feedback | project | user | reference
+- **name**: <人類可讀標題，短，例：「Review 說明精簡偏好」>
+- **slug**: <lowercase-hyphen-ascii，例：review-explanation-concise>
+- **description**: <一句話，給 MEMORY.md index 用>
+- **body**: <entry 正文；可多行>
+- **rationale**: <為什麼現在 propose——觸發這筆 propose 的 context 一句話>
+```
+
+**欄位規則：**
+
+| 欄位 | 必填 | 規則 |
+|------|------|------|
+| `type` | 是 | 四選一；agent 依啟發式判斷，不確定時選最可能的並在 rationale 說明 |
+| `name` | 是 | 中文或英文皆可；短但可讀 |
+| `slug` | 是 | lowercase + hyphen + ASCII only |
+| `description` | 是 | 一句話；給 reader 決定要不要讀全文用 |
+| `body` | 是 | entry 正文；可多行 |
+| `rationale` | 是 | 讓 orchestrator / 使用者判斷「這筆 propose 合不合理」的 context |
+
+**每 turn 最多 propose 1 筆**——不允許一次出現兩個 `## Memory propose` 段。
+
+**propose ≠ 寫入**：propose 段出現後，orchestrator 跑 confirm flow，使用者確認後才寫。agent 輸出 propose 段不等於記憶已存。
+
+**格式範例**（`type: feedback` 典型情境）：
+
+```markdown
+## Memory propose
+
+- **type**: feedback
+- **name**: Review 說明精簡偏好
+- **slug**: review-explanation-concise
+- **description**: 使用者偏好 must-fix 說明精簡、抓重點，不要長篇大論
+- **body**: Review 輸出的 must-fix 說明文字要精簡。「為什麼」抓重點即可，不要寫一大段。
+- **rationale**: 使用者在這個 review 回合說「說明可以短一點」，是可複用的偏好信號
+```
 
 ## 載入語意
 

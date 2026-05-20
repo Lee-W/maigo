@@ -80,6 +80,11 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 - **不延伸推斷**——只用使用者實際講過 / context 浮現的東西，不要「補充使用者可能也想存的」。
 - **不複製 `/maigo:remember` 的寫檔 spec**——指向它就好。寫檔 / index / rollback / 同 slug 處理都遵照 remember 的步驟 6 + 「失敗 / 中斷處理」段。
 - **不 delegate 給 Tomori 或 Anon**——orchestrator 自己跑。
+- **即時 propose vs retro 的關係**：Soyo / Anon 即時 propose 是前置網；
+  retro 是 catch-all 後置網。即使這個 session 已用過即時 propose，retro 仍應照常跑——
+  即時 propose 只抓當下明確信號，retro 還能補抓沒講清楚的。
+  retro 跑到與即時 propose 重複的候選時，正常展示 MEMORY.md index，
+  由使用者眼睛判斷是否重複；orchestrator 不做 keyword dedup。
 
 → 寫檔細節：[/maigo:remember](https://github.com/Lee-W/maigo/blob/main/commands/remember.md)
 

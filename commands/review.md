@@ -147,3 +147,6 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 - 爽世的 verdict 不因為「author 是大佬」放水
 - 立希拒絕「CI 已綠就不跑」，本地至少要重跑 lint/type
 - 你（orchestrator）不要自己 review，每個 agent 都用 Task tool 啟動
+- Soyo 的 review 輸出若含 `## Memory propose`，
+  把 review report 完整呈現給使用者後再觸發 confirm flow；
+  不要在使用者讀完 report 之前插入確認問題。
