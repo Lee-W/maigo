@@ -182,7 +182,9 @@ class TestRepoDetect:
         content = seeded.read_text(encoding="utf-8")
         # First non-comment line is what verify_completion reads as the skip reason
         first_payload = next(
-            line for line in content.splitlines() if line.strip() and not line.startswith("#")
+            line
+            for line in content.splitlines()
+            if line.strip() and not line.startswith("#")
         )
         assert "airflow" in first_payload.lower()
         assert ".claude/skip-test-verification" in result["systemMessage"]
