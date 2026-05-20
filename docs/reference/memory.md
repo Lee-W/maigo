@@ -44,8 +44,8 @@ Slug 規則：lowercase + hyphen + ASCII only。
 ---
 name: <人類可讀標題，不必跟檔名相同>
 description: <一句話，給 reader agent 判斷相關性用>
-type: user | feedback | convention | reference
-triggers: [<skill-name>, ...]   # optional；只有 type: convention 適用
+type: user | feedback | project | reference
+triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
 ---
 ```
 
@@ -54,16 +54,20 @@ triggers: [<skill-name>, ...]   # optional；只有 type: convention 適用
 | `name` | 人類可讀標題，可以有中文、空格 |
 | `description` | 一句話摘要；reader 用這句話決定要不要讀全文 |
 | `type` | 見下方 Types 說明 |
-| `triggers` | optional；skill name list；只 `type: convention` 適用 |
+| `triggers` | optional；skill name list；只 `type: project` 適用 |
 
-**`triggers` 載入行為**：Soyo 啟動時，對每個 `type: convention` entry 的 `triggers` list，
+**`triggers` 載入行為**：Soyo 啟動時，對每個 `type: project` entry 的 `triggers` list，
 逐一嘗試讀 `skills/<name>/SKILL.md`——存在就附加為 base 9 項 checklist 之後的 item 10+；
 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續後續 entry。
 其他 type（`user` / `feedback` / `reference`）的 `triggers` 欄位無聲忽略。
 
 ## Types 解釋 + 範例
 
-### `convention` — 跨專案共用慣例
+> **Note**: v0 的 spec 原本有 `convention` type；實際使用中發現 `project` 更能表達語意
+> （跨專案共用的 per-project 慣例），故從 v0.1 起 enum 改為 `project`。
+> 舊 entry 若仍使用 `type: convention`，validator 會發出 schema warn。
+
+### `project` — 跨專案共用慣例
 
 可被 reviewer（Soyo）用來判斷對錯。
 
@@ -71,7 +75,7 @@ triggers: [<skill-name>, ...]   # optional；只有 type: convention 適用
 ---
 name: Integration test 偏好
 description: 偏好用 integration test 驗行為，而非大量 unit mock
-type: convention
+type: project
 ---
 
 寫測試時，優先用 integration test 驗端到端行為。
@@ -80,13 +84,13 @@ type: convention
 不要為了 coverage 數字用假的 mock 把 business logic 測掉。
 ```
 
-convention entry 也可以透過 `triggers` 欄位觸發額外 domain skill 載入（v1.1 新增）：
+project entry 也可以透過 `triggers` 欄位觸發額外 domain skill 載入（v1.1 新增）：
 
 ```markdown
 ---
 name: Airflow DAG 慣例
 description: 這個專案的 Airflow DAG 寫法與版本控制規範
-type: convention
+type: project
 triggers: [review-airflow]
 ---
 
@@ -159,8 +163,8 @@ spec: https://www.conventionalcommits.org/
 | Agent | 為什麼讀 |
 |-------|---------|
 | **Raana** | 探索時帶入使用者慣例，找更對的東西 |
-| **Tomori** | 寫計畫時把相關 `convention` / `user` entry 內嵌進 plan |
-| **Soyo** | review 時把 `convention` entry 當作 checklist item 4 的判斷依據 |
+| **Tomori** | 寫計畫時把相關 `project` / `user` entry 內嵌進 plan |
+| **Soyo** | review 時把 `project` entry 當作 checklist item 4 的判斷依據 |
 
 ### Non-readers（有意設計）
 
@@ -194,12 +198,55 @@ Reader agent 啟動時：
 - `MEMORY.md` 不存在或是空的
 - index 裡沒有任何跟當前 task 相關的 entry
 
+## Validation
+
+Memory entry 的 schema 採「warn-not-block」策略——schema 錯誤只 warn，不阻止 agent 工作。
+有兩層 validation 機制：
+
+### 1. `validate_memory.py`（手動跑）
+
+[`python3 scripts/validate_memory.py`](https://github.com/Lee-W/maigo/blob/main/scripts/validate_memory.py)
+掃描 cross-project（`~/.config/maigo/memory/`）與 project-specific（`~/.claude/projects/*/memory/`）
+兩個來源，逐一檢查 entry frontmatter：
+
+- 缺 `name` / `description` / `type` → warning
+- `type` 不在 `{user, feedback, project, reference}` → warning
+- unknown key（如 `originSessionId`）→ 完全忽略，不 warn
+
+輸出範例：
+
+```
+## Cross-project memory: /Users/you/.config/maigo/memory
+  ! some-entry.md: missing field: `type`
+  ! old-entry.md: type=`convention` not in {feedback, project, reference, user}
+
+## Project memory (-Users-you-my-project): /Users/you/.claude/projects/-Users-you-my-project/memory
+  ✓ 3 entries passed schema check
+```
+
+加 `--strict` flag 時，有任何 warning 則 exit 1（給 CI / power user 用）。
+
+### 2. Reader agent inline warn
+
+Raana、Tomori、Soyo 在載入每個 entry 後做最小 schema 自檢。遇到問題不 abort，
+繼續使用該 entry，但在 `## Loaded memory entries` 輸出段該行末尾加 `[schema warn: ...]`：
+
+```
+## Loaded memory entries
+- [Integration test 偏好](integration-test-preference.md) — 已載入
+- [Some entry](some-entry.md) — 已載入 [schema warn: 缺 type]
+```
+
+這讓使用者在 agent 工作輸出裡馬上看到問題，自己決定要不要修。
+
 ## What v0 doesn't do
 
-- **沒有 validator**——schema 鬆，使用者手改也沒問題
+- **Lazy validator only**——[`scripts/validate_memory.py`](https://github.com/Lee-W/maigo/blob/main/scripts/validate_memory.py)
+  只 warn 不 block；reader agent 載入 entry 時遇到 schema 不符也只在輸出標 `[schema warn: ...]`。
+  沒有 strict mode 預設啟用、沒有 pre-commit hook。
 - **Agent 不自動寫 memory**——只有 `/maigo:remember` 和手改
 - **不做語意搜尋、不做 embedding**——純粹靠 description keyword / 主題 overlap
 - **不跨機器同步**——使用者自行用 dotfiles / git 管理 `~/.config/maigo/memory/`
 - **Memory 不會讓 Soyo 放水**——記憶是 input，不是 waiver；
-  `feedback` type 不降低標準，`convention` type 才算 convention claim。
+  `feedback` type 不降低標準，`project` type 才算 convention claim。
   見 [Memory is input, not waiver](../skills/strict-review.md#memory-is-input-not-waiver)
