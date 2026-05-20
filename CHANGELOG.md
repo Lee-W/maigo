@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.4.0 (2026-05-20)
+
+### Feat
+
+- auto-skip test verification in apache/airflow checkouts
+
 ## v0.3.0 (2026-05-20)
 
 ### Feat
