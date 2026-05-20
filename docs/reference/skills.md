@@ -34,6 +34,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 |-------|-------------|-----------|------|
 | [`strict-review`](../skills/strict-review.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
 | [`airflow-aware`](../skills/airflow-aware.md) | — (知識層) | 任何 skill（在 apache-airflow contributor checkout 時由 repo-detect hook 自動載入） | Airflow contributor 慣例：命名（Dag/DAG）、Breeze/uv 環境、Ruff/Mypy 風格、coding rules、pytest patterns、PR hygiene |
+| [`github-title-description`](../skills/github-title-description.md) | — (orchestrator 直跑) | `/maigo:describe-pr` | 從 branch commits / diff 產 user-impact PR title + Summary / Motivation / Test plan |
 
 ## skill 檔案規格
 

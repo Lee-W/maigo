@@ -133,6 +133,21 @@ orchestrator 判斷兩條路徑：
 
 → [Memory reference](memory.md)
 
+## `/maigo:describe-pr` — 產 GitHub PR title + description
+
+從當前 branch 的 commits / diff 產出 PR 草稿（user-impact title + Summary / Motivation / Test plan）。
+Orchestrator 直跑，套 `github-title-description` skill。**read-only，不寫檔、不開 PR。**
+
+```
+/maigo:describe-pr                    # base 預設 main
+/maigo:describe-pr --base develop
+```
+
+PR title **不套** conventional commits 格式（user-impact 句子就好）；
+即使 repo 用 commitizen，那只影響 commit message，不影響 PR title。
+
+→ Skill: [github-title-description](../skills/github-title-description.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -141,6 +156,7 @@ orchestrator 判斷兩條路徑：
 | 同上但想省牆鐘時間 | `/maigo:team` |
 | Review 同事的 PR | `/maigo:review <pr-url>` |
 | 上線前最後一道把關自己的 branch | `/maigo:review` |
+| 寫 PR title / description | `/maigo:describe-pr` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
 | Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |

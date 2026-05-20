@@ -19,7 +19,7 @@ at session start when an Apache Airflow repo is detected.
 It mirrors and supplements the repo's own `AGENTS.md` / `CLAUDE.md`, condensed for agent context.
 
 It can also be triggered manually via a memory entry with `triggers: [airflow-aware]`
-(see [Memory-triggered skill loading](../reference/skills.md#memory-triggered-skill-載入)).
+(see [Memory-triggered skill loading](https://github.com/Lee-W/maigo/blob/main/docs/reference/skills.md#memory-triggered-skill-載入)).
 
 Once loaded, treat every convention as background — do not re-read each task.
 

@@ -38,9 +38,11 @@ nav:
       - /maigo:remember: commands/remember.md
       - /maigo:memory: commands/memory.md
       - /maigo:retro: commands/retro.md
+      - /maigo:describe-pr: commands/describe-pr.md
   - Skills (source):
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
+      - github-title-description: skills/github-title-description.md
   - Changelog: changelog.md
 
 markdown_extensions:
