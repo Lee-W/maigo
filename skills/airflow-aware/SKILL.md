@@ -92,6 +92,33 @@ focused area, delete that file or replace it with a targeted
 `.claude/test-command` such as
 `uv run --project airflow-core pytest tests/unit/<path>/test_<file>.py`.
 
+#### `uv.lock` phantom diff diagnostic
+
+A persistent `uv.lock` diff in your worktree that you did not introduce — and
+that returns after `git checkout HEAD -- uv.lock` followed by the next
+`uv sync` — is almost always **lockfile drift on `main`**, not a local
+environment problem. A contributor edited a `pyproject.toml` (e.g., removed
+an extra) without re-running `uv lock`, so the committed lockfile is out of
+sync with the committed pyproject; every fresh `uv sync` regenerates the lock
+to match the current pyproject and shows the delta as an uncommitted diff.
+
+Diagnose:
+
+```bash
+git diff HEAD uv.lock | head -50               # what package changed
+grep -rn "<package>" --include=pyproject.toml -l    # which pyproject owns it
+grep "<package>" <pyproject>                   # current HEAD declares it?
+git show HEAD:uv.lock | grep "<package>"       # committed lock has it?
+```
+
+If the pyproject and the committed lock disagree, drift is confirmed. Fix it
+in a **separate** `chore: re-lock <pyproject>` PR off `upstream/main`. **Do
+not** fold the lock regeneration into the current feature PR — it pollutes
+the diff and creates a force-push risk if `main` re-locks before merge. For
+the feature PR, `git checkout HEAD -- uv.lock` keeps the noise out of the
+commit; the diff will re-appear locally on the next `uv sync` and that is
+expected.
+
 ### 4. Code style — Ruff + Mypy
 
 - Formatter: `uv run ruff format`
@@ -174,6 +201,34 @@ Airflow's subsystems have strict ownership boundaries that must not be crossed:
 Cross-boundary changes require extra scrutiny. Before proposing or reviewing such a change,
 read
 [`.github/instructions/code-review.instructions.md`](https://github.com/apache/airflow/blob/main/.github/instructions/code-review.instructions.md).
+
+#### Core ↔ SDK paired-class symmetry
+
+Several public APIs exist as paired classes — one in `airflow-core/` and one in
+`task-sdk/` with the same conceptual role and the same name (e.g., the temporal
+partition mappers `_BaseTemporalMapper` in `airflow.partition_mappers.temporal`
+vs `airflow.sdk.definitions.partition_mappers.temporal`). When the two
+implementations drift on a **same-named attribute**, the divergence is a
+**bug**, not a nit — even if both sides happen to work in practice because
+downstream code (encoders, serializers, consumers) tolerates both shapes.
+
+Things to compare side-by-side when reviewing or self-reviewing such a class:
+
+- Constructor signature (kwargs, positional-vs-keyword, defaults).
+- Attribute *type* after `__init__` (e.g., is `_timezone` always
+  `Timezone | FixedTimezone` on both sides, or is one side keeping a raw
+  `str`?).
+- Validation / normalization step in `__init__` (e.g., one side runs
+  `parse_timezone()`, the other stores verbatim).
+- Eager-raise behaviour for invalid input.
+
+Do **not** accept "this can be a separate PR" framing just because the gap
+is "merely" a type or validation asymmetry. Fix it in the current PR. The
+related question — whether the overall patch is a **bugfix** or **feature
+completion**, which determines newsfragment + backport label — is a
+separate axis covered by the SDK/Core release-state framing memory
+(check release tags via `git tag --contains <sha>` **and** `git show
+<tag>:<file>` to confirm).
 
 ## Composing with other skills
 
