@@ -92,6 +92,14 @@ focused area, delete that file or replace it with a targeted
 `.claude/test-command` such as
 `uv run --project airflow-core pytest tests/unit/<path>/test_<file>.py`.
 
+**jpype1 fallback**: if the Stop-hook still encounters a `jpype1` / `cmake` /
+`FindJava` error (because `.claude/skip-test-verification` was missing or the
+hook executed before `repo_detect` had a chance to write it), treat it as a
+**known upstream constraint** and move on. Do not try to install a JDK, patch
+`jpype1` import paths, or rewire the lock file — those are upstream issues, not
+part of any maigo task scope. If verification was genuinely needed, run a
+targeted single-file pytest manually instead.
+
 #### `uv.lock` phantom diff diagnostic
 
 A persistent `uv.lock` diff in your worktree that you did not introduce — and
