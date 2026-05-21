@@ -5,6 +5,22 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.6.0 (2026-05-21)
+
+### Feat
+
+- **memory**: v1 agent propose — Soyo/Anon propose, orchestrator confirms
+- add commitizen-aware contributor skill
+- **retro**: add destination judgment (personal memory vs maigo doc gap)
+- **memory**: add validate_memory.py + reader agent inline schema warn
+
+### Fix
+
+- memory propose doc — link, fence guard tracking, retro path-B constraint
+- memory propose confirm flow gaps (fix.md, retro dedup, dual memory index)
+- stale What v0 doesn't do + team.md code fence guard
+- stale comment + verify skill doc link
+
 ## v0.5.0 (2026-05-20)
 
 ### Feat
