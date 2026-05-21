@@ -75,3 +75,4 @@ Confirm flow 完成後繼續主線流程——不改變 go 的步驟結構。
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題
 - 偵測 `## Memory propose` 標頭時，只掃描 code fence 外的行；
   code block 內（triple-backtick fence 之間）的同名標頭不觸發 confirm flow。
+  追蹤法：從輸出文字開頭往下追蹤 triple-backtick 計數（奇數 → in-fence），遇到 `^## Memory propose` 且 in-fence 為 true 時跳過。

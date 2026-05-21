@@ -81,7 +81,7 @@ stop hook 會把 failure 自動顯示給使用者。orchestrator 接到後把錯
    - `~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
 3. 印出 propose 摘要（type / name / description / rationale）。
 4. **AskUserQuestion**，選項：`存` / `修改` / `跳過`。
-5. 選「存」或「修改」→ reuse `/maigo:remember` 步驟 5+6
+5. 選「存」或「修改」→ reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 5+6
    （以 propose 的欄位為預填值；「修改」時步驟 5 讓使用者改各欄位）。
 6. 選「跳過」→ 繼續正常流程，不寫任何檔。
 
@@ -95,6 +95,7 @@ Confirm flow 完成後繼續主線流程——不改變 fix 的步驟結構。
 - **不要自己 review / 不要自己實作**——分別交給 Anon 與 Soyo Task
 - 偵測 `## Memory propose` 標頭時，只掃描 code fence 外的行；
   code block 內（triple-backtick fence 之間）的同名標頭不觸發 confirm flow。
+  追蹤法：從輸出文字開頭往下追蹤 triple-backtick 計數（奇數 → in-fence），遇到 `^## Memory propose` 且 in-fence 為 true 時跳過。
 
 ## 與 `/maigo:go` / `/maigo:team` 的差異
 

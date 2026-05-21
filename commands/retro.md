@@ -85,7 +85,8 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
   即時 propose 只抓當下明確信號，retro 還能補抓沒講清楚的。
   retro 跑到與即時 propose 重複的候選時，正常展示 MEMORY.md index，
   由使用者眼睛判斷是否重複；orchestrator 不做 keyword dedup。
-  已在 confirm flow 存入的 entry（可從當次 session context 判斷），retro 不重複 propose。
+  已在 confirm flow 存入的 entry（使用者選「存」或「修改」後完成寫檔的），retro 不重複 propose。
+  此判斷僅限路徑 A；路徑 B 因無 session context，orchestrator 無法可靠辨別，照常 propose 並讓使用者從 MEMORY.md index 自行判斷是否重複。
 
 → 寫檔細節：[/maigo:remember](https://github.com/Lee-W/maigo/blob/main/commands/remember.md)
 
