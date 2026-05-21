@@ -56,7 +56,9 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 1. 檢查 propose 段的 6 個必填欄位（name / slug / description / body / type / rationale）是否齊全。
    缺任一欄位 → 不 confirm，印一行提示「偵測到 propose 段但格式不完整，已跳過」，繼續正常流程。
-2. 顯示目前 `~/.config/maigo/memory/MEMORY.md` index（讓使用者判斷是否重複）。
+2. 顯示目前兩個 memory 來源的 index：
+   - `~/.config/maigo/memory/MEMORY.md`（cross-project）
+   - `~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
 3. 印出 propose 摘要（type / name / description / rationale）。
 4. **AskUserQuestion**，選項：`存` / `修改` / `跳過`。
 5. 選「存」或「修改」→ reuse `/maigo:remember` 步驟 5+6

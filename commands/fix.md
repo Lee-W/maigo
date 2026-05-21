@@ -70,12 +70,31 @@ orchestrator 啟動 Soyo 時 prompt 必須明示「mode=quick-fix」與上述 su
 
 stop hook 會把 failure 自動顯示給使用者。orchestrator 接到後把錯誤完整貼給 Anon 重修。
 
+## Memory propose confirm flow
+
+當 Soyo 或 Anon 的輸出末尾含 `## Memory propose` 段時，orchestrator 在該 agent 完成後、繼續下一步前，立刻執行 confirm flow：
+
+1. 檢查 propose 段的 6 個必填欄位（name / slug / description / body / type / rationale）是否齊全。
+   缺任一欄位 → 不 confirm，印一行提示「偵測到 propose 段但格式不完整，已跳過」，繼續正常流程。
+2. 顯示目前兩個 memory 來源的 index：
+   - `~/.config/maigo/memory/MEMORY.md`（cross-project）
+   - `~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
+3. 印出 propose 摘要（type / name / description / rationale）。
+4. **AskUserQuestion**，選項：`存` / `修改` / `跳過`。
+5. 選「存」或「修改」→ reuse `/maigo:remember` 步驟 5+6
+   （以 propose 的欄位為預填值；「修改」時步驟 5 讓使用者改各欄位）。
+6. 選「跳過」→ 繼續正常流程，不寫任何檔。
+
+Confirm flow 完成後繼續主線流程——不改變 fix 的步驟結構。
+
 ## Orchestrator 守則
 
 - **不能跳過 Soyo**——quick-fix 砍的是 stage 數量（無 Raana / Tomori / 顯式 Taki），不是 review 本身
 - **不能改 Soyo 的 4 項 subset 為更少**——這 4 項是硬底線
 - **不能因為「使用者說 quick-fix」就放寬 must-fix 標準**——subset 內的項仍照 strict-review 規則
 - **不要自己 review / 不要自己實作**——分別交給 Anon 與 Soyo Task
+- 偵測 `## Memory propose` 標頭時，只掃描 code fence 外的行；
+  code block 內（triple-backtick fence 之間）的同名標頭不觸發 confirm flow。
 
 ## 與 `/maigo:go` / `/maigo:team` 的差異
 
