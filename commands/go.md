@@ -8,6 +8,22 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 > 「It's MyGO!!!!!」——輪到我了。
 
+```mermaid
+flowchart TD
+    Start([使用者: /maigo:go 任務]) --> Raana[樂奈 Raana<br/>探 codebase + 慣例]
+    Raana --> Tomori[燈 Tomori<br/>寫 plan.md]
+    Tomori --> Confirm{使用者確認 plan?}
+    Confirm -- 有 open questions --> Tomori
+    Confirm -- OK --> Anon[愛音 Anon<br/>實作]
+    Anon --> Soyo[爽世 Soyo<br/>strict review]
+    Soyo --> SoyoVerdict{APPROVED?}
+    SoyoVerdict -- BLOCKED --> Anon
+    SoyoVerdict -- APPROVED --> Taki[立希 Taki<br/>test / lint / type]
+    Taki --> TakiVerdict{全綠?}
+    TakiVerdict -- FAIL --> Anon
+    TakiVerdict -- PASS --> Done([完成: summary])
+```
+
 把這件事交給 MyGO!!!!!。從前奏到尾聲，五個人各自負責自己那一段。
 
 ## 使用

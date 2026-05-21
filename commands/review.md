@@ -6,6 +6,21 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 
 # /maigo:review
 
+```mermaid
+flowchart TD
+    Start([使用者: /maigo:review target --mode]) --> Raana[樂奈 Raana<br/>取 diff + 套<br/>pr-context-cache]
+    Raana --> Tomori[燈 Tomori<br/>寫 review-rubric.md]
+    Tomori --> Soyo[爽世 Soyo<br/>對 rubric 嚴格 review]
+    Soyo --> ModeCheck{mode =<br/>design-preview?}
+    ModeCheck -- 是 --> Skip[Taki skipped<br/>標 Verification: Skipped]
+    ModeCheck -- 否 --> Taki[立希 Taki<br/>checkout + 驗證]
+    Skip --> Report([輸出 review report])
+    Taki --> Report
+    Report --> ReReview{使用者要 re-review?}
+    ReReview -- 是 --> Raana
+    ReReview -- 否 --> Done([結束])
+```
+
 對**既有的**變更做嚴格 review。跟 `/maigo:go` 不同，這裡沒有實作環節——
 變更已經寫好了，要做的是**判斷它對不對**。
 

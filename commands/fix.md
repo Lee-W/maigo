@@ -6,6 +6,23 @@ description: 輕量任務入口。Orchestrator 直接呼叫 Anon 做小改動，
 
 # /maigo:fix
 
+```mermaid
+flowchart TD
+    Start([使用者: /maigo:fix 小任務]) --> Gate{描述像大改動?}
+    Gate -- 是 --> Warn[提醒一次:<br/>要改用 /maigo:go 嗎?]
+    Warn --> UserChoose{使用者:<br/>仍用 fix?}
+    UserChoose -- 否 --> Redirect([改走 /maigo:go])
+    UserChoose -- 是 --> Anon
+    Gate -- 否 --> Anon[愛音 Anon<br/>直接動手]
+    Anon --> Soyo[爽世 Soyo<br/>輕量 review<br/>4 項 subset]
+    Soyo --> SoyoVerdict{APPROVED?}
+    SoyoVerdict -- BLOCKED --> Anon
+    SoyoVerdict -- APPROVED --> StopHook([Stop hook<br/>自動跑 test])
+    StopHook --> HookVerdict{test 綠?}
+    HookVerdict -- FAIL --> Anon
+    HookVerdict -- PASS --> Done([完成])
+```
+
 「這個小東西改一下」級別的任務。跳過 Raana 探索 / Tomori 寫 plan 的 overhead，
 orchestrator 直接呼叫 Anon 動手，做完跑 Soyo 輕量 review（9 項 → 4 項）。
 Test 不顯式喊 Taki——stop hook 在任務完成前自動跑測試兜底。
