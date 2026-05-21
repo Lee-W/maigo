@@ -2,15 +2,20 @@
 
 MyGO!!!!! 五位角色在 maigo 的 canonical 代表色，套用於 [Commands (source)](https://github.com/Lee-W/maigo/tree/main/commands) 的 mermaid 圖 `classDef`。改色從這裡改，再同步到 4 張 mermaid 圖。
 
-| Class | 角色 | 樂團位置 | Fill (hex) | Stroke | Color |
-|---|---|---|---|---|---|
-| `raana` | 要 樂奈 | Gt | `#6EEB83` | `#333` | `#000` |
-| `tomori` | 高松 燈 | Vo | `#6EC1E4` | `#333` | `#000` |
-| `anon` | 千早 愛音 | Gt | `#FF6F91` | `#333` | `#000` |
-| `soyo` | 長崎 爽世 | Ba | `#FFC857` | `#333` | `#000` |
-| `taki` | 椎名 立希 | Dr | `#7A5CFF` | `#333` | `#fff` |
+| Class | 角色 | Emoji | 樂團位置 | Fill (hex) | Stroke | Color |
+|---|---|---|---|---|---|---|
+| `raana` | 要 樂奈 | 🐱 | Gt | `#6EEB83` | `#333` | `#000` |
+| `tomori` | 高松 燈 | 🩵 | Vo | `#6EC1E4` | `#333` | `#000` |
+| `anon` | 千早 愛音 | 🎀 | Gt | `#FF6F91` | `#333` | `#000` |
+| `soyo` | 長崎 爽世 | 🟡 | Ba | `#FFC857` | `#333` | `#000` |
+| `taki` | 椎名 立希 | 🟣 | Dr | `#7A5CFF` | `#333` | `#fff` |
 
 色票來源：原作兩位元色。立希紫色較深，文字 `color` 用白色保證對比。
+
+Emoji 用於 agent 對話時的角色標識（每次輸出開頭印「{emoji} {角色名}：」），詳見各 [`agents/*.md`](https://github.com/Lee-W/maigo/tree/main/agents) 的「語氣」段。Emoji 採混合 system：
+
+- **🐱 / 🩵 / 🎀**（Raana / Tomori / Anon）用物件 emoji，強化角色辨識
+- **🟡 / 🟣**（Soyo / Taki）用色塊 emoji，直接對應 mermaid classDef 的 fill 色票
 
 ## 套用位置
 
