@@ -68,7 +68,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 
 ## 流程
 
-### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「らーなだよ。看完了。相關的在這三個檔案。」
+### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
 **先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：第一次 fetch 後 cache 到 `/tmp/maigo/<repo>/review-rubric.md` 開頭的 `<!-- pr-context-cache:start v1 -->` 段。後續 re-review 偵測同一段且 diff sha 未變 → 跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。
 
