@@ -28,13 +28,38 @@ claude --plugin-dir /path/to/maigo
 
 進 Claude Code 後輸入 `/` 應該能看到 `/maigo:go`、`/maigo:team`、`/maigo:review`。
 
+### 持久化載入
+
+快速試完想長期用，可透過 marketplace 持久化載入：
+
+在 Claude Code 內：
+
+```
+/plugin marketplace add Lee-W/maigo
+/plugin install maigo@maigo
+```
+
+之後啟動 `claude` 就會自動載入，不必再帶 `--plugin-dir`。
+
+更新、停用、移除：
+
+```
+/plugin marketplace update maigo
+/plugin disable maigo@maigo
+/plugin uninstall maigo@maigo
+```
+
 ## 命令快覽
+
+日常 90% 用這三個：
 
 ```bash
 /maigo:go <task>          # 5 人順序：探索 → 計畫 → 實作 → review → 驗證
 /maigo:team <task>        # 同上，但 Soyo + Taki 並行（省 ~30% 牆鐘）
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
 ```
+
+完整 8 個命令（含 `/maigo:fix`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:describe-pr`）詳見 [Commands reference](reference/commands.md)。
 
 ## 文件導覽
 

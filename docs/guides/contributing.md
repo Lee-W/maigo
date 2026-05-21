@@ -102,6 +102,15 @@ Agent / command / skill source 檔內含 `<!-- mkdocs-include-start -->` HTML co
 
 issue 模板還沒寫；先寫一個簡短的 repro / 期待行為即可。
 
+## Future considerations
+
+### Zensical（MkDocs 替代方案）
+
+目前不切換至 Zensical（Material for MkDocs 作者新作，尚未 GA）的原因：
+Maigo 重度依賴 `include-markdown`、`pymdownx.superfences`、`admonition`、`pymdownx.details`，這些插件均不在 Zensical 目前支援清單。切換成本高（mkdocs.yml、pyproject.toml、CI workflow、23 個 include-markdown shim 可能全部重寫），收益不明確——Material theme 已滿足現有文件需求。
+
+**重新評估時機**：Zensical 進入 GA 且明確支援等價的 include-markdown 機制時；或 Maigo 文件需求發生重大變化、Material theme 不再夠用時。
+
 ## License
 
 MIT.

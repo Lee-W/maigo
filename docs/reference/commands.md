@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供六個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供八個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug

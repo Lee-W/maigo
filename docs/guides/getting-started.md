@@ -58,6 +58,27 @@ claude --plugin-dir /path/to/maigo
 `NEEDS_CHANGES` / `BLOCKED`，會留 must-fix 清單；Taki 結尾必貼 `exit <N>` 與
 `PASS` / `FAIL`。
 
+### 持久化載入
+
+快速試完想長期用，可透過 marketplace 持久化載入：
+
+在 Claude Code 內：
+
+```
+/plugin marketplace add Lee-W/maigo
+/plugin install maigo@maigo
+```
+
+之後啟動 `claude` 就會自動載入，不必再帶 `--plugin-dir`。
+
+更新、停用、移除：
+
+```
+/plugin marketplace update maigo
+/plugin disable maigo@maigo
+/plugin uninstall maigo@maigo
+```
+
 ## 4. 常見命令速查
 
 開始上手後最常用的三個 command，挑選原則：
@@ -70,6 +91,7 @@ claude --plugin-dir /path/to/maigo
 
 其他輔助 command（不在第一次必學範圍）：
 
+- `/maigo:fix` — 輕量任務入口，跳過 Raana / Tomori，Soyo 跑輕量 4 項 review
 - `/maigo:describe-pr` — 從 branch commits / diff 產 PR title + description
 - `/maigo:memory` — 管理跨專案記憶（讀、寫、刪、瀏覽）
 - `/maigo:remember` — 在當下任務裡新增一條 memory entry

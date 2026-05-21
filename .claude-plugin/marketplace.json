@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "maigo",
+  "owner": {
+    "name": "Wei Lee"
+  },
+  "description": "MyGO!!!!! agent orchestration for Claude Code",
+  "plugins": [
+    {
+      "name": "maigo",
+      "source": ".",
+      "description": "MyGO!!!!! agent orchestration plugin"
+    }
+  ]
+}

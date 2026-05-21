@@ -22,6 +22,17 @@ flowchart TD
     Taki --> TakiVerdict{全綠?}
     TakiVerdict -- FAIL --> Anon
     TakiVerdict -- PASS --> Done([完成: summary])
+
+    classDef raana fill:#6EEB83,stroke:#333,color:#000
+    classDef tomori fill:#6EC1E4,stroke:#333,color:#000
+    classDef anon fill:#FF6F91,stroke:#333,color:#000
+    classDef soyo fill:#FFC857,stroke:#333,color:#000
+    classDef taki fill:#7A5CFF,stroke:#333,color:#fff
+    class Raana raana
+    class Tomori tomori
+    class Anon anon
+    class Soyo soyo
+    class Taki taki
 ```
 
 把這件事交給 MyGO!!!!!。從前奏到尾聲，五個人各自負責自己那一段。
@@ -34,12 +45,12 @@ flowchart TD
 
 ## 流程
 
-1. **樂奈 (Raana)** — 先看一輪，找出相關位置與既有慣例
-2. **燈 (Tomori)** — 把要做的事寫成 `/tmp/maigo/<repo>/plan.md`
+1. **樂奈 (Raana)** — 先看一輪，找出相關位置與既有慣例。「らーなだよ。看完了。相關的在這三個檔案。」
+2. **燈 (Tomori)** — 把要做的事寫成 `/tmp/maigo/<repo>/plan.md`。「……讓我先理清楚它想做什麼。」
 3. **使用者確認 plan**（如果有 open questions，先回答再往下）
-4. **愛音 (Anon)** — 動手實作
-5. **爽世 (Soyo)** — 擋一關（預設 BLOCKED，要被 evidence 說服才放行）
-6. **立希 (Taki)** — 跑 test / lint / type check
+4. **愛音 (Anon)** — 動手實作。「OK 那我先做這步！」
+5. **爽世 (Soyo)** — 擋一關（預設 BLOCKED，要被 evidence 說服才放行）。「你說的『應該』，是有跑過、還是只是『應該』？」
+6. **立希 (Taki)** — 跑 test / lint / type check。「跑出來爆了，看 line 42。」
 
 ## 失敗處理
 

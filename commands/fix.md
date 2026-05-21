@@ -21,6 +21,14 @@ flowchart TD
     StopHook --> HookVerdict{test 綠?}
     HookVerdict -- FAIL --> Anon
     HookVerdict -- PASS --> Done([完成])
+
+    classDef raana fill:#6EEB83,stroke:#333,color:#000
+    classDef tomori fill:#6EC1E4,stroke:#333,color:#000
+    classDef anon fill:#FF6F91,stroke:#333,color:#000
+    classDef soyo fill:#FFC857,stroke:#333,color:#000
+    classDef taki fill:#7A5CFF,stroke:#333,color:#fff
+    class Anon anon
+    class Soyo soyo
 ```
 
 「這個小東西改一下」級別的任務。跳過 Raana 探索 / Tomori 寫 plan 的 overhead，
@@ -48,10 +56,10 @@ Test 不顯式喊 Taki——stop hook 在任務完成前自動跑測試兜底。
 
 ## 流程
 
-1. **愛音 (Anon)** — 直接動手實作（無 Raana 探索、無 Tomori plan）
+1. **愛音 (Anon)** — 直接動手實作（無 Raana 探索、無 Tomori plan）。「OK 那我先做這步！」
    - Anon 自己看周邊 1-2 個檔抓慣例，不做大範圍探索
    - 不寫 plan.md
-2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項
+2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫的話……應該不太對哦？」
 3. **Stop hook 自動跑 test** — 不顯式呼叫 Taki
 
 ## Soyo 輕量 checklist（9 項 → 4 項）

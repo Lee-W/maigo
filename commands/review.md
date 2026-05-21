@@ -19,6 +19,16 @@ flowchart TD
     Report --> ReReview{使用者要 re-review?}
     ReReview -- 是 --> Raana
     ReReview -- 否 --> Done([結束])
+
+    classDef raana fill:#6EEB83,stroke:#333,color:#000
+    classDef tomori fill:#6EC1E4,stroke:#333,color:#000
+    classDef anon fill:#FF6F91,stroke:#333,color:#000
+    classDef soyo fill:#FFC857,stroke:#333,color:#000
+    classDef taki fill:#7A5CFF,stroke:#333,color:#fff
+    class Raana raana
+    class Tomori tomori
+    class Soyo soyo
+    class Taki taki
 ```
 
 對**既有的**變更做嚴格 review。跟 `/maigo:go` 不同，這裡沒有實作環節——
@@ -58,7 +68,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 
 ## 流程
 
-### 1. 樂奈 (Raana) — 抓變更 + 周邊 context
+### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「らーなだよ。看完了。相關的在這三個檔案。」
 
 **先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：第一次 fetch 後 cache 到 `/tmp/maigo/<repo>/review-rubric.md` 開頭的 `<!-- pr-context-cache:start v1 -->` 段。後續 re-review 偵測同一段且 diff sha 未變 → 跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。
 
@@ -69,7 +79,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 - **看周邊**：diff 涉及檔案的呼叫關係（被誰用、用了誰）、同檔案 / 同 module 既有的寫法慣例
 - 回報：變更摘要 + 周邊 context + 既有慣例
 
-### 2. 燈 (Tomori) — 寫 review rubric 到 `/tmp/maigo/<repo>/review-rubric.md`
+### 2. 燈 (Tomori) — 寫 review rubric 到 `/tmp/maigo/<repo>/review-rubric.md`。「……讓我先理清楚它想做什麼。」
 
 （`<repo>` = `basename "$PWD"`；目錄不存在請先 `mkdir -p`）
 
@@ -97,7 +107,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 **為什麼這步很關鍵：** 沒有對照基準的 review = 憑感覺。
 這也是 reviewer 不嚴謹最常見的根因。
 
-### 3. 爽世 (Soyo) — 拿 rubric 對 diff 做嚴格 review
+### 3. 爽世 (Soyo) — 拿 rubric 對 diff 做嚴格 review。「你說的『應該』，是有跑過、還是只是『應該』？」
 
 依 `skills/strict-review/SKILL.md` 操作（預設 BLOCKED、9 項 checklist、要 evidence、不接受 TODO 規避）。
 
@@ -107,7 +117,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 
 **Mode-aware：** orchestrator 傳給 Soyo 的 prompt 必須明示 mode 與對應 checklist subset。Soyo 輸出 checklist 表時：mode subset 內的項照常 `[x]` / `[ ]`；不在 subset 內的項標 `[—]`，附 `skipped by mode=<name>`。
 
-### 4. 立希 (Taki) — 跑驗證
+### 4. 立希 (Taki) — 跑驗證。「跑出來爆了，看 line 42。」
 
 **若 mode=design-preview → 不啟動本 stage，最終報告 Verification 段標「Skipped (mode=design-preview)」。**
 
