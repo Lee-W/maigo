@@ -104,7 +104,8 @@ def test_skill_has_include_marker():
 
 
 # ---------------------------------------------------------------------------
-# 8. docs shims exist, each has exactly 1 non-empty line, contains include-markdown
+# 8. docs files exist and include the source exactly once via include-markdown
+#    (a mermaid diagram before the include is allowed, like other command docs)
 # ---------------------------------------------------------------------------
 
 
@@ -112,13 +113,12 @@ def test_docs_shims_exist():
     for shim_path in (DOCS_COMMAND_SHIM, DOCS_SKILL_SHIM):
         assert shim_path.exists(), f"{shim_path} が存在しない"
         text = shim_path.read_text(encoding="utf-8")
-        non_empty_lines = [line for line in text.splitlines() if line.strip()]
+        include_lines = [
+            line for line in text.splitlines() if "include-markdown" in line
+        ]
         assert (
-            len(non_empty_lines) == 1
-        ), f"{shim_path} の非空行数が 1 でない: {len(non_empty_lines)}"
-        assert (
-            "include-markdown" in non_empty_lines[0]
-        ), f"{shim_path} の行に include-markdown がない: {non_empty_lines[0]!r}"
+            len(include_lines) == 1
+        ), f"{shim_path} の include-markdown 行が 1 行でない: {len(include_lines)}"
 
 
 # ---------------------------------------------------------------------------

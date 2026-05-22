@@ -7,7 +7,7 @@ description: This skill should be used when drafting a GitHub PR title and descr
 
 # GitHub Title & Description
 
-**Owner Agent**: orchestrator（`/maigo:describe-pr` 直跑，不 delegate）
+**Owner Agent**: Tomori（`/maigo:describe-pr` step 2——orchestrator 前置抓料後交給燈套用）
 **Consumers**: [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)
 
 ## Why this skill exists

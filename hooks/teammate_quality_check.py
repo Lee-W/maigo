@@ -37,8 +37,23 @@ def check_raana(out: str) -> None:
     emit("approve", "樂奈 (Raana) 輸出含 memory 載入回報")
 
 
+PR_DRAFT_RE = re.compile(r"##\s+Suggested PR title", re.IGNORECASE)
+
+
 def check_tomori(out: str) -> None:
     require_memory_header(out, "燈 (Tomori)")
+
+    # describe-pr 模式：燈產 PR 草稿，不寫 plan.md，結構照 github-title-description skill
+    if PR_DRAFT_RE.search(out):
+        if not re.search(r"##\s+Suggested PR description", out, re.IGNORECASE):
+            emit(
+                "block",
+                "燈 (Tomori) 的 PR 草稿缺少 `## Suggested PR description` 段。"
+                "describe-pr 要同時給 `## Suggested PR title` 與 `## Suggested PR description` 兩塊。",
+            )
+        emit("approve", "燈 (Tomori) PR 草稿結構齊全")
+
+    # plan 模式（預設）：把計畫寫進 /tmp/maigo/<repo>/ 的檔案
     if not re.search(r"/tmp/maigo/[^/\s]+/(plan|review-rubric)\.md", out):
         emit(
             "block",

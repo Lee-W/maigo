@@ -74,6 +74,37 @@ class TestCheckTomori:
         assert result["decision"] == "block"
         assert "Loaded memory entries" in result["reason"]
 
+    def test_pr_draft_mode_approves(self, capsys: pytest.CaptureFixture):
+        # describe-pr 模式：有 PR title + description 兩塊就過，不要求 plan.md
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "## Suggested PR title\nReject empty emails at signup\n"
+                "## Suggested PR description\n## Summary\n...\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+        assert "PR 草稿" in result["reason"]
+
+    def test_pr_draft_missing_description_blocks(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "## Suggested PR title\nReject empty emails at signup\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "Suggested PR description" in result["reason"]
+
+    def test_pr_draft_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Suggested PR title\nx\n## Suggested PR description\n## Summary\ny\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "Loaded memory entries" in result["reason"]
+
 
 # ---------------------------------------------------------------------------
 # check_soyo
