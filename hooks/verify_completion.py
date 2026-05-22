@@ -2,7 +2,8 @@
 """Maigo Stop hook：任務宣告完成前強制跑 test。
 
 偵測專案類型 → 跑對應 test 指令 → 失敗就 block。即使 orchestrator
-跳過立希也擋下；defense in depth。
+跳過立希也擋下；defense in depth。Host build-env 失敗（CMake、native
+wheel build 等）一律 emit skip——那不是 test 失敗，是 host 環境問題。
 
 支援的設定檔（放在 user 專案的 `.claude/` 下）：
 - `skip-test-verification` — 第一行非空非註解視為原因，整個檢查跳過
@@ -25,6 +26,17 @@ GIT_TIMEOUT_SEC = 5
 OUTPUT_TAIL_CHARS = 500  # chars to include in block message
 # Match `Foo:` with a colon to reduce false positives from incidental mentions
 FATAL_MARKER_RE = re.compile(r"\b(ImportError|ModuleNotFoundError|SyntaxError):")
+# Host-environment build failures (CMake/Java/native wheel) bubble up through
+# `uv run pytest` / `pip install` when a transitive dependency tries to compile
+# at import time. These look like test failures because the command exits
+# non-zero, but they are not — the project's own code never ran. Treat as
+# "skip with reason" so the operator can fix the host env (or pin
+# `.claude/test-command` / `.claude/skip-test-verification`) without the loop.
+BUILD_ENV_ERROR_RE = re.compile(
+    r"CMake configuration failed"
+    r"|Failed building wheel for \S+"
+    r"|Failed to build [`'\"]?\S+",
+)
 
 
 def emit(decision: str, reason: str) -> None:
@@ -156,6 +168,13 @@ def main() -> None:
 
     if exit_code == 0:
         emit("approve", f"立希 (Taki)：`{' '.join(cmd)}` 通過")
+
+    build_env_match = BUILD_ENV_ERROR_RE.search(output)
+    if build_env_match:
+        emit(
+            "approve",
+            f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 host build env（{build_env_match.group(0)!r}），不是 test 失敗。跳過——修 host build env，或在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 永久關閉本 worktree 的檢查。",
+        )
 
     fatal_match = FATAL_MARKER_RE.search(output)
     if fatal_match:

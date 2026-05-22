@@ -169,7 +169,7 @@ orchestrator 判斷兩條路徑：
 
 ## `/maigo:describe-pr` — 產 GitHub PR title + description
 
-從當前 branch 的 commits / diff 產出 PR 草稿（user-impact title + Summary / Motivation / Test plan）。
+從當前 branch 的 commits / diff 產出 PR 草稿（user-impact title + Why / What / Test Plan）。
 Orchestrator 前置抓 git context，燈 (Tomori) 套 `github-title-description` skill 產草稿。**read-only，不寫檔、不開 PR。**
 
 ```

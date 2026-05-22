@@ -58,7 +58,7 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
      - 要不要編輯 **body**？（預設 body = 從 input 提煉的一句話 + 原 input 當補充；使用者可直接接受或提供新版）
 
    - **第四題（僅 `type: convention`）**：
-     - 要 tag triggered skills 嗎？（optional，list，例：`review-airflow`）。預設空，直接 Enter 略過
+     - 要 tag triggered skills 嗎？（optional，list，例：`airflow-aware`、`commitizen-aware`）。預設空，直接 Enter 略過
      - 非空 → frontmatter 加 `triggers: [...]`；空 → 不加 `triggers` 欄位
      - 此欄位只對 `type: convention` 有效；其他 type 不詢問、不寫入
 

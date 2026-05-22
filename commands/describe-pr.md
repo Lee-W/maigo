@@ -7,7 +7,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 # /maigo:describe-pr
 
 幫忙寫 PR 的 title 跟 description——拿你 branch 已經有的 commits / diff，
-產出符合「user-impact title + Summary / Motivation / Test plan」結構的草稿。
+產出符合「user-impact title + Why / What / Test Plan」結構的草稿。
 你 review / 修改後再用 `gh pr create` 或 GitHub UI 開 PR。
 
 這條命令是**燈一個人的舞台**：orchestrator 先把 git 那些料抓齊（燈沒有 Bash），
@@ -44,7 +44,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 4. **偵測 PR template**：
    - 依序找：`.github/PULL_REQUEST_TEMPLATE.md` → `.github/pull_request_template.md` → `.github/PULL_REQUEST_TEMPLATE/` 目錄內第一個 `.md` 檔
-   - 找到 → 讀取 template 內容，作為描述框架傳給燈（取代預設 Summary / Motivation / Test plan 結構）
+   - 找到 → 讀取 template 內容，作為描述框架傳給燈（取代預設 Why / What / Test Plan 結構）
    - 找不到 → 用 skill 預設結構
 
 把 1–4 的結果整理成一份 bundle，連同「不 hallucinate」守則一起寫進啟動燈的 Task prompt。

@@ -65,6 +65,10 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 - 每步驟標註：**做什麼 / 為什麼 / acceptance criteria**
 - 寫到 `/tmp/maigo/<repo>/plan.md`（`<repo>` = `basename "$PWD"`；目錄不存在請先 `mkdir -p`）
 - 找出隱性需求（使用者沒講但顯然需要的）並標出來請使用者確認
+- **把需要使用者點頭的決定收進 `## Decisions needed` 段**，每筆附 `[**default**]`。
+  Default 必須是你已經分析過、推薦的方案，**不是「你選吧」**。這讓使用者可以一句
+  「go」/「accept defaults」批准全部，不必逐題回答。需要使用者真的權衡 trade-off
+  的事項才開另一個小節展開——大多數情況把 default 寫清楚就好。
 
 ## 你不會做的事
 
@@ -112,6 +116,11 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 1. [Anon] <步驟一> — acceptance: <怎樣算完成>
 2. [Anon] <步驟二>（依賴 1）— acceptance: ...
 3. [Taki] 跑 <X test>，必須全綠
+
+## Decisions needed（optional，有需要使用者點頭的選擇才加）
+這些是 blocking。使用者可一句「go」批准全部。
+1. <決定一>？ [**default**]
+2. <決定二>？ [**default**]
 
 ## Risks / Open questions
 - <風險或需要使用者確認的事>
