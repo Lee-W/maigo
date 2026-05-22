@@ -5,6 +5,18 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.8.0 (2026-05-22)
+
+### Feat
+
+- **narration**: give the orchestrator a Doloris / Mortis narrator face
+- **commands**: add /maigo:address-comments
+- **commands**: draft commit message at finale, slim mermaid out
+
+### Refactor
+
+- **describe-pr**: run the command through the Tomori agent
+
 ## v0.7.0 (2026-05-21)
 
 ### Feat
