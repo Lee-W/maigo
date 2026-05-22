@@ -34,6 +34,8 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 |-------|-------------|-----------|------|
 | [`strict-review`](../skills/strict-review.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
 | [`airflow-aware`](../skills/airflow-aware.md) | — (知識層) | 任何 skill（在 apache-airflow contributor checkout 時由 repo-detect hook 自動載入） | Airflow contributor 慣例：命名（Dag/DAG）、Breeze/uv 環境、Ruff/Mypy 風格、coding rules、pytest patterns、PR hygiene |
+| [`commitizen-aware`](../skills/commitizen-aware.md) | — (知識層) | 任何 skill（在 commitizen-tools/commitizen contributor checkout 時由 repo-detect hook 自動載入） | commitizen contributor 慣例：uv + poe 任務、Conventional Commits 自舉、ruff/mypy lint、pytest、PR guidelines |
+| [`commit-message`](../skills/commit-message.md) | — (orchestrator 直跑) | `/maigo:go` step 7、`/maigo:fix` step 4、`/maigo:team` step 7 | 從 diff 草擬 user-impact subject + 短 body 的 commit message，避免把 PR motivation 倒進 commit log |
 | [`github-title-description`](../skills/github-title-description.md) | — (orchestrator 直跑) | `/maigo:describe-pr` | 從 branch commits / diff 產 user-impact PR title + Summary / Motivation / Test plan |
 | [`pr-context-cache`](../skills/pr-context-cache.md) | Raana | `/maigo:review` step 1 | 把 PR title/body/diff/CI status/linked issues cache 到 review-rubric.md，re-review 時跳過重抓 |
 

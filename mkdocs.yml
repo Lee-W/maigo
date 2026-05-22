@@ -46,6 +46,7 @@ nav:
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
       - commitizen-aware: skills/commitizen-aware.md
+      - commit-message: skills/commit-message.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
   - Changelog: changelog.md

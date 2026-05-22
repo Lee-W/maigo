@@ -8,33 +8,6 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 > 「It's MyGO!!!!!」——輪到我了。
 
-```mermaid
-flowchart TD
-    Start([使用者: /maigo:go 任務]) --> Raana[樂奈 Raana<br/>探 codebase + 慣例]
-    Raana --> Tomori[燈 Tomori<br/>寫 plan.md]
-    Tomori --> Confirm{使用者確認 plan?}
-    Confirm -- 有 open questions --> Tomori
-    Confirm -- OK --> Anon[愛音 Anon<br/>實作]
-    Anon --> Soyo[爽世 Soyo<br/>strict review]
-    Soyo --> SoyoVerdict{APPROVED?}
-    SoyoVerdict -- BLOCKED --> Anon
-    SoyoVerdict -- APPROVED --> Taki[立希 Taki<br/>test / lint / type]
-    Taki --> TakiVerdict{全綠?}
-    TakiVerdict -- FAIL --> Anon
-    TakiVerdict -- PASS --> Done([完成: summary])
-
-    classDef raana fill:#6EEB83,stroke:#333,color:#000
-    classDef tomori fill:#6EC1E4,stroke:#333,color:#000
-    classDef anon fill:#FF6F91,stroke:#333,color:#000
-    classDef soyo fill:#FFC857,stroke:#333,color:#000
-    classDef taki fill:#7A5CFF,stroke:#333,color:#fff
-    class Raana raana
-    class Tomori tomori
-    class Anon anon
-    class Soyo soyo
-    class Taki taki
-```
-
 把這件事交給 MyGO!!!!!。從前奏到尾聲，五個人各自負責自己那一段。
 
 ## 使用
@@ -51,6 +24,7 @@ flowchart TD
 4. **愛音 (Anon)** — 動手實作。「OK 那我先做這步！」
 5. **爽世 (Soyo)** — 擋一關（預設 BLOCKED，要被 evidence 說服才放行）。「你說的『應該』，是有跑過、還是只是『應該』？」
 6. **立希 (Taki)** — 跑 test / lint / type check。「跑出來爆了，看 line 42。」
+7. **Orchestrator** — Taki 全綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。**不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
 
 ## 失敗處理
 
