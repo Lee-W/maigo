@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供八個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供九個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -182,6 +182,27 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 
 → Skill: [github-title-description](../skills/github-title-description.md)
 
+## `/maigo:address-comments` — 處理 PR 上的 review 意見
+
+讀當前 branch 對應 PR 的 GitHub review 意見，列出讓使用者挑，擬路由計畫確認後逐項實作：
+
+```
+/maigo:address-comments    # 一律針對當前 branch 的 PR；讀不到就擋下
+```
+
+| 步驟 | 誰 | 做什麼 |
+|------|-----|--------|
+| 1 | Orchestrator | Pre-flight gate——不在 git repo / 沒 `gh` / 當前 branch 無 PR → 擋下、非 0 退出 |
+| 2 | Orchestrator | 抓 inline review threads + review 摘要 + conversation comments |
+| 3 | Orchestrator | 列出意見，使用者挑哪些要處理 |
+| 4 | Orchestrator | 寫 `/tmp/maigo/<repo>/pr-comments.md`，分組 work item + 提路由計畫，AskUserQuestion 確認 |
+| 5 | (route) | 逐 work item 跑 `/maigo:fix` / `/maigo:go` / `/maigo:team` 的完整流程 |
+| 6 | Orchestrator | finale——處理對照 + 回覆草稿（不送出）+ commit message 草稿 |
+
+**路由原則：** 單檔機械性修正 → `fix`；跨檔 / 動行為 → `go`；大且低風險想省牆鐘 → `team`。**預設盡量走 `fix`**，不確定偏 `go`。
+
+步驟 1–4 orchestrator 直跑（要跟使用者多輪互動）；步驟 5 才委派 agent 流程。**不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push，只產回覆草稿讓使用者自己貼。
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -194,6 +215,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | Review 介面 / 設計層（不要求功能完成） | `/maigo:review --mode=design-preview <ref>` |
 | Compliance audit（只看規範 / 安全） | `/maigo:review --mode=compliance-only <ref>` |
 | 寫 PR title / description | `/maigo:describe-pr` |
+| 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
 | Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |

@@ -93,6 +93,7 @@ claude --plugin-dir /path/to/maigo
 
 - `/maigo:fix` — 輕量任務入口，跳過 Raana / Tomori，Soyo 跑輕量 4 項 review
 - `/maigo:describe-pr` — 從 branch commits / diff 產 PR title + description
+- `/maigo:address-comments` — 收當前 branch PR 的 review 意見，逐項路由到 fix / go / team 處理
 - `/maigo:memory` — 管理跨專案記憶（讀、寫、刪、瀏覽）
 - `/maigo:remember` — 在當下任務裡新增一條 memory entry
 - `/maigo:retro` — 結束任務後做一輪 retrospective，候選提案進 memory

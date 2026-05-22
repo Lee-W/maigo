@@ -42,6 +42,7 @@ nav:
       - /maigo:memory: commands/memory.md
       - /maigo:retro: commands/retro.md
       - /maigo:describe-pr: commands/describe-pr.md
+      - /maigo:address-comments: commands/address-comments.md
   - Skills (source):
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
