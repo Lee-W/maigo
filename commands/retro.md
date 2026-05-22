@@ -74,6 +74,7 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **一次只 propose 一筆**——不要一次列五筆讓使用者勾選；逐筆問，使用者答完才下一筆。
   （理由：勾選 UI 鼓勵草率回答；逐筆強迫使用者真的看過。）
 - **目的地優先**——每筆 propose 前先判斷「個人 memory vs maigo 文件缺口」；把 maigo 本身的規則/慣例/實作規範存成個人 memory，是把 plugin 知識放錯地方。

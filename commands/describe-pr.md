@@ -73,6 +73,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **只開一個 agent（燈）**——前置抓料與收尾印出是 orchestrator 的事；中間「把混亂寫成 narrative」交給燈。其他命令的 orchestrator-solo pattern（`/maigo:remember` / `/maigo:memory` / `/maigo:retro`）不適用這條。
 - **不寫任何檔**——describe-pr read-only on filesystem；燈在這條命令是 PR-draft 模式，也不寫 `plan.md`。
 - **不開 PR / 不 push**——只產草稿，使用者自己貼到 GitHub。

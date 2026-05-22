@@ -70,6 +70,7 @@ Confirm flow 完成後繼續主線流程——不改變 go 的步驟結構。
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **你（orchestrator）不要自己實作**。每個 agent 都用 Task tool 啟動
 - 每個 agent 完成後給使用者一行 summary（不是貼全文）
 - 不要跳關。即使任務看起來很小，每一步都要走

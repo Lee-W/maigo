@@ -38,6 +38,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`commit-message`](../skills/commit-message.md) | — (orchestrator 直跑) | `/maigo:go` step 7、`/maigo:fix` step 4、`/maigo:team` step 7 | 從 diff 草擬 user-impact subject + 短 body 的 commit message，避免把 PR motivation 倒進 commit log |
 | [`github-title-description`](../skills/github-title-description.md) | Tomori | `/maigo:describe-pr` step 2 | 從 branch commits / diff 產 user-impact PR title + Summary / Motivation / Test plan |
 | [`pr-context-cache`](../skills/pr-context-cache.md) | Raana | `/maigo:review` step 1 | 把 PR title/body/diff/CI status/linked issues cache 到 review-rubric.md，re-review 時跳過重抓 |
+| [`narration`](../skills/narration.md) | orchestrator | 全部 `/maigo:*` 命令 | maigo orchestrator 的旁白——🌙 Doloris / 🌑 Mortis 在開場 / 收場 / 卡關節點框住整場演出 |
 
 ## skill 檔案規格
 

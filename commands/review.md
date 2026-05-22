@@ -142,6 +142,7 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **不能跳過燈**——沒有 rubric 的 review 就是憑感覺
 - **不能跳過樂奈**——脫離 context 的 review 會把「不熟悉」誤判成「有問題」
 - 爽世的 verdict 不因為「author 是大佬」放水

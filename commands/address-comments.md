@@ -175,8 +175,9 @@ address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **讀不到 PR 一定擋**——步驟 1 的 gate 是硬規則，沒有 PR 不准往下跑。
-- **步驟 1–4 orchestrator 親自跑、不開新 agent**——pattern 跟 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md) / [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 一致；步驟 2–4 要跟使用者多輪互動，必須由 orchestrator 掌握。
+- **步驟 1–4 orchestrator 親自跑、不開新 agent**——pattern 跟 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) / [`/maigo:memory`](https://github.com/Lee-W/maigo/blob/main/commands/memory.md) / [`/maigo:retro`](https://github.com/Lee-W/maigo/blob/main/commands/retro.md) 一致；步驟 2–4 要跟使用者多輪互動，必須由 orchestrator 掌握。
 - **不替使用者決定哪些要處理**——步驟 3 由使用者挑，orchestrator 不自作主張全收或全略。
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 fix / go / team 的 agent 流程。

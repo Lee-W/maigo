@@ -105,6 +105,7 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **不要替使用者推斷後直接寫**——type / name 必須經過 AskUserQuestion 確認，使用者看到後同意才寫
 - **不要把這條 delegate 給 Tomori 或 Anon**——這條命令是 orchestrator 自己跑（mirror Claude Code 內建 memory command 的設計）
 - **不要碰 repo 內任何檔案**——這條命令只動 `~/.config/maigo/memory/`

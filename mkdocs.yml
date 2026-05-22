@@ -50,6 +50,7 @@ nav:
       - commit-message: skills/commit-message.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
+      - narration: skills/narration.md
   - Changelog: changelog.md
 
 markdown_extensions:

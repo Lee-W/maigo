@@ -90,6 +90,7 @@ Confirm flow 完成後繼續主線流程——不改變 fix 的步驟結構。
 
 ## Orchestrator 守則
 
+- **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **不能跳過 Soyo**——quick-fix 砍的是 stage 數量（無 Raana / Tomori / 顯式 Taki），不是 review 本身
 - **不能改 Soyo 的 4 項 subset 為更少**——這 4 項是硬底線
 - **不能因為「使用者說 quick-fix」就放寬 must-fix 標準**——subset 內的項仍照 strict-review 規則
