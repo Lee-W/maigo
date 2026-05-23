@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.9.0 (2026-05-23)
+
+### Feat
+
+- **narration**: require emoji prefix on every agent / narrator mention
+
 ## v0.8.1 (2026-05-22)
 
 ### Refactor
