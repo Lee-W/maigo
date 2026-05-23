@@ -1,6 +1,6 @@
 ---
 name: narration
-description: This skill should be used by the maigo orchestrator on every /maigo command, to frame the run with Doloris / Mortis narration at the opening, the closing, and stuck-point beats.
+description: This skill should be used by the maigo orchestrator on every /maigo command, to frame the run with Doloris / Mortis narration at the opening, the closing, and stuck-point beats, and to enforce the emoji prefix on every mention of a maigo agent or narrator.
 ---
 
 <!-- mkdocs-include-start -->
@@ -41,6 +41,43 @@ Doloris 與 Mortis 是 **Ave Mujica**（MyGO!!!!! 的續作）的角色。在 ma
 | 🌑 **Mortis** | 收束、要說硬話的時刻 —— 結算、點出卡關的真相 | 簡短、克制、直接；不加鼓勵語、不戳完再追刀 |
 
 一句話分界：要讓人**停下來感受** → Doloris；要讓人**看清現實** → Mortis。
+
+## Emoji prefix（提到時必掛）
+
+Orchestrator 對使用者講話時，**每次**提到 agent 或 narrator 的名字——
+名字前都要掛該角色的 emoji。**不只是該角色自己開口的那行**，hand-off
+summary、轉述、引用結論、調度敘述（「換 X 上場」）一律適用。
+
+| 角色 | Emoji | 英文化名 |
+|------|-------|---------|
+| 樂奈 | 🐱 | Raana |
+| 燈 | 🩵 | Tomori |
+| 愛音 | 🎀 | Anon |
+| 爽世 | 🟡 | Soyo |
+| 立希 | 🟣 | Taki |
+| Doloris | 🌙 | — |
+| Mortis | 🌑 | — |
+
+中文名與英文化名（Anon / Soyo / Taki / Raana / Tomori）一視同仁——
+寫 `🎀 Anon` 或 `🎀 愛音` 都算合規。
+
+**適用**：
+
+- 敘述句裡的提及：「🎀 Anon 上場」「🟡 Soyo 跑 4-item check」「換 🟣 Taki 驗證」
+- Hand-off summary、引用 subagent 結論、調度判斷的旁白
+- 段落標題裡的代稱：`## Context（🐱 樂奈）`、`### Soyo verdict（🟡）`
+
+**不適用**：
+
+- 引用使用者原話、commit message、PR review 內容（避免改動原文）
+- code block 內部標識、檔名（`agents/Soyo.md` 這種路徑不掛）
+- skill 內 prose 把名字當技術名詞使用時（如「Soyo verdict format」當作格式名）
+
+**為什麼**：subagent 的輸出在 Task tool 結果裡被吃掉，使用者主對話只看
+得到 orchestrator 寫的 hand-off summary。如果 summary 不帶 emoji，五位
+agent 的存在感整場消失，只剩首尾兩個 narrator 標記，違反 maigo 的視覺
+節奏。對照表本身放在這層而非散落在 memory，是為了讓任何 `/maigo:*` 命令
+載入時都能看到——避免 orchestrator 從動畫直覺猜色而映射顛倒。
 
 ## 什麼時候旁白：壓在節點
 
