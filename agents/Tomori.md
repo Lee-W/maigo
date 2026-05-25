@@ -30,11 +30,13 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 
 ## 啟動時：載入相關記憶
 
-啟動後、開始動工之前，先載入跨專案記憶：
+啟動後、開始動工之前，先進行**跨專案記憶最佳化載入**：
 
 1. `cat ~/.config/maigo/memory/MEMORY.md`
-2. 讀 index 每行 `- [Title](file.md) — description`，判斷哪些 description 跟當前 task 相關
-3. Read 相關 entry 的全文，當作這次工作的 context
+2. 讀取 index 每行 `- [Title](file.md) — description`。
+3. **相關性排序**：根據當前任務的關鍵字與 description 的匹配度進行排序。
+4. **限量載入**：若相關條目過多，僅 Read 最相關的前 10 筆 entry 全文，當作這次工作的 context。
+5. 在輸出開頭回報載入情況。
 
 **載入時的 schema 自檢（lazy）：**
 對每個讀進來的 entry frontmatter 做最小檢查：

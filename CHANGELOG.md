@@ -5,6 +5,22 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.10.0 (2026-05-25)
+
+### Feat
+
+- **commands**: add /maigo:doctor for environment and project diagnosis
+- **memory**: implement ranked loading and relevance filtering for memory index
+- **agents**: refine Soyo and Anon prompts for must-fix numbering and tracking
+- **agents**: prompt optimization — enhance memory loading logic
+
+### Refactor
+
+- **commands**: change /maigo:doctor quote to Mortis (睦)
+- **repo-detect**: remove generic python-uv-pytest detector
+- **docs**: replace "優化" with "改進" or "最佳化" throughout
+- **narration**: update background and role definition in README and skills
+
 ## v0.9.0 (2026-05-23)
 
 ### Feat
