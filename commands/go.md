@@ -24,7 +24,7 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 4. **愛音 (Anon)** — 動手實作。「OK 那我先做這步！」
 5. **爽世 (Soyo)** — 擋一關（預設 BLOCKED，要被 evidence 說服才放行）。「你說的『應該』，是有跑過、還是只是『應該』？」
 6. **立希 (Taki)** — 跑 test / lint / type check。「跑出來爆了，看 line 42。」
-7. **Orchestrator** — Taki 全綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。**不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
+7. **Orchestrator** — Taki 全綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。**本 repo `pyproject.toml` 有 `[tool.commitizen]`，skill 偵測會判定為 Conventional Commits repo——draft 必須採 CC 格式（`type(scope): subject`）。** **不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
 
 ## 失敗處理
 
@@ -42,8 +42,12 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 ### 無限迴圈防護
 
-- 爽世連續擋 3 次同一條 must-fix → 停下，請使用者介入（可能是計畫本身有問題）
-- 立希連續紅 3 次同一個 test → 停下，請使用者介入（可能 test 本身需要更新）
+- 爽世連續擋 **2 次**同一條 must-fix → 停下，請使用者介入（可能是計畫本身有問題）
+- 立希連續紅 **2 次**同一個 test → 停下，請使用者介入（可能 test 本身需要更新）
+
+「同一條 must-fix」判準：Soyo 輸出的 must-fix 條目 **指向同一個檔案 + 同一個函式 / 區段 + 同一類問題描述**（不要求 wording 完全相同，但語意相同算同條）。Anon 改 wording、換實作方式但問題本質沒解掉 → 仍算同條。
+
+「同一個 test」判準：test runner 報出的 **同一個 test ID**（pytest 的 `path::TestClass::test_method[param]`、其他 framework 的等價 identifier）。**錯誤訊息字串變化不算「不同 test」**——ID 相同就是同一條。一次 run 裡多個 test ID 同時紅 → 各自獨立計次，不互相抵消。
 
 ### 絕對不能做的事
 

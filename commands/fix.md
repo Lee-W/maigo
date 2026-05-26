@@ -36,7 +36,7 @@ Test 不顯式喊 Taki——stop hook 在任務完成前自動跑測試兜底。
    - 不寫 plan.md
 2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫的話……應該不太對哦？」
 3. **Stop hook 自動跑 test** — 不顯式呼叫 Taki
-4. **Orchestrator** — Stop hook 綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。**不自動跑 git commit**。
+4. **Orchestrator** — Stop hook 綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。（本 repo 是 CC repo，draft 採 `type(scope): subject` 格式）**不自動跑 git commit**。
 
 ## Soyo 輕量 checklist（9 項 → 4 項）
 
@@ -64,7 +64,7 @@ orchestrator 啟動 Soyo 時 prompt 必須明示「mode=quick-fix」與上述 su
 
 ### Soyo 擋下（NEEDS_CHANGES / BLOCKED）
 
-跟 `/maigo:go` 同——把 must-fix 完整給 Anon、修完重 review、3 次同條才停下找使用者。
+跟 `/maigo:go` 同——把 must-fix 完整給 Anon、修完重 review、**2** 次同條才停下找使用者。
 詳見 [`/maigo:go`](https://github.com/Lee-W/maigo/blob/main/commands/go.md) 失敗處理段。
 
 ### Stop hook 測試紅
