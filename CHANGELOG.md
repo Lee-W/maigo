@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.11.0 (2026-05-27)
+
+### Feat
+
+- **commands**: rename /maigo:fix to /maigo:quick
+
 ## v0.10.1 (2026-05-27)
 
 ### Fix
