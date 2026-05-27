@@ -137,8 +137,10 @@ C3  [conversation]  @reviewer
 **預設盡量走 `/maigo:quick`**——多數 review 意見是局部修正。
 不確定 quick 還是 go → 偏 `/maigo:go`（多一輪探索 + 完整 9 項 review，往上靠較安全）。
 
-把 work item 清單 + 各自的 route + rationale 印給使用者，用 **AskUserQuestion** 確認：
-`照計畫跑` / `我要調整路由或分組` / `取消`。選「調整」→ 收使用者修改後重印計畫再確認；選「取消」→ 不動任何檔（triage 檔可留著）並結束。
+把 work item 清單 + 各自的 route + rationale 印給使用者，同一輪 **AskUserQuestion** 同時問兩個問題：
+
+1. 確認計畫：`照計畫跑` / `我要調整路由或分組` / `取消`。選「調整」→ 收使用者修改後重印計畫再確認；選「取消」→ 不動任何檔（triage 檔可留著）並結束。
+2. **Commit 格式**：`各自獨立 commit（預設）` / `fixup! commit（autosquash 用）`。
 
 ### 5. 逐 work item 實作
 
@@ -153,7 +155,12 @@ C3  [conversation]  @reviewer
 - 每個 work item 開跑前把 triage 檔該項 `Status` 改 `in-progress`，完成改 `done`。
 - 被選 route 的失敗處理、Soyo 擋下、Taki 紅、**2** 次同條卡關才停下找使用者——依 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)，address-comments 不另立規則。
 - 某個 work item 卡死（依該 route 規則停下找使用者）→ 該項標 `blocked`，**其餘 work item 照常繼續**，最後在 summary 點出卡住的那項。
-- **Commit 政策覆寫**：address-comments 操作在已有 fixup chain 的 PR branch 上，多個 work item 共享 working tree——若不 commit，後一個 work item 的 Anon / Soyo 會看到前一個的未 commit 改動，污染 diff、混淆 review 焦點。**因此覆寫 inner route 的「不自動 `git commit`」預設**（`/maigo:quick` 流程步驟 4、`/maigo:go` / `/maigo:team` 的 finale 規則）：每個 work item 完成、Soyo 過、Stop hook 綠後，orchestrator 在 inner route 草擬的 commit message 基礎上（inner route 在本 repo 偵測為 CC，subject 為 `type(scope): ...`；fixup 前綴維持 `fixup!` 不動）**確實落地為新 fixup commit**（subject `fixup! <原 PR 主題>`，讓 `git rebase --autosquash` 接得起來）。**仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。
+- **Commit 政策覆寫**：多個 work item 共享 working tree——若不 commit，後一個 work item 的 Anon / Soyo 會看到前一個的未 commit 改動，污染 diff、混淆 review 焦點。**因此覆寫 inner route 的「不自動 `git commit`」預設**（`/maigo:quick` 流程步驟 4、`/maigo:go` / `/maigo:team` 的 finale 規則）：每個 work item 完成、Soyo 過、Stop hook 綠後，orchestrator 依步驟 4 使用者選擇的 commit 格式落地：
+
+  - **各自獨立 commit（預設）**：直接用 inner route 草擬的 commit message 落地（本 repo 偵測為 CC，subject 為 `type(scope): ...`）。
+  - **fixup! commit（使用者在步驟 4 選擇）**：subject 改為 `fixup! <原 PR 主題>`，讓 `git rebase --autosquash` 接得起來。
+
+  **仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。
 
 ### 6. Finale
 
@@ -167,7 +174,7 @@ C3  [conversation]  @reviewer
    貼上去：gh api repos/{owner}/{repo}/pulls/<number>/comments/<comment-id>/replies -f body='...'
    ```
 
-3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 fixup commit。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
+3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
 
 ## Memory propose confirm flow
 
