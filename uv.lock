@@ -253,7 +253,7 @@ wheels = [
 
 [[package]]
 name = "maigo"
-version = "0.12.0"
+version = "0.13.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

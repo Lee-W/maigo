@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.13.0 (2026-05-27)
+
+### Feat
+
+- **review**: batch multi-PR, bilingual output, Airflow review-time checks
+
 ## v0.12.0 (2026-05-27)
 
 ### Feat
