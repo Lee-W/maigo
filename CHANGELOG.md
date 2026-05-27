@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.12.0 (2026-05-27)
+
+### Feat
+
+- **hooks**: add persistent must-fix retry counting for Soyo
+- **failure-handling**: extract skill and add persistent retry counting
+
 ## v0.11.0 (2026-05-27)
 
 ### Feat
