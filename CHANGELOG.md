@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.10.1 (2026-05-27)
+
+### Fix
+
+- **plugin**: use ./ prefix for relative source path in marketplace.json
+
 ## v0.10.0 (2026-05-25)
 
 ### Feat
