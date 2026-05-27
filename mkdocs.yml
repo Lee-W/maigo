@@ -48,6 +48,7 @@ nav:
       - airflow-aware: skills/airflow-aware.md
       - commitizen-aware: skills/commitizen-aware.md
       - commit-message: skills/commit-message.md
+      - failure-handling: skills/failure-handling.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
       - narration: skills/narration.md

@@ -151,7 +151,7 @@ C3  [conversation]  @reviewer
 該 route 的「任務描述」= 這個 work item 對應的 comment 原文 + triage 檔裡的 context（檔案路徑、行號、reviewer 在意什麼）。
 
 - 每個 work item 開跑前把 triage 檔該項 `Status` 改 `in-progress`，完成改 `done`。
-- 被選 route 的失敗處理、Soyo 擋下、Taki 紅、**2** 次同條卡關才停下找使用者——**全部承襲該 command 的規格**，address-comments 不另立規則。
+- 被選 route 的失敗處理、Soyo 擋下、Taki 紅、**2** 次同條卡關才停下找使用者——依 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)，address-comments 不另立規則。
 - 某個 work item 卡死（依該 route 規則停下找使用者）→ 該項標 `blocked`，**其餘 work item 照常繼續**，最後在 summary 點出卡住的那項。
 - **Commit 政策覆寫**：address-comments 操作在已有 fixup chain 的 PR branch 上，多個 work item 共享 working tree——若不 commit，後一個 work item 的 Anon / Soyo 會看到前一個的未 commit 改動，污染 diff、混淆 review 焦點。**因此覆寫 inner route 的「不自動 `git commit`」預設**（`/maigo:quick` 流程步驟 4、`/maigo:go` / `/maigo:team` 的 finale 規則）：每個 work item 完成、Soyo 過、Stop hook 綠後，orchestrator 在 inner route 草擬的 commit message 基礎上（inner route 在本 repo 偵測為 CC，subject 為 `type(scope): ...`；fixup 前綴維持 `fixup!` 不動）**確實落地為新 fixup commit**（subject `fixup! <原 PR 主題>`，讓 `git rebase --autosquash` 接得起來）。**仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。
 

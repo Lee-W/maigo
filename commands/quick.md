@@ -65,7 +65,7 @@ orchestrator 啟動 Soyo 時 prompt 必須明示「mode=quick」與上述 subset
 ### Soyo 擋下（NEEDS_CHANGES / BLOCKED）
 
 跟 `/maigo:go` 同——把 must-fix 完整給 Anon、修完重 review、**2** 次同條才停下找使用者。
-詳見 [`/maigo:go`](https://github.com/Lee-W/maigo/blob/main/commands/go.md) 失敗處理段。
+詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。
 
 ### Stop hook 測試紅
 

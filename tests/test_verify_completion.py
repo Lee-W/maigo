@@ -257,3 +257,127 @@ class TestMain:
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "approve"
+
+
+# ---------------------------------------------------------------------------
+# _retry_log_path
+# ---------------------------------------------------------------------------
+
+
+class TestRetryLogPath:
+    def test_path_structure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", tmp_path / "maigo")
+        cwd = tmp_path / "myrepo"
+        cwd.mkdir()
+        result = verify_completion._retry_log_path(cwd)
+        assert result == tmp_path / "maigo" / "myrepo" / "test-failures.jsonl"
+
+    def test_parent_created(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", tmp_path / "maigo")
+        cwd = tmp_path / "myrepo"
+        cwd.mkdir()
+        result = verify_completion._retry_log_path(cwd)
+        assert result.parent.is_dir()
+
+
+# ---------------------------------------------------------------------------
+# _record_and_count
+# ---------------------------------------------------------------------------
+
+
+class TestRecordAndCount:
+    def test_first_append_count_is_one(self, tmp_path: Path):
+        log = tmp_path / "test-failures.jsonl"
+        counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        assert counts["tests/x.py::test_a"] == 1
+
+    def test_second_append_same_id_count_is_two(self, tmp_path: Path):
+        log = tmp_path / "test-failures.jsonl"
+        verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        assert counts["tests/x.py::test_a"] == 2
+
+    def test_different_ids_counted_independently(self, tmp_path: Path):
+        log = tmp_path / "test-failures.jsonl"
+        verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        counts = verify_completion._record_and_count(log, {"tests/x.py::test_b"})
+        assert counts["tests/x.py::test_a"] == 1
+        assert counts["tests/x.py::test_b"] == 1
+
+    def test_corrupted_log_line_skipped(self, tmp_path: Path):
+        log = tmp_path / "test-failures.jsonl"
+        log.write_text(
+            '{"ts": "2026-01-01T00:00:00Z", "failures": ["tests/x.py::test_a"]}\n'
+            "not valid json at all\n",
+            encoding="utf-8",
+        )
+        counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        # first line parsed correctly → count is 1 from history + 1 from this call = 2
+        assert counts["tests/x.py::test_a"] == 2
+
+    def test_io_error_returns_empty_dict(self, tmp_path: Path):
+        # Make log path unwritable by placing a file where the parent dir should be
+        parent_blocker = tmp_path / "blocked-dir"
+        parent_blocker.write_text("i am a file, not a dir")
+        log = parent_blocker / "test-failures.jsonl"
+        # log.open("a") will raise OSError since parent is a file, not a dir
+        counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
+        assert counts == {}
+
+
+# ---------------------------------------------------------------------------
+# main() retry warning integration
+# ---------------------------------------------------------------------------
+
+
+class TestMainRetryWarning:
+    def test_first_failure_no_warning(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, "FAILED tests/x.py::test_y"),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+        assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
+
+    def test_second_failure_same_id_emits_warning(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, "FAILED tests/x.py::test_y"),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+
+        # First run — no warning
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        # Second run — should have warning
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
+        assert "2 次" in result["reason"]
