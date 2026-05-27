@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "maigo",
-      "source": ".",
+      "source": "./",
       "description": "MyGO!!!!! agent orchestration plugin"
     }
   ]
