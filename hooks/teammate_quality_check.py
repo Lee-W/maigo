@@ -6,9 +6,102 @@
 
 from __future__ import annotations
 
+import datetime
 import json
+import os
 import re
 import sys
+from pathlib import Path
+
+
+SOYO_RETRY_LIMIT = 2
+_RETRY_LOG_BASE = Path("/tmp/maigo")
+_MUST_FIX_FILE_RE = re.compile(r"`([\w./-]+\.\w+)(?::\d+)?`")
+_MUST_FIX_LINE_RE = re.compile(
+    r"^\s*(?:[-*]|\d+\.)\s+(.+)$",
+    re.MULTILINE,
+)
+
+
+_MUST_FIX_HEADING_RE = re.compile(
+    r"##\s+(?:must[-\s]?fix|必須修)",
+    re.IGNORECASE,
+)
+_NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
+
+
+def _extract_soyo_must_fix_keys(out: str) -> set[str]:
+    """Extract must-fix keys from Soyo output.
+
+    Strategy:
+    1. If a '## Must-fix' section exists, extract bullet items from that section only.
+    2. Otherwise, fall back to lines containing the 'must-fix' keyword.
+    For each item: backtick file path (with :line stripped) is the key;
+    if none, use normalized text (lowercase, whitespace collapsed, max 80 chars).
+    """
+    # Find ## Must-fix section
+    heading_match = _MUST_FIX_HEADING_RE.search(out)
+    if heading_match:
+        section_start = heading_match.end()
+        # Find the next ## heading after section_start
+        next_heading = _NEXT_HEADING_RE.search(out, section_start)
+        section_text = (
+            out[section_start : next_heading.start()]
+            if next_heading
+            else out[section_start:]
+        )
+        items = _MUST_FIX_LINE_RE.findall(section_text)
+    else:
+        # Fallback: lines that mention 'must-fix' keyword
+        items = [
+            line.strip()
+            for line in out.splitlines()
+            if re.search(r"must[-\s]?fix", line, re.IGNORECASE)
+        ]
+
+    keys: set[str] = set()
+    for item in items:
+        file_match = _MUST_FIX_FILE_RE.search(item)
+        if file_match:
+            keys.add(file_match.group(1))
+        else:
+            normalized = re.sub(r"\s+", " ", item).strip().lower()[:80]
+            if normalized:
+                keys.add(normalized)
+    return keys
+
+
+def _soyo_log_path(cwd: Path) -> Path:
+    log_dir = _RETRY_LOG_BASE / cwd.name
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "soyo-must-fix.jsonl"
+
+
+def _soyo_record_and_count(log_path: Path, keys: set[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    try:
+        if log_path.is_file():
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    for k in entry.get("must_fix_keys", []):
+                        counts[k] = counts.get(k, 0) + 1
+                except json.JSONDecodeError:
+                    pass  # corrupted line — skip, don't crash
+        ts = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        new_entry = json.dumps(
+            {"ts": ts, "must_fix_keys": sorted(keys)}, ensure_ascii=False
+        )
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(new_entry + "\n")
+        for k in keys:
+            counts[k] = counts.get(k, 0) + 1
+    except (OSError, PermissionError):
+        return {}
+    return counts
 
 
 def emit(decision: str, reason: str) -> None:
@@ -89,6 +182,25 @@ def check_soyo(out: str) -> None:
                 "block",
                 f"爽世 (Soyo) 給出 {verdict} 卻沒列 must-fix 或 evidence 待補。要擋就要說擋什麼、怎麼改。",
             )
+
+        cwd = Path(os.getcwd()).resolve()
+        keys = _extract_soyo_must_fix_keys(out)
+        if keys:
+            counts = _soyo_record_and_count(_soyo_log_path(cwd), keys)
+            over_limit = {
+                k: c for k, c in counts.items() if k in keys and c >= SOYO_RETRY_LIMIT
+            }
+            if over_limit:
+                lines = "\n".join(
+                    f"  - {k} ({c} 次)" for k, c in sorted(over_limit.items())
+                )
+                emit(
+                    "block",
+                    f"⚠️ RETRY LIMIT REACHED (Soyo): 以下 must-fix 已連續被指出 "
+                    f"≥ {SOYO_RETRY_LIMIT} 次（本次含），考慮停下找使用者介入：\n"
+                    f"{lines}\n依 skills/failure-handling 的「無限迴圈防護」"
+                    f"——同 must-fix key 連續 {SOYO_RETRY_LIMIT} 次即達 limit。",
+                )
 
     emit("approve", f"爽世 (Soyo) 輸出符合規格 (verdict={verdict})")
 

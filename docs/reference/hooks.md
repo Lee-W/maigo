@@ -88,10 +88,25 @@ agent 跑完輸出送回 orchestrator 時觸發。
 | **Soyo** | verdict 字串：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED` | 「沒下 verdict」 |
 | **Soyo** | checklist 項目：`[x]` / `[X]` / `[ ]` | 「沒 checklist」 |
 | **Soyo** | 非 APPROVED 時：`must-fix` / `改法` / `evidence` / `待補` 之一 | 「擋下卻沒列 must-fix」 |
+| **Soyo** | 同 must-fix key 連續 ≥ 2 次 | block reason 前綴 `⚠️ RETRY LIMIT REACHED (Soyo):` |
 | **Taki** | `exit <number>` 模式 | 「沒貼 exit code」 |
 | **Taki** | `PASS` 或 `FAIL` 之一 | 「沒給最終 verdict」 |
 | **Taki** | **不能包含** `should work` / `looks good` / `應該可以` / `看起來沒問題` 等 hedge 語 | 「verifier 只能拿 exit code 講話」 |
 | **Anon** | 至少一個 file path reference（regex 抓 `*.py` / `*.md` / `*.yml` / `*.yaml` / `*.json` / `*.toml` / `*.txt` / `*.sh` / `*.cfg`）| 「沒看到檔案路徑 reference」 |
+
+### Soyo must-fix 計次
+
+Soyo verdict 非 APPROVED 時，hook 會從輸出抽 must-fix 條目，用
+backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
+條目用 normalized 文字當 fallback key。
+
+計數寫到 `/tmp/maigo/<repo>/soyo-must-fix.jsonl`，每行一筆
+`{"ts": "...Z", "must_fix_keys": [...]}`。同一 key 累計到
+`SOYO_RETRY_LIMIT`（預設 2）時，block reason 前綴
+`⚠️ RETRY LIMIT REACHED (Soyo):`，提醒 orchestrator 停下找使用者
+——hook 本身仍 block，不會放行。
+
+對齊 Stop hook 的 `RETRY_LIMIT` 機制（見下面 Stop 段）。
 
 ### 不檢查的角色
 

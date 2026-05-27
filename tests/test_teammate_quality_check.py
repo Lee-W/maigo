@@ -11,6 +11,16 @@ import hooks.teammate_quality_check as tqc
 from tests.conftest import run_hook_main
 
 
+@pytest.fixture(autouse=True)
+def _redirect_soyo_log_base(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """Redirect tqc._RETRY_LOG_BASE to tmp_path for every test in this module.
+
+    Prevents the real /tmp/maigo/ from being polluted and makes tests
+    deterministic regardless of prior runs.
+    """
+    monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
+
+
 # ---------------------------------------------------------------------------
 # check_raana
 # ---------------------------------------------------------------------------
@@ -153,6 +163,130 @@ class TestCheckSoyo:
     def test_blocked_with_checklist_without_must_fix_blocks(self, capsys):
         result = self._run("BLOCKED\n[x] done\n[ ] pending\n", capsys)
         assert result["decision"] == "block"
+
+
+# ---------------------------------------------------------------------------
+# Soyo retry count (must-fix persistence)
+# ---------------------------------------------------------------------------
+
+
+class TestSoyoRetryCount:
+    """Tests for _extract_soyo_must_fix_keys, _soyo_log_path, _soyo_record_and_count,
+    and the retry-count logic inside check_soyo."""
+
+    _BLOCKED_OUTPUT = (
+        "## Loaded memory entries\n（無相關 entry）\n"
+        "BLOCKED\n[x] done\n[ ] pending\n"
+        "## Must-fix\n- `hooks/foo.py:10` — broken import\n"
+    )
+
+    def test_extract_must_fix_keys_with_file_ref(self):
+        out = "## Must-fix\n- `hooks/foo.py` — something wrong\n"
+        keys = tqc._extract_soyo_must_fix_keys(out)
+        assert keys == {"hooks/foo.py"}
+
+    def test_extract_must_fix_keys_strips_line_number(self):
+        out = "## Must-fix\n- `foo.py:42` — broken import\n"
+        keys = tqc._extract_soyo_must_fix_keys(out)
+        assert keys == {"foo.py"}
+
+    def test_extract_must_fix_keys_fallback_no_file(self):
+        out = "## Must-fix\n- must-fix: rename var X to Y\n"
+        keys = tqc._extract_soyo_must_fix_keys(out)
+        assert len(keys) == 1
+        key = next(iter(keys))
+        assert key != ""
+
+    def test_extract_must_fix_keys_empty_returns_empty_set(self):
+        assert tqc._extract_soyo_must_fix_keys("") == set()
+        assert tqc._extract_soyo_must_fix_keys("APPROVED\n[x] ok\n") == set()
+
+    def test_blocked_first_round_no_warning(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path,
+    ):
+        monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            tqc.check_soyo(self._BLOCKED_OUTPUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+        # log file should exist with 1 line
+        log_file = tmp_path / tmp_path.name / "soyo-must-fix.jsonl"
+        assert log_file.is_file()
+        lines = [line for line in log_file.read_text().splitlines() if line.strip()]
+        assert len(lines) == 1
+
+    def test_blocked_second_round_emits_retry_warning(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path,
+    ):
+        monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
+        monkeypatch.chdir(tmp_path)
+        # Pre-write one log entry with the same key
+        log_dir = tmp_path / tmp_path.name
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "soyo-must-fix.jsonl"
+        import json as _json
+
+        log_file.write_text(
+            _json.dumps(
+                {"ts": "2026-01-01T00:00:00Z", "must_fix_keys": ["hooks/foo.py"]}
+            )
+            + "\n"
+        )
+        with pytest.raises(SystemExit):
+            tqc.check_soyo(self._BLOCKED_OUTPUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "⚠️ RETRY LIMIT REACHED (Soyo):" in result["reason"]
+        assert "hooks/foo.py" in result["reason"]
+        assert "次" in result["reason"]
+
+    def test_approved_does_not_write_log(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+        tmp_path,
+    ):
+        monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
+        monkeypatch.chdir(tmp_path)
+        approved_output = (
+            "## Loaded memory entries\n（無相關 entry）\n"
+            "APPROVED\n[x] all good\n[x] verified\n"
+        )
+        with pytest.raises(SystemExit):
+            tqc.check_soyo(approved_output)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+        # No log file should be written
+        log_dir = tmp_path / tmp_path.name
+        assert not log_dir.exists()
+
+    def test_corrupted_log_line_does_not_crash(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path,
+    ):
+        monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
+        import json as _json
+
+        log_dir = tmp_path / "myrepo"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "soyo-must-fix.jsonl"
+        # Write one corrupted line + one good line
+        log_file.write_text(
+            "{bad json\n"
+            + _json.dumps({"ts": "2026-01-01T00:00:00Z", "must_fix_keys": ["foo.py"]})
+            + "\n"
+        )
+        counts = tqc._soyo_record_and_count(log_file, {"foo.py"})
+        # 1 from good existing line + 1 from current call = 2
+        assert counts["foo.py"] == 2
 
 
 # ---------------------------------------------------------------------------
