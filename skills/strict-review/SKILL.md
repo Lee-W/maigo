@@ -66,6 +66,28 @@ context）該引述，就重新驗。
 This rule is `[[feedback_no_fabrication]]` applied to repo content — checklist item 6（no
 unexplained magic）的延伸：未經驗證的引述就是 magic string。
 
+### Commit / staging state is not in review scope
+
+Strict review evaluates **the diff content**, not whether it's been committed yet.
+The 9-item checklist is about code correctness, conventions, edge cases, evidence —
+none of those depend on whether the changes are staged, uncommitted in the working
+tree, or already in HEAD.
+
+In `/maigo:address-comments`, the orchestrator deliberately commits **after** Soyo +
+Taki pass — that's the documented commit-policy override（see
+[`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
+step 5）. Soyo flagging「changes are uncommitted」/「`git status` shows ` M`」/
+「`git diff main...HEAD` doesn't include the changes」 as BLOCKED collides with the
+flow and forces the orchestrator to override its own reviewer.
+
+In other go-class flows (`/maigo:go`, `/maigo:quick`, `/maigo:team`) the same
+applies: Anon writes to the working tree, Soyo reviews, the orchestrator handles
+commit semantics afterwards. **`git status` cleanliness is not a checklist item.**
+
+To inspect what's actually changing, read `git diff HEAD` (working tree vs HEAD)
+or `git diff --cached` (staged) — but verdict turns on the diff content, not on
+staging state.
+
 ## The 9-item mandatory checklist
 
 Every review must walk through every item. Output explicitly marks `[x]` or `[ ]` per item.

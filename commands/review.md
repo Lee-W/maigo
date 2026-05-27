@@ -12,9 +12,10 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 ## 使用
 
 ```
-/maigo:review <github-pr-url>     # GitHub PR（需要 gh CLI）
-/maigo:review <branch-name>        # 本地 branch（跟 main / 預設 base 比）
-/maigo:review <commit-range>       # 例：HEAD~3..HEAD 或 main..feature
+/maigo:review <github-pr-url>          # GitHub PR（需要 gh CLI）
+/maigo:review <pr-1> <pr-2> ...         # 多 PR 批次（空白或逗號分隔）
+/maigo:review <branch-name>             # 本地 branch（跟 main / 預設 base 比）
+/maigo:review <commit-range>            # 例：HEAD~3..HEAD 或 main..feature
 ```
 
 不給參數 → 預設 `HEAD` 對 `main`（review 你目前 branch 的所有變更）。
@@ -24,6 +25,7 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 ```
 /maigo:review --mode=design-preview <target>     # 只看設計層，不查 evidence
 /maigo:review --mode=compliance-only <target>    # 只查 convention/safety/magic/TODO/bloat
+/maigo:review --bilingual <target>                # 雙語輸出（zh-TW 快結 + English detail）
 /maigo:review <target>                            # 預設 full mode（9 項全跑）
 ```
 
@@ -33,13 +35,110 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 | `design-preview` | 只跑 1 + 4 | ❌ skip | 早期設計討論、介面預審 |
 | `compliance-only` | 只跑 4 / 5 / 6 / 7 / 8 | ✅ | 安全 audit、規範對焦 |
 
+`--bilingual` 是**輸出格式 flag**，跟上面三個 mode 正交——可以跟 `--mode=*` 同時用。
+偵測到 `apache/airflow` checkout（`hooks/repo_detect.py` 已 load airflow-aware）時 orchestrator 預設啟用 `--bilingual`，不必手動加旗標。
+
 ## Mode 旗標處理
 
-Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
+Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode` 與 `--bilingual`：
 - 把 mode 名稱寫進 review-rubric.md 開頭 `<!-- mode: <mode-name> -->` 註解，讓 Soyo / Taki 啟動時讀得到
 - Soyo 收到 prompt 時被明確告知 checklist subset（mirror `skills/strict-review/SKILL.md` 「Adapting per context」表的寫法——standard 9 項保持，只是把不在 subset 的項在輸出表標 `[—]` 而非 `[x]` / `[ ]`，附 reason「skipped by mode=<name>」）
 - mode = `design-preview` → 不啟動 Taki stage；最終報告 Verification 段註記「Skipped (mode=design-preview)」
 - mode = `compliance-only` → 正常啟動 Taki stage（與 full mode 相同）
+- `--bilingual` 旗標**或** repo-detect 回報 `apache/airflow` → orchestrator 在最終 report 前面加一段 Taiwanese Mandarin 快結（見「## 雙語輸出」）；不影響 Soyo / Taki 行為
+
+## 多 PR 批次與狀態前置處理
+
+`/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後一次一個 review；每完成一個 PR 等使用者 go-ahead 才推進。
+
+### 樂奈先抓 metadata 排隊
+
+第一輪 🐱 樂奈以 parallel 方式抓**每個 PR** 的 lightweight metadata（不抓 diff）：
+
+```bash
+gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDraft,mergedAt,reviewDecision
+```
+
+排序規則：
+
+1. **Bucket A — `APPROVED`** 先（通常只欠最後一眼）
+2. **Bucket B — neutral**（`reviewDecision` 為 `null` / `COMMENTED` / `REVIEW_REQUIRED`）
+3. **Bucket C — `CHANGES_REQUESTED`** 最後（author 還欠 follow-up，reviewer 時間花在別處更值）
+4. 每個 bucket 內按 `additions + deletions` **升序**——quick win 先
+
+排好後印一張 queue 表給使用者：
+
+```markdown
+## 排序後 review queue（共 N 個）
+
+| 順序 | PR | Title | Lines | State |
+|---|---|---|---|---|
+| 1 | #X | … | +A/-B | ✅ APPROVED |
+| 2 | #Y | … | +A/-B | REVIEW_REQUIRED |
+| 3 | #Z | … | +A/-B | ⚠️ CHANGES_REQUESTED |
+| — | #W | … | — | ⏭️ skipped (merged) |
+
+從 **#X** 開始。
+```
+
+第一個 PR **不必**等 go-ahead——使用者送多 PR 進來就已經授權 batch 啟動。「等 go-ahead」規則只套在 PR 與 PR 之間。
+
+### 狀態前置處理（每 PR 進 §1 前）
+
+| PR 狀態 | 處理 |
+|---|---|
+| `state == "MERGED"` 或 `mergedAt` 已設 | 不進流程，queue 上標 `⏭️ skipped (merged)`，**自動推進**到下一個 |
+| `state == "CLOSED"` 未 merge | 同上，標 `⏭️ skipped (closed)` |
+| `isDraft == true` | orchestrator 先問使用者「PR #N 是 draft，還是要看嗎？」`yes` → 走，`skip` → 跳下一個 |
+| 其他 | 正常進入 §1 樂奈 stage |
+
+merged / closed 的 PR **不需要** review report——只在 queue 表標 skipped 一行帶過。
+
+### 一次一個 PR 規則
+
+每個 PR 走完 §1-§4 出完一份 review report 後，orchestrator 在 report 結尾加一行：
+
+```
+Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再看下一個。
+```
+
+然後**停下來等使用者明確 go-ahead**。任何短肯定（`好` / `ok` / `next` / `下一個` / `繼續` / `go` / `yep`）都算。
+
+- 使用者若給 substantive feedback（追問、要 re-read、pivot），先處理那個再推進
+- 使用者說「全部一起看」/ `batch them` / `do them all` → 放掉這個 gate 直到 batch 結束
+- 最後一個 PR 跑完 → queue 行改成最終 roll-up（見「## 輸出」雙語版範本）
+
+## 雙語輸出
+
+`--bilingual` 旗標或 repo-detect 自動觸發時，最終 report 在前面加一段 **Taiwanese Mandarin 快結**（1-3 句），後面接英文 detail：
+
+```markdown
+## 台灣華語快速結論
+
+**PR #<N> — <short title>** <APPROVE / REQUEST_CHANGES / BLOCKED>
+<1-3 句：做什麼、能不能上、最大一個 concern；點到具體 file / function 名。>
+
+---
+
+## English — Detailed Review
+
+[（既有的 # Review / Context / Rubric / Verdict / Verification / Bottom line 段落）]
+
+---
+
+**PR link:** <url>
+
+<Queue / next-step line — 見「## 多 PR 批次」>
+```
+
+zh-TW 行文規範（通用，跨專案）：
+
+- **「Taiwanese Mandarin」**，不寫「Traditional Chinese」
+- 三個以上 item 不要 inline `(1)…(2)…(3)…`，拆 bullets
+- 中英文之間留一個半形空格；不雙空格
+- 技術名詞英文穿插無妨（PR / merge / refactor / cache / token / scheduler）
+
+Repo-specific 命名規範（例如 Airflow 的 `Dag` title case + code token 例外）由各 repo 的 domain skill 負責（如 `airflow-aware` §2），這裡不重述——`--bilingual` 自動觸發那條路徑下 domain skill 已經被 repo-detect 載入。
 
 ## 流程
 
@@ -104,7 +203,7 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode`：
 
 ## 輸出
 
-最終一份 review report 給使用者：
+### 單一 PR / branch / range（預設）
 
 ```markdown
 # Review: <PR title / branch / range>
@@ -131,6 +230,45 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 <一句話總結>
 ```
 
+### 多 PR batch 最終 roll-up
+
+batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行改成 roll-up：
+
+```markdown
+**Summary of recommendations:**
+- Approve: **#N**, **#N**
+- Approve with nits: **#N** (one-line why)
+- Request changes: **#N** (one-line why)
+- Block: **#N** (one-line why)
+- Skipped: **#N** (merged/closed/draft)
+```
+
+涵蓋整輪 batch，不只當下這個 PR。
+
+### 雙語版（`--bilingual` 或 repo-detect 觸發）
+
+最終 report 前加 Taiwanese Mandarin 快結 + horizontal rule，後面接既有英文 detail：
+
+```markdown
+## 台灣華語快速結論
+
+**PR #<N> — <short title>** <APPROVE / REQUEST_CHANGES / BLOCKED>
+<1-3 句：做什麼、能不能上、最大一個 concern>
+
+---
+
+## English — Detailed Review
+
+# Review: <PR title>
+[（既有 Context / Rubric / Verdict / Verification / Bottom line 全段）]
+
+---
+
+**PR link:** <url>
+
+<Queue / next-step line | batch 結束的 roll-up>
+```
+
 ## 與 `/maigo:go` 的差異
 
 | 項目 | `/maigo:go` | `/maigo:review` |
@@ -151,3 +289,5 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 - Soyo 的 review 輸出若含 `## Memory propose`，
   把 review report 完整呈現給使用者後再觸發 confirm flow；
   不要在使用者讀完 report 之前插入確認問題。
+- **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、PR 與 PR 間等 go-ahead——細節見「## 多 PR 批次與狀態前置處理」；不要一次 fire 多個 review，不要自己決定 draft 要不要看。
+- **雙語自動觸發**：repo-detect 回報 `apache/airflow` 時 orchestrator 自動加 `--bilingual`；偵測非 Airflow repo 但使用者顯式傳 `--bilingual` 也照樣執行——`--bilingual` 純粹是輸出層 flag，不會改變 agent 行為。
