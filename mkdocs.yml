@@ -36,7 +36,7 @@ nav:
   - Commands (source):
       - /maigo:go: commands/go.md
       - /maigo:team: commands/team.md
-      - /maigo:fix: commands/fix.md
+      - /maigo:quick: commands/quick.md
       - /maigo:review: commands/review.md
       - /maigo:remember: commands/remember.md
       - /maigo:memory: commands/memory.md

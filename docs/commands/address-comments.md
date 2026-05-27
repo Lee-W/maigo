@@ -10,10 +10,10 @@ flowchart TD
     Plan --> Confirm{使用者確認<br/>分組 + 路由?}
     Confirm -- 要調整 --> Plan
     Confirm -- OK --> Route[逐 work item 跑指定 route]
-    Route --> Fix[/maigo:fix]
+    Route --> Quick[/maigo:quick]
     Route --> Go[/maigo:go]
     Route --> Team[/maigo:team]
-    Fix --> Finale[Orchestrator finale<br/>處理對照 + 回覆草稿 + commit msg]
+    Quick --> Finale[Orchestrator finale<br/>處理對照 + 回覆草稿 + commit msg]
     Go --> Finale
     Team --> Finale
     Finale --> Done([完成])

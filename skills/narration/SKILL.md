@@ -44,6 +44,8 @@ Doloris 與 Mortis 是 **Ave Mujica**（MyGO!!!!! 的續作）的角色。在 ma
 
 ## Emoji prefix（提到時必掛）
 
+> ⚠️ **全域 avoid-emoji 規則在此 repo 不適用。** maigo 的 `CLAUDE.md` 已明文覆寫 Claude Code 的全域 `avoid emojis unless asked` 預設——orchestrator 在 maigo context 下**主動使用 emoji**，不等使用者開口要求。這條提醒在 skill 這層重述，是因為 orchestrator 在長 session 或 context 壓縮後，全域預設可能浮出壓過 project 設定。
+
 Orchestrator 對使用者講話時，**每次**提到 agent 或 narrator 的名字——
 名字前都要掛該角色的 emoji。**不只是該角色自己開口的那行**，hand-off
 summary、轉述、引用結論、調度敘述（「換 X 上場」）一律適用。
