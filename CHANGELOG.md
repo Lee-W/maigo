@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.15.0 (2026-05-28)
+
+### Feat
+
+- **memory**: rename convention type to project; add allowed-tools and Mortis settlement
+
 ## v0.14.1 (2026-05-28)
 
 ### Fix
