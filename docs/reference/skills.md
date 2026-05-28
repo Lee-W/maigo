@@ -65,13 +65,13 @@ description: This skill should be used when ...    # 必填
 
 skill 也可以被 memory entry 觸發載入——不需要在 agent prompt 裡直接引用。
 
-機制：`type: convention` 的 entry 可在 frontmatter 加 `triggers: [<skill-name>]` 欄位。
-Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 convention entry 時，
+機制：`type: project` 的 entry 可在 frontmatter 加 `triggers: [<skill-name>]` 欄位。
+Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 project entry 時，
 對每個 triggered skill name 嘗試讀 `skills/<name>/SKILL.md`，
 存在就附加為 base 9 項 checklist 之後的 item 10+；
 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash。
 
-**注意**：只有 `type: convention` 的 entry 適用 `triggers`——
+**注意**：只有 `type: project` 的 entry 適用 `triggers`——
 `user` / `feedback` / `reference` type 的 triggers 欄位會被無聲忽略。
 
 詳見 [`memory.md` frontmatter schema](memory.md#entry-frontmatter-schema) 與

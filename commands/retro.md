@@ -1,5 +1,6 @@
 ---
 description: Session 結束時，把對話裡浮現的偏好 / 約定 / 學到的事，逐筆 AskUserQuestion 確認後寫進跨專案記憶層。寫檔流程 reuse /maigo:remember。
+allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(cat:*), Bash(ls:*), Bash(test:*), AskUserQuestion
 ---
 
 <!-- mkdocs-include-start -->
@@ -53,6 +54,22 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 
 5. 所有候選跑完，或使用者「結束 retro」→ 印 summary：「本次 retro 存了 K 筆：
    `<name1>`（`<type1>`）、`<name2>`（`<type2>`）...」。
+
+6. **🌑 Mortis 結算（一句）**
+
+   Summary 印完後，再加一行——把本次 retro 的核心壓縮成**一句**。
+
+   **硬性字數限：1 句。**
+
+   範例：
+   ```
+   🌑 Mortis：本次 retro 的核心是「Soyo review 要更精簡」。
+   ```
+
+   守則：
+   - 溫柔包裹克制——短句；不刻意冷酷；結尾常是靜靜的收束
+   - 不感嘆號、不鼓勵語
+   - 候選為 0 筆 → 跳過結算（沒存任何東西的 retro 不需要結算）
 
 ### 路徑 B — 跨 session fallback（orchestrator **無** conversation context）
 

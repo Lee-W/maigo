@@ -1,5 +1,6 @@
 ---
 description: 列出 ~/.config/maigo/memory/ 目前的跨專案記憶。read-only。可選 type filter。
+allowed-tools: Read, Bash(cat:*), Bash(ls:*), Bash(test:*)
 ---
 
 <!-- mkdocs-include-start -->
@@ -14,7 +15,7 @@ description: 列出 ~/.config/maigo/memory/ 目前的跨專案記憶。read-only
 
 ```
 /maigo:memory             # 列全部
-/maigo:memory convention  # 只列 convention type
+/maigo:memory project     # 只列 project type
 /maigo:memory user        # 只列 user type
 /maigo:memory feedback
 /maigo:memory reference
@@ -31,7 +32,7 @@ description: 列出 ~/.config/maigo/memory/ 目前的跨專案記憶。read-only
    抽出 `name` / `type` / `description` / `triggers`（optional）。
 
 4. 若使用者帶了 `<type>` 參數，filter 掉 type 不符的 entry。
-   - `<type>` 不在 `{user, feedback, convention, reference}` → 印「不支援的 type `<x>`，可用值：user / feedback / convention / reference」並報錯結束（非 0 退出）。
+   - `<type>` 不在 `{user, feedback, project, reference}` → 印「不支援的 type `<x>`，可用值：user / feedback / project / reference」並報錯結束（非 0 退出）。
    - filter 後 0 筆 → 印「（目前無 type=`<type>` 的記憶）」並正常結束（不視為錯誤）。
 
 5. 以 markdown table 輸出：

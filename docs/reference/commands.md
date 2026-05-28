@@ -151,7 +151,7 @@ Orchestrator 推斷 type / name，AskUserQuestion 確認後才寫檔。
 
 ```
 /maigo:memory             # 列全部
-/maigo:memory convention  # 只列 convention type
+/maigo:memory project     # 只列 project type
 /maigo:memory user        # 只列 user type
 /maigo:memory feedback
 /maigo:memory reference

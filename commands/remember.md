@@ -1,5 +1,6 @@
 ---
 description: 把使用者一句話的偏好 / 慣例 / 反饋，存進跨專案記憶層（~/.config/maigo/memory/）。orchestrator 推斷 type / name，AskUserQuestion 確認後寫檔。
+allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(cat:*), Bash(ls:*), Bash(test:*), AskUserQuestion
 ---
 
 <!-- mkdocs-include-start -->
@@ -30,13 +31,13 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
 
 1. 讀 input 自然語言
 
-2. 推斷 `type`（`user` / `feedback` / `convention` / `reference` 之一）
+2. 推斷 `type`（`user` / `feedback` / `project` / `reference` 之一）
 
    啟發式判斷：
 
    | 輸入特徵 | 推斷 type |
    |---------|---------|
-   | 含「偏好」「習慣」「慣例」「以後都」 | `convention` |
+   | 含「偏好」「習慣」「慣例」「以後都」 | `project` |
    | 含「上次」「之前」「那次」「有人說」 | `feedback` |
    | 含 URL 或「文件」「參考」「spec」 | `reference` |
    | 含「我是」「我叫」「稱呼我」「語言」 | `user` |
@@ -57,10 +58,10 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
      - 確認或修改 **name**
      - 要不要編輯 **body**？（預設 body = 從 input 提煉的一句話 + 原 input 當補充；使用者可直接接受或提供新版）
 
-   - **第四題（僅 `type: convention`）**：
+   - **第四題（僅 `type: project`）**：
      - 要 tag triggered skills 嗎？（optional，list，例：`airflow-aware`、`commitizen-aware`）。預設空，直接 Enter 略過
      - 非空 → frontmatter 加 `triggers: [...]`；空 → 不加 `triggers` 欄位
-     - 此欄位只對 `type: convention` 有效；其他 type 不詢問、不寫入
+     - 此欄位只對 `type: project` 有效；其他 type 不詢問、不寫入
 
 6. 使用者確認後：
 
@@ -68,7 +69,7 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
 
    b. 寫 `~/.config/maigo/memory/<slug>.md`：
 
-      （`triggers` 行只在 `type: convention` 且使用者第四題回非空時加進 frontmatter）
+      （`triggers` 行只在 `type: project` 且使用者第四題回非空時加進 frontmatter）
 
       ```markdown
       ---
@@ -80,7 +81,7 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
       <body 內容>
       ```
 
-      若 `type: convention` 且使用者填了 triggers，在 `type:` 行後加一行：
+      若 `type: project` 且使用者填了 triggers，在 `type:` 行後加一行：
 
       ```markdown
       triggers: [<skill-name>, ...]

@@ -7,7 +7,7 @@ flowchart TD
     Resolve -- 重命名 --> Infer
     Resolve -- 取消 --> Cancel([未寫入])
     Collision -- 否 --> Ask3[AskUserQuestion:<br/>type / name / body]
-    Ask3 --> TypeCheck{type = convention?}
+    Ask3 --> TypeCheck{type = project?}
     TypeCheck -- 是 --> Ask4[AskUserQuestion:<br/>tag triggered skills?]
     TypeCheck -- 否 --> Write
     Ask4 --> Write[寫 slug.md<br/>到 ~/.config/maigo/memory/]
