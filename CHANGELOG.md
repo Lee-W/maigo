@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.14.0 (2026-05-28)
+
+### Feat
+
+- **agents**: add character voice rules to all five agent personas
+
 ## v0.13.0 (2026-05-27)
 
 ### Feat
