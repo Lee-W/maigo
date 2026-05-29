@@ -9,8 +9,9 @@
     {
       "name": "maigo",
       "source": {
-        "source": "github",
-        "repo": "Lee-W/maigo"
+        "source": "url",
+        "url": "https://github.com/Lee-W/maigo.git",
+        "sha": "f9436c0cd120eb211b51d56c1d99021ce60c3a17"
       },
       "description": "MyGO!!!!! agent orchestration plugin"
     }
