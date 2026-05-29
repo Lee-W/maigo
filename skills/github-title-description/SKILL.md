@@ -125,6 +125,18 @@ skill 跑完直接給 caller 兩塊 markdown：
 - Closes #...
 ```
 
+### Copy-paste 版本（caller 收尾用）
+
+上面兩塊是 skill 回給 caller 的**結構化**輸出。caller（`/maigo:describe-pr` orchestrator）
+在印給使用者時，**額外**再附一份「可整段複製」的 description：
+
+- 把 `## Suggested PR description` 底下的 body 原封放進**單一** fenced code block。
+- 外層 fence 用**四個 backtick**，避免 Test Plan 等內部三-backtick code block 把它截斷。
+- 緊接著用 `**Title:** <one line>` 給 title，方便一起複製。
+- 純淨版：不夾旁白、不夾額外提示；`<待補：...>` 佔位符保留讓使用者替換。
+
+（skill 本身只負責產 body / title；組裝 copy-paste block 是 caller 的收尾步驟。）
+
 ## What this skill does NOT cover
 
 - 開 PR（這是 caller / 使用者 的 `gh pr create` 或 GitHub UI）

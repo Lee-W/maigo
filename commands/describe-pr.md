@@ -62,7 +62,14 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 ### 3. Orchestrator 收尾
 
 - 把燈的草稿原樣印到對話。**不寫任何檔**（不存 `/tmp/maigo/`、不 push、不開 PR）。
-- **附帶提示**（最末）：
+- **再附一份「可整段複製」的 description**：把燈草稿 `## Suggested PR description` 底下的 body
+  原封不動放進**單一** fenced code block，讓使用者一鍵複製貼到 GitHub。
+  - **外層 fence 用四個 backtick**（````` ```` `````），這樣 description 內部的三 backtick code block
+    （例：Test Plan 的指令）不會把外層 fence 截斷。
+  - title 緊接在這塊下方用一行 `**Title:** <one line>` 給出，方便連 title 一起複製。
+  - 這份是「給機器/剪貼簿」的純淨版——**不含旁白、不含 `<待補>` 以外的提示文字**；
+    `<待補：...>` 佔位符照樣留在 body 裡（使用者複製後自己替換）。
+- **附帶提示**（最末，放在可複製 block 之後）：
   - 「若要直接開 PR：`gh pr create --title '<title>' --body-file -`（接 stdin 貼 description）」
   - 若燈的草稿標出 `<待補：...>`，列出來提醒使用者補。
 
