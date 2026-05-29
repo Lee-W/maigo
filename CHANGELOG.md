@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.16.0 (2026-05-29)
+
+### Feat
+
+- **describe-pr**: emit a copy-paste-ready PR description block
+
 ## v0.15.3 (2026-05-29)
 
 ### Fix
