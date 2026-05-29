@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.15.1 (2026-05-29)
+
+### Fix
+
+- **plugin**: switch marketplace source from github to url type
+
 ## v0.15.0 (2026-05-28)
 
 ### Feat
