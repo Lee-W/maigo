@@ -54,11 +54,19 @@ def plugin_tree(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
 
-    # commands/bar.md
+    # commands/bar.md (must contain mkdocs-include-start marker)
     cmds_dir = tmp_path / "commands"
     cmds_dir.mkdir()
     (cmds_dir / "bar.md").write_text(
-        "---\ndescription: test command\n---\n\n# bar\n",
+        "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n# bar\n",
+        encoding="utf-8",
+    )
+
+    # docs/commands/bar.md — include shim (required by check_commands_docs_alignment)
+    docs_cmds_dir = tmp_path / "docs" / "commands"
+    docs_cmds_dir.mkdir(parents=True)
+    (docs_cmds_dir / "bar.md").write_text(
+        '{% include-markdown "../../commands/bar.md" start="<!-- mkdocs-include-start -->" %}\n',
         encoding="utf-8",
     )
 

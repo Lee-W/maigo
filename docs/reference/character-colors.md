@@ -1,6 +1,6 @@
 # 角色代表色
 
-MyGO!!!!! 五位角色在 maigo 的 canonical 代表色，套用於 [Commands (source)](https://github.com/Lee-W/maigo/tree/main/commands) 的 mermaid 圖 `classDef`。改色從這裡改，再同步到 4 張 mermaid 圖。
+MyGO!!!!! 五位角色在 maigo 的 canonical 代表色，套用於 [`docs/commands/*.md`](https://github.com/Lee-W/maigo/tree/main/docs/commands) 裡的 mermaid 圖 `classDef`。mermaid 圖定義在 `docs/commands/*.md`（docs shim 層），不在 [`commands/`](https://github.com/Lee-W/maigo/tree/main/commands) source。改色從這裡改，再同步到 4 張 mermaid 圖。
 
 | Class | 角色 | Emoji | 樂團位置 | Fill (hex) | Stroke | Color |
 |---|---|---|---|---|---|---|

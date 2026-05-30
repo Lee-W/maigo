@@ -31,10 +31,10 @@ Test 不顯式喊 Taki——stop hook 在任務完成前自動跑測試兜底。
 
 ## 流程
 
-1. **愛音 (Anon)** — 直接動手實作（無 Raana 探索、無 Tomori plan）。「OK 那我先做這步！」
+1. **愛音 (Anon)** — 直接動手實作（無 Raana 探索、無 Tomori plan）。「嗯！先做 Step 1！」
    - Anon 自己看周邊 1-2 個檔抓慣例，不做大範圍探索
    - 不寫 plan.md
-2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫的話……應該不太對哦？」
+2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫，應該不對。」
 3. **Stop hook 自動跑 test** — 不顯式呼叫 Taki
 4. **Orchestrator** — Stop hook 綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。（本 repo 是 CC repo，draft 採 `type(scope): subject` 格式）**不自動跑 git commit**。
 
@@ -73,20 +73,7 @@ stop hook 會把 failure 自動顯示給使用者。orchestrator 接到後把錯
 
 ## Memory propose confirm flow
 
-當 Soyo 或 Anon 的輸出末尾含 `## Memory propose` 段時，orchestrator 在該 agent 完成後、繼續下一步前，立刻執行 confirm flow：
-
-1. 檢查 propose 段的 6 個必填欄位（name / slug / description / body / type / rationale）是否齊全。
-   缺任一欄位 → 不 confirm，印一行提示「偵測到 propose 段但格式不完整，已跳過」，繼續正常流程。
-2. 顯示目前兩個 memory 來源的 index：
-   - `~/.config/maigo/memory/MEMORY.md`（cross-project）
-   - `~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
-3. 印出 propose 摘要（type / name / description / rationale）。
-4. **AskUserQuestion**，選項：`存` / `修改` / `跳過`。
-5. 選「存」或「修改」→ reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 5+6
-   （以 propose 的欄位為預填值；「修改」時步驟 5 讓使用者改各欄位）。
-6. 選「跳過」→ 繼續正常流程，不寫任何檔。
-
-Confirm flow 完成後繼續主線流程——不改變 quick 的步驟結構。
+依 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md) 處理。Confirm flow 完成後繼續主線流程——不改變 quick 的步驟結構。
 
 ## Orchestrator 守則
 
@@ -95,9 +82,7 @@ Confirm flow 完成後繼續主線流程——不改變 quick 的步驟結構。
 - **不能改 Soyo 的 4 項 subset 為更少**——這 4 項是硬底線
 - **不能因為「使用者說 quick-fix」就放寬 must-fix 標準**——subset 內的項仍照 strict-review 規則
 - **不要自己 review / 不要自己實作**——分別交給 Anon 與 Soyo Task
-- 偵測 `## Memory propose` 標頭時，只掃描 code fence 外的行；
-  code block 內（triple-backtick fence 之間）的同名標頭不觸發 confirm flow。
-  追蹤法：從輸出文字開頭往下追蹤 triple-backtick 計數（奇數 → in-fence），遇到 `^## Memory propose` 且 in-fence 為 true 時跳過。
+- fence tracking 與 `## Memory propose` 偵測規則依 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md)
 
 ## 與 `/maigo:go` / `/maigo:team` 的差異
 

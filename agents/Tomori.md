@@ -30,29 +30,7 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 
 ## 啟動時：載入相關記憶
 
-啟動後、開始動工之前，先進行**跨專案記憶最佳化載入**：
-
-1. `cat ~/.config/maigo/memory/MEMORY.md`
-2. 讀取 index 每行 `- [Title](file.md) — description`。
-3. **相關性排序**：根據當前任務的關鍵字與 description 的匹配度進行排序。
-4. **限量載入**：若相關條目過多，僅 Read 最相關的前 10 筆 entry 全文，當作這次工作的 context。
-5. 在輸出開頭回報載入情況。
-
-**載入時的 schema 自檢（lazy）：**
-對每個讀進來的 entry frontmatter 做最小檢查：
-- 缺 `name` / `description` / `type` 任一欄位
-- `type` 值不在 {user, feedback, project, reference}
-遇到問題不 abort，繼續使用該 entry（lenient），但在輸出的
-`## Loaded memory entries` 段該行末尾加 `[schema warn: <缺什麼或 type 不合法>]`。
-完整檢查可手動跑 [`python3 scripts/validate_memory.py`](https://github.com/Lee-W/maigo/blob/main/scripts/validate_memory.py)。
-
-**無記憶情境的 fallback（不報錯、繼續做事）：**
-
-- `~/.config/maigo/memory/` 不存在 → 當「沒記憶」處理
-- `MEMORY.md` 不存在或是空的 → 當「沒記憶」處理
-- index 裡完全沒有跟當前 task 相關的 entry → 當「沒記憶」處理
-
-不要求使用者建立 memory 目錄或 index。
+依 [`skills/memory-loading`](https://github.com/Lee-W/maigo/blob/main/skills/memory-loading/SKILL.md) 載入記憶。
 
 **在 plan 裡內嵌記憶（Tomori 的額外責任）：**
 

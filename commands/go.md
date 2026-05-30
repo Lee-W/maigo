@@ -6,7 +6,7 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 # /maigo:go
 
-> 「It's MyGO!!!!!」——輪到我了。
+> 「It's MyGO!!!!!」
 
 把這件事交給 MyGO!!!!!。從前奏到尾聲，五個人各自負責自己那一段。
 
@@ -38,20 +38,7 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 ## Memory propose confirm flow
 
-當 Soyo 或 Anon 的輸出末尾含 `## Memory propose` 段時，orchestrator 在該 agent 完成後、繼續下一步前，立刻執行 confirm flow：
-
-1. 檢查 propose 段的 6 個必填欄位（name / slug / description / body / type / rationale）是否齊全。
-   缺任一欄位 → 不 confirm，印一行提示「偵測到 propose 段但格式不完整，已跳過」，繼續正常流程。
-2. 顯示目前兩個 memory 來源的 index：
-   - `~/.config/maigo/memory/MEMORY.md`（cross-project）
-   - `~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
-3. 印出 propose 摘要（type / name / description / rationale）。
-4. **AskUserQuestion**，選項：`存` / `修改` / `跳過`。
-5. 選「存」或「修改」→ reuse `/maigo:remember` 步驟 5+6
-   （以 propose 的欄位為預填值；「修改」時步驟 5 讓使用者改各欄位）。
-6. 選「跳過」→ 繼續正常流程，不寫任何檔。
-
-Confirm flow 完成後繼續主線流程——不改變 go 的步驟結構。
+依 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md) 處理。Confirm flow 完成後繼續主線流程——不改變 go 的步驟結構。
 
 ## Orchestrator 守則
 
@@ -60,6 +47,4 @@ Confirm flow 完成後繼續主線流程——不改變 go 的步驟結構。
 - 每個 agent 完成後給使用者一行 summary（不是貼全文）
 - 不要跳關。即使任務看起來很小，每一步都要走
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題
-- 偵測 `## Memory propose` 標頭時，只掃描 code fence 外的行；
-  code block 內（triple-backtick fence 之間）的同名標頭不觸發 confirm flow。
-  追蹤法：從輸出文字開頭往下追蹤 triple-backtick 計數（奇數 → in-fence），遇到 `^## Memory propose` 且 in-fence 為 true 時跳過。
+- fence tracking 與 `## Memory propose` 偵測規則依 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md)

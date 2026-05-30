@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供九個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -224,6 +224,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | Compliance audit（只看規範 / 安全） | `/maigo:review --mode=compliance-only <ref>` |
 | 寫 PR title / description | `/maigo:describe-pr` |
 | 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
+| 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
 | Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |

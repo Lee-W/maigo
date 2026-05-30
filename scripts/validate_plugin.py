@@ -221,6 +221,25 @@ def check_skill_crossrefs() -> CheckResult:
     return r
 
 
+def check_commands_docs_alignment() -> CheckResult:
+    """每個 commands/*.md 必須含 mkdocs-include-start 且有對應 docs/commands/<basename>.md。"""
+    r = CheckResult("commands/*.md ↔ docs/commands/ alignment")
+    cmds_dir = ROOT / "commands"
+    docs_cmds_dir = ROOT / "docs" / "commands"
+    if not cmds_dir.is_dir():
+        r.note("commands/ 目錄不存在，跳過")
+        return r
+    for path in sorted(cmds_dir.glob("*.md")):
+        rel = path.relative_to(ROOT)
+        text = path.read_text(encoding="utf-8")
+        if "<!-- mkdocs-include-start -->" not in text:
+            r.fail(f"{rel}: 缺 `<!-- mkdocs-include-start -->`")
+        shim = docs_cmds_dir / path.name
+        if not shim.is_file():
+            r.fail(f"{rel}: 缺對應 docs/commands/{path.name}")
+    return r
+
+
 def check_version_sync() -> CheckResult:
     """plugin.json version must equal pyproject.toml [project].version.
 
@@ -274,6 +293,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_pre_commit_config,
     check_skill_crossrefs,
     check_version_sync,
+    check_commands_docs_alignment,
 ]
 
 

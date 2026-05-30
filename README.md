@@ -81,7 +81,7 @@ claude --plugin-dir /path/to/maigo
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
 ```
 
-完整 9 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:describe-pr`、`/maigo:address-comments`）詳見 [Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)。
+完整 10 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:doctor`）詳見 [Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)。
 
 ## Hook 自動行為
 

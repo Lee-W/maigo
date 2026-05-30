@@ -43,6 +43,7 @@ nav:
       - /maigo:retro: commands/retro.md
       - /maigo:describe-pr: commands/describe-pr.md
       - /maigo:address-comments: commands/address-comments.md
+      - /maigo:doctor: commands/doctor.md
   - Skills (source):
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
@@ -51,6 +52,8 @@ nav:
       - failure-handling: skills/failure-handling.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
+      - memory-loading: skills/memory-loading.md
+      - memory-propose-confirm: skills/memory-propose-confirm.md
       - narration: skills/narration.md
   - Changelog: changelog.md
 
