@@ -94,4 +94,6 @@ stop hook 會把 failure 自動顯示給使用者。orchestrator 接到後把錯
 | Soyo review | ✅ 輕量（4 項） | ✅ 完整（9 項） | ✅ 完整（9 項） |
 | Taki 顯式 | ❌（stop hook 兜底） | ✅ | ✅（並行） |
 
+/maigo:go 與 /maigo:team 共用 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)；/maigo:quick 流程結構不同（無 Raana / Tomori、Soyo subset、Stop hook 兜底測試），所以獨立。
+
 → 場景對照、其他命令：[Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)

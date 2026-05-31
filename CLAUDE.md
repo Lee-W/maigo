@@ -39,3 +39,18 @@ must carry the emoji prefix — not just the line where they speak.
 
 Full narration rules (when to use Doloris vs Mortis, voice tone, etc.)
 live in [`skills/narration`](skills/narration/SKILL.md).
+
+## Hooks vs Skills boundary
+
+- **`hooks/`** = 機器擋。Code-driven 強制檢查，agent 沒得繞過。例：🩵 Tomori 沒寫
+  plan path → `teammate_quality_check.py` block；任務宣告完成沒跑 test →
+  `verify_completion.py` block。
+- **`skills/`** = 知識共享。Prompt-driven 共用 narrative / convention / workflow。
+  被 commands / agents 用 markdown link 引用、合進 context。例：
+  [`skills/strict-review`](skills/strict-review/SKILL.md)、[`skills/commit-message`](skills/commit-message/SKILL.md)、[`skills/narration`](skills/narration/SKILL.md)。
+
+新增 enforcement 時的判斷：
+
+- 「失敗應該擋下整個 turn」→ hook
+- 「失敗只是品質下降、人可自決定要不要做」→ skill 段落
+- 兩者都要：先 skill 寫清楚 narrative、hook 做最小 regex 兜底

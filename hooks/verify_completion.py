@@ -26,7 +26,7 @@ TEST_TIMEOUT_SEC = 90
 GIT_TIMEOUT_SEC = 5
 OUTPUT_TAIL_CHARS = 500  # chars to include in block message
 RETRY_LIMIT = 2
-_RETRY_LOG_BASE = Path("/tmp/maigo")
+_RETRY_LOG_BASE = Path(".maigo")
 # Match `Foo:` with a colon to reduce false positives from incidental mentions
 FATAL_MARKER_RE = re.compile(r"\b(ImportError|ModuleNotFoundError|SyntaxError):")
 # Host-environment build failures (CMake/Java/native wheel) bubble up through
@@ -144,7 +144,7 @@ def read_known_failures(path: Path) -> set[str]:
 
 
 def _retry_log_path(cwd: Path) -> Path:
-    log_dir = _RETRY_LOG_BASE / cwd.name
+    log_dir = cwd / _RETRY_LOG_BASE
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "test-failures.jsonl"
 

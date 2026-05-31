@@ -61,7 +61,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 
 ### 3. Orchestrator 收尾
 
-- 把燈的草稿原樣印到對話。**不寫任何檔**（不存 `/tmp/maigo/`、不 push、不開 PR）。
+- 把燈的草稿原樣印到對話。**不寫任何檔**（不存 `.maigo/`、不 push、不開 PR）。
 - **再附一份「可整段複製」的 description**：把燈草稿 `## Suggested PR description` 底下的 body
   原封不動放進**單一** fenced code block，讓使用者一鍵複製貼到 GitHub。
   - **外層 fence 用四個 backtick**（````` ```` `````），這樣 description 內部的三 backtick code block

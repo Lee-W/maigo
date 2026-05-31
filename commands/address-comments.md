@@ -99,7 +99,7 @@ C3  [conversation]  @reviewer
 
 ### 4. 寫 triage + 提路由計畫，確認
 
-把被選中的意見寫進 `/tmp/maigo/<repo>/pr-comments.md`（`<repo>` = `basename "$PWD"`；目錄不存在先 `mkdir -p`），並擬路由計畫：
+把被選中的意見寫進 `.maigo/pr-comments.md`（目錄不存在先 `mkdir -p .maigo`），並擬路由計畫：
 
 ```markdown
 # PR comments: <PR title> (#<number>)
@@ -190,7 +190,7 @@ address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 quick / go / team 的 agent 流程。
 - **不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push、不開 / 關 PR；只產草稿。
-- **唯一會寫的 repo 外檔案是 `/tmp/maigo/<repo>/pr-comments.md`**——triage / 進度追蹤用。
+- **唯一會寫的 artefact 檔案是 `.maigo/pr-comments.md`**——triage / 進度追蹤用。
 
 ## 與其他命令的差異
 

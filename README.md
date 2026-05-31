@@ -94,8 +94,8 @@ claude --plugin-dir /path/to/maigo
 
 ## 產出檔案
 
-計畫與 rubric 寫在 `/tmp/maigo/<repo>/`（`<repo>` = `basename "$PWD"`）。
-**刻意放在 `/tmp`**——不污染 repo、不需 gitignore、重開機自動清掉。想保留就自己另存它處。
+計畫與 rubric 寫在 `.maigo/`（repo root 下，gitignored，跨 session 留存）。
+Artefact 在本機保留直到手動清除；`.gitignore` 已加入 `.maigo/`，不會被 commit 進 repo。
 
 ## 文件
 

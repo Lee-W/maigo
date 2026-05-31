@@ -1,4 +1,5 @@
 .claude/local/
+.maigo/
 .DS_Store
 *.log
 __pycache__/

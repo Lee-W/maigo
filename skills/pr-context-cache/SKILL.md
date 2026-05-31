@@ -21,7 +21,7 @@ description: This skill should be used during /maigo:review when fetching or reu
 ## Inputs
 
 - **Source**：review 參數（GitHub PR URL / branch name / commit range）
-- **review-rubric.md 路徑**：`/tmp/maigo/<repo>/review-rubric.md`（`<repo>` = `basename "$PWD"`）
+- **review-rubric.md 路徑**：`.maigo/review-rubric.md`（repo root 下）
 - **目前 diff**（cache miss 時抓）
 
 ## Outputs
@@ -72,7 +72,7 @@ diff_full: <diff 內容，截斷版>
 
 ### 1. Detect cache
 
-讀 `/tmp/maigo/<repo>/review-rubric.md`（若存在），grep `<!-- pr-context-cache:start v1 -->`。
+讀 `.maigo/review-rubric.md`（若存在），grep `<!-- pr-context-cache:start v1 -->`。
 若找到 → 進入步驟 2（Validate）；若無 → 直接跳步驟 3（Fetch）。
 
 ### 2. Validate cache（若存在）

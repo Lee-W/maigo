@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 SOYO_RETRY_LIMIT = 2
-_RETRY_LOG_BASE = Path("/tmp/maigo")
+_RETRY_LOG_BASE = Path(".maigo")
 _MUST_FIX_FILE_RE = re.compile(r"`([\w./-]+\.\w+)(?::\d+)?`")
 _MUST_FIX_LINE_RE = re.compile(
     r"^\s*(?:[-*]|\d+\.)\s+(.+)$",
@@ -72,7 +72,7 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
 
 
 def _soyo_log_path(cwd: Path) -> Path:
-    log_dir = _RETRY_LOG_BASE / cwd.name
+    log_dir = cwd / _RETRY_LOG_BASE
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "soyo-must-fix.jsonl"
 
@@ -146,11 +146,11 @@ def check_tomori(out: str) -> None:
             )
         emit("approve", "燈 (Tomori) PR 草稿結構齊全")
 
-    # plan 模式（預設）：把計畫寫進 /tmp/maigo/<repo>/ 的檔案
-    if not re.search(r"/tmp/maigo/[^/\s]+/(plan|review-rubric)\.md", out):
+    # plan 模式（預設）：把計畫寫進 .maigo/ 的檔案
+    if not re.search(r"\.maigo/(plan|review-rubric)\.md", out):
         emit(
             "block",
-            "燈 (Tomori) 的輸出沒提到 /tmp/maigo/<repo>/plan.md 或 /tmp/maigo/<repo>/review-rubric.md。把計畫寫進那個檔案再回報。",
+            "燈 (Tomori) 的輸出沒提到 .maigo/plan.md 或 .maigo/review-rubric.md。把計畫寫進那個檔案再回報。",
         )
     if not re.search(r"##\s+(Goal|Steps|Rubric|Acceptance|目標|步驟|期待|對照)", out):
         emit(

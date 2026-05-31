@@ -96,7 +96,7 @@ agent 跑完輸出送回 orchestrator 時觸發。
 |-------|---------|----------------------|
 | **Raana** | `## Loaded memory entries` 段（即使無相關 entry 也要明寫「（無相關 entry）」）| 「缺 memory 載入回報」 |
 | **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
-| **Tomori** | 提到 `/tmp/maigo/<repo>/plan.md` 或 `/tmp/maigo/<repo>/review-rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
+| **Tomori** | 提到 `.maigo/plan.md` 或 `.maigo/review-rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Soyo** | verdict 字串：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED` | 「沒下 verdict」 |
@@ -114,7 +114,7 @@ Soyo verdict 非 APPROVED 時，hook 會從輸出抽 must-fix 條目，用
 backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 條目用 normalized 文字當 fallback key。
 
-計數寫到 `/tmp/maigo/<repo>/soyo-must-fix.jsonl`，每行一筆
+計數寫到 `.maigo/soyo-must-fix.jsonl`，每行一筆
 `{"ts": "...Z", "must_fix_keys": [...]}`。同一 key 累計到
 `SOYO_RETRY_LIMIT`（預設 2）時，block reason 前綴
 `⚠️ RETRY LIMIT REACHED (Soyo):`，提醒 orchestrator 停下找使用者

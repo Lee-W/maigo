@@ -15,7 +15,7 @@ from tests.conftest import run_hook_main
 def _redirect_soyo_log_base(monkeypatch: pytest.MonkeyPatch, tmp_path):
     """Redirect tqc._RETRY_LOG_BASE to tmp_path for every test in this module.
 
-    Prevents the real /tmp/maigo/ from being polluted and makes tests
+    Prevents the real .maigo/ from being polluted and makes tests
     deterministic regardless of prior runs.
     """
     monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
@@ -55,7 +55,7 @@ class TestCheckTomori:
 
     def test_plan_path_but_no_heading_blocks(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
-            tqc.check_tomori("/tmp/maigo/myrepo/plan.md was written\n")
+            tqc.check_tomori(".maigo/plan.md was written\n")
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "block"
 
@@ -63,7 +63,7 @@ class TestCheckTomori:
         with pytest.raises(SystemExit):
             tqc.check_tomori(
                 "## Loaded memory entries\n（無相關 entry）\n"
-                "/tmp/maigo/myrepo/plan.md\n## Goal\n## Steps\n"
+                ".maigo/plan.md\n## Goal\n## Steps\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
@@ -72,14 +72,14 @@ class TestCheckTomori:
         with pytest.raises(SystemExit):
             tqc.check_tomori(
                 "## Loaded memory entries\n（無相關 entry）\n"
-                "/tmp/maigo/myrepo/plan.md\n## 目標\n## 步驟\n"
+                ".maigo/plan.md\n## 目標\n## 步驟\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
 
     def test_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
-            tqc.check_tomori("/tmp/maigo/myrepo/plan.md\n## Goal\n## Steps\n")
+            tqc.check_tomori(".maigo/plan.md\n## Goal\n## Steps\n")
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "block"
         assert "Loaded memory entries" in result["reason"]
@@ -214,7 +214,7 @@ class TestSoyoRetryCount:
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
         # log file should exist with 1 line
-        log_file = tmp_path / tmp_path.name / "soyo-must-fix.jsonl"
+        log_file = tmp_path / "soyo-must-fix.jsonl"
         assert log_file.is_file()
         lines = [line for line in log_file.read_text().splitlines() if line.strip()]
         assert len(lines) == 1
@@ -228,7 +228,7 @@ class TestSoyoRetryCount:
         monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
         monkeypatch.chdir(tmp_path)
         # Pre-write one log entry with the same key
-        log_dir = tmp_path / tmp_path.name
+        log_dir = tmp_path
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "soyo-must-fix.jsonl"
         import json as _json
@@ -264,8 +264,8 @@ class TestSoyoRetryCount:
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "approve"
         # No log file should be written
-        log_dir = tmp_path / tmp_path.name
-        assert not log_dir.exists()
+        log_file = tmp_path / "soyo-must-fix.jsonl"
+        assert not log_file.exists()
 
     def test_corrupted_log_line_does_not_crash(
         self,
@@ -275,9 +275,7 @@ class TestSoyoRetryCount:
         monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
         import json as _json
 
-        log_dir = tmp_path / "myrepo"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "soyo-must-fix.jsonl"
+        log_file = tmp_path / "soyo-must-fix.jsonl"
         # Write one corrupted line + one good line
         log_file.write_text(
             "{bad json\n"
@@ -373,7 +371,7 @@ class TestMain:
             "teammate_role": "Tomori",
             "teammate_output": (
                 "## Loaded memory entries\n（無相關 entry）\n"
-                "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n"
+                ".maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
@@ -388,7 +386,7 @@ class TestMain:
             "teammate_role": "planner",
             "teammate_output": (
                 "## Loaded memory entries\n（無相關 entry）\n"
-                "/tmp/maigo/repo/plan.md\n## Goal\n## Steps\n"
+                ".maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)

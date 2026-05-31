@@ -266,16 +266,14 @@ class TestMain:
 
 class TestRetryLogPath:
     def test_path_structure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", tmp_path / "maigo")
-        cwd = tmp_path / "myrepo"
-        cwd.mkdir()
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", Path(".maigo"))
+        cwd = tmp_path
         result = verify_completion._retry_log_path(cwd)
-        assert result == tmp_path / "maigo" / "myrepo" / "test-failures.jsonl"
+        assert result == tmp_path / ".maigo" / "test-failures.jsonl"
 
     def test_parent_created(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", tmp_path / "maigo")
-        cwd = tmp_path / "myrepo"
-        cwd.mkdir()
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", Path(".maigo"))
+        cwd = tmp_path
         result = verify_completion._retry_log_path(cwd)
         assert result.parent.is_dir()
 

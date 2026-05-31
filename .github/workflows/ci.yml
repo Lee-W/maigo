@@ -26,3 +26,9 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Install docs deps
+        run: uv sync --group docs
+
+      - name: Build docs (strict)
+        run: uv run mkdocs build --strict

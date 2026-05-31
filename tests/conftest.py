@@ -30,11 +30,14 @@ def run_hook_main(
     return json.loads(out.strip())
 
 
-@pytest.fixture
-def plugin_tree(tmp_path: Path) -> Path:
-    """Build a minimal valid plugin tree under tmp_path."""
-    # plugin.json
-    (tmp_path / "plugin.json").write_text(
+def make_plugin_json(tmp_path: Path) -> Path:
+    """Write a minimal valid plugin.json to tmp_path.
+
+    Minimal valid structure: name, version, description, license fields.
+    Returns the path to the created file.
+    """
+    p = tmp_path / "plugin.json"
+    p.write_text(
         json.dumps(
             {
                 "name": "test-plugin",
@@ -45,42 +48,85 @@ def plugin_tree(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    return p
 
-    # agents/foo.md with full required frontmatter
+
+def make_agent_file(tmp_path: Path, name: str = "foo") -> Path:
+    """Write a minimal valid agent markdown file to tmp_path/agents/<name>.md.
+
+    Minimal valid structure: frontmatter with name, description, model, tools fields.
+    Returns the path to the created file.
+    """
     agents_dir = tmp_path / "agents"
-    agents_dir.mkdir()
-    (agents_dir / "foo.md").write_text(
-        "---\nname: foo\ndescription: test agent\nmodel: sonnet\ntools: [Read]\n---\n\n# foo\n",
+    agents_dir.mkdir(exist_ok=True)
+    p = agents_dir / f"{name}.md"
+    p.write_text(
+        f"---\nname: {name}\ndescription: test agent\nmodel: sonnet\ntools: [Read]\n---\n\n# {name}\n",
         encoding="utf-8",
     )
+    return p
 
-    # commands/bar.md (must contain mkdocs-include-start marker)
+
+def make_command_file(tmp_path: Path, name: str = "bar") -> Path:
+    """Write a minimal valid command markdown file to tmp_path/commands/<name>.md.
+
+    Minimal valid structure: frontmatter with description field, plus the
+    mkdocs-include-start marker required by check_commands_docs_alignment.
+    Returns the path to the created file.
+    """
     cmds_dir = tmp_path / "commands"
-    cmds_dir.mkdir()
-    (cmds_dir / "bar.md").write_text(
-        "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n# bar\n",
+    cmds_dir.mkdir(exist_ok=True)
+    p = cmds_dir / f"{name}.md"
+    p.write_text(
+        f"---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n# {name}\n",
         encoding="utf-8",
     )
+    return p
 
-    # docs/commands/bar.md — include shim (required by check_commands_docs_alignment)
+
+def make_docs_command_shim(tmp_path: Path, name: str = "bar") -> Path:
+    """Write a minimal valid docs/commands shim to tmp_path/docs/commands/<name>.md.
+
+    Minimal valid structure: an include-markdown directive pointing at
+    commands/<name>.md with the mkdocs-include-start marker, required by
+    check_commands_docs_alignment.
+    Returns the path to the created file.
+    """
     docs_cmds_dir = tmp_path / "docs" / "commands"
-    docs_cmds_dir.mkdir(parents=True)
-    (docs_cmds_dir / "bar.md").write_text(
-        '{% include-markdown "../../commands/bar.md" start="<!-- mkdocs-include-start -->" %}\n',
+    docs_cmds_dir.mkdir(parents=True, exist_ok=True)
+    p = docs_cmds_dir / f"{name}.md"
+    p.write_text(
+        f'{{% include-markdown "../../commands/{name}.md" start="<!-- mkdocs-include-start -->" %}}\n',
         encoding="utf-8",
     )
+    return p
 
-    # skills/baz/SKILL.md
-    skill_dir = tmp_path / "skills" / "baz"
-    skill_dir.mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text(
-        "---\nname: baz\ndescription: test skill\n---\n\n# baz\n",
+
+def make_skill(tmp_path: Path, name: str = "baz") -> Path:
+    """Write a minimal valid skill directory to tmp_path/skills/<name>/SKILL.md.
+
+    Minimal valid structure: frontmatter with name and description fields.
+    Returns the path to the created SKILL.md file.
+    """
+    skill_dir = tmp_path / "skills" / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    p = skill_dir / "SKILL.md"
+    p.write_text(
+        f"---\nname: {name}\ndescription: test skill\n---\n\n# {name}\n",
         encoding="utf-8",
     )
+    return p
 
-    # hooks/hooks.json pointing at a real hook script
+
+def make_hooks(tmp_path: Path) -> Path:
+    """Write a minimal valid hooks/ directory to tmp_path/hooks/.
+
+    Minimal valid structure: hooks.json with a Stop hook entry referencing a
+    real hook script (check.py), plus the script itself.
+    Returns the path to the hooks directory.
+    """
     hooks_dir = tmp_path / "hooks"
-    hooks_dir.mkdir()
+    hooks_dir.mkdir(exist_ok=True)
     (hooks_dir / "hooks.json").write_text(
         json.dumps(
             {
@@ -101,5 +147,21 @@ def plugin_tree(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (hooks_dir / "check.py").write_text("# minimal hook\n", encoding="utf-8")
+    return hooks_dir
 
+
+@pytest.fixture
+def plugin_tree(tmp_path: Path) -> Path:
+    """Build a minimal valid plugin tree under tmp_path.
+
+    Composes all make_* helpers to produce a tree that passes validate_plugin.py
+    with zero errors. Tests that only need plugin_tree can use this fixture directly;
+    tests that need to vary individual components can call the helpers directly.
+    """
+    make_plugin_json(tmp_path)
+    make_agent_file(tmp_path)
+    make_command_file(tmp_path)
+    make_docs_command_shim(tmp_path)
+    make_skill(tmp_path)
+    make_hooks(tmp_path)
     return tmp_path

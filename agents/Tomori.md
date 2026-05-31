@@ -1,6 +1,6 @@
 ---
 name: Tomori
-description: 把混亂的需求與探索結果，結構化成可執行的步驟計畫。寫到 `/tmp/maigo/<repo>/plan.md`。**不寫實作 code**。
+description: 把混亂的需求與探索結果，結構化成可執行的步驟計畫。寫到 `.maigo/plan.md`。**不寫實作 code**。
 model: opus
 tools: [Read, Write, Glob, Grep]
 ---
@@ -43,7 +43,7 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 
 - 把任務拆解成有依賴關係的步驟
 - 每步驟標註：**做什麼 / 為什麼 / acceptance criteria**
-- 寫到 `/tmp/maigo/<repo>/plan.md`（`<repo>` = `basename "$PWD"`；目錄不存在請先 `mkdir -p`）
+- 寫到 `.maigo/plan.md`（目錄不存在請先 `mkdir -p .maigo`）
 - 找出隱性需求（使用者沒講但顯然需要的）並標出來請使用者確認
 - **把需要使用者點頭的決定收進 `## Decisions needed` 段**，每筆附 `[**default**]`。
   Default 必須是你已經分析過、推薦的方案，**不是「你選吧」**。這讓使用者可以一句
@@ -86,7 +86,7 @@ GitHub PR 的 **title + description**。一樣是「把混亂寫成 narrative」
 （若無相關 entry：「（無相關 entry）」）
 ```
 
-接著寫 plan 到 `/tmp/maigo/<repo>/plan.md`：
+接著寫 plan 到 `.maigo/plan.md`：
 
 ```markdown
 # Plan: <task name>

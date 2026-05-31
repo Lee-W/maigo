@@ -42,6 +42,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`memory-loading`](../skills/memory-loading.md) | Raana / Tomori / Soyo | 全部 agent 啟動時 | 跨專案記憶載入 5 步流程、schema 自檢、fallback 規則、10 筆上限 |
 | [`memory-propose-confirm`](../skills/memory-propose-confirm.md) | orchestrator | `/maigo:go`、`/maigo:quick`、`/maigo:team` | Memory propose 的 6 步 confirm flow、fence-tracking 規則、並行模式追加 |
 | [`narration`](../skills/narration.md) | orchestrator | 全部 `/maigo:*` 命令 | maigo orchestrator 的旁白——🌙 Doloris / 🌑 Mortis 在開場 / 收場 / 卡關節點框住整場演出 |
+| [`teammate-flow`](../skills/teammate-flow.md) | orchestrator | `/maigo:go`、`/maigo:team` | MyGO!!!!! 五人協作的共通流程骨架——sequential 段（🐱 樂奈 → 🩵 燈 → 🎀 愛音）、Orchestrator 守則、commit message draft 規則、失敗處理與 memory confirm flow 引用 |
 
 ## skill 檔案規格
 
