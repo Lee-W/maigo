@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -79,24 +80,29 @@ def read_config_line(path: Path) -> str | None:
 
 
 def detect_test_command(cwd: Path) -> list[str] | None:
-    """Return the test command for the first matching project type."""
+    """Return the test command for the first matching project type, or None if tool unavailable."""
     if (cwd / "uv.lock").is_file():
-        return ["uv", "run", "pytest"]
+        if shutil.which("uv"):
+            return ["uv", "run", "pytest"]
     if (cwd / "pyproject.toml").is_file() or (cwd / "setup.py").is_file():
         if (cwd / "tests").is_dir() or (cwd / "test").is_dir():
-            return ["pytest"]
+            if shutil.which("pytest"):
+                return ["pytest"]
     pkg = cwd / "package.json"
     if pkg.is_file():
         try:
             data = json.loads(pkg.read_text(encoding="utf-8"))
             if "test" in (data.get("scripts") or {}):
-                return ["npm", "test", "--silent"]
+                if shutil.which("npm"):
+                    return ["npm", "test", "--silent"]
         except json.JSONDecodeError:
             pass
     if (cwd / "Cargo.toml").is_file():
-        return ["cargo", "test", "--quiet"]
+        if shutil.which("cargo"):
+            return ["cargo", "test", "--quiet"]
     if (cwd / "go.mod").is_file():
-        return ["go", "test", "./..."]
+        if shutil.which("go"):
+            return ["go", "test", "./..."]
     return None
 
 

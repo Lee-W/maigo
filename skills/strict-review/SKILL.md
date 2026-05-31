@@ -10,83 +10,22 @@ description: This skill should be used when performing code review on a diff (wh
 **Owner Agent**: Soyo (Reviewer)
 **Consumers**: `/maigo:go` (Soyo reviews Anon's diff), `/maigo:review` (Soyo reviews external PR / branch)
 
-## Why this skill exists
-
-Most code review fails the same way: reviewer reads the diff, says "looks good"
-or flags a few nits, and lets it through. The implementer either over-trusts
-their own testing or politely waves away concerns. Bugs ship.
-
-Strict review fixes this by:
-
-1. **Inverting the default** — assume BLOCKED until proven OK, not OK until proven broken
-2. **Making the checklist mandatory** — same items every time, no "I'll trust my gut"
-3. **Demanding evidence** — "tested this" without `exit 0` output doesn't count
-4. **Giving specific改法** — reviewer must show what "correct" looks like, not just point at problems
-
 ## Core stance: default BLOCKED
 
 **Verdict starts at BLOCKED.** The implementer must convince you otherwise.
 
 These do **not** count as convincing:
-- "看起來能跑"
-- "應該沒問題"
-- "之後再改"
+- "看起來能跑" / "應該沒問題" / "之後再改"
 - "test 都過了" (test itself may be missing the case)
 - "符合 convention" (without pointing at the reference file)
 
-### Memory is input, not waiver
+### Waiver rules
 
-Cross-project memory entries (`~/.config/maigo/memory/`) can inform what counts
-as a convention vs. a real bug. They cannot:
+- **Memory** (`~/.config/maigo/memory/`) can inform conventions but cannot replace any checklist item, lower the must-fix threshold, or substitute for evidence
+- **Existing repo content** (quotes, catchphrases, dialogue) that appears in this diff needs a source: (a) original work citation with episode/scene, (b) user confirmed in session, or (c) explicitly marked self-created — flag even if the line wasn't changed in this diff
+- **Commit / staging state** is not in review scope; `git status` cleanliness is not a checklist item — read `git diff HEAD` or `git diff --cached` for the actual changes
 
-- Replace any of the 9 mandatory checklist items
-- Lower the must-fix threshold ("user previously accepted X" is not evidence)
-- Override evidence demands ("user prefers Y" needs a memory entry of type
-  `project`, not `feedback`, to count as a convention claim)
-
-If memory says "user prefers integration tests" → that's a `project` entry;
-treat as part of checklist item 4. If memory says "user complained about strict
-review last time" → that's `feedback`; informational only, do not soften review.
-
-### Existing repo content is input, not waiver
-
-Same principle: prose already in this repo（agent 檔的口頭禪、人設範例台詞、example
-output）**並非因為早就 commit 進來就被視為已驗證**。
-
-審視 diff 動到引述 / 台詞 / catchphrase 時，來源必須限定為：
-
-- (a) 原作明文可查（含集數 / 場景）
-- (b) 使用者親自於某 turn 確認過（可追溯）
-- (c) maigo 自創且 explicitly 標明為自創
-
-既有檔內已存在的引述也算——若無 (a)/(b)/(c) 出處，**仍須 flag**，即使該行不是本次 diff 動的。Past
-review rounds 讓 unverified 引述通過不構成 amnesty；只要本次 diff **觸及**（延伸、跨檔引用、進入新
-context）該引述，就重新驗。
-
-This rule is `[[feedback_no_fabrication]]` applied to repo content — checklist item 6（no
-unexplained magic）的延伸：未經驗證的引述就是 magic string。
-
-### Commit / staging state is not in review scope
-
-Strict review evaluates **the diff content**, not whether it's been committed yet.
-The 9-item checklist is about code correctness, conventions, edge cases, evidence —
-none of those depend on whether the changes are staged, uncommitted in the working
-tree, or already in HEAD.
-
-In `/maigo:address-comments`, the orchestrator deliberately commits **after** Soyo +
-Taki pass — that's the documented commit-policy override（see
-[`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
-step 5）. Soyo flagging「changes are uncommitted」/「`git status` shows ` M`」/
-「`git diff main...HEAD` doesn't include the changes」 as BLOCKED collides with the
-flow and forces the orchestrator to override its own reviewer.
-
-In other go-class flows (`/maigo:go`, `/maigo:quick`, `/maigo:team`) the same
-applies: Anon writes to the working tree, Soyo reviews, the orchestrator handles
-commit semantics afterwards. **`git status` cleanliness is not a checklist item.**
-
-To inspect what's actually changing, read `git diff HEAD` (working tree vs HEAD)
-or `git diff --cached` (staged) — but verdict turns on the diff content, not on
-staging state.
+> Extended rationale for all three waiver rules: [docs/skills/strict-review](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md)
 
 ## The 9-item mandatory checklist
 
@@ -106,37 +45,14 @@ If any item is `[ ]`, verdict stays at NEEDS_CHANGES or BLOCKED.
 
 ## Domain skill composition
 
-Base checklist（上方 9 項）是通用流程，適用所有 review。
-Domain skill 提供針對特定技術棧或專案慣例的**額外 checklist**，附加為 item 10+。
-
-### 為什麼需要 domain skill
-
-不同專案有不同的領域規範——Airflow Dag 的寫法、Commitizen 版本管理、特定框架的慣例等。
-把這些塞進 base checklist 會讓通用 process 膨脹；
-分成 domain skill 可以「按需載入」，只在相關專案跑，不影響其他 review。
-
-### 觸發機制
-
-cross-project memory entry（`type: project`）的 frontmatter 可以帶 `triggers` 欄位：
+Base checklist（上方 9 項）通用於所有 review。Memory entry（`type: project`）的 `triggers` 欄位可附加領域 checklist：
 
 ```yaml
----
-name: Airflow Dag 慣例
-description: 這個專案的 Airflow Dag 寫法與版本控制規範
-type: project
 triggers: [airflow-aware]
----
 ```
 
-Soyo 載入該 entry 時：
-
-1. 讀 `triggers` list 的每個 `<name>`
-2. 嘗試 read `skills/<name>/SKILL.md`
-3. 存在 → 把內容附加為 item 10+，一起跑 review
-4. 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續做 base 9 項
-
-**注意**：只有 `type: project` 的 entry 適用 `triggers`——
-`user` / `feedback` / `reference` type 的 triggers 欄位無聲忽略。
+Soyo: read `skills/<name>/SKILL.md` → append as item 10+. If not found, log and continue.
+Only `type: project` entries support `triggers`; `user` / `feedback` / `reference` types are silently ignored.
 
 ## Must-fix format: problem + specific改法 + reason
 
@@ -151,8 +67,6 @@ Good must-fix:
 You have a vision of what the code should look like — articulate it. Don't make the implementer guess what you'd accept.
 
 ## Evidence demands
-
-When implementer's claim is unverified, push back:
 
 | Claim | Push back |
 |-------|-----------|
