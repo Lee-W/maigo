@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.16.2 (2026-05-31)
+
+### Refactor
+
+- slim down skill files and move rationale to docs
+
 ## v0.16.1 (2026-05-31)
 
 ### Refactor
