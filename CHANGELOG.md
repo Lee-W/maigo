@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.16.1 (2026-05-31)
+
+### Refactor
+
+- persist artefacts in .maigo/ and extract teammate-flow
+- extract memory skills and align project spec + tone
+
 ## v0.16.0 (2026-05-29)
 
 ### Feat
