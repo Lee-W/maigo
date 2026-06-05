@@ -103,7 +103,7 @@ Artefact 在本機保留直到手動清除；`.gitignore` 已加入 `.maigo/`，
 - [Commands reference](docs/reference/commands.md) — 三個命令的完整流程、合流邏輯、場景對照
 - [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
 - [Hooks reference](docs/reference/hooks.md) — SessionStart / TeammateIdle / Stop hook 完整行為與設定
-- [Skills reference](docs/reference/skills.md) — skill 機制與目前 catalog（`strict-review`）
+- [Skills reference](docs/reference/skills.md) — skill 機制與完整 catalog（`strict-review`、`teammate-flow`、`commit-message`、`doc-link-convention`、`failure-handling` 等）
 - [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
 - [CHANGELOG](CHANGELOG.md) — 版本歷史

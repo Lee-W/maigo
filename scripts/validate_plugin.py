@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Comprehensive structural check for the Maigo plugin.
 
-Runs ~8 checks covering plugin.json / hooks.json / agent / command / skill
-frontmatter, hook script existence + syntax, pre-commit config sanity,
-and skill cross-references.
+Runs the full check list (see `CHECKS` at the bottom of this file for the
+canonical, always-current set). Covers plugin.json / hooks.json / agent /
+command / skill frontmatter, hook script existence + syntax, pre-commit
+config sanity, skill cross-references, plugin↔pyproject version sync, and
+commands/skills ↔ docs alignment.
 
 跑：`python3 scripts/validate_plugin.py`
-Exit 0 = 全綠；Exit 1 = 至少一項失敗。
+Exit 0 = 全綠；Exit 1 = 至少一項失敗。輸出最末一行印「全部 N checks 通過」
+或「N/M checks 失敗」——以 N 為準，不必同步任何文件。
 
 跟 `scripts/validate_frontmatter.py` 的差別：
 - validate_frontmatter — 快、窄、給 pre-commit 用

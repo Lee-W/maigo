@@ -37,22 +37,26 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 python3 scripts/validate_plugin.py
 ```
 
-8 項檢查涵蓋：
-1. `plugin.json` valid JSON + 必要欄位
-2. `hooks/hooks.json` valid JSON
-3. `agents/*.md` frontmatter（name / description / model / tools；name 必須對應檔名）
-4. `commands/*.md` frontmatter（description）
-5. `skills/*/SKILL.md` frontmatter（name / description；name 必須對應目錄名）
-6. `hooks/hooks.json` 指向的 script 真的存在 + Python 語法 OK / Shell 有 executable bit
-7. `.pre-commit-config.yaml` 結構合理 + local hook entry 指向的檔案存在
-8. `agents/` 與 `commands/` 引用的 `skills/<name>` 真的有對應 skill
+涵蓋的檢查面向（具體項數會隨 plugin 演進變動，**以 `CHECKS` list 與實際輸出為準**）：
+
+- `plugin.json` valid JSON + 必要欄位
+- `hooks/hooks.json` valid JSON
+- `agents/*.md` frontmatter（name / description / model / tools；name 必須對應檔名）
+- `commands/*.md` frontmatter（description）
+- `skills/*/SKILL.md` frontmatter（name / description；name 必須對應目錄名）
+- `hooks/hooks.json` 指向的 script 真的存在 + Python 語法 OK / Shell 有 executable bit
+- `.pre-commit-config.yaml` 結構合理 + local hook entry 指向的檔案存在
+- `agents/` 與 `commands/` 引用的 `skills/<name>` 真的有對應 skill
+- `plugin.json` 與 `pyproject.toml` 的 version 同步
+- `commands/*.md` ↔ `docs/commands/<name>.md` 對齊（mkdocs-include-start marker + shim）
+- `skills/*/SKILL.md` ↔ `docs/skills/` + `mkdocs.yml` + `docs/reference/skills.md` catalog 四向對齊
 
 ### Validator 速查
 
 | Validator | 何時跑 | 涵蓋 |
 |-----------|-------|------|
 | `validate_frontmatter.py` | pre-commit（自動） | 只看 agent / command frontmatter；快 |
-| `validate_plugin.py` | 手動 / CI / 升版本前 | 全面 8 項 |
+| `validate_plugin.py` | 手動 / CI / 升版本前 | 全面，項數會 drift——看 `CHECKS` |
 
 ## 設計原則
 
@@ -66,26 +70,28 @@ python3 scripts/validate_plugin.py
 
 ## 專案結構
 
+> 列舉只放代表性檔案——目錄底下的完整內容會 drift。看本機 `tree -L 2` 或 GitHub 介面比較準。
+
 ```
 maigo/
 ├── agents/                          # 5 位團員（人設 + 角色）
-│   ├── Raana.md / Tomori.md / Anon.md / Soyo.md / Taki.md
-├── commands/
-│   ├── go.md                        # /maigo:go     順序版
-│   ├── team.md                      # /maigo:team   並行版
-│   └── review.md                    # /maigo:review
+│   └── Raana.md / Tomori.md / Anon.md / Soyo.md / Taki.md
+├── commands/                        # /maigo:<name> 入口（go / team / quick / review / remember / memory / retro / describe-pr / address-comments / doctor）
 ├── skills/                          # 跨 agent/command 共用的 process
-│   └── strict-review/SKILL.md
+│   └── strict-review/ / teammate-flow/ / commit-message/ / failure-handling/ / memory-loading/ / memory-propose-confirm/ / narration/ / pr-context-cache/ / github-title-description/ / doc-link-convention/ / airflow-aware/ / commitizen-aware/
 ├── hooks/
-│   ├── hooks.json                   # 註冊 TeammateIdle + Stop
-│   ├── teammate_quality_check.py    # agent 輸出規格檢查
-│   └── verify_completion.py         # 任務宣告完成前強制跑 test
+│   ├── hooks.json                   # 註冊 SessionStart + TeammateIdle + Stop
+│   ├── repo_detect.py               # SessionStart：偵測 repo 自動載 domain skill
+│   ├── teammate_quality_check.py    # TeammateIdle：agent 輸出規格檢查
+│   ├── verify_completion.py         # Stop：任務宣告完成前強制跑 test
+│   ├── _hook_io.py                  # 共用 emit() payload
+│   └── _retry_log.py                # 共用 JSONL retry-log（Soyo must-fix / Taki test 失敗）
 ├── scripts/
 │   ├── validate_frontmatter.py
 │   └── validate_plugin.py
 ├── docs/                            # ← 你在這裡
-│   ├── reference/                   # commands / hooks / skills
-│   └── guides/                      # contributing 等
+│   ├── reference/                   # agents / commands / hooks / skills / memory / character-colors
+│   └── guides/                      # getting-started / contributing
 ├── .pre-commit-config.yaml
 ├── plugin.json
 ├── CHANGELOG.md
@@ -107,7 +113,7 @@ issue 模板還沒寫；先寫一個簡短的 repro / 期待行為即可。
 ### Zensical（MkDocs 替代方案）
 
 目前不切換至 Zensical（Material for MkDocs 作者新作，尚未 GA）的原因：
-Maigo 重度依賴 `include-markdown`、`pymdownx.superfences`、`admonition`、`pymdownx.details`，這些插件均不在 Zensical 目前支援清單。切換成本高（mkdocs.yml、pyproject.toml、CI workflow、23 個 include-markdown shim 可能全部重寫），收益不明確——Material theme 已滿足現有文件需求。
+Maigo 重度依賴 `include-markdown`、`pymdownx.superfences`、`admonition`、`pymdownx.details`，這些插件均不在 Zensical 目前支援清單。切換成本高（mkdocs.yml、pyproject.toml、CI workflow、`docs/{agents,commands,skills}/` 底下的 include-markdown shim 可能全部重寫），收益不明確——Material theme 已滿足現有文件需求。
 
 **重新評估時機**：Zensical 進入 GA 且明確支援等價的 include-markdown 機制時；或 Maigo 文件需求發生重大變化、Material theme 不再夠用時。
 

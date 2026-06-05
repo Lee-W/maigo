@@ -148,12 +148,15 @@ backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 
 | 偵測到 | 跑什麼指令 |
 |--------|----------|
-| `uv.lock` | `uv run pytest` |
-| `pyproject.toml` 或 `setup.py` + `tests/` 或 `test/` 目錄 | `pytest` |
+| `uv.lock` | `uv run pytest -x` |
+| `pyproject.toml` 或 `setup.py` + `tests/` 或 `test/` 目錄 | `pytest -x` |
 | `package.json` 內 `scripts.test` 存在 | `npm test --silent` |
 | `Cargo.toml` | `cargo test --quiet` |
-| `go.mod` | `go test ./...` |
+| `go.mod` | `go test -failfast ./...` |
 | 都沒有 | 跳過（no-op approve） |
+
+`-x` / `-failfast` 是讓單一失敗就停的旗標，省下 90s timeout 餘額給 parsing & emit。
+`cargo test` 本身對編譯錯誤即 abort，`npm test` 的 script 是 user-defined，這兩個不強加旗標。
 
 ### 設定檔（放在 user 專案的 `.claude/` 下）
 
