@@ -19,6 +19,7 @@ import ast
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Callable
 
@@ -257,18 +258,13 @@ def check_version_sync() -> CheckResult:
     except json.JSONDecodeError as exc:
         r.fail(f"plugin.json 解析失敗：{exc}")
         return r
-    # Minimal pyproject [project].version parser (avoid tomllib import cost for one field)
-    pyproject_ver = None
-    in_project = False
-    for line in pyproject_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            in_project = stripped == "[project]"
-            continue
-        if in_project and stripped.startswith("version"):
-            _, _, raw = stripped.partition("=")
-            pyproject_ver = raw.strip().strip('"').strip("'")
-            break
+    try:
+        with pyproject_path.open("rb") as f:
+            pyproject_data = tomllib.load(f)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        r.fail(f"pyproject.toml 解析失敗：{exc}")
+        return r
+    pyproject_ver = pyproject_data.get("project", {}).get("version")
     if plugin_ver is None:
         r.fail("plugin.json 沒有 `version` 欄位")
         return r

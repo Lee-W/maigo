@@ -6,12 +6,15 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import emit  # noqa: E402
+from _retry_log import record_and_count  # noqa: E402
 
 
 SOYO_RETRY_LIMIT = 2
@@ -78,36 +81,7 @@ def _soyo_log_path(cwd: Path) -> Path:
 
 
 def _soyo_record_and_count(log_path: Path, keys: set[str]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    try:
-        if log_path.is_file():
-            for line in log_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    for k in entry.get("must_fix_keys", []):
-                        counts[k] = counts.get(k, 0) + 1
-                except json.JSONDecodeError:
-                    pass  # corrupted line — skip, don't crash
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_entry = json.dumps(
-            {"ts": ts, "must_fix_keys": sorted(keys)}, ensure_ascii=False
-        )
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(new_entry + "\n")
-        for k in keys:
-            counts[k] = counts.get(k, 0) + 1
-    except (OSError, PermissionError):
-        return {}
-    return counts
-
-
-def emit(decision: str, reason: str) -> None:
-    payload = {"decision": decision, "reason": reason, "systemMessage": reason}
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    sys.exit(0)
+    return record_and_count(log_path, keys, "must_fix_keys")
 
 
 MEMORY_HEADER_RE = re.compile(r"##\s+Loaded memory entries", re.IGNORECASE)
@@ -206,7 +180,118 @@ def check_soyo(out: str) -> None:
 
 
 _URL_RE = re.compile(r"https?://\S+")
-FILE_PATH_RE = re.compile(r"[\w./-]+\.(py|md|yml|yaml|json|toml|txt|sh|cfg)\b")
+# Common source / config / docs extensions across the language ecosystems Maigo
+# advertises support for. Word boundary at end so trailing punctuation (`,`, `.`,
+# `:`, closing backtick) does not break the match.
+_FILE_PATH_EXTS = (
+    # Python
+    "py",
+    "pyi",
+    # JS / TS / web frontends
+    "js",
+    "jsx",
+    "mjs",
+    "cjs",
+    "ts",
+    "tsx",
+    "vue",
+    "svelte",
+    "astro",
+    # JVM
+    "java",
+    "kt",
+    "kts",
+    "scala",
+    "groovy",
+    # Systems
+    "rs",
+    "go",
+    "c",
+    "cc",
+    "cpp",
+    "cxx",
+    "h",
+    "hh",
+    "hpp",
+    "hxx",
+    # Other languages
+    "rb",
+    "php",
+    "swift",
+    "m",
+    "mm",
+    "cs",
+    "fs",
+    "fsx",
+    "ex",
+    "exs",
+    "erl",
+    "hs",
+    "lua",
+    "pl",
+    "r",
+    "jl",
+    "dart",
+    "clj",
+    "cljs",
+    "zig",
+    "nim",
+    # Web markup / style
+    "html",
+    "htm",
+    "css",
+    "scss",
+    "sass",
+    "less",
+    # Docs
+    "md",
+    "mdx",
+    "rst",
+    "txt",
+    "adoc",
+    # Data / config
+    "json",
+    "yml",
+    "yaml",
+    "toml",
+    "ini",
+    "conf",
+    "cfg",
+    "env",
+    "xml",
+    "csv",
+    "tsv",
+    "lock",
+    "properties",
+    # Shell / scripts
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "ps1",
+    "bat",
+    "cmd",
+    # Build / infra
+    "mk",
+    "bzl",
+    "bazel",
+    "gradle",
+    "sbt",
+    "cmake",
+    "tf",
+    "tfvars",
+    "dockerfile",
+    # Other useful
+    "sql",
+    "proto",
+    "graphql",
+    "gql",
+    "ipynb",
+)
+FILE_PATH_RE = re.compile(
+    r"[\w./-]+\.(?:" + "|".join(_FILE_PATH_EXTS) + r")\b",
+    re.IGNORECASE,
+)
 
 
 def check_anon(out: str) -> None:

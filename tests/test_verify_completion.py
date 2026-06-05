@@ -106,12 +106,13 @@ class TestDetectTestCommand:
             "uv",
             "run",
             "pytest",
+            "-x",
         ]
 
     def test_pyproject_with_tests_dir(self, tmp_path: Path):
         (tmp_path / "pyproject.toml").touch()
         (tmp_path / "tests").mkdir()
-        assert verify_completion.detect_test_command(tmp_path) == ["pytest"]
+        assert verify_completion.detect_test_command(tmp_path) == ["pytest", "-x"]
 
     def test_pyproject_without_tests_dir_falls_through(self, tmp_path: Path):
         (tmp_path / "pyproject.toml").touch()
@@ -145,6 +146,7 @@ class TestDetectTestCommand:
         assert verify_completion.detect_test_command(tmp_path) == [
             "go",
             "test",
+            "-failfast",
             "./...",
         ]
 

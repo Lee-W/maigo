@@ -14,6 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import emit  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -72,16 +75,6 @@ REPO_RULES: list[dict] = [
 # ---------------------------------------------------------------------------
 
 GIT_TIMEOUT_SEC = 3
-
-
-def emit(decision: str, system_message: str) -> None:
-    payload = {
-        "decision": decision,
-        "reason": system_message,
-        "systemMessage": system_message,
-    }
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    sys.exit(0)
 
 
 # ---------------------------------------------------------------------------
