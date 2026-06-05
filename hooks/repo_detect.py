@@ -174,6 +174,54 @@ def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
     return written
 
 
+def ensure_maigo_ignored(cwd: str) -> None:
+    """Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
+
+    maigo writes working artefacts (``plan.md``, ``review-rubric.md``,
+    ``pr-comments.md``, retry logs) into ``.maigo/`` at the repo root; those must
+    never be committed. We append the rule to the repo's ``info/exclude`` —
+    resolved via ``git rev-parse --git-path`` so it lands in the shared git dir
+    even from a linked worktree — rather than the project's tracked ``.gitignore``,
+    which the host repo (e.g. apache/airflow) commits and must not be mutated.
+
+    Idempotent and fail-open: does nothing if ``.maigo/`` is already ignored (a
+    global excludesfile, a tracked ``.gitignore``, or a prior run), if *cwd* is
+    not a git repo, or on any git/OS error.
+    """
+    try:
+        already = subprocess.run(
+            ["git", "-C", cwd, "check-ignore", "-q", ".maigo/"],
+            timeout=GIT_TIMEOUT_SEC,
+            check=False,
+        )
+        if already.returncode == 0:
+            return  # already ignored by some mechanism — nothing to do
+
+        resolved = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--git-path", "info/exclude"],
+            capture_output=True,
+            timeout=GIT_TIMEOUT_SEC,
+            check=False,
+        )
+        if resolved.returncode != 0:
+            return  # not a git repo
+
+        exclude = Path(resolved.stdout.decode("utf-8", errors="replace").strip())
+        if not exclude.is_absolute():
+            exclude = Path(cwd) / exclude
+
+        existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+        if ".maigo/" in existing.split():
+            return  # entry already present
+
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        prefix = "" if (not existing or existing.endswith("\n")) else "\n"
+        with exclude.open("a", encoding="utf-8") as fh:
+            fh.write(f"{prefix}# maigo working artefacts (auto-added)\n.maigo/\n")
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -188,6 +236,11 @@ def main() -> None:
             data = {}
 
         cwd = (data.get("cwd") or os.getcwd()).strip()
+
+        # Keep maigo's own scratch dir out of the host repo regardless of which
+        # project this is — every command (go/quick/team/review/address-comments)
+        # writes into .maigo/.
+        ensure_maigo_ignored(cwd)
 
         for rule in REPO_RULES:
             try:

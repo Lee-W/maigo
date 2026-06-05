@@ -94,8 +94,12 @@ claude --plugin-dir /path/to/maigo
 
 ## 產出檔案
 
-計畫與 rubric 寫在 `.maigo/`（repo root 下，gitignored，跨 session 留存）。
-Artefact 在本機保留直到手動清除；`.gitignore` 已加入 `.maigo/`，不會被 commit 進 repo。
+計畫與 rubric 寫在 `.maigo/`（repo root 下，跨 session 留存）。
+Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`）會在
+偵測到 git repo 時，把 `.maigo/` 寫進該 repo 的 `.git/info/exclude`（不是
+被追蹤的 `.gitignore`），所以不會污染 host repo、也不會被 commit 進去；若你
+已用 global excludesfile 或 repo `.gitignore` 忽略 `.maigo/`，則 hook 視為
+已忽略、不再重複寫入。
 
 ## 文件
 

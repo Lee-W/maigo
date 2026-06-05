@@ -248,3 +248,73 @@ def _raise_file_not_found(*args, **kwargs):
 
 def _raise_timeout_expired(*args, **kwargs):
     raise subprocess.TimeoutExpired(cmd="git", timeout=3)
+
+
+# ---------------------------------------------------------------------------
+# ensure_maigo_ignored
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureMaigoIgnored:
+    """Exercises the real-git side effect, isolated from the machine's global config."""
+
+    @staticmethod
+    def _init_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Neutralise the machine's global/system git config (incl. any global
+        # core.excludesFile) so check-ignore reflects only this repo.
+        empty = tmp_path / "gitconfig.empty"
+        empty.write_text("", encoding="utf-8")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
+        monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(empty))
+        monkeypatch.setenv("HOME", str(tmp_path))
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+
+    def test_writes_exclude_and_git_ignores_it(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        self._init_repo(tmp_path, monkeypatch)
+
+        rd.ensure_maigo_ignored(str(tmp_path))
+
+        exclude = tmp_path / ".git" / "info" / "exclude"
+        assert ".maigo/" in exclude.read_text(encoding="utf-8").split()
+        # The whole point: git now actually ignores the dir.
+        check = subprocess.run(
+            ["git", "-C", str(tmp_path), "check-ignore", "-q", ".maigo/"], check=False
+        )
+        assert check.returncode == 0
+
+    def test_idempotent(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        self._init_repo(tmp_path, monkeypatch)
+
+        rd.ensure_maigo_ignored(str(tmp_path))
+        rd.ensure_maigo_ignored(str(tmp_path))
+
+        exclude = tmp_path / ".git" / "info" / "exclude"
+        assert exclude.read_text(encoding="utf-8").count(".maigo/") == 1
+
+    def test_noop_when_already_ignored_by_tracked_gitignore(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        self._init_repo(tmp_path, monkeypatch)
+        (tmp_path / ".gitignore").write_text(".maigo/\n", encoding="utf-8")
+
+        rd.ensure_maigo_ignored(str(tmp_path))
+
+        exclude = tmp_path / ".git" / "info" / "exclude"
+        text = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+        assert ".maigo/" not in text.split()
+
+    def test_noop_outside_git_repo(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        empty = tmp_path / "gitconfig.empty"
+        empty.write_text("", encoding="utf-8")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
+        monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(empty))
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        # tmp_path is not a git repo — must not raise and must not create one.
+        rd.ensure_maigo_ignored(str(tmp_path))
+
+        assert not (tmp_path / ".git").exists()
