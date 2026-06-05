@@ -241,6 +241,51 @@ def check_commands_docs_alignment() -> CheckResult:
     return r
 
 
+def check_skills_docs_alignment() -> CheckResult:
+    """Each skills/<name>/SKILL.md must align with the 6-step publish path.
+
+    Checks the four mechanically-verifiable steps from the new-skill checklist
+    (the other two — frontmatter and validate_plugin run — already have their
+    own checks above):
+
+    1. SKILL.md contains `<!-- mkdocs-include-start -->`
+    2. docs/skills/<name>.md shim exists
+    3. mkdocs.yml nav references skills/<name>.md
+    4. docs/reference/skills.md catalog has a row for `<name>`
+    """
+    r = CheckResult("skills/*/SKILL.md ↔ docs/skills/ + mkdocs + catalog alignment")
+    skills_dir = ROOT / "skills"
+    docs_skills_dir = ROOT / "docs" / "skills"
+    if not skills_dir.is_dir():
+        r.note("skills/ 目錄不存在，跳過")
+        return r
+    mkdocs_text = ""
+    mkdocs_path = ROOT / "mkdocs.yml"
+    if mkdocs_path.is_file():
+        mkdocs_text = mkdocs_path.read_text(encoding="utf-8")
+    catalog_text = ""
+    catalog_path = ROOT / "docs" / "reference" / "skills.md"
+    if catalog_path.is_file():
+        catalog_text = catalog_path.read_text(encoding="utf-8")
+
+    for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
+        name = skill_dir.name
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_file.is_file():
+            continue  # check_skill_frontmatter already flags this
+        text = skill_file.read_text(encoding="utf-8")
+        if "<!-- mkdocs-include-start -->" not in text:
+            r.fail(f"skills/{name}/SKILL.md: 缺 `<!-- mkdocs-include-start -->`")
+        shim = docs_skills_dir / f"{name}.md"
+        if not shim.is_file():
+            r.fail(f"skills/{name}/: 缺對應 docs/skills/{name}.md shim")
+        if mkdocs_text and f"skills/{name}.md" not in mkdocs_text:
+            r.fail(f"skills/{name}/: mkdocs.yml nav 未列入 `skills/{name}.md`")
+        if catalog_text and f"`{name}`" not in catalog_text:
+            r.fail(f"skills/{name}/: docs/reference/skills.md catalog 未列入 `{name}`")
+    return r
+
+
 def check_version_sync() -> CheckResult:
     """plugin.json version must equal pyproject.toml [project].version.
 
@@ -290,6 +335,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_skill_crossrefs,
     check_version_sync,
     check_commands_docs_alignment,
+    check_skills_docs_alignment,
 ]
 
 

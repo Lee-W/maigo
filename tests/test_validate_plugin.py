@@ -8,6 +8,12 @@ from pathlib import Path
 import pytest
 
 import scripts.validate_plugin as validate_plugin
+from tests.conftest import (
+    make_docs_skill_shim,
+    make_mkdocs_yml,
+    make_skill,
+    make_skills_catalog,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +292,85 @@ class TestCheckVersionSync:
         result = validate_plugin.check_version_sync()
         assert result.passed
         assert any("跳過" in n for n in result.notes)
+
+
+# ---------------------------------------------------------------------------
+# check_skills_docs_alignment — 4-way check (SKILL marker / shim / mkdocs / catalog)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSkillsDocsAlignment:
+    def test_skills_dir_missing_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert result.passed
+        assert any("不存在" in n for n in result.notes)
+
+    def test_all_four_components_present_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_docs_skill_shim(tmp_path, "foo")
+        make_mkdocs_yml(tmp_path, ["foo"])
+        make_skills_catalog(tmp_path, ["foo"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert result.passed
+
+    def test_missing_mkdocs_marker_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        skill_dir = tmp_path / "skills" / "foo"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: foo\ndescription: d\n---\n\n# foo\n",  # no marker
+            encoding="utf-8",
+        )
+        make_docs_skill_shim(tmp_path, "foo")
+        make_mkdocs_yml(tmp_path, ["foo"])
+        make_skills_catalog(tmp_path, ["foo"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert not result.passed
+        assert any("mkdocs-include-start" in e for e in result.errors)
+
+    def test_missing_docs_shim_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        # no shim
+        make_mkdocs_yml(tmp_path, ["foo"])
+        make_skills_catalog(tmp_path, ["foo"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert not result.passed
+        assert any("docs/skills/foo.md" in e for e in result.errors)
+
+    def test_missing_mkdocs_nav_entry_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_docs_skill_shim(tmp_path, "foo")
+        make_mkdocs_yml(tmp_path, ["other-skill"])  # foo not in nav
+        make_skills_catalog(tmp_path, ["foo"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert not result.passed
+        assert any("mkdocs.yml" in e for e in result.errors)
+
+    def test_missing_catalog_row_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_docs_skill_shim(tmp_path, "foo")
+        make_mkdocs_yml(tmp_path, ["foo"])
+        make_skills_catalog(tmp_path, ["other-skill"])  # foo not in catalog
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_docs_alignment()
+        assert not result.passed
+        assert any("catalog" in e for e in result.errors)
 
 
 # ---------------------------------------------------------------------------

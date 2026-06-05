@@ -56,6 +56,7 @@ nav:
       - memory-propose-confirm: skills/memory-propose-confirm.md
       - narration: skills/narration.md
       - teammate-flow: skills/teammate-flow.md
+      - doc-link-convention: skills/doc-link-convention.md
   - Changelog: changelog.md
 
 markdown_extensions:

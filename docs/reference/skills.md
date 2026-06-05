@@ -43,6 +43,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`memory-propose-confirm`](../skills/memory-propose-confirm.md) | orchestrator | `/maigo:go`、`/maigo:quick`、`/maigo:team` | Memory propose 的 6 步 confirm flow、fence-tracking 規則、並行模式追加 |
 | [`narration`](../skills/narration.md) | orchestrator | 全部 `/maigo:*` 命令 | maigo orchestrator 的旁白——🌙 Doloris / 🌑 Mortis 在開場 / 收場 / 卡關節點框住整場演出 |
 | [`teammate-flow`](../skills/teammate-flow.md) | orchestrator | `/maigo:go`、`/maigo:team` | MyGO!!!!! 五人協作的共通流程骨架——sequential 段（🐱 樂奈 → 🩵 燈 → 🎀 愛音）、Orchestrator 守則、commit message draft 規則、失敗處理與 memory confirm flow 引用 |
+| [`doc-link-convention`](../skills/doc-link-convention.md) | Soyo | review 觸及 `agents/` / `commands/` / `skills/` 的 PR 時 | Maigo source 檔的跨檔 link 強制用絕對 GitHub URL，避免 `mkdocs build --strict` 因 include-markdown rewrite 抓不到 page 而 abort |
 
 ## skill 檔案規格
 
@@ -82,8 +83,16 @@ Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 project entry 時，
 
 ## Add New Skill Checklist
 
-1. `mkdir skills/<new-name>/`
-2. 寫 `skills/<new-name>/SKILL.md`（記得 frontmatter `name` 跟目錄名一樣）
-3. 在 owner agent 的 prompt 加引用：「process 依 `skills/<new-name>/SKILL.md`」
-4. 在這份 catalog 加一列
-5. 跑 `python3 scripts/validate_plugin.py` 確認 cross-ref 通
+1. `mkdir skills/<new-name>/` + 寫 `skills/<new-name>/SKILL.md`
+   （frontmatter `name` 必須等於目錄名，內文要有 `<!-- mkdocs-include-start -->` 標記）
+2. `docs/skills/<new-name>.md` — 寫 include-markdown shim（單行 include 指令，
+   `start="<!-- mkdocs-include-start -->"`）。直接複製
+   [`docs/skills/strict-review.md`](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md)
+   換掉路徑即可
+3. `mkdocs.yml` 的 `Skills (source):` 段加一條 `- <new-name>: skills/<new-name>.md`
+4. 這份 catalog 表加一列（Owner / Consumers / 摘要）
+5. 在 owner agent 的 prompt 加引用：「process 依 `skills/<new-name>/SKILL.md`」
+6. 跑 `python3 scripts/validate_plugin.py`（cross-ref + 上述 alignment 檢查）
+   與 `uv run mkdocs build --strict`（doc link rewrite 不報缺檔）
+
+第 1–4 步漏掉任何一條 → `check_skills_docs_alignment` 會擋下。

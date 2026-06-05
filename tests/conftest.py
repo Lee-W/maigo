@@ -105,14 +105,68 @@ def make_docs_command_shim(tmp_path: Path, name: str = "bar") -> Path:
 def make_skill(tmp_path: Path, name: str = "baz") -> Path:
     """Write a minimal valid skill directory to tmp_path/skills/<name>/SKILL.md.
 
-    Minimal valid structure: frontmatter with name and description fields.
+    Minimal valid structure: frontmatter with name and description fields,
+    plus the `<!-- mkdocs-include-start -->` marker required by
+    check_skills_docs_alignment.
     Returns the path to the created SKILL.md file.
     """
     skill_dir = tmp_path / "skills" / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     p = skill_dir / "SKILL.md"
     p.write_text(
-        f"---\nname: {name}\ndescription: test skill\n---\n\n# {name}\n",
+        f"---\nname: {name}\ndescription: test skill\n---\n\n"
+        f"<!-- mkdocs-include-start -->\n\n# {name}\n",
+        encoding="utf-8",
+    )
+    return p
+
+
+def make_docs_skill_shim(tmp_path: Path, name: str = "baz") -> Path:
+    """Write a minimal valid docs/skills shim to tmp_path/docs/skills/<name>.md.
+
+    Required by check_skills_docs_alignment.
+    Returns the path to the created shim file.
+    """
+    docs_skills_dir = tmp_path / "docs" / "skills"
+    docs_skills_dir.mkdir(parents=True, exist_ok=True)
+    p = docs_skills_dir / f"{name}.md"
+    p.write_text(
+        f'{{% include-markdown "../../skills/{name}/SKILL.md" '
+        f'start="<!-- mkdocs-include-start -->" %}}\n',
+        encoding="utf-8",
+    )
+    return p
+
+
+def make_mkdocs_yml(tmp_path: Path, skill_names: list[str] | None = None) -> Path:
+    """Write a minimal mkdocs.yml referencing the given skill shims.
+
+    Required by check_skills_docs_alignment — each skill must appear
+    in the nav as `skills/<name>.md`.
+    """
+    skill_names = skill_names or ["baz"]
+    nav_lines = "\n".join(f"      - {n}: skills/{n}.md" for n in skill_names)
+    p = tmp_path / "mkdocs.yml"
+    p.write_text(
+        f"site_name: test\nnav:\n  - Skills (source):\n{nav_lines}\n",
+        encoding="utf-8",
+    )
+    return p
+
+
+def make_skills_catalog(tmp_path: Path, skill_names: list[str] | None = None) -> Path:
+    """Write a minimal docs/reference/skills.md catalog referencing the skills.
+
+    Required by check_skills_docs_alignment — each skill must appear
+    in the catalog as a backticked name `<name>`.
+    """
+    skill_names = skill_names or ["baz"]
+    rows = "\n".join(f"| `{n}` | — | — |" for n in skill_names)
+    docs_ref_dir = tmp_path / "docs" / "reference"
+    docs_ref_dir.mkdir(parents=True, exist_ok=True)
+    p = docs_ref_dir / "skills.md"
+    p.write_text(
+        f"# Skills\n\n| Skill | Owner | Consumers |\n|---|---|---|\n{rows}\n",
         encoding="utf-8",
     )
     return p
@@ -163,5 +217,8 @@ def plugin_tree(tmp_path: Path) -> Path:
     make_command_file(tmp_path)
     make_docs_command_shim(tmp_path)
     make_skill(tmp_path)
+    make_docs_skill_shim(tmp_path)
+    make_mkdocs_yml(tmp_path)
+    make_skills_catalog(tmp_path)
     make_hooks(tmp_path)
     return tmp_path
