@@ -5,6 +5,23 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.17.0 (2026-06-06)
+
+### Feat
+
+- add /maigo:triage-issue for maintainer-side batch issue triage
+- enforce doc-link convention + skills-docs validator
+- **hooks**: broaden language coverage and dedup shared helpers
+
+### Fix
+
+- **plugin**: align manifest location with Claude Code spec + valid source
+
+### Refactor
+
+- **agents**: align Tomori / Soyo / Taki persona with canon
+- **agents**: sharpen Raana and Anon persona framing
+
 ## v0.16.2 (2026-05-31)
 
 ### Refactor
