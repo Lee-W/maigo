@@ -27,5 +27,4 @@ annotated_tag = true
 update_changelog_on_bump = true
 
 [tool.uv.pip]
-# Synchroonize with scripts/ci/prek/upgrade_important_versions.py
 exclude-newer = "4 days"
