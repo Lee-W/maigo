@@ -120,18 +120,21 @@ def check_tomori(out: str) -> None:
             )
         emit("approve", "燈 (Tomori) PR 草稿結構齊全")
 
-    # plan 模式（預設）：把計畫寫進 .maigo/ 的檔案
-    if not re.search(r"\.maigo/(plan|review-rubric)\.md", out):
+    # plan 模式（預設）/ review 模式 / triage 模式：把產出寫進 .maigo/ 的檔案
+    if not re.search(r"\.maigo/(plan|review-rubric|triage-rubric)\.md", out):
         emit(
             "block",
-            "燈 (Tomori) 的輸出沒提到 .maigo/plan.md 或 .maigo/review-rubric.md。把計畫寫進那個檔案再回報。",
+            "燈 (Tomori) 的輸出沒提到 .maigo/plan.md / .maigo/review-rubric.md / .maigo/triage-rubric.md。把計畫 / rubric 寫進那個檔案再回報。",
         )
-    if not re.search(r"##\s+(Goal|Steps|Rubric|Acceptance|目標|步驟|期待|對照)", out):
+    if not re.search(
+        r"##\s+(Goal|Steps|Rubric|Acceptance|Category|目標|步驟|期待|對照|分類)",
+        out,
+    ):
         emit(
             "block",
-            "燈 (Tomori) 的輸出缺少計畫結構（## Goal / ## Steps / ## Rubric / ## Acceptance / 目標 / 步驟）。",
+            "燈 (Tomori) 的輸出缺少結構（## Goal / ## Steps / ## Rubric / ## Acceptance / ## Category / 目標 / 步驟 / 分類）。",
         )
-    emit("approve", "燈 (Tomori) 計畫結構齊全")
+    emit("approve", "燈 (Tomori) 輸出結構齊全")
 
 
 def check_soyo(out: str) -> None:

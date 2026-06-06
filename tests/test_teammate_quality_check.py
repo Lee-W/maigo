@@ -115,6 +115,29 @@ class TestCheckTomori:
         assert result["decision"] == "block"
         assert "Loaded memory entries" in result["reason"]
 
+    def test_triage_rubric_with_category_approves(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                "## Triage rubric\n"
+                ".maigo/triage-rubric.md\n"
+                "## Category\nbug\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+    def test_triage_path_but_no_category_heading_blocks(
+        self, capsys: pytest.CaptureFixture
+    ):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                ".maigo/triage-rubric.md\n"  # path mentioned, no structural heading
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "結構" in result["reason"]
+
 
 # ---------------------------------------------------------------------------
 # check_soyo

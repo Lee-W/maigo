@@ -43,6 +43,7 @@ nav:
       - /maigo:retro: commands/retro.md
       - /maigo:describe-pr: commands/describe-pr.md
       - /maigo:address-comments: commands/address-comments.md
+      - /maigo:triage-issue: commands/triage-issue.md
       - /maigo:doctor: commands/doctor.md
   - Skills (source):
       - strict-review: skills/strict-review.md
@@ -57,6 +58,7 @@ nav:
       - narration: skills/narration.md
       - teammate-flow: skills/teammate-flow.md
       - doc-link-convention: skills/doc-link-convention.md
+      - strict-triage: skills/strict-triage.md
   - Changelog: changelog.md
 
 markdown_extensions:
