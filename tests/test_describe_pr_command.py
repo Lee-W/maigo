@@ -47,9 +47,9 @@ def test_command_frontmatter():
 
 def test_command_has_include_marker():
     text = COMMAND_FILE.read_text(encoding="utf-8")
-    assert (
-        "<!-- mkdocs-include-start -->" in text
-    ), "commands/describe-pr.md に <!-- mkdocs-include-start --> がない"
+    assert "<!-- mkdocs-include-start -->" in text, (
+        "commands/describe-pr.md に <!-- mkdocs-include-start --> がない"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -59,9 +59,9 @@ def test_command_has_include_marker():
 
 def test_command_references_skill():
     text = COMMAND_FILE.read_text(encoding="utf-8")
-    assert (
-        "skills/github-title-description" in text
-    ), "commands/describe-pr.md に skills/github-title-description への参照がない"
+    assert "skills/github-title-description" in text, (
+        "commands/describe-pr.md に skills/github-title-description への参照がない"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -82,13 +82,13 @@ def test_skill_frontmatter():
     text = SKILL_FILE.read_text(encoding="utf-8")
     fm = parse_frontmatter(text)
     assert fm is not None, "SKILL.md frontmatter が解析できない"
-    assert (
-        fm.get("name") == "github-title-description"
-    ), f"skill name が期待と異なる: {fm.get('name')!r}"
+    assert fm.get("name") == "github-title-description", (
+        f"skill name が期待と異なる: {fm.get('name')!r}"
+    )
     desc = fm.get("description", "")
-    assert desc.startswith(
-        "This skill should be used when"
-    ), f"skill description が 'This skill should be used when' で始まっていない: {desc!r}"
+    assert desc.startswith("This skill should be used when"), (
+        f"skill description が 'This skill should be used when' で始まっていない: {desc!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +98,9 @@ def test_skill_frontmatter():
 
 def test_skill_has_include_marker():
     text = SKILL_FILE.read_text(encoding="utf-8")
-    assert (
-        "<!-- mkdocs-include-start -->" in text
-    ), "SKILL.md に <!-- mkdocs-include-start --> がない"
+    assert "<!-- mkdocs-include-start -->" in text, (
+        "SKILL.md に <!-- mkdocs-include-start --> がない"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,9 +116,9 @@ def test_docs_shims_exist():
         include_lines = [
             line for line in text.splitlines() if "include-markdown" in line
         ]
-        assert (
-            len(include_lines) == 1
-        ), f"{shim_path} の include-markdown 行が 1 行でない: {len(include_lines)}"
+        assert len(include_lines) == 1, (
+            f"{shim_path} の include-markdown 行が 1 行でない: {len(include_lines)}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -128,12 +128,12 @@ def test_docs_shims_exist():
 
 def test_mkdocs_nav_has_entries():
     text = MKDOCS_YML.read_text(encoding="utf-8")
-    assert (
-        "commands/describe-pr.md" in text
-    ), "mkdocs.yml の nav に commands/describe-pr.md がない"
-    assert (
-        "skills/github-title-description.md" in text
-    ), "mkdocs.yml の nav に skills/github-title-description.md がない"
+    assert "commands/describe-pr.md" in text, (
+        "mkdocs.yml の nav に commands/describe-pr.md がない"
+    )
+    assert "skills/github-title-description.md" in text, (
+        "mkdocs.yml の nav に skills/github-title-description.md がない"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -154,9 +154,9 @@ def test_no_conventional_prefix_in_skill_good_examples():
     # Build a simple check: find all table row lines, split by |, check second cell.
 
     # sanity-check: pattern must catch a conventional prefix
-    assert conventional_cell_pattern.search(
-        "`feat: Reject something`"
-    ), "pattern should catch conventional prefix but didn't"
+    assert conventional_cell_pattern.search("`feat: Reject something`"), (
+        "pattern should catch conventional prefix but didn't"
+    )
 
     bad_matches = []
     for line in text.splitlines():

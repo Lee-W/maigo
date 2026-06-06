@@ -35,12 +35,7 @@ def make_memory_dir(base: Path, entries: dict[str, str]) -> Path:
 
 
 def good_entry(extra: str = "") -> str:
-    base = (
-        "---\n"
-        "name: Test Entry\n"
-        "description: A good test entry\n"
-        "type: project\n"
-    )
+    base = "---\nname: Test Entry\ndescription: A good test entry\ntype: project\n"
     if extra:
         base += extra + "\n"
     base += "---\n\nBody text.\n"

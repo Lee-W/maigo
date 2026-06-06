@@ -20,7 +20,7 @@ repos:
       - id: check-shebang-scripts-are-executable
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.15.13
     hooks:
       - id: ruff
         args: [--fix]
