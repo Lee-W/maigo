@@ -3,7 +3,9 @@
   "version": "0.17.0",
   "description": "MyGO!!!!! 驅動的通用開發 agent flow。大家一起迷失吧。",
   "license": "MIT",
-  "author": "Wei Lee",
+  "author": {
+    "name": "Wei Lee"
+  },
   "homepage": "https://lee-w.github.io/maigo/",
   "repository": "https://github.com/Lee-W/maigo",
   "keywords": ["multi-agent", "workflow", "review", "mygo", "claude-code"]

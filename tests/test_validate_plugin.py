@@ -88,6 +88,53 @@ class TestCheckPluginJson:
         result = validate_plugin.check_plugin_json()
         assert result.passed
 
+    def test_author_as_string_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        data = {
+            "name": "test",
+            "version": "1.0",
+            "description": "d",
+            "license": "MIT",
+            "author": "Wei Lee",  # invalid — must be object
+        }
+        _plugin_json_path(tmp_path).write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_plugin_json()
+        assert not result.passed
+        assert any("author" in e and "object" in e for e in result.errors)
+
+    def test_author_object_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        data = {
+            "name": "test",
+            "version": "1.0",
+            "description": "d",
+            "license": "MIT",
+            "author": {"name": "Wei Lee"},
+        }
+        _plugin_json_path(tmp_path).write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_plugin_json()
+        assert result.passed
+
+    def test_author_object_missing_name_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        data = {
+            "name": "test",
+            "version": "1.0",
+            "description": "d",
+            "license": "MIT",
+            "author": {"email": "x@y.com"},  # missing required name
+        }
+        _plugin_json_path(tmp_path).write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_plugin_json()
+        assert not result.passed
+        assert any("author.name" in e for e in result.errors)
+
 
 # ---------------------------------------------------------------------------
 # check_agent_frontmatter

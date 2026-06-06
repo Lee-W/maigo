@@ -63,6 +63,17 @@ def check_plugin_json() -> CheckResult:
     for key in ("name", "version", "description", "license"):
         if not data.get(key):
             r.fail(f"缺欄位 `{key}`")
+    # Type check for object-shaped fields — Claude Code v2.1.154+ rejects the
+    # plugin install when `author` is a bare string instead of `{name, email?}`.
+    author = data.get("author")
+    if author is not None:
+        if not isinstance(author, dict):
+            r.fail(
+                f'欄位 `author` 必須是 object（如 `{{"name": "..."}}`），'
+                f"目前是 {type(author).__name__}"
+            )
+        elif not author.get("name"):
+            r.fail("欄位 `author.name` 缺值（object 形式下 name 是必填）")
     return r
 
 
