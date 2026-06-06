@@ -50,8 +50,8 @@ class CheckResult:
 
 
 def check_plugin_json() -> CheckResult:
-    r = CheckResult("plugin.json")
-    path = ROOT / "plugin.json"
+    r = CheckResult(".claude-plugin/plugin.json")
+    path = ROOT / ".claude-plugin" / "plugin.json"
     if not path.is_file():
         r.fail("檔案不存在")
         return r
@@ -295,16 +295,16 @@ def check_version_sync() -> CheckResult:
     Commitizen bumps both via `version_files`, but a manual edit to one
     without the other silently desyncs. This catches that.
     """
-    r = CheckResult("plugin.json ↔ pyproject.toml version sync")
-    plugin_path = ROOT / "plugin.json"
+    r = CheckResult(".claude-plugin/plugin.json ↔ pyproject.toml version sync")
+    plugin_path = ROOT / ".claude-plugin" / "plugin.json"
     pyproject_path = ROOT / "pyproject.toml"
     if not plugin_path.is_file() or not pyproject_path.is_file():
-        r.note("plugin.json 或 pyproject.toml 不存在，跳過")
+        r.note(".claude-plugin/plugin.json 或 pyproject.toml 不存在，跳過")
         return r
     try:
         plugin_ver = json.loads(plugin_path.read_text(encoding="utf-8")).get("version")
     except json.JSONDecodeError as exc:
-        r.fail(f"plugin.json 解析失敗：{exc}")
+        r.fail(f".claude-plugin/plugin.json 解析失敗：{exc}")
         return r
     try:
         with pyproject_path.open("rb") as f:
@@ -314,14 +314,14 @@ def check_version_sync() -> CheckResult:
         return r
     pyproject_ver = pyproject_data.get("project", {}).get("version")
     if plugin_ver is None:
-        r.fail("plugin.json 沒有 `version` 欄位")
+        r.fail(".claude-plugin/plugin.json 沒有 `version` 欄位")
         return r
     if pyproject_ver is None:
         r.fail("pyproject.toml [project] 找不到 `version`")
         return r
     if plugin_ver != pyproject_ver:
         r.fail(
-            f"版本不一致：plugin.json=`{plugin_ver}` vs "
+            f"版本不一致：.claude-plugin/plugin.json=`{plugin_ver}` vs "
             f"pyproject.toml=`{pyproject_ver}`。執行 `cz bump` 或手動同步。"
         )
     return r

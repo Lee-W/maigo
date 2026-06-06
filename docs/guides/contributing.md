@@ -27,7 +27,7 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 ### pre-commit 會自動擋下
 
 - 基本檔案衛生：trailing whitespace、EOF newline、大檔、merge conflict marker、shebang 與 executable bit 一致性
-- 壞掉的 JSON / YAML（`plugin.json` / `hooks/hooks.json` 壞了 plugin 整個載不到）
+- 壞掉的 JSON / YAML（`.claude-plugin/plugin.json` / `hooks/hooks.json` 壞了 plugin 整個載不到）
 - Ruff lint / format 失敗
 - Agent / command frontmatter 缺欄位（`name` / `description` / `model` / `tools`）或 agent name 跟檔名對不上
 
@@ -39,7 +39,7 @@ python3 scripts/validate_plugin.py
 
 涵蓋的檢查面向（具體項數會隨 plugin 演進變動，**以 `CHECKS` list 與實際輸出為準**）：
 
-- `plugin.json` valid JSON + 必要欄位
+- `.claude-plugin/plugin.json` valid JSON + 必要欄位
 - `hooks/hooks.json` valid JSON
 - `agents/*.md` frontmatter（name / description / model / tools；name 必須對應檔名）
 - `commands/*.md` frontmatter（description）
@@ -47,7 +47,7 @@ python3 scripts/validate_plugin.py
 - `hooks/hooks.json` 指向的 script 真的存在 + Python 語法 OK / Shell 有 executable bit
 - `.pre-commit-config.yaml` 結構合理 + local hook entry 指向的檔案存在
 - `agents/` 與 `commands/` 引用的 `skills/<name>` 真的有對應 skill
-- `plugin.json` 與 `pyproject.toml` 的 version 同步
+- `.claude-plugin/plugin.json` 與 `pyproject.toml` 的 version 同步
 - `commands/*.md` ↔ `docs/commands/<name>.md` 對齊（mkdocs-include-start marker + shim）
 - `skills/*/SKILL.md` ↔ `docs/skills/` + `mkdocs.yml` + `docs/reference/skills.md` catalog 四向對齊
 
@@ -92,8 +92,10 @@ maigo/
 ├── docs/                            # ← 你在這裡
 │   ├── reference/                   # agents / commands / hooks / skills / memory / character-colors
 │   └── guides/                      # getting-started / contributing
+├── .claude-plugin/
+│   ├── plugin.json                  # plugin manifest（per Claude Code spec）
+│   └── marketplace.json             # marketplace catalog（用於 /plugin install）
 ├── .pre-commit-config.yaml
-├── plugin.json
 ├── CHANGELOG.md
 └── README.md
 ```

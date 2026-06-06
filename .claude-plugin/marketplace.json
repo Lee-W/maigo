@@ -9,8 +9,8 @@
     {
       "name": "maigo",
       "source": {
-        "source": "directory",
-        "path": "."
+        "source": "github",
+        "repo": "Lee-W/maigo"
       },
       "description": "MyGO!!!!! agent orchestration plugin"
     }

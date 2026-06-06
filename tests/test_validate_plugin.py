@@ -16,6 +16,13 @@ from tests.conftest import (
 )
 
 
+def _plugin_json_path(tmp_path: Path) -> Path:
+    """Return the canonical .claude-plugin/plugin.json path, ensuring its parent exists."""
+    d = tmp_path / ".claude-plugin"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "plugin.json"
+
+
 # ---------------------------------------------------------------------------
 # parse_frontmatter
 # ---------------------------------------------------------------------------
@@ -58,7 +65,7 @@ class TestCheckPluginJson:
         assert any("不存在" in e for e in result.errors)
 
     def test_bad_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        (tmp_path / "plugin.json").write_text("{not valid json", encoding="utf-8")
+        _plugin_json_path(tmp_path).write_text("{not valid json", encoding="utf-8")
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_plugin_json()
         assert not result.passed
@@ -68,7 +75,7 @@ class TestCheckPluginJson:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         data = {"name": "test", "description": "d", "license": "MIT"}
-        (tmp_path / "plugin.json").write_text(json.dumps(data), encoding="utf-8")
+        _plugin_json_path(tmp_path).write_text(json.dumps(data), encoding="utf-8")
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_plugin_json()
         assert not result.passed
@@ -76,7 +83,7 @@ class TestCheckPluginJson:
 
     def test_all_fields_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         data = {"name": "test", "version": "1.0", "description": "d", "license": "MIT"}
-        (tmp_path / "plugin.json").write_text(json.dumps(data), encoding="utf-8")
+        _plugin_json_path(tmp_path).write_text(json.dumps(data), encoding="utf-8")
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_plugin_json()
         assert result.passed
@@ -238,7 +245,7 @@ class TestCheckPluginJsonAllMissing:
     def test_empty_plugin_json_reports_all_missing_fields(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        (tmp_path / "plugin.json").write_text("{}", encoding="utf-8")
+        _plugin_json_path(tmp_path).write_text("{}", encoding="utf-8")
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_plugin_json()
         assert not result.passed
@@ -257,7 +264,7 @@ class TestCheckVersionSync:
         self, tmp_path: Path, plugin_ver: str | None, pyproject_ver: str | None
     ) -> None:
         if plugin_ver is not None:
-            (tmp_path / "plugin.json").write_text(
+            _plugin_json_path(tmp_path).write_text(
                 json.dumps({"version": plugin_ver}), encoding="utf-8"
             )
         if pyproject_ver is not None:

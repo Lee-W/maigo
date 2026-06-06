@@ -31,12 +31,14 @@ def run_hook_main(
 
 
 def make_plugin_json(tmp_path: Path) -> Path:
-    """Write a minimal valid plugin.json to tmp_path.
+    """Write a minimal valid .claude-plugin/plugin.json under tmp_path.
 
     Minimal valid structure: name, version, description, license fields.
     Returns the path to the created file.
     """
-    p = tmp_path / "plugin.json"
+    claude_plugin_dir = tmp_path / ".claude-plugin"
+    claude_plugin_dir.mkdir(parents=True, exist_ok=True)
+    p = claude_plugin_dir / "plugin.json"
     p.write_text(
         json.dumps(
             {

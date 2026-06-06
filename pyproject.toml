@@ -18,7 +18,7 @@ pythonpath = ["."]
 name = "cz_conventional_commits"
 version_provider = "uv"
 version_files = [
-  'plugin.json:"version"',
+  '.claude-plugin/plugin.json:"version"',
   '.pre-commit-config.yaml:rev:.+Commitizen',
 ]
 version_scheme = "semver"
