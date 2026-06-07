@@ -45,6 +45,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`teammate-flow`](../skills/teammate-flow.md) | orchestrator | `/maigo:go`、`/maigo:team` | MyGO!!!!! 五人協作的共通流程骨架——sequential 段（🐱 樂奈 → 🩵 燈 → 🎀 愛音）、Orchestrator 守則、commit message draft 規則、失敗處理與 memory confirm flow 引用 |
 | [`doc-link-convention`](../skills/doc-link-convention.md) | Soyo | review 觸及 `agents/` / `commands/` / `skills/` 的 PR 時 | Maigo source 檔的跨檔 link 強制用絕對 GitHub URL，避免 `mkdocs build --strict` 因 include-markdown rewrite 抓不到 page 而 abort |
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
+| [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
 
 ## skill 檔案規格
 

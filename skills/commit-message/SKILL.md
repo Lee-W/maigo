@@ -87,6 +87,8 @@ The amend message replaces the original; treat it as a fresh draft from this ski
 
 Provide the raw text to the caller. Do **not** wrap in a code fence by default (the caller usually pipes it into `git commit -F -` or `git commit --amend -F -` and an outer fence breaks that). If the caller explicitly asks for a quoted form, fence it then.
 
+When the caller **presents the commit message to the user** as a deliverable (rather than piping it directly to `git commit`), follow [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md) — wrap it in a single fenced code block so the user can copy the raw text without reformatting.
+
 ## What this skill does NOT cover
 
 - The PR description / motivation / test plan — that is [`github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md).

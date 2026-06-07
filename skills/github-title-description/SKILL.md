@@ -137,6 +137,8 @@ skill 跑完直接給 caller 兩塊 markdown：
 
 （skill 本身只負責產 body / title；組裝 copy-paste block 是 caller 的收尾步驟。）
 
+caller 呈現最終 deliverable 給使用者時，遵守 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)——把可複製的內容放進單一 fenced code block。
+
 ## What this skill does NOT cover
 
 - 開 PR（這是 caller / 使用者 的 `gh pr create` 或 GitHub UI）

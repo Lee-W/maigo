@@ -59,6 +59,7 @@ nav:
       - teammate-flow: skills/teammate-flow.md
       - doc-link-convention: skills/doc-link-convention.md
       - strict-triage: skills/strict-triage.md
+      - copyable-deliverable: skills/copyable-deliverable.md
   - Changelog: changelog.md
 
 markdown_extensions:

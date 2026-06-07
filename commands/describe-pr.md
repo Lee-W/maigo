@@ -69,6 +69,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
   - title 緊接在這塊下方用一行 `**Title:** <one line>` 給出，方便連 title 一起複製。
   - 這份是「給機器/剪貼簿」的純淨版——**不含旁白、不含 `<待補>` 以外的提示文字**；
     `<待補：...>` 佔位符照樣留在 body 裡（使用者複製後自己替換）。
+  - 此為 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md) 的具體套用。
 - **附帶提示**（最末，放在可複製 block 之後）：
   - 「若要直接開 PR：`gh pr create --title '<title>' --body-file -`（接 stdin 貼 description）」
   - 若燈的草稿標出 `<待補：...>`，列出來提醒使用者補。
