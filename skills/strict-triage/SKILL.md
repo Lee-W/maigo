@@ -84,15 +84,28 @@ disagreement worth surfacing.
 
 For each verdict, provide one or more `gh` commands the maintainer can paste:
 
-| Verdict | gh commands to draft |
+| Verdict | 建議操作 |
 |---|---|
-| READY | `gh issue edit <N> --add-label <X>` (one per suggested label) |
-| NEEDS_INFO | `gh issue comment <N> --body-file -` (with the draft response piped via stdin) + `gh issue edit <N> --add-label needs-info` if such a label exists |
-| DUP | `gh issue comment <N> --body "Duplicate of #<M>"` + `gh issue close <N> --reason "not planned"` |
-| CLOSE | `gh issue comment <N> --body-file -` (close reason) + `gh issue close <N> --reason "not planned"` (or `--reason "completed"` if marking as resolved by other means) |
+| READY | `gh issue edit <N> --add-label <X>`（每個 suggested label 一條） |
+| NEEDS_INFO | issue 連結 + 純內文回覆 block（見下）；`gh issue edit <N> --add-label needs-info`（若有此 label） |
+| DUP | issue 連結 + 純內文回覆 block；`gh issue close <N> --reason "not planned"` |
+| CLOSE | issue 連結 + 純內文回覆 block（close reason）；`gh issue close <N> --reason "not planned"`（或 `--reason "completed"`） |
 
-**Skill does not run these commands.** Suggest them; maintainer pastes them. Same convention as
-[`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md).
+**Reply 慣例（NEEDS_INFO / DUP / CLOSE 的回覆部分）**：不用 `gh issue comment --body-file -`——改給 **issue 連結 + 純內文 fenced code block**，maintainer 在 GitHub 網頁直接貼上送出：
+
+```markdown
+https://github.com/<owner>/<repo>/issues/<N>
+
+````
+<draft response above>
+````
+```
+
+**Label / close 操作（READY / DUP / CLOSE 的 label 與 close 部分）**：這些沒有純文字等價物，仍用 `gh` 指令草稿（maintainer 自己貼到 terminal 執行）。
+
+**Skill does not run these commands.** Suggest them; maintainer pastes them.
+Reply 走「連結 + 純內文 block」慣例；label / close 走 gh 指令——對齊
+[`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md) 的新分流。
 
 ## Output format
 
@@ -125,12 +138,15 @@ READY | NEEDS_INFO | DUP | CLOSE
 具體想看：(1) 哪個指令 / API 呼叫，(2) 跑出來實際 output 與你期待 output 的差。
 有的話可以直接進開發；沒有的話我們會先標 needs-info 等補上再回來看。
 
+## Reply
+https://github.com/<owner>/<repo>/issues/<N>
+
+````
+<draft response above>
+````
+
 ## Suggested gh commands
 ```bash
-gh issue comment <N> --body-file - <<'EOF'
-<draft response above>
-EOF
-
 gh issue edit <N> --add-label needs-info --remove-label bug
 ```
 
