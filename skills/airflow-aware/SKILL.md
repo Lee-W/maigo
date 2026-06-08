@@ -132,8 +132,40 @@ because they are the conventions agents most frequently overlook.
 - **Use `time.monotonic()`** for elapsed-time measurement — not `time.time()`.
 - **Imports go at the top of the file** — no function-local imports unless the comment
   explicitly notes a circular dependency, lazy load, or `TYPE_CHECKING` guard.
+- **`__init__` and always-called functions: default to top-level imports.** Reserve the
+  lazy / function-body form for exactly four cases: (1) `TYPE_CHECKING` block, (2) breaking
+  a known circular-import cycle, (3) multi-process worker-isolation path, (4) deferred-execution
+  callback (e.g., a `deserialize()` body that is not called at module import time).
+  Self-check: "does this function run on every public touch of the class?" If yes → top-level.
+  Note: §10.3 and §10.4 address distinct but adjacent rules — Unix-only module gates and heavy
+  type-only imports in multi-process paths; this rule is about the default for eager call sites.
 
-### 6. Testing
+### 6. Delivery completeness
+
+User-facing features (new public class / SDK symbol / scheduling behaviour) must ship
+**all three** deliverables in the same PR:
+
+1. **Implementation + tests** — the obvious part.
+2. **Example Dag** — fold into an **existing** example file (e.g., `example_asset_partition.py`);
+   reuse the existing block style and existing asset/producer objects. Do **not** open a new
+   example file or add a bare new `with DAG(...)` block — consistent with the
+   "don't proliferate example Dags" convention.
+3. **Docs update** — update the relevant `.rst` (e.g., `airflow-core/docs/authoring-and-scheduling/assets.rst`).
+   Prose uses "Dag"; known limitations are written as constraints, not `# TODO` placeholders.
+
+**Public-symbol sync (docs side):** whenever a public symbol is added or removed,
+`task-sdk/docs/api.rst` and the corresponding `airflow-core/docs/` `.. autoapiclass::` entries
+must be updated together with `__init__.py` / `__all__` / lazy-import table.
+Dropping a removed symbol and adding a new one are both required — a missing deletion causes
+`breeze build-docs` to crash at Sphinx import time; a missing addition causes a silent gap
+in the API reference. After editing, `grep` the old symbol name across `docs/` to confirm
+no stale references remain.
+
+Why: apache/airflow PR #64571 (`Window` / `RollupMapper`) and the partition-mapper
+refactor both shipped with example + docs in the same PR; missing either was flagged in
+round-1 review.
+
+### 7. Testing
 
 - **pytest only** — do not subclass `unittest.TestCase`.
 - **All mocks must have `spec=` or `autospec=True`** — bare `MagicMock()` without a spec is not acceptable.
@@ -151,7 +183,7 @@ because they are the conventions agents most frequently overlook.
 - **Test paths mirror source paths**:
   `airflow-core/src/airflow/foo/bar.py` ↔ `airflow-core/tests/unit/foo/test_bar.py`
 
-### 7. PR / commit / newsfragment
+### 8. PR / commit / newsfragment
 
 - Write commit messages and PR titles from the **user-impact perspective** — describe what
   changes for users, not which files were touched.
@@ -162,7 +194,7 @@ because they are the conventions agents most frequently overlook.
 - **Imminent fixes** (obvious bugs, small refactors with no design question) can go straight
   to a PR — no need to open an issue first.
 
-### 8. Architecture boundaries *(optional, for architectural review)*
+### 9. Architecture boundaries *(optional, for architectural review)*
 
 Airflow's subsystems have strict ownership boundaries that must not be crossed:
 
@@ -203,14 +235,14 @@ separate axis covered by the SDK/Core release-state framing memory
 (check release tags via `git tag --contains <sha>` **and** `git show
 <tag>:<file>` to confirm).
 
-### 9. Review-time-only checks *(loaded as strict-review item 10+)*
+### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 When `airflow-aware` is loaded during a review task (🟡 Soyo running `strict-review`
 on an Airflow diff), the following Airflow-specific checks supplement the base 9-item
 checklist as items 10+. Outside of a review context (quick-fix / refactor) they
 are useful background but not a checklist gate.
 
-#### 9.1 Execution API wire-format gate *(Block-level)*
+#### 10.1 Execution API wire-format gate *(Block-level)*
 
 If the diff touches any of:
 
@@ -228,7 +260,7 @@ Missing version file → **Block**, point at
 Reason: server `StrictBaseModel` payloads default to `extra="forbid"` and 422 unknown
 fields, so mixed-version rollouts break silently otherwise.
 
-#### 9.2 Multi-PR split: wire-format symbol cross-check
+#### 10.2 Multi-PR split: wire-format symbol cross-check
 
 If the PR body says "PR N of M", "split from #NNNNN", "consumes what was added in
 #NNNNN", or `cc:` mentions the same reviewer across sibling PRs, fetch the sibling
@@ -241,20 +273,20 @@ own tests will not catch because they're self-consistent against the wrong shape
 Past examples: #66699 renamed `retention_days` → `expires_at` in prod but not tests;
 #66782 consumer reads `partition_key` while #65447 producer emits `partition_keys`.
 
-#### 9.3 Top-level imports of Unix-only modules
+#### 10.3 Top-level imports of Unix-only modules
 
 Top-level imports of `fcntl`, `pwd`, `grp`, or `resource` break Windows.
 Flag as **Block** unless the whole file is Unix-gated (e.g., `sys.platform != "win32"`
 guard at module top, or the file lives under a `_unix` / `_posix` submodule).
 
-#### 9.4 `TYPE_CHECKING` guards for heavy type-only imports
+#### 10.4 `TYPE_CHECKING` guards for heavy type-only imports
 
 In multi-process code paths (scheduler, Dag File Processor, triggerer, worker), heavy
 type-only imports (e.g., `kubernetes.client`, `boto3`, `google.cloud.*`) must be
 guarded by `if TYPE_CHECKING:` — pulling them into every fork balloons memory and
 startup time. Flag as **Request changes**.
 
-#### 9.5 Security finding classification
+#### 10.5 Security finding classification
 
 When flagging a security concern, classify it as exactly one of three before
 reporting:
@@ -273,7 +305,7 @@ reporting:
 Authority:
 [`airflow-core/docs/security/security_model.rst`](https://github.com/apache/airflow/blob/main/airflow-core/docs/security/security_model.rst).
 
-#### 9.6 Newsfragment file presence
+#### 10.6 Newsfragment file presence
 
 If the diff modifies code under `airflow-core/`, `chart/`, or `dev/mypy/` and is
 user-visible (feature / bugfix / breaking change / doc change with user impact),
@@ -293,10 +325,11 @@ airflow-aware conventions as Airflow-specific supplements:
 
 - Convention 2 (naming) reinforces the naming check (base item 4).
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
-- Convention 6 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§9 sub-checks (9.1–9.6) become items 10+** in the checklist output, with Block /
+- Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
+- Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
+- **§10 sub-checks (10.1–10.6) become items 10+** in the checklist output, with Block /
   Request-changes severity inherited from each sub-section.
 
-**Quick-fix / refactor scenario** — use conventions 3, 4, 5, and 6 as background knowledge.
+**Quick-fix / refactor scenario** — use conventions 3, 4, 5, 6, and 7 as background knowledge.
 Flag violations you notice, but do not run the full `strict-review` checklist unless the
-task calls for it. §9 sub-checks are review-only — do not gate non-review tasks on them.
+task calls for it. §10 sub-checks are review-only — do not gate non-review tasks on them.

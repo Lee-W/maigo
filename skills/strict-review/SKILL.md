@@ -128,6 +128,50 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 | `/maigo:review --mode=compliance-only` | Run items 4/5/6/7/8; mark 1/2/3/9 as `[—]` with reason `skipped by mode=compliance-only` |
 | `/maigo:quick` (quick mode) | Run items 1/4/5/7; mark 2/3/6/8/9 as `[—]` with reason `skipped by mode=quick` |
 
+## Recurring must-fix patterns
+
+These are cross-cutting patterns that surface frequently enough to be named; treat them as
+supplements to the 9-item checklist, not replacements.
+
+### Commit body is a contract — verify it matches the diff
+
+A commit body that states a runtime behaviour ("X defaults to Y", "we now raise on Z",
+"ordering is guaranteed") is a **contract** future bisect users will trust. When body prose
+says "X happens", the diff must show X happening.
+
+How to apply during review:
+1. For each behavioral claim in the commit body (defaults, fallbacks, raise conditions,
+   ordering, validation rules) grep / read the relevant code path to verify.
+2. If code does not match: **must-fix**. Either implement the promised behaviour (Option A)
+   or rewrite the commit body to describe what the code actually does (Option B). Do not
+   accept "this is just docs".
+3. Pre-release status does **not** downgrade this. Wire-format mutations are acceptable
+   pre-release, but the commit body's promise about behaviour must still align with the diff.
+
+Concrete case: a trigger-policy commit claimed _"pre-existing serialized Dags default to
+`WAIT_FOR_ALL` on deserialize"_ but `RollupMapper.deserialize` used `data["wait_policy"]`
+with no `.get()` fallback — any cache-resident payload would `KeyError`. Fix was to align
+prose with code (Option B), not the reverse.
+
+### Underscore-private exception that consumers must `isinstance`-check is de-facto public API
+
+When a module defines private exception classes (`_FooError`, `_BarError`) and a consumer
+must `isinstance`-check one of them to distinguish failure modes, that one exception is
+**already public API** — the underscore is a lie.
+
+Two-step signal to watch for:
+1. Multiple exception types exist behind a common wrapper (e.g., `_PollFailure(exc)`).
+2. A consumer must inspect `.exc` and branch on its concrete type.
+
+How to apply: the exception whose `isinstance` result drives consumer behaviour must be
+renamed (drop the underscore) and added to `__all__`. Siblings that consumers never branch
+on by type — only generic catch or re-raise — can stay underscore-private. Selective
+promotion is the discipline; do not broadcast the whole hierarchy.
+
+Concrete case: `_AckTimeout`, `_PollTerminated`, `_SubscriberOverflow` were all private,
+but test files imported `_AckTimeout` to write `isinstance(sentinel.exc, _AckTimeout)`.
+Fix: rename only `_AckTimeout` → `AckTimeout` (add to `__all__`); the others stay private.
+
 ## What this skill does NOT cover
 
 - Writing or editing code (reviewer has read-only tools)

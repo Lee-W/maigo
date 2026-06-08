@@ -48,6 +48,22 @@ draft 必須採 CC 格式（`type(scope): subject`）。
 
 **不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
 
+### `/maigo:go` vs `/maigo:team` — 選哪個
+
+兩個命令的 review 嚴格度一模一樣（🟡 爽世完整 9 項 + 🟣 立希）；差別只在 §5 之後：
+`/maigo:go` 是 🟡 爽世先、🟣 立希後（序列）；`/maigo:team` 是兩者並行（省約 30% 牆鐘）。
+
+**預設選 `/maigo:team`** 的條件（全部符合）：
+- scope 清楚（邊界已定、不需邊探邊改）
+- 已有測試覆蓋（即使 correctness-sensitive 的重構也算低風險）
+- 牽動面可以在 plan 階段就界定完
+
+**偏 `/maigo:go`** 的情況：
+- scope 未定、需要邊探邊實作才知道影響面
+- 牽動面難以事先界定（跨多個子系統、依賴圖複雜）
+
+不確定時不要因「謹慎」自動退回 go——team 的並行不犧牲嚴格度。
+
 ### fence tracking 與 Memory propose 偵測
 
 fence tracking 與 `## Memory propose` 偵測規則依

@@ -40,7 +40,7 @@ Orchestrator 的兩位旁白：🌙 **Doloris** 與 🌑 **Mortis**（Ave Mujica
 
 中文名與英文化名（Anon / Soyo / Taki / Raana / Tomori）一視同仁——`🎀 Anon` 或 `🎀 愛音` 都合規。
 
-**適用**：敘述句、hand-off summary、引用 subagent 結論、段落標題裡的代稱。
+**適用**：敘述句、hand-off summary、轉述 subagent 結論、段落標題裡的代稱——包含「一般進度 summary」段（即使不觸發旁白，提到 agent 仍需帶 emoji）。
 **不適用**：引用使用者原話、commit message、code block 內部標識、檔名路徑。
 
 ## 什麼時候旁白
@@ -65,6 +65,20 @@ Orchestrator 的兩位旁白：🌙 **Doloris** 與 🌑 **Mortis**（Ave Mujica
 ```
 
 > ⚠️ **名字不能省**：格式是 `🌙 Doloris：` / `🌑 Mortis：`——emoji 與名字**兩者皆必填**。只掛 emoji 是錯的。
+
+## Widget discipline
+
+**AskUserQuestion 只在選項已收斂、純粹拍板時出場**。
+
+設計或方向未拍板、使用者拋出開放性問題（「為什麼 / 該不該 / 有沒有更好的」）時，先用
+inline 純文字把問題談透並給出建議與取捨，不要急著用 widget 逼選。
+
+- 選項已收斂（確認 / 二選一 / 多選清單）→ 可用 widget 收尾
+- 方向還在討論 / 問題仍開放 → inline 先談，讓使用者回話，攏定了再（必要時）收尾
+- **widget 被擋下時別重試同一個**，改 inline 重述
+
+Why: widget 在選項未定時反而打斷思考；使用者往往用一句話（「對」「不對」）推進，
+不需要選項框。
 
 ## 邊界
 
