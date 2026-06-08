@@ -195,19 +195,13 @@ uv run mkdocs build --strict           # venv 工具 → uv run
 
 ## Orchestrator 守則
 
+（流程細節見上面各步驟；以下只列貫穿全程的原則。）
+
 - **旁白**：開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依
   [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
-- **一次只 propose 一筆**——逐筆問，使用者答完才下一筆。
-- **世界觀隔離優先**——每筆 propose 前先過步驟 3 的 gate；maigo 記憶不畢業進 mujica skill。
-- **不延伸推斷**——只畢業記憶層裡實際存在的條目，不「順手補一個使用者可能也想要的 skill」。
-- **互動留 orchestrator、寫 skill 下放愛音**——挑候選 / propose / confirm / 退役記憶是
-  orchestrator 的活；寫 SKILL.md + shim + mkdocs + catalog + 驗證交給 🎀 愛音，**不要自己
-  寫 skill、不要自己 review**（分別交給愛音與 🟡 爽世）。批次委派、一次 spawn，不 per-entry。
-- **skill 寫法不複製 spec**——愛音指向 repo 的 Add New Skill Checklist 與 doc-link-convention。
-- **退役記憶不複製 spec**——指向 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 6。
+- **互動留 orchestrator、寫 skill 下放愛音**：挑候選 / propose / confirm / 退役記憶是
+  orchestrator 的活（需對話 context，不下放）；寫 SKILL.md + shim + mkdocs + catalog + 驗證
+  批次委派 🎀 愛音、review 交 🟡 爽世——不要自己寫 skill、自己 review。一次 spawn，不 per-entry。
+- **不延伸推斷**：只畢業記憶層裡實際存在的條目，不順手補使用者「可能也想要」的 skill。
 - **跟 retro 的關係**：[`/maigo:retro`](https://github.com/Lee-W/maigo/blob/main/commands/retro.md)
-  把 session 學到的事**寫進** memory；crystallize 把 memory 裡夠成熟的條目**升階成** skill。
-  前者餵養記憶層，後者收割記憶層。
-
-→ 寫 skill 細節：[Add New Skill Checklist](https://github.com/Lee-W/maigo/blob/main/docs/reference/skills.md#add-new-skill-checklist)
-→ 退役記憶細節：[/maigo:remember](https://github.com/Lee-W/maigo/blob/main/commands/remember.md)
+  把 session 學到的事**寫進** memory；crystallize 把夠成熟的條目**升階成** skill——前者餵養、後者收割。

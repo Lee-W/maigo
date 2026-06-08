@@ -23,42 +23,26 @@ It can also be triggered manually via a memory entry with `triggers: [airflow-aw
 
 Once loaded, treat every convention as background — do not re-read each task.
 
-## Read AGENTS.md first
+## Contributor conventions
 
-The single source of truth for contributor conventions lives in the repo itself.
+### 1. Read AGENTS.md first — it wins
+
+The single source of truth for contributor conventions lives in the repo itself. This skill is a
+condensed onramp formatted for agent startup context, not a competing authority.
 
 1. **First action**: read [`AGENTS.md`](https://github.com/apache/airflow/blob/main/AGENTS.md)
    (or `CLAUDE.md` — both are identical, 455 lines).
 2. **Conflict resolution**: if anything in this skill contradicts `AGENTS.md`, the repo file wins.
-   This skill is an onramp and supplement, not a competing authority.
 3. **Review tasks**: also read
    [`.github/instructions/code-review.instructions.md`](https://github.com/apache/airflow/blob/main/.github/instructions/code-review.instructions.md)
    for review-specific guidance.
 
-## Contributor conventions
-
-### 1. Defer to AGENTS.md
-
-This skill is an onramp — a condensed version of `AGENTS.md` formatted for agent startup context.
-It is not a replacement. Any time a convention here conflicts with what `AGENTS.md` says,
-follow `AGENTS.md`. See the [Read AGENTS.md first](#read-agentsmd-first) section above.
-
 ### 2. Naming — Dag (prose) vs `DAG` (code)
 
-In **prose and documentation**, use `Dag` (title case): "the Dag will run at midnight".
-
-**Code tokens are always preserved as-is** — do not alter casing:
-
-- class name: `DAG`
-- parameter: `dag_id`
-- CLI: `airflow dags list`
-- directory: `dag_processing/`
-- env var: `DAG_FOLDER`
-
-Do **not** expand "Directed Acyclic Graph" in prose — just write `Dag`.
-Do **not** write all-caps `DAG` in prose unless you are literally referring to the Python class.
-
-This rule is covered in the "Naming" section of `AGENTS.md`; refer to that section when in doubt.
+In **prose**, write `Dag` (title case) — never all-caps `DAG` unless referring to the Python
+class, and never expand "Directed Acyclic Graph". **Code tokens stay as-is**: class `DAG`,
+`dag_id`, `airflow dags list`, `dag_processing/`, `DAG_FOLDER`. See the "Naming" section of
+`AGENTS.md` when in doubt.
 
 ### 3. Environment — Breeze + uv + prek
 
@@ -132,27 +116,8 @@ expected.
 - Formatter: `uv run ruff format`
 - Linter: `uv run ruff check --fix`
 - **Line length: 110** (not the Ruff default of 88 — agents most often miss this)
-- **New files require an Apache License header**:
-
-```python
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-```
-
+- **New files require the Apache License header** — copy it verbatim from any existing `.py`
+  file in the repo (do not hand-retype it).
 - Mypy is run via `prek` — do not invoke it directly on the host.
 
 ### 5. Coding rules agents most often miss
