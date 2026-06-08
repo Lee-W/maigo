@@ -41,6 +41,7 @@ nav:
       - /maigo:remember: commands/remember.md
       - /maigo:memory: commands/memory.md
       - /maigo:retro: commands/retro.md
+      - /maigo:crystallize: commands/crystallize.md
       - /maigo:describe-pr: commands/describe-pr.md
       - /maigo:address-comments: commands/address-comments.md
       - /maigo:triage-issue: commands/triage-issue.md

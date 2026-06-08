@@ -175,6 +175,33 @@ orchestrator 判斷兩條路徑：
 
 → [Memory reference](memory.md)
 
+## `/maigo:crystallize` — 把成熟的記憶條目畢業成 skill
+
+記憶層是扁平、relevance-ranked、capped 10 筆的事實儲存；有些條目其實是「反覆出現的慣例 / workflow」，塞在 memory 裡只被當事實載入、相關條目一多還會被擠出前 10 筆。`/maigo:crystallize` 把這類條目**畢業**成常駐 skill——trigger 命中就一定在 context、結構化、可被 command / agent 引用。
+
+```
+/maigo:crystallize    # 無參數，掃整個記憶層找畢業候選
+```
+
+| 步驟 | 誰 | 做什麼 |
+|------|-----|--------|
+| 1 | Orchestrator | 全讀記憶層（不做 relevance 排序），掃畢業候選 |
+| 2 | Orchestrator | 套 criteria 挑候選：convention 形狀 + 有明確 consumer + 反覆性 signal |
+| 3 | Orchestrator | 世界觀隔離 gate——maigo 記憶不畢業進 mujica skill |
+| 4 | Orchestrator | **逐筆** propose，AskUserQuestion（新建 / 併進 / 修改 / 跳過 / 結束），確認的記進批次清單 |
+| 5 | 🎀 愛音 + 🟡 爽世 | manifest 一次委派：愛音照 Add New Skill Checklist 批次寫 skill + 跑 validator + mkdocs strict，爽世輕量 review（quick 模式） |
+| 6 | Orchestrator | skill side 綠後退役來源記憶（刪 entry / 降級指針）|
+
+**分工**：互動的挑候選 / propose / confirm / 退役記憶留 orchestrator；「寫 SKILL.md + shim + mkdocs + catalog + 驗證」這段該被 review、被 verify 的 code change **委派 🎀 愛音**（走 `/maigo:quick` 輕量模式），**批次**委派、一次 spawn 不 per-entry——攤平冷啟動 token 成本。
+
+**atomic：skill side 驗證綠才動記憶層**——skill 沒寫成就退役會讓知識消失。寫 skill 細節指向 repo 的 [Add New Skill Checklist](skills.md#add-new-skill-checklist)，退役記憶指向 `/maigo:remember` 步驟 6，本命令不重複 spec。
+
+**跟 retro 的關係**：retro 把 session 學到的事**寫進** memory（餵養）；crystallize 把 memory 裡夠成熟的條目**升階成** skill（收割）。
+
+→ [Add New Skill Checklist](skills.md#add-new-skill-checklist)
+
+→ [/maigo:remember](../commands/remember.md)
+
 ## `/maigo:describe-pr` — 產 GitHub PR title + description
 
 從當前 branch 的 commits / diff 產出 PR 草稿（user-impact title + Why / What / Test Plan）。
@@ -230,3 +257,4 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | Security audit | `/maigo:review`，告訴 Soyo 重點看 unsafe pattern |
 | 看現在記了什麼跨專案偏好 | `/maigo:memory` |
 | Session 結束想沉澱學到的事 | `/maigo:retro` |
+| 記憶裡某條慣例反覆出現，想升階成常駐 skill | `/maigo:crystallize` |
