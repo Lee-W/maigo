@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.20.0 (2026-06-08)
+
+### Feat
+
+- **commands**: add /maigo:crystallize to graduate memory into skills
+
 ## v0.19.0 (2026-06-08)
 
 ### Feat
