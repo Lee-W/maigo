@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.19.0 (2026-06-08)
+
+### Feat
+
+- **commands**: reply 草稿改為 comment 連結 + 純內文可複製 block
+
 ## v0.18.0 (2026-06-07)
 
 ### Feat
