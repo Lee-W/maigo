@@ -172,6 +172,23 @@ Concrete case: `_AckTimeout`, `_PollTerminated`, `_SubscriberOverflow` were all 
 but test files imported `_AckTimeout` to write `isinstance(sentinel.exc, _AckTimeout)`.
 Fix: rename only `_AckTimeout` → `AckTimeout` (add to `__all__`); the others stay private.
 
+### 測試要預設用 parametrize——疊 assert 與近重複 test method 是 must-fix
+
+寫測試時，預設就把「同一呼叫只差輸入 / 期望的多條 assert」與「只差輸入 / 期望的近重複 test method」收成 `@pytest.mark.parametrize`，不要等被要求。
+
+Review 時看到以下情形，當 must-fix 退回：
+
+- **疊 assert**：同一個 test method 裡連續 assert 同性質的結果，失敗時只報第一條，看不出哪些 case 過 / 不過。
+- **近重複 test method**：複製貼上的 test，只差輸入與期望值，邏輯結構完全相同。
+
+退回要求：拆成 `@pytest.mark.parametrize`，每個 case 用 `pytest.param(..., id=...)` 標清楚 case 名稱，方便失敗時一眼定位。
+
+### 不要框框式區段分隔註解
+
+程式碼與腳本不要用 `# ----------` 橫幅或 `# --- 區段名 ---` 這類框框式區段分隔註解。
+
+Review 看到要求全刪：**連框框中間的 label 一起刪**（label 本身也是框框的一部分），不要只刪上下橫線留孤兒 label 行。靠函式邊界、邏輯順序、空行分段即可。
+
 ## What this skill does NOT cover
 
 - Writing or editing code (reviewer has read-only tools)
