@@ -68,10 +68,11 @@ python3 scripts/validate_plugin.py
 4. **Artefact 寫到 `.maigo/`**（repo root 下，gitignored），不要污染使用者 repo。
 5. **agent 個性與 process 解耦**——人設、語氣 → agent 檔；做事方法 → skill 或 command。
 6. **Skill 文件語言慣例**——Engineering-facing skills **MUST** be written in English;
-   user-facing utility skills **SHOULD** be written in Traditional Chinese unless
+   user-facing utility skills **SHOULD** be written in Taiwanese Mandarin unless
    portability is required.
    - 工程知識、架構設計、開發規範（如 `strict-review`、`airflow-aware`、`commit-message`）→ 英文：工程技能具可移植性
-   - 個人工具、流程 utility（如 `teammate-flow`、`failure-handling`、`narration`）→ 繁體中文：強依賴個人語境
+   - 個人工具、流程 utility（如 `teammate-flow`、`failure-handling`、`narration`）→ 台灣漢語：強依賴個人語境
+   - 稱呼語言時用「台灣漢語 / 華語」（英文 Taiwanese Mandarin），避免「繁體中文 / Traditional Chinese」——繁體是字形，不是語言
 7. **角色刻畫以動機為主**——Characterization is conveyed primarily through motivation,
    value hierarchy, and conflict handling; catchphrases, emoji, punctuation, and verbal
    tics are secondary signals only.
