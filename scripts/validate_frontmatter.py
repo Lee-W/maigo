@@ -16,9 +16,12 @@ from _frontmatter import parse_frontmatter  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_REQUIRED = {"name", "description", "model", "tools"}
 COMMAND_REQUIRED = {"description"}
+SKILL_REQUIRED = {"name", "description"}
 
 
-def check_file(path: Path, required: set[str], expect_name_match: bool) -> list[str]:
+def check_file(
+    path: Path, required: set[str], expected_name: str | None = None
+) -> list[str]:
     """Return list of error messages for one file (empty = OK)."""
     errors: list[str] = []
     text = path.read_text(encoding="utf-8")
@@ -35,11 +38,10 @@ def check_file(path: Path, required: set[str], expect_name_match: bool) -> list[
         if not fm[key]:
             errors.append(f"{path}: frontmatter 欄位 `{key}` 是空值")
 
-    if expect_name_match and "name" in fm:
-        expected = path.stem
-        if fm["name"] != expected:
+    if expected_name is not None and "name" in fm:
+        if fm["name"] != expected_name:
             errors.append(
-                f"{path}: agent `name: {fm['name']}` 跟檔名 `{expected}` 不一致"
+                f"{path}: agent `name: {fm['name']}` 跟 `{expected_name}` 不一致"
             )
 
     return errors
@@ -51,12 +53,21 @@ def main() -> int:
     agents_dir = ROOT / "agents"
     if agents_dir.is_dir():
         for path in sorted(agents_dir.glob("*.md")):
-            errors.extend(check_file(path, AGENT_REQUIRED, expect_name_match=True))
+            errors.extend(check_file(path, AGENT_REQUIRED, expected_name=path.stem))
 
     commands_dir = ROOT / "commands"
     if commands_dir.is_dir():
         for path in sorted(commands_dir.glob("*.md")):
-            errors.extend(check_file(path, COMMAND_REQUIRED, expect_name_match=False))
+            errors.extend(check_file(path, COMMAND_REQUIRED))
+
+    skills_dir = ROOT / "skills"
+    if skills_dir.is_dir():
+        for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
+            skill_file = skill_dir / "SKILL.md"
+            if skill_file.is_file():
+                errors.extend(
+                    check_file(skill_file, SKILL_REQUIRED, expected_name=skill_dir.name)
+                )
 
     if errors:
         sys.stderr.write("\n".join(errors) + "\n")

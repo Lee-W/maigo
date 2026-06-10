@@ -203,6 +203,7 @@ def main() -> None:
 
     if cmd is None:
         emit("approve", "立希 (Taki)：偵測不到 test 設定，跳過（no-op）")
+        return
 
     known = read_known_failures(claude_dir / "known-test-failures")
     exit_code, output = run_command(cmd, cwd)

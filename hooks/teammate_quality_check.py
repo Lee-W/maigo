@@ -145,6 +145,7 @@ def check_soyo(out: str) -> None:
             "block",
             "爽世 (Soyo) 的輸出沒看到 verdict（APPROVED / NEEDS_CHANGES / BLOCKED）。預設 BLOCKED，所有 review 都要明確寫出 verdict。",
         )
+        return
     verdict = verdict_match.group(1)
 
     if not re.search(r"\[[xX ]\]", out):
@@ -319,6 +320,7 @@ def check_taki(out: str) -> None:
     verdict_match = re.search(r"\b(PASS|FAIL)\b", out)
     if not verdict_match:
         emit("block", "立希 (Taki) 沒給最終 verdict（PASS / FAIL）。")
+        return
     verdict = verdict_match.group(1)
 
     hedge_patterns = [
@@ -374,6 +376,7 @@ def main() -> None:
     handler = ROLE_HANDLERS.get(role)
     if handler is None:
         emit("approve", f"{role}：未設規格，預設通過")
+        return
 
     handler(output)
 

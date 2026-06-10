@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import NoReturn
 
 
-def emit(decision: str, reason: str) -> None:
+def emit(decision: str, reason: str) -> NoReturn:
     """Write the standard hook decision payload to stdout and exit 0."""
     payload = {"decision": decision, "reason": reason, "systemMessage": reason}
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")

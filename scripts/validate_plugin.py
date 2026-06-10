@@ -300,6 +300,48 @@ def check_skills_docs_alignment() -> CheckResult:
     return r
 
 
+def check_agents_docs_alignment() -> CheckResult:
+    """Each agents/<Name>.md must align with the docs publishing path.
+
+    1. agents/<Name>.md contains `<!-- mkdocs-include-start -->`
+    2. docs/agents/<name_lower>.md shim exists
+    3. mkdocs.yml nav references agents/<name_lower>.md
+    4. docs/reference/agents.md catalog mentions the agent name
+    """
+    r = CheckResult("agents/*.md ↔ docs/agents/ + mkdocs + catalog alignment")
+    agents_dir = ROOT / "agents"
+    docs_agents_dir = ROOT / "docs" / "agents"
+    if not agents_dir.is_dir():
+        r.note("agents/ 目錄不存在，跳過")
+        return r
+    mkdocs_text = ""
+    mkdocs_path = ROOT / "mkdocs.yml"
+    if mkdocs_path.is_file():
+        mkdocs_text = mkdocs_path.read_text(encoding="utf-8")
+    catalog_text = ""
+    catalog_path = ROOT / "docs" / "reference" / "agents.md"
+    if catalog_path.is_file():
+        catalog_text = catalog_path.read_text(encoding="utf-8")
+
+    for path in sorted(agents_dir.glob("*.md")):
+        name = path.stem  # e.g. "Anon"
+        name_lower = name.lower()  # e.g. "anon"
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(ROOT)
+        if "<!-- mkdocs-include-start -->" not in text:
+            r.fail(f"{rel}: 缺 `<!-- mkdocs-include-start -->`")
+        shim = docs_agents_dir / f"{name_lower}.md"
+        if not shim.is_file():
+            r.fail(f"agents/{name}.md: 缺對應 docs/agents/{name_lower}.md shim")
+        if mkdocs_text and f"agents/{name_lower}.md" not in mkdocs_text:
+            r.fail(f"agents/{name}.md: mkdocs.yml nav 未列入 `agents/{name_lower}.md`")
+        if catalog_text and name not in catalog_text:
+            r.fail(
+                f"agents/{name}.md: docs/reference/agents.md catalog 未提及 `{name}`"
+            )
+    return r
+
+
 def check_version_sync() -> CheckResult:
     """plugin.json version must equal pyproject.toml [project].version.
 
@@ -335,6 +377,41 @@ def check_version_sync() -> CheckResult:
             f"版本不一致：.claude-plugin/plugin.json=`{plugin_ver}` vs "
             f"pyproject.toml=`{pyproject_ver}`。執行 `cz bump` 或手動同步。"
         )
+    return r
+
+
+def check_doc_link_convention() -> CheckResult:
+    """Cross-source links in agents/commands/skills sources must be absolute GitHub URLs."""
+    r = CheckResult("agents / commands / skills cross-source 連結需用絕對 GitHub URL")
+    link_re = re.compile(r"\]\(([^)]+)\)")
+    source_prefix_re = re.compile(r"^(agents|commands|skills)/")
+
+    source_files: list[tuple[Path, str]] = []
+    agents_dir = ROOT / "agents"
+    if agents_dir.is_dir():
+        for p in sorted(agents_dir.glob("*.md")):
+            source_files.append((p, p.read_text(encoding="utf-8")))
+    commands_dir = ROOT / "commands"
+    if commands_dir.is_dir():
+        for p in sorted(commands_dir.glob("*.md")):
+            source_files.append((p, p.read_text(encoding="utf-8")))
+    skills_dir = ROOT / "skills"
+    if skills_dir.is_dir():
+        for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
+            sf = skill_dir / "SKILL.md"
+            if sf.is_file():
+                source_files.append((sf, sf.read_text(encoding="utf-8")))
+
+    for path, text in source_files:
+        rel = path.relative_to(ROOT)
+        for m in link_re.finditer(text):
+            target = m.group(1)
+            if target.startswith(
+                ("http://", "https://", "#", "../docs/reference/", "../docs/guides/")
+            ):
+                continue
+            if source_prefix_re.match(target):
+                r.fail(f"{rel}: 相對跨 source 連結 `]({target})` 需改為絕對 GitHub URL")
     return r
 
 
@@ -374,7 +451,9 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_version_sync,
     check_commands_docs_alignment,
     check_skills_docs_alignment,
+    check_agents_docs_alignment,
     check_skills_graph,
+    check_doc_link_convention,
 ]
 
 

@@ -28,9 +28,16 @@ repos:
 
   - repo: local
     hooks:
+      - id: mypy
+        name: Type-check Python (mypy)
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [hooks/, scripts/]
       - id: maigo-frontmatter
         name: Validate Maigo agent/command frontmatter
         entry: python3 scripts/validate_frontmatter.py
         language: system
         pass_filenames: false
-        files: ^(agents|commands)/.*\.md$
+        files: ^(agents|commands)/.*\.md$|^skills/.*/SKILL\.md$

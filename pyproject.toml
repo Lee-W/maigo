@@ -6,13 +6,20 @@ requires-python = ">=3.13"
 license = {text = "MIT"}
 
 [dependency-groups]
-dev = ["pytest>=9.0.0", "pre-commit", "commitizen>=4.16"]
+dev = ["pytest>=9.0.0", "pre-commit", "commitizen>=4.16", "mypy>=1.10"]
 docs = ["mkdocs-material>=9", "mkdocs-include-markdown-plugin>=6"]
 
 [tool.pytest]
 testpaths = ["tests"]
 addopts = ["-q"]
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.13"
+
+[[tool.mypy.overrides]]
+module = ["_frontmatter", "_hook_io", "_retry_log"]
+ignore_missing_imports = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"

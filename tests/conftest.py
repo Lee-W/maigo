@@ -56,14 +56,33 @@ def make_plugin_json(tmp_path: Path) -> Path:
 def make_agent_file(tmp_path: Path, name: str = "foo") -> Path:
     """Write a minimal valid agent markdown file to tmp_path/agents/<name>.md.
 
-    Minimal valid structure: frontmatter with name, description, model, tools fields.
+    Minimal valid structure: frontmatter with name, description, model, tools fields,
+    plus the `<!-- mkdocs-include-start -->` marker required by check_agents_docs_alignment.
     Returns the path to the created file.
     """
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir(exist_ok=True)
     p = agents_dir / f"{name}.md"
     p.write_text(
-        f"---\nname: {name}\ndescription: test agent\nmodel: sonnet\ntools: [Read]\n---\n\n# {name}\n",
+        f"---\nname: {name}\ndescription: test agent\nmodel: sonnet\ntools: [Read]\n---\n\n"
+        f"<!-- mkdocs-include-start -->\n\n# {name}\n",
+        encoding="utf-8",
+    )
+    return p
+
+
+def make_docs_agent_shim(tmp_path: Path, name: str = "foo") -> Path:
+    """Write a minimal valid docs/agents shim to tmp_path/docs/agents/<name_lower>.md.
+
+    Required by check_agents_docs_alignment.
+    Returns the path to the created shim file.
+    """
+    docs_agents_dir = tmp_path / "docs" / "agents"
+    docs_agents_dir.mkdir(parents=True, exist_ok=True)
+    name_lower = name.lower()
+    p = docs_agents_dir / f"{name_lower}.md"
+    p.write_text(
+        f'{{% include-markdown "../../agents/{name}.md" start="<!-- mkdocs-include-start -->" %}}\n',
         encoding="utf-8",
     )
     return p
@@ -140,17 +159,25 @@ def make_docs_skill_shim(tmp_path: Path, name: str = "baz") -> Path:
     return p
 
 
-def make_mkdocs_yml(tmp_path: Path, skill_names: list[str] | None = None) -> Path:
-    """Write a minimal mkdocs.yml referencing the given skill shims.
+def make_mkdocs_yml(
+    tmp_path: Path,
+    skill_names: list[str] | None = None,
+    agent_names: list[str] | None = None,
+) -> Path:
+    """Write a minimal mkdocs.yml referencing the given skill and agent shims.
 
-    Required by check_skills_docs_alignment — each skill must appear
-    in the nav as `skills/<name>.md`.
+    Required by check_skills_docs_alignment — each skill must appear in the nav as
+    `skills/<name>.md` — and by check_agents_docs_alignment — each agent must appear
+    as `agents/<name_lower>.md`.
     """
     skill_names = skill_names or ["baz"]
-    nav_lines = "\n".join(f"      - {n}: skills/{n}.md" for n in skill_names)
+    agent_names = agent_names or ["foo"]
+    skill_lines = "\n".join(f"      - {n}: skills/{n}.md" for n in skill_names)
+    agent_lines = "\n".join(f"      - {n}: agents/{n.lower()}.md" for n in agent_names)
     p = tmp_path / "mkdocs.yml"
     p.write_text(
-        f"site_name: test\nnav:\n  - Skills (source):\n{nav_lines}\n",
+        f"site_name: test\nnav:\n  - Skills (source):\n{skill_lines}\n"
+        f"  - Agents (source):\n{agent_lines}\n",
         encoding="utf-8",
     )
     return p
@@ -219,6 +246,7 @@ def plugin_tree(tmp_path: Path) -> Path:
     """
     make_plugin_json(tmp_path)
     make_agent_file(tmp_path)
+    make_docs_agent_shim(tmp_path)
     make_command_file(tmp_path)
     make_docs_command_shim(tmp_path)
     make_skill(tmp_path)
