@@ -5,6 +5,14 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.21.0 (2026-06-10)
+
+### Feat
+
+- use Taiwanese Mandarian instead of Traditional Chinese whenever possible
+- **agents**: add Soyo external-PR voice + narrator stuck-point lines
+- **skills**: slim skill bodies via progressive disclosure + script-ify pr-context-cache
+
 ## v0.20.0 (2026-06-08)
 
 ### Feat
