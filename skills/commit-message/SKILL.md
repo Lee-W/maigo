@@ -89,11 +89,14 @@ Provide the raw text to the caller. Do **not** wrap in a code fence by default (
 
 When the caller **presents the commit message to the user** as a deliverable (rather than piping it directly to `git commit`), follow [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md) — wrap it in a single fenced code block so the user can copy the raw text without reformatting.
 
+## Trailers
+
+- **No `Co-Authored-By` trailer.** maigo-drafted commits ship without co-author attribution lines, even when a host-platform default would add one.
+
 ## What this skill does NOT cover
 
 - The PR description / motivation / test plan — that is [`github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md).
 - Choosing what to commit (`git add` strategy, hunk staging) — caller's job.
 - Running `git commit` — this skill only drafts text.
 - Conventional Commits scope taxonomy — if the repo uses CC, the caller decides the scope from the diff; this skill only mirrors the detected style.
-- Co-author attribution rules — those are policy decisions of the host repo / agent platform, not commit-style.
 - Multi-commit history shaping (squash decisions, rebase plans) — separate concern.
