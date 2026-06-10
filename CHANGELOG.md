@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.21.1 (2026-06-10)
+
+### Fix
+
+- **validate**: add agents alignment check, doc-link enforcement, skills frontmatter pre-commit, and mypy
+
 ## v0.21.0 (2026-06-10)
 
 ### Feat
