@@ -428,6 +428,55 @@ class TestCheckSkillsDocsAlignment:
 
 
 # ---------------------------------------------------------------------------
+# check_skills_graph
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSkillsGraph:
+    def test_all_skills_in_graph_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_skills_catalog(tmp_path, ["foo"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_graph()
+        assert result.passed
+
+    def test_missing_skill_node_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_skills_catalog(tmp_path, ["other-skill"])  # foo not in graph
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_graph()
+        assert not result.passed
+        assert any("foo" in e for e in result.errors)
+
+    def test_no_mermaid_block_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        docs_ref_dir = tmp_path / "docs" / "reference"
+        docs_ref_dir.mkdir(parents=True, exist_ok=True)
+        (docs_ref_dir / "skills.md").write_text(
+            "# Skills\n\n| Skill |\n|---|\n| `foo` |\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_graph()
+        assert not result.passed
+        assert any("mermaid" in e for e in result.errors)
+
+    def test_missing_page_is_note_not_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")  # no docs/reference/skills.md at all
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skills_graph()
+        assert result.passed
+        assert result.notes
+
+
+# ---------------------------------------------------------------------------
 # main() happy-path integration (M-1)
 # ---------------------------------------------------------------------------
 

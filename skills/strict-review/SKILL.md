@@ -148,11 +148,6 @@ How to apply during review:
 3. Pre-release status does **not** downgrade this. Wire-format mutations are acceptable
    pre-release, but the commit body's promise about behaviour must still align with the diff.
 
-Concrete case: a trigger-policy commit claimed _"pre-existing serialized Dags default to
-`WAIT_FOR_ALL` on deserialize"_ but `RollupMapper.deserialize` used `data["wait_policy"]`
-with no `.get()` fallback — any cache-resident payload would `KeyError`. Fix was to align
-prose with code (Option B), not the reverse.
-
 ### Underscore-private exception that consumers must `isinstance`-check is de-facto public API
 
 When a module defines private exception classes (`_FooError`, `_BarError`) and a consumer
@@ -168,9 +163,9 @@ renamed (drop the underscore) and added to `__all__`. Siblings that consumers ne
 on by type — only generic catch or re-raise — can stay underscore-private. Selective
 promotion is the discipline; do not broadcast the whole hierarchy.
 
-Concrete case: `_AckTimeout`, `_PollTerminated`, `_SubscriberOverflow` were all private,
-but test files imported `_AckTimeout` to write `isinstance(sentinel.exc, _AckTimeout)`.
-Fix: rename only `_AckTimeout` → `AckTimeout` (add to `__all__`); the others stay private.
+> Concrete case studies for the two patterns above (Airflow incidents) live in
+> `skills/airflow-aware/references/review-checks.md` — read them when reviewing an
+> Airflow diff and a worked example helps.
 
 ### 測試要預設用 parametrize——疊 assert 與近重複 test method 是 must-fix
 

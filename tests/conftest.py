@@ -159,16 +159,19 @@ def make_mkdocs_yml(tmp_path: Path, skill_names: list[str] | None = None) -> Pat
 def make_skills_catalog(tmp_path: Path, skill_names: list[str] | None = None) -> Path:
     """Write a minimal docs/reference/skills.md catalog referencing the skills.
 
-    Required by check_skills_docs_alignment — each skill must appear
-    in the catalog as a backticked name `<name>`.
+    Required by check_skills_docs_alignment — each skill must appear in the
+    catalog as a backticked name `<name>` — and by check_skills_graph — each
+    skill must appear as a node in the mermaid dependency graph.
     """
     skill_names = skill_names or ["baz"]
     rows = "\n".join(f"| `{n}` | — | — |" for n in skill_names)
+    nodes = "\n".join(f'    {n.replace("-", "_")}["{n}"]' for n in skill_names)
     docs_ref_dir = tmp_path / "docs" / "reference"
     docs_ref_dir.mkdir(parents=True, exist_ok=True)
     p = docs_ref_dir / "skills.md"
     p.write_text(
-        f"# Skills\n\n| Skill | Owner | Consumers |\n|---|---|---|\n{rows}\n",
+        f"# Skills\n\n| Skill | Owner | Consumers |\n|---|---|---|\n{rows}\n"
+        f"\n```mermaid\ngraph LR\n{nodes}\n```\n",
         encoding="utf-8",
     )
     return p

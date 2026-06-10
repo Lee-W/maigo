@@ -12,118 +12,39 @@ description: This skill should be used during /maigo:review when fetching or reu
 
 ## Why this skill exists
 
-`/maigo:review` 的第一步是 Raana 抓 PR context（title / body / diff / CI status / linked issues）。
-當使用者做「re-review」（同一個 PR 改完再跑一次）時，這些資料幾乎沒變——重抓只是浪費時間。
+`/maigo:review` 的第一步是 Raana 抓 PR context。「re-review」（同一個 PR 改完再跑一次）
+時這些資料幾乎沒變——重抓只是浪費時間。第一次 fetch 後 cache 到
+`.maigo/review-rubric.md` 開頭的機讀區段，re-review 偵測同 source 且 diff sha 未變
+→ 直接還原，跳過全部 `gh` / `git` 重抓。
 
-這個 skill 在第一次 fetch 後把 context cache 到 `review-rubric.md` 開頭的機讀區段。
-後續 re-review 偵測到相同 source 且 diff sha 未變 → 直接還原 cache，跳過全部 `gh` / `git` 命令。
+## 怎麼跑
 
-## Inputs
+機械流程由 script 代勞（cache 偵測 / 驗證 / fetch / truncate / 寫檔一條龍）：
 
-- **Source**：review 參數（GitHub PR URL / branch name / commit range）
-- **review-rubric.md 路徑**：`.maigo/review-rubric.md`（repo root 下）
-- **目前 diff**（cache miss 時抓）
-
-## Outputs
-
-給 caller 一個 dict-like summary：
-
-```
-cache_hit: true | false
-source: <github-pr-url | branch-name | commit-range>
-title: <PR title 或 "n/a">
-body: <PR body，截斷版>
-linked_issues: <list 或 "n/a">
-ci_status: <gh pr checks 摘要 或 "n/a">
-diff_stat: <diff --stat output>
-diff_full: <diff 內容，截斷版>
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source> \
+    [--rubric .maigo/review-rubric.md] [--base main]
 ```
 
-## Cache schema
+- `<source>`：GitHub PR URL / PR 編號（需要 gh CLI）、本地 branch 名、或 commit range
+- 在 maigo repo 自身工作時，直接 `python3 scripts/pr_context_cache.py` 即可
 
-寫入 `review-rubric.md` 開頭的獨立區段（HTML comment 包住作為機讀標記）：
+stdout 第一行是 `cache_hit: true|false`，其後是 cache 區段全文——
+含 Source / PR number / Title / Body（截 500 行）/ Linked issues / CI status /
+Diff stat / Diff sha / Full diff（截 2000 行）。
 
-```markdown
-<!-- pr-context-cache:start v1 -->
-## PR Context (cached)
+## 行為摘要
 
-- **Source**: <github-pr-url | branch-name | commit-range>
-- **Fetched at**: <ISO timestamp>
-- **PR number**: <num or "n/a">
-- **Title**: <title>
-- **Body**: <body, truncated to 500 lines, suffix "...[truncated]" if cut>
-- **Linked issues**: <list of #N from body / commits, or "n/a">
-- **CI status**: <gh pr checks output 摘要，或 "n/a"（非 GitHub PR）>
-- **Diff stat**: <git diff --stat 或 gh pr diff --stat output>
-- **Diff sha**: <sha256 of full diff，用來偵測 diff 改變>
+- **cache hit**（Source 相同且 diff sha256 未變）→ 印出快取區段，不碰網路（除了重算 sha 的那次 diff）
+- **cache miss** → 重抓全部欄位，寫回 rubric 開頭
+  `<!-- pr-context-cache:start v1 -->` … `<!-- pr-context-cache:end -->` 區段
+  （無檔案 → 建立；無區段 → prepend；有舊區段 → 整段取代）
 
-<details>
-<summary>Full diff (cached, first 2000 lines)</summary>
+## Fallback
 
-```diff
-<diff，過大時取前 2000 行 + 末尾標 "[diff truncated at 2000 lines]">
-```
-
-</details>
-<!-- pr-context-cache:end -->
-```
-
-## 操作流程
-
-### 1. Detect cache
-
-讀 `.maigo/review-rubric.md`（若存在），grep `<!-- pr-context-cache:start v1 -->`。
-若找到 → 進入步驟 2（Validate）；若無 → 直接跳步驟 3（Fetch）。
-
-### 2. Validate cache（若存在）
-
-- 比對「Source」欄位是否等於本次 review 參數
-- 比對「Diff sha」欄位是否等於現在重抓 diff 的 sha256
-
-兩者皆同 → **cache hit**：
-- 輸出 `cache_hit=true`
-- 從 cache 區段還原所有 fields，回傳給 caller
-- **結束，跳過步驟 3-5**
-
-任一不同 → **cache miss**：繼續步驟 3。
-
-### 3. Fetch（cache miss / 無 cache）
-
-依 source 類型抓資料：
-
-**GitHub PR：**
-- `gh pr view <id> --json title,body,number` → title / body / PR number
-- `gh pr diff <id>` → diff 內容
-- `gh pr checks <id>` → CI status 摘要
-- body 裡的 `#N` / `Closes #N` / `Refs #N` → linked issues
-
-**本地 branch：**
-- `git log <base>...<branch>` → commits（找 linked issues）
-- `git diff <base>...<branch>` → diff 內容
-- PR number = `n/a`、CI status = `n/a`
-
-**Commit range：**
-- `git log <range>` → commits（找 linked issues）
-- `git diff <range>` → diff 內容
-- PR number = `n/a`、CI status = `n/a`
-
-計算 `diff_sha`：`sha256(full diff content)`。
-
-### 4. Truncation
-
-- **Diff**：取前 2000 行，末尾加 `[diff truncated at 2000 lines]`（與 `/maigo:review` 既有慣例一致）
-- **Body**：取前 500 行，末尾加 `...[truncated]`
-
-### 5. Write cache
-
-把 cache schema 寫到 `review-rubric.md` 開頭：
-- 檔案不存在 → 建立，cache 區段為全部內容
-- 存在但無 cache 區段 → prepend（cache 區段 + 換行 + 既有內容）
-- 存在且有舊 cache 區段 → 整段取代（`<!-- pr-context-cache:start v1 -->` 到 `<!-- pr-context-cache:end -->` 含端點）
-
-### 6. Output
-
-回傳 dict-like summary 給 caller（見 Outputs 段）。
+script 跑不起來（找不到路徑、無 gh CLI、git 失敗 → exit 1 + stderr）→
+Raana 回退手動抓：依 `/maigo:review` step 1 列的 `gh pr view / gh pr diff /
+gh pr checks`（或 `git diff` / `git log`）指令直接 fetch，不寫 cache。
 
 ## What this skill does NOT cover
 

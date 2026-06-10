@@ -338,6 +338,30 @@ def check_version_sync() -> CheckResult:
     return r
 
 
+def check_skills_graph() -> CheckResult:
+    """docs/reference/skills.md 的 mermaid 相依圖必須涵蓋每一個 skill。
+
+    圖是手繪維護的；這個 check 抓「新增 skill 但忘了加進相依圖」的 drift。
+    只驗節點存在（skill 名出現在 mermaid 區塊內），不驗邊的正確性。
+    """
+    r = CheckResult("docs/reference/skills.md mermaid 相依圖涵蓋所有 skill")
+    skills_dir = ROOT / "skills"
+    page = ROOT / "docs" / "reference" / "skills.md"
+    if not skills_dir.is_dir() or not page.is_file():
+        r.note("skills/ 或 docs/reference/skills.md 不存在，跳過")
+        return r
+    text = page.read_text(encoding="utf-8")
+    m = re.search(r"```mermaid\n(.*?)```", text, re.DOTALL)
+    if not m:
+        r.fail("docs/reference/skills.md 找不到 ```mermaid 相依圖區塊")
+        return r
+    graph = m.group(1)
+    for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
+        if skill_dir.name not in graph:
+            r.fail(f"mermaid 相依圖缺 skill 節點：{skill_dir.name}")
+    return r
+
+
 CHECKS: list[Callable[[], CheckResult]] = [
     check_plugin_json,
     check_hooks_json,
@@ -350,6 +374,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_version_sync,
     check_commands_docs_alignment,
     check_skills_docs_alignment,
+    check_skills_graph,
 ]
 
 

@@ -64,18 +64,14 @@ draft 必須採 CC 格式（`type(scope): subject`）。
 
 不確定時不要因「謹慎」自動退回 go——team 的並行不犧牲嚴格度。
 
-### fence tracking 與 Memory propose 偵測
-
-fence tracking 與 `## Memory propose` 偵測規則依
-[`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md)。
-
 ## 失敗處理
 
 詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。
 
 ## Memory propose confirm flow
 
-依 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md) 處理。
+偵測（含 fence tracking）與 6 步 confirm flow 依
+[`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md) 處理。
 Confirm flow 完成後繼續主線流程——不改變各 command 的步驟結構。
 
 ## 絕對不能做的事

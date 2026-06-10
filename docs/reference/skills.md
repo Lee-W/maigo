@@ -46,6 +46,122 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`doc-link-convention`](../skills/doc-link-convention.md) | Soyo | review 觸及 `agents/` / `commands/` / `skills/` 的 PR 時 | Maigo source 檔的跨檔 link 強制用絕對 GitHub URL，避免 `mkdocs build --strict` 因 include-markdown rewrite 抓不到 page 而 abort |
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
+| [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
+
+## Skill 相依圖
+
+手繪維護的相依總覽——command / agent 引用哪些 skill、skill 之間誰引用誰、
+progressive-disclosure 的 references 檔掛在哪個 skill 下。新增 skill 或改相依時
+**同步更新本圖**（`validate_plugin.py` 的 `check_skills_graph` 會擋漏掉的 skill 節點）。
+
+```mermaid
+graph LR
+    subgraph Commands
+        go["/maigo:go"]
+        team["/maigo:team"]
+        quick["/maigo:quick"]
+        review["/maigo:review"]
+        describe["/maigo:describe-pr"]
+        triage["/maigo:triage-issue"]
+        address["/maigo:address-comments"]
+        crystallize["/maigo:crystallize"]
+    end
+
+    subgraph Agents
+        raana["🐱 Raana"]
+        tomori["🩵 Tomori"]
+        anon["🎀 Anon"]
+        soyo["🟡 Soyo"]
+        taki["🟣 Taki"]
+    end
+
+    repo_detect["hooks/repo_detect.py<br/>(SessionStart)"]
+
+    subgraph Skills
+        teammate_flow["teammate-flow"]
+        narration_s["narration"]
+        orchestrator_voice["orchestrator-voice"]
+        strict_review["strict-review"]
+        strict_triage["strict-triage"]
+        failure_handling["failure-handling"]
+        memory_loading["memory-loading"]
+        memory_propose["memory-propose-confirm"]
+        commit_message["commit-message"]
+        gtd["github-title-description"]
+        copyable["copyable-deliverable"]
+        pr_cache["pr-context-cache"]
+        doc_link["doc-link-convention"]
+        airflow_aware["airflow-aware"]
+        commitizen_aware["commitizen-aware"]
+    end
+
+    airflow_refs["airflow-aware/references/<br/>review-checks.md"]
+    pr_cache_script["scripts/pr_context_cache.py"]
+
+    Commands --> narration_s
+    narration_s --> orchestrator_voice
+
+    go --> teammate_flow
+    team --> teammate_flow
+    teammate_flow --> commit_message
+    teammate_flow --> failure_handling
+    teammate_flow --> memory_propose
+
+    go --> strict_review
+    team --> strict_review
+    quick --> strict_review
+    review --> strict_review
+    quick --> failure_handling
+    quick --> memory_propose
+    quick --> commit_message
+
+    review --> pr_cache
+    review --> copyable
+    describe --> gtd
+    describe --> copyable
+    triage --> strict_triage
+    triage --> copyable
+    address --> failure_handling
+    crystallize --> memory_loading
+    crystallize --> failure_handling
+    crystallize --> doc_link
+
+    raana --> memory_loading
+    tomori --> memory_loading
+    soyo --> memory_loading
+    raana --> pr_cache
+    tomori --> gtd
+    soyo --> strict_review
+    soyo --> strict_triage
+    soyo --> doc_link
+    anon -.->|"## Memory propose 輸出"| memory_propose
+    soyo -.->|"## Memory propose 輸出"| memory_propose
+    teammate_flow -.->|"流程末端：驗證"| taki
+    review -.->|"step 4：驗證"| taki
+    failure_handling -.->|"驗證紅 → 重跑"| taki
+
+    repo_detect --> airflow_aware
+    repo_detect --> commitizen_aware
+    airflow_aware --> strict_review
+    commitizen_aware --> strict_review
+    airflow_aware --> airflow_refs
+    strict_review -.->|case studies| airflow_refs
+
+    commit_message --> copyable
+    gtd --> commit_message
+    gtd --> copyable
+    pr_cache --> pr_cache_script
+```
+
+讀圖說明：
+
+- **實線** = 引用 / 載入（command、agent 或 skill 的文件指向某 skill）
+- **虛線** = 觸發關係（🎀 Anon / 🟡 Soyo 的 `## Memory propose` 輸出觸發 orchestrator
+  的 confirm flow；`strict-review` 在 Airflow review 時去讀案例檔；流程末端觸發
+  🟣 Taki 驗證）
+- **🟣 Taki 只有入邊、沒有出邊**——立希被 teammate-flow / `/maigo:review` /
+  failure-handling 的流程步驟觸發來驗證，但他自己不載入任何 skill，驗證規格全在
+  [`agents/Taki.md`](https://github.com/Lee-W/maigo/blob/main/agents/Taki.md) 本體
 
 ## skill 檔案規格
 
@@ -83,10 +199,25 @@ Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 project entry 時，
 詳見 [`memory.md` frontmatter schema](memory.md#entry-frontmatter-schema) 與
 [`strict-review/SKILL.md` Domain skill composition 段](../skills/strict-review.md#domain-skill-composition)。
 
+## Progressive disclosure：`references/` 子目錄
+
+skill 是**目錄**不是單檔。SKILL.md 本體在 skill 觸發時整份進 context；
+目錄下的其他檔案（慣例：`references/<topic>.md`）**只在被 Read 時才付 token**。
+
+- 展開內容多、又非每次觸發都需要（review-only checks、案例敘事、罕見情境診斷）
+  → 放 `references/`，SKILL.md 本體留摘要 + 「何時去讀」的指示
+- SKILL.md 本體超過 ~150 行 → 預設考慮拆 references/
+- references 檔不進 docs nav、不需要 shim（agent-facing，不是 docs page）；
+  SKILL.md 指向它時用 inline code 路徑（如 `references/review-checks.md`），
+  **不要用 markdown link**——include-markdown 的 rewrite 會把它指到不存在的 docs 路徑，
+  炸 `mkdocs build --strict`
+- 範例：[`skills/airflow-aware/references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+
 ## Add New Skill Checklist
 
 1. `mkdir skills/<new-name>/` + 寫 `skills/<new-name>/SKILL.md`
-   （frontmatter `name` 必須等於目錄名，內文要有 `<!-- mkdocs-include-start -->` 標記）
+   （frontmatter `name` 必須等於目錄名，內文要有 `<!-- mkdocs-include-start -->` 標記；
+   展開內容多的部分依上節拆 `references/`）
 2. `docs/skills/<new-name>.md` — 寫 include-markdown shim（單行 include 指令，
    `start="<!-- mkdocs-include-start -->"`）。直接複製
    [`docs/skills/strict-review.md`](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md)
@@ -98,3 +229,6 @@ Soyo 在跨專案記憶 v1.1 之後支援此機制：載入 project entry 時，
    與 `uv run mkdocs build --strict`（doc link rewrite 不報缺檔）
 
 第 1–4 步漏掉任何一條 → `check_skills_docs_alignment` 會擋下。
+
+另外：上方「Skill 相依圖」的 mermaid 要同步加節點與相依邊——
+漏掉 skill 節點時 `check_skills_graph` 會擋下。

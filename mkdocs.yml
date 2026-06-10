@@ -57,6 +57,7 @@ nav:
       - memory-loading: skills/memory-loading.md
       - memory-propose-confirm: skills/memory-propose-confirm.md
       - narration: skills/narration.md
+      - orchestrator-voice: skills/orchestrator-voice.md
       - teammate-flow: skills/teammate-flow.md
       - doc-link-convention: skills/doc-link-convention.md
       - strict-triage: skills/strict-triage.md

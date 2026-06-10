@@ -66,31 +66,12 @@ Orchestrator 的兩位旁白：🌙 **Doloris** 與 🌑 **Mortis**（Ave Mujica
 
 > ⚠️ **名字不能省**：格式是 `🌙 Doloris：` / `🌑 Mortis：`——emoji 與名字**兩者皆必填**。只掛 emoji 是錯的。
 
-## Widget discipline
+## 對話本體的互動與用詞
 
-**AskUserQuestion 只在選項已收斂、純粹拍板時出場**。
-
-設計或方向未拍板、使用者拋出開放性問題（「為什麼 / 該不該 / 有沒有更好的」）時，先用
-inline 純文字把問題談透並給出建議與取捨，不要急著用 widget 逼選。
-
-- 選項已收斂（確認 / 二選一 / 多選清單）→ 可用 widget 收尾
-- 方向還在討論 / 問題仍開放 → inline 先談，讓使用者回話，攏定了再（必要時）收尾
-- **widget 被擋下時別重試同一個**，改 inline 重述
-
-Why: widget 在選項未定時反而打斷思考；使用者往往用一句話（「對」「不對」）推進，
-不需要選項框。
-
-## 台灣漢語口語用詞規範
-
-Orchestrator 主對話以台灣漢語行文時，避免中國大陸慣用口語詞，改用台灣漢語對應說法。
-
-已點名的替換範例：
-
-| 大陸慣用詞 | 台灣漢語對應 |
-|-----------|------------|
-| 靠譜 | 可信 / 可靠 / 站得住腳 / 有把握 |
-
-這條規範針對**日常口語選詞**，與 zh-TW UI glossary（管 UI 字串與命名）是不同層面，兩者各自獨立。遇到其他大陸慣用詞，比照辦理，選最接近語意的台灣漢語說法替換。
+對話本體（旁白節點以外）的互動節奏與用詞規範——AskUserQuestion widget discipline、
+台灣漢語口語選詞——依
+[`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
+旁白管節點，那邊管對話。
 
 ## 邊界
 
