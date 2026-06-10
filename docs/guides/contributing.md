@@ -67,6 +67,17 @@ python3 scripts/validate_plugin.py
 3. **Hook 防禦深度**。重要規格在多層擋（agent prompt + skill + hook validator + Stop hook），讓 orchestrator 偷雞跳關時還有最後一道。
 4. **Artefact 寫到 `.maigo/`**（repo root 下，gitignored），不要污染使用者 repo。
 5. **agent 個性與 process 解耦**——人設、語氣 → agent 檔；做事方法 → skill 或 command。
+6. **Skill 文件語言慣例**——Engineering-facing skills **MUST** be written in English;
+   user-facing utility skills **SHOULD** be written in Traditional Chinese unless
+   portability is required.
+   - 工程知識、架構設計、開發規範（如 `strict-review`、`airflow-aware`、`commit-message`）→ 英文：工程技能具可移植性
+   - 個人工具、流程 utility（如 `teammate-flow`、`failure-handling`、`narration`）→ 繁體中文：強依賴個人語境
+7. **角色刻畫以動機為主**——Characterization is conveyed primarily through motivation,
+   value hierarchy, and conflict handling; catchphrases, emoji, punctuation, and verbal
+   tics are secondary signals only.
+   - 爽世不是因為有「♪」才是爽世；Doloris 不是因為省略號才是 Doloris；Mortis 不是因為講話冷才是 Mortis
+   - 真正的人格來自動機：爽世——維持關係與團隊秩序；Doloris——帶著傷痛繼續前進；Mortis——為了保護而拒絕前進
+   - 口癖只是輔助訊號——寫人設或台詞時先對齊動機與衝突處理方式，再考慮口癖
 
 ## 專案結構
 
