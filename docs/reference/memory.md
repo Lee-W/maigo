@@ -112,11 +112,11 @@ triggered skill 不存在（typo、未安裝等）→ log「triggered skill `<na
 ```markdown
 ---
 name: 語言偏好
-description: 偏好華語回覆，技術詞彙可保留英文
+description: 偏好漢語回覆，技術詞彙可保留英文
 type: user
 ---
 
-與我溝通時請用華語，程式語言關鍵字、函式名、路徑等技術詞彙保留英文。
+與我溝通時請用漢語，程式語言關鍵字、函式名、路徑等技術詞彙保留英文。
 不要硬翻「callback」、「dependency injection」之類的詞。
 ```
 
