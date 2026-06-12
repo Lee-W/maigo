@@ -70,6 +70,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
   - 這份是「給機器/剪貼簿」的純淨版——**不含旁白、不含 `<待補>` 以外的提示文字**；
     `<待補：...>` 佔位符照樣留在 body 裡（使用者複製後自己替換）。
   - 此為 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md) 的具體套用。
+- **使用者要求修改描述結構時，回覆也必須附 copyable block**：任何針對 PR description 的修改回覆（例：加 Why/What、重整結構），都必須把修改後的完整描述重新放進 4-backtick fence，並在 fence 後附 `**Title:** <one line>`。不能只用 markdown 呈現修改版本——那樣使用者拿不到可複製的純淨文字。
 - **附帶提示**（最末，放在可複製 block 之後）：
   - 「若要直接開 PR：`gh pr create --title '<title>' --body-file -`（接 stdin 貼 description）」
   - 若燈的草稿標出 `<待補：...>`，列出來提醒使用者補。
