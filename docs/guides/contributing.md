@@ -29,7 +29,8 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 - 基本檔案衛生：trailing whitespace、EOF newline、大檔、merge conflict marker、shebang 與 executable bit 一致性
 - 壞掉的 JSON / YAML（`.claude-plugin/plugin.json` / `hooks/hooks.json` 壞了 plugin 整個載不到）
 - Ruff lint / format 失敗
-- Agent / command frontmatter 缺欄位（`name` / `description` / `model` / `tools`）或 agent name 跟檔名對不上
+- Agent / command / skill frontmatter 缺欄位或 name 跟檔名 / 目錄名對不上
+- mypy type check 失敗（`hooks/` + `scripts/`）
 
 ### 升版本或大動結構前，跑完整檢查
 
@@ -37,7 +38,9 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 python3 scripts/validate_plugin.py
 ```
 
-涵蓋的檢查面向（具體項數會隨 plugin 演進變動，**以 `CHECKS` list 與實際輸出為準**）：
+涵蓋的檢查面向（具體項數會隨 plugin 演進變動，**以 `CHECKS` list 與實際輸出為準**）。
+
+> **注意**：每次在 `validate_plugin.py` 新增或修改 CHECKS 裡的 check function，`tests/conftest.py` 的 `plugin_tree` fixture 和相關 `make_*` helper 通常也要跟著更新，否則 `test_main_all_checks_pass` 會立刻紅。例：加了 `check_agents_docs_alignment` 後，需要同步更新 `make_agent_file`（加 mkdocs-include-start marker）、新增 `make_docs_agent_shim`、更新 `make_mkdocs_yml` 加 agent nav entries。
 
 - `.claude-plugin/plugin.json` valid JSON + 必要欄位
 - `hooks/hooks.json` valid JSON
@@ -55,8 +58,24 @@ python3 scripts/validate_plugin.py
 
 | Validator | 何時跑 | 涵蓋 |
 |-----------|-------|------|
-| `validate_frontmatter.py` | pre-commit（自動） | 只看 agent / command frontmatter；快 |
+| `validate_frontmatter.py` | pre-commit（自動） | agent / command / skill frontmatter；快 |
 | `validate_plugin.py` | 手動 / CI / 升版本前 | 全面，項數會 drift——看 `CHECKS` |
+| mypy | pre-commit（自動） | `hooks/` + `scripts/` 的靜態型別 |
+
+### mypy 設定說明
+
+`hooks/` 和 `scripts/` 都有 `__init__.py`（pytest import 用），同時又用 `sys.path.insert(0, ...)` 讓內部 helper（`_hook_io`、`_frontmatter`、`_retry_log`）以裸模組名稱被 import。若把 `hooks/` 或 `scripts/` 加進 `mypy_path`，mypy 會報「Source file found twice under different module names」——因為同一個 `.py` 同時被找到兩次（`hooks._hook_io` via `__init__.py` + `_hook_io` via mypy_path）。
+
+**正確做法**：不用 `mypy_path`；改在 `pyproject.toml` 的 `[[tool.mypy.overrides]]` 指定 `ignore_missing_imports = true`：
+
+```toml
+[[tool.mypy.overrides]]
+module = ["_frontmatter", "_hook_io", "_retry_log"]
+ignore_missing_imports = true
+```
+
+附帶注意：`_hook_io.emit()` 標注為 `-> NoReturn`（它一定呼叫 `sys.exit(0)`）。
+當 `emit()` 從 mypy 角度是 `Any`（因 ignore_missing_imports），mypy 不會把它視為 NoReturn，導致後面的 None-check 失效。解法：在 `if … is None: emit(…)` 那個 if block 末尾加 `return`——雖然 runtime 永遠跑不到，但讓 mypy 能正確 narrow 型別。
 
 ## 設計原則
 
