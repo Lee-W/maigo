@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _frontmatter import parse_frontmatter  # noqa: E402
 
 VALID_TYPES: frozenset[str] = frozenset({"user", "feedback", "project", "reference"})
-REQUIRED_FIELDS: tuple[str, ...] = ("name", "description", "type")
+REQUIRED_FIELDS: tuple[str, ...] = ("name", "description")
 
 # Regex to parse MEMORY.md index lines:
 # - [Title](slug.md) — description
@@ -57,6 +57,43 @@ def _parse_index(memory_md: Path) -> list[str]:
     return slugs
 
 
+def _extract_metadata_type(text: str) -> str | None:
+    """Extract type from a nested ``metadata:`` block in raw frontmatter text.
+
+    The flat ``parse_frontmatter`` parser skips indented lines, so
+    ``metadata.type`` written by the Claude Code harness (indented under
+    ``metadata:``) is invisible to it.  This helper scans the raw frontmatter
+    body directly.
+
+    Returns the stripped type string if found and non-empty, otherwise None.
+    Does not raise on malformed input.
+    """
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None
+    body = text[4:end]
+
+    in_metadata_block = False
+    for line in body.splitlines():
+        stripped = line.lstrip()
+        is_indented = line != stripped and line.startswith((" ", "\t"))
+
+        if not is_indented:
+            # Top-level key: enter or leave the metadata block.
+            in_metadata_block = stripped.startswith("metadata:")
+            continue
+
+        if in_metadata_block and ":" in stripped:
+            k, _, v = stripped.partition(":")
+            if k.strip() == "type":
+                val = v.strip()
+                return val if val else None
+
+    return None
+
+
 def _check_entry(result: MemoryCheckResult, slug: str, path: Path) -> None:
     """Run schema check on a single entry file, appending warnings to result."""
     result.entry_count += 1
@@ -70,8 +107,21 @@ def _check_entry(result: MemoryCheckResult, slug: str, path: Path) -> None:
         if not fm.get(field):
             result.warn(slug, f"missing field: `{field}`")
 
-    type_val = fm.get("type")
-    if type_val and type_val not in VALID_TYPES:
+    # Resolve effective type: top-level `type` takes priority; fall back to
+    # `metadata.type` for entries written by the Claude Code harness auto-memory
+    # system (which nests type under a `metadata` dict).
+    #
+    # Note: parse_frontmatter is a flat parser that skips indented lines, so
+    # `metadata.type` (indented) is not returned as a dict — it returns the
+    # `metadata` key with an empty-string value.  We extract the nested type
+    # directly from the raw frontmatter text instead.
+    type_val = fm.get("type") or None
+    if not type_val:
+        type_val = _extract_metadata_type(text)
+
+    if not type_val:
+        result.warn(slug, "missing field: `type`")
+    elif type_val not in VALID_TYPES:
         enum_str = "{" + ", ".join(sorted(VALID_TYPES)) + "}"
         result.warn(slug, f"type=`{type_val}` not in {enum_str}")
 

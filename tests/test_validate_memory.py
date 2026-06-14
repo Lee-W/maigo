@@ -344,3 +344,92 @@ class TestDiscoverDirectories:
 
         assert str(cross_mem) in paths
         assert str(proj_mem) in paths
+
+
+# ---------------------------------------------------------------------------
+# T-14: metadata.type fallback for Claude Code harness auto-memory entries
+# ---------------------------------------------------------------------------
+
+
+class TestMetadataTypeFallback:
+    def test_top_level_type_project_no_warnings(self, tmp_path: Path):
+        """Top-level type: project → no warnings (existing behaviour preserved)."""
+        content = (
+            "---\n"
+            "name: Top Level Entry\n"
+            "description: has top-level type\n"
+            "type: project\n"
+            "---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"top-level-type.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert not result.has_warnings
+
+    def test_metadata_type_feedback_no_warnings(self, tmp_path: Path):
+        """No top-level type, metadata.type: feedback → no warnings (new behaviour)."""
+        content = (
+            "---\n"
+            "name: Harness Entry\n"
+            "description: written by Claude Code harness\n"
+            "metadata:\n"
+            "  type: feedback\n"
+            "---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"harness-entry.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert not result.has_warnings
+
+    def test_metadata_type_invalid_warns_enum(self, tmp_path: Path):
+        """No top-level type, metadata.type is an invalid value → enum warning."""
+        content = (
+            "---\n"
+            "name: Bad Harness Entry\n"
+            "description: metadata type is invalid\n"
+            "metadata:\n"
+            "  type: bogus\n"
+            "---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"bad-harness.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert result.has_warnings
+        assert any("bogus" in w or "not in" in w for w in result.warnings)
+
+    def test_both_type_and_metadata_type_absent_warns_missing(self, tmp_path: Path):
+        """No top-level type, no metadata.type → missing field: type warning."""
+        content = (
+            "---\nname: Typeless Entry\ndescription: no type anywhere\n---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"typeless.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert result.has_warnings
+        assert any("missing field" in w and "type" in w for w in result.warnings)
+
+    def test_metadata_not_dict_does_not_crash_warns_missing(self, tmp_path: Path):
+        """metadata is a scalar string (not dict) → no crash, warns missing type."""
+        content = (
+            "---\n"
+            "name: Weird Entry\n"
+            "description: metadata is a string\n"
+            "metadata: somestring\n"
+            "---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"weird-meta.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert result.has_warnings
+        assert any("missing field" in w and "type" in w for w in result.warnings)
+
+    def test_top_level_type_takes_priority_over_metadata_type(self, tmp_path: Path):
+        """Top-level type wins when both top-level and metadata.type are present."""
+        content = (
+            "---\n"
+            "name: Priority Entry\n"
+            "description: both levels have type\n"
+            "type: project\n"
+            "metadata:\n"
+            "  type: feedback\n"
+            "---\n\nBody.\n"
+        )
+        mem_dir = make_memory_dir(tmp_path, {"priority.md": content})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        # top-level `project` is valid → no warnings
+        assert not result.has_warnings
