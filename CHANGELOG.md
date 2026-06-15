@@ -5,6 +5,14 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.23.0 (2026-06-15)
+
+### Feat
+
+- **crystallize**: 新增萃取 memory 的慣例
+- **review**: crystallize review preferences into strict-review skill
+- **validate**: flag orphan memory files missing from MEMORY.md index
+
 ## v0.22.0 (2026-06-15)
 
 ### Feat
