@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.24.0 (2026-06-15)
+
+### Feat
+
+- **skills**: split verbose recipes into skill reference files
+
 ## v0.23.0 (2026-06-15)
 
 ### Feat
