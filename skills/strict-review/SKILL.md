@@ -43,6 +43,8 @@ Every review must walk through every item. Output explicitly marks `[x]` or `[ ]
 
 If any item is `[ ]`, verdict stays at NEEDS_CHANGES or BLOCKED.
 
+碰 pyproject.toml / git hook / 升 tool 版本的 diff 時，對照 `references/tooling-conventions.md` 的 tooling 慣例把關。
+
 ## Domain skill composition
 
 Base checklist（上方 9 項）通用於所有 review。Memory entry（`type: project`）的 `triggers` 欄位可附加領域 checklist：
@@ -183,6 +185,10 @@ Review 時看到以下情形，當 must-fix 退回：
 程式碼與腳本不要用 `# ----------` 橫幅或 `# --- 區段名 ---` 這類框框式區段分隔註解。
 
 Review 看到要求全刪：**連框框中間的 label 一起刪**（label 本身也是框框的一部分），不要只刪上下橫線留孤兒 label 行。靠函式邊界、邏輯順序、空行分段即可。
+
+### Concurrent PR 根本修法優先
+
+發現另一個 concurrent PR 在 SDK/library 層修同一問題的根本（例如改用 SDK 提供的 credential 類別，取代手動 URL path 拼接），而當前 PR 只在 test / workaround 層修症狀時——在 comment 裡肯定當前解法「not wrong」，但明確指向 SDK 層的根本修法，說明後者 ready 後當前 PR 會被 supersede。傾向推薦架構層解法而非繞路補丁。
 
 ## What this skill does NOT cover
 
