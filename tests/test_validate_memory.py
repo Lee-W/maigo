@@ -196,6 +196,30 @@ class TestMissingFile:
 
 
 # ---------------------------------------------------------------------------
+# T-8b: entry file present on disk but absent from MEMORY.md → orphan warning
+# ---------------------------------------------------------------------------
+
+
+class TestOrphanFile:
+    def test_unindexed_file_warns_orphan(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        mem_dir = make_memory_dir(tmp_path, {"indexed.md": good_entry()})
+        # Drop a valid entry file on disk that the index does not declare.
+        (mem_dir / "orphan.md").write_text(good_entry(), encoding="utf-8")
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert result.has_warnings
+        assert any("orphan.md" in w and "orphan" in w for w in result.warnings)
+
+    def test_memory_md_itself_not_flagged_as_orphan(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        mem_dir = make_memory_dir(tmp_path, {"indexed.md": good_entry()})
+        result = vm.scan_directory(mem_dir, "Cross-project memory")
+        assert not result.has_warnings
+
+
+# ---------------------------------------------------------------------------
 # T-9a: Cross-project dir completely absent → no raise, no warnings
 # T-9b: Project-specific dir completely absent → no raise, no warnings
 # ---------------------------------------------------------------------------
