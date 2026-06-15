@@ -61,10 +61,7 @@ gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDra
 
 排序規則：
 
-1. **Bucket A — `APPROVED`** 先（通常只欠最後一眼）
-2. **Bucket B — neutral**（`reviewDecision` 為 `null` / `COMMENTED` / `REVIEW_REQUIRED`）
-3. **Bucket C — `CHANGES_REQUESTED`** 最後（author 還欠 follow-up，reviewer 時間花在別處更值）
-4. 每個 bucket 內按 `additions + deletions` **升序**——quick win 先
+按 `additions + deletions` **升序**——最少改動先看，一路由小到大。`reviewDecision` 不影響順序。
 
 排好後印一張 queue 表給使用者：
 
