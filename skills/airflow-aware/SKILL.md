@@ -111,6 +111,10 @@ the feature PR, `git checkout HEAD -- uv.lock` keeps the noise out of the
 commit; the diff will re-appear locally on the next `uv sync` and that is
 expected.
 
+For the full diagnostic (including "find when drift was introduced" via `git log -p`
+and a concrete case study), read the "uv.lock drift diagnostic" section in
+`references/review-checks.md`.
+
 ### 4. Code style — Ruff + Mypy
 
 - Formatter: `uv run ruff format`

@@ -138,6 +138,13 @@ skill 跑完直接給 caller 兩塊 markdown：
 
 caller 呈現最終 deliverable 給使用者時，遵守 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)——把可複製的內容放進單一 fenced code block。
 
+## Verification discipline (references)
+
+**Verify every PR-state / API-signature / CLI-flag claim against live source before writing** —
+reference docs go stale silently; use `gh pr view`, `git show HEAD:<path>`, or
+`gh pr diff <n>` to confirm. Details and a per-claim-type recipe in
+`references/verification-discipline.md`.
+
 ## What this skill does NOT cover
 
 - 開 PR（這是 caller / 使用者 的 `gh pr create` 或 GitHub UI）

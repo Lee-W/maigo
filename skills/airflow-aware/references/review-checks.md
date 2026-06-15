@@ -78,6 +78,65 @@ file in the diff. Missing → flag as **Request changes** (not Block).
 **Do not** require newsfragments for changes under `providers/` or `airflow-ctl/`
 — their release managers regenerate the changelog from `git log`.
 
+## uv.lock drift diagnostic (extended recipe)
+
+The SKILL.md §3 covers the summary. Use this section when you need the full
+diagnostic, the "find when it was introduced" step, or a concrete case study.
+
+### Full diagnostic recipe
+
+1. Inspect the diff — identify which package changed:
+   ```bash
+   git diff HEAD uv.lock | head -50
+   ```
+2. Find which `pyproject.toml` declares (or should declare) that dependency:
+   ```bash
+   grep -rn "<package-name>" --include=pyproject.toml -l
+   ```
+3. Cross-check: is the package in the *committed* pyproject and the *committed* lock?
+   ```bash
+   grep "<package-name>" <pyproject>           # current HEAD
+   git show HEAD:uv.lock | grep "<package-name>"   # committed lock
+   ```
+   If pyproject lacks the package but the committed lock has it (or vice versa) →
+   **drift confirmed**.
+4. Find when the drift was introduced:
+   ```bash
+   git log -p -- <pyproject>
+   ```
+   Look for a commit that changed dependencies without a companion `uv.lock` change
+   in the same commit.
+
+### Why it recurs
+
+Airflow is a large `uv` workspace monorepo with 100+ provider packages.
+Contributors sometimes edit a `pyproject.toml` and push without running `uv lock`,
+especially for small changes ("just remove an unused extra"). CI lock-validation can
+be partial and miss the drift.
+
+### Concrete case
+
+`dcdd124431` ("Add Langchain hook to common-ai provider", 2026-05-20) committed a
+`uv.lock` containing `langchain-openai`, but `providers/common/ai/pyproject.toml` at
+HEAD no longer declares that dependency. A contributor trimmed the pyproject without
+re-running `uv lock`, leaving the committed lockfile out of sync. Every fresh `uv sync`
+regenerates the lock to match the current pyproject and surfaces the delta as a phantom
+diff in every worktree.
+
+### How to handle in a feature PR
+
+1. Run the diagnostic above before touching anything else.
+2. If drift is confirmed, do **not** fold the lock regeneration into the current feature
+   PR. Open a separate worktree off `upstream/main` and submit a focused
+   `chore: re-lock <pyproject>` PR.
+3. For the current feature PR, `git checkout HEAD -- uv.lock` keeps the diff out of the
+   commit. The diff will re-appear locally on the next `uv sync` — that is expected.
+4. If another contributor suggests "just commit the lock diff with your feature work,"
+   push back: it pollutes the PR diff and creates a force-push risk if `main` re-locks
+   before merge.
+
+---
+
 ## Case studies backing strict-review recurring patterns
 
 Concrete Airflow incidents behind two of `strict-review`'s recurring must-fix
