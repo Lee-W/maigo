@@ -5,6 +5,17 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.22.0 (2026-06-15)
+
+### Feat
+
+- **agents**: add Tomori plan-rejected and Anon all-steps-done voice lines
+- **crystallize**: gate private memory with a public-safety check before graduation
+
+### Fix
+
+- **validate**: recognize nested metadata.type in memory schema check
+
 ## v0.21.2 (2026-06-12)
 
 ### Fix
