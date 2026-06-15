@@ -208,6 +208,15 @@ message 強調「這不是 test fail，是 import 錯」。
 預設 90 秒（hook 自身 timeout 120 秒，留 30 秒 buffer）。
 編輯 `TEST_TIMEOUT_SEC` 常數可調。
 
+### 偵測到專案類型但無可跑的測試（**不** fail-open）
+
+專案有 `uv.lock` / `pyproject.toml`（或其他類型標記）但實際沒有測試套件、或測試框架沒裝時，hook 仍會跑偵測到的指令並擋下。例：Python repo 沒有 `pytest`，`uv run pytest` 回 `error: Failed to spawn: pytest / No such file or directory (os error 2)`（exit 2）；這不在 `BUILD_ENV_ERROR_RE` 也不是 fatal marker，所以會 block，並在每次收尾重複觸發成 loop。
+
+緩解（任一）：
+
+- 在專案放 `.claude/skip-test-verification`（第一行寫原因）讓整個檢查跳過
+- 或補上最小測試套件 + 對應依賴，讓指令真的 exit 0
+
 ### Fail-open 情況
 
 - 偵測不到任何專案類型（沒有 `uv.lock` / `pyproject.toml` / `package.json` / `Cargo.toml` / `go.mod`）→ approve（no-op）
