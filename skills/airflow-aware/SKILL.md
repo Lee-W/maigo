@@ -86,34 +86,16 @@ targeted single-file pytest manually instead.
 
 #### `uv.lock` phantom diff diagnostic
 
-A persistent `uv.lock` diff in your worktree that you did not introduce — and
-that returns after `git checkout HEAD -- uv.lock` followed by the next
-`uv sync` — is almost always **lockfile drift on `main`**, not a local
-environment problem. A contributor edited a `pyproject.toml` (e.g., removed
-an extra) without re-running `uv lock`, so the committed lockfile is out of
-sync with the committed pyproject; every fresh `uv sync` regenerates the lock
-to match the current pyproject and shows the delta as an uncommitted diff.
+A persistent `uv.lock` diff you did not introduce — and that returns after
+`git checkout HEAD -- uv.lock` + the next `uv sync` — is almost always
+**lockfile drift on `main`** (a contributor edited a `pyproject.toml` without
+re-running `uv lock`), not a local environment problem. Don't fold the
+re-lock into your feature PR; `git checkout HEAD -- uv.lock` keeps the noise
+out, and the diff re-appearing on the next `uv sync` is expected.
 
-Diagnose:
-
-```bash
-git diff HEAD uv.lock | head -50               # what package changed
-grep -rn "<package>" --include=pyproject.toml -l    # which pyproject owns it
-grep "<package>" <pyproject>                   # current HEAD declares it?
-git show HEAD:uv.lock | grep "<package>"       # committed lock has it?
-```
-
-If the pyproject and the committed lock disagree, drift is confirmed. Fix it
-in a **separate** `chore: re-lock <pyproject>` PR off `upstream/main`. **Do
-not** fold the lock regeneration into the current feature PR — it pollutes
-the diff and creates a force-push risk if `main` re-locks before merge. For
-the feature PR, `git checkout HEAD -- uv.lock` keeps the noise out of the
-commit; the diff will re-appear locally on the next `uv sync` and that is
-expected.
-
-For the full diagnostic (including "find when drift was introduced" via `git log -p`
-and a concrete case study), read the "uv.lock drift diagnostic" section in
-`references/review-checks.md`.
+Full diagnostic — confirm the drift, find when it was introduced, worked case
+study, and how to handle in a feature PR — is in the "uv.lock drift diagnostic"
+section of `references/review-checks.md`.
 
 ### 4. Code style — Ruff + Mypy
 
