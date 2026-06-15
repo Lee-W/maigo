@@ -145,6 +145,16 @@ def scan_directory(mem_dir: Path, display_name: str) -> MemoryCheckResult:
             continue
         _check_entry(result, slug, entry_path)
 
+    # Reverse check: flag entry files present on disk but absent from the index.
+    # Agents discover memory through MEMORY.md only (see skills/memory-loading),
+    # so an unindexed file is invisible to them no matter how valid its schema.
+    indexed = set(slugs)
+    for entry_path in sorted(mem_dir.glob("*.md")):
+        name = entry_path.name
+        if name == "MEMORY.md" or name in indexed:
+            continue
+        result.warn(name, "file present but not declared in MEMORY.md (orphan)")
+
     return result
 
 
