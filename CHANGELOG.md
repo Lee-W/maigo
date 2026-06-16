@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.25.0 (2026-06-16)
+
+### Feat
+
+- no hard-wrap for docs
+
 ## v0.24.1 (2026-06-16)
 
 ### Refactor
