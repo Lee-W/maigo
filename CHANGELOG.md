@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.24.1 (2026-06-16)
+
+### Refactor
+
+- **skills,commands**: trim duplicated and over-long recipe prose
+
 ## v0.24.0 (2026-06-15)
 
 ### Feat
