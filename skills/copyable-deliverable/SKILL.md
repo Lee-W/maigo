@@ -52,6 +52,14 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 平台 render markdown 後，使用者從 UI 框選複製到的是 rendered 結果，不是 raw 語法——
 手動框選費工又容易在內部 code block 處截斷。**一個 fenced block = 一鍵複製 = 零選取誤差。**
 
+## Prose 不 hard-wrap
+
+Deliverable 內的 prose 段落**一行連續到底，不手動斷行**——表格列、list item、
+fenced code block 內容不受影響（本來就一行一項 / 逐字保留）。
+
+理由同上：hard-wrap 的段落，使用者每次改字都要重排、diff 也雜；一段一行才好
+複製、好編輯、diff 乾淨。
+
 ## What this skill does NOT cover
 
 - 純對話 / 分析 / 狀態表——那是 orchestrator 的敘述，不是 deliverable
