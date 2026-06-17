@@ -381,3 +381,140 @@ class TestMainRetryWarning:
         assert result["decision"] == "block"
         assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
         assert "2 次" in result["reason"]
+
+
+# ---------------------------------------------------------------------------
+# main() collection / config error handling
+# ---------------------------------------------------------------------------
+
+
+class TestMainCollectionError:
+    """A test command that errors during collection / config (suite never ran)
+    must be treated as a skip, not a blocking test failure — otherwise a
+    uv-workspace monorepo root (bare `uv run pytest` needs `--project`) loops
+    forever with no parseable failure name.
+    """
+
+    CONFTEST_ERROR = (
+        "Defining 'pytest_plugins' in a non-top-level conftest is no longer "
+        "supported\n1 error in 0.30s\n"
+    )
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            CONFTEST_ERROR,
+            "no tests ran in 0.01s",
+            "ERROR: file or directory not found: nope/",
+            "ERROR: not found: tests/x.py::test_missing",
+            "pytest: error: unrecognized arguments: --bogus",
+        ],
+    )
+    def test_collection_error_approves_with_guidance(
+        self,
+        output: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion, "run_command", lambda cmd, cwd: (1, output)
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "approve"
+        assert "collection" in result["reason"]
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            "FAILED tests/x.py::test_y\n1 failed in 0.10s",
+            # Mixed: a real failure AND collection errors in the same summary —
+            # the failure must win (collection guard runs only when nothing was
+            # parseable), so this must still block.
+            "FAILED tests/x.py::test_y\n1 failed, 2 errors in 1.1s",
+        ],
+    )
+    def test_real_test_failure_still_blocks(
+        self,
+        output: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        # A genuine FAILED line must not be swallowed by the collection guard.
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, output),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+
+
+# ---------------------------------------------------------------------------
+# main() unparseable non-zero exit circuit-breaker
+# ---------------------------------------------------------------------------
+
+
+class TestMainUnparsedNonZero:
+    """A non-zero exit with no parseable failures and no recognized error class
+    blocks the first times, but must approve after RETRY_LIMIT so it cannot
+    loop forever.
+    """
+
+    OPAQUE_FAILURE = "something went wrong but no test name here\nexit\n"
+
+    def _setup(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, self.OPAQUE_FAILURE),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+
+    def test_first_unparsed_blocks(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        self._setup(tmp_path, monkeypatch)
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+        assert "無法 parse failure" in result["reason"]
+
+    def test_repeated_unparsed_breaks_out(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        self._setup(tmp_path, monkeypatch)
+        payload = {"cwd": str(tmp_path)}
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "approve"
+        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
