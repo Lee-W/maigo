@@ -62,6 +62,30 @@ BUILD_ENV_ERROR_RE = re.compile(
     r"|(?:gcc|cc|clang|cl): command not found"
     r"|No such file or directory: ['\"]?(?:gcc|cc|clang|make|cmake)['\"]?",
 )
+# pytest collection / usage / config errors and "no tests ran" mean the suite
+# never executed — the project's own code didn't fail, the *invocation* did.
+# The classic case is a uv-workspace monorepo whose root needs `--project`:
+# bare `uv run pytest` then errors out in a sub-package conftest
+# (`pytest-plugins-in-non-top-level-conftest-files`). These emit no FAILED
+# lines, so without this guard they fall through to the blind block below and
+# loop forever (no test name to act on). Import/syntax errors in the user's
+# own changed code are caught earlier by FATAL_MARKER_RE and still block; this
+# pattern is for setup/invocation problems the operator fixes via
+# `.claude/test-command`, not for masking real test breakage.
+COLLECTION_ERROR_RE = re.compile(
+    r"non-top-level[ -]conftest"  # pytest-plugins-in-non-top-level-conftest(-files)
+    r"|errors during collection"
+    r"|ERROR collecting "
+    r"|no tests ran in"
+    r"|ERROR: file or directory not found"
+    r"|ERROR: not found:"
+    r"|unrecognized arguments"
+    # pytest summary reporting *errors* (collection) rather than failures, e.g.
+    # "1 error in 0.30s" / "2 errors in 1.1s". Only consulted when no FAILED
+    # line was parseable (see call site), so it cannot mask real failures that
+    # happen to share a summary line with errors.
+    r"|\b\d+ errors? in [\d.]+s",
+)
 
 
 def has_git_modifications(cwd: Path) -> bool:
@@ -260,7 +284,34 @@ def main() -> None:
             f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
         )
 
+    # No parseable failures at this point. If the output looks like a
+    # collection / usage / config error (the suite never ran — e.g. a
+    # uv-workspace monorepo root that needs `--project`), treat it like
+    # build-env: skip with guidance. Checked here (not before extract_failures)
+    # so a summary that mixes errors *and* real failures still blocks on the
+    # failures above. Import/syntax errors in the user's own code are caught
+    # earlier by FATAL_MARKER_RE and still block.
+    collection_match = COLLECTION_ERROR_RE.search(output)
+    if collection_match:
+        emit(
+            "approve",
+            f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑——不是 test 失敗。常見於 uv-workspace monorepo 根目錄要用 `--project`。跳過——在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 永久關閉本 worktree 的檢查。",
+        )
+
+    # Non-zero exit we couldn't attribute to any test name (and not a
+    # recognized build-env / collection / config error). Block so the operator
+    # sees it — but route through the retry log so a genuinely unparseable
+    # command can't loop forever: after RETRY_LIMIT consecutive such blocks,
+    # approve with a warning to get human intervention. The key is stable per
+    # command so distinct commands count independently.
     tail = output[-OUTPUT_TAIL_CHARS:] if len(output) > OUTPUT_TAIL_CHARS else output
+    unparsed_key = f"__unparsed_nonzero__:{' '.join(cmd)}"
+    counts = _record_and_count(_retry_log_path(cwd), {unparsed_key})
+    if counts.get(unparsed_key, 0) >= RETRY_LIMIT:
+        emit(
+            "approve",
+            f"⚠️ RETRY LIMIT REACHED: 立希 (Taki)：`{' '.join(cmd)}` exit {exit_code} 已連續 ≥ {RETRY_LIMIT} 次無法 parse failure（本次含），停止重試以免無限迴圈，放行——請人工介入確認。依 skills/failure-handling 的「無限迴圈防護」。若這是 collection / 設定問題，在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 關閉本 worktree 的檢查。Raw tail:\n{tail}",
+        )
     emit(
         "block",
         f"立希 (Taki)：`{' '.join(cmd)}` exit {exit_code}，無法 parse failure 名稱。Raw tail:\n{tail}",
