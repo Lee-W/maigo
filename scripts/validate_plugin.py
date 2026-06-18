@@ -255,6 +255,28 @@ def check_commands_docs_alignment() -> CheckResult:
     return r
 
 
+def check_commands_reference_coverage() -> CheckResult:
+    """docs/reference/commands.md 散文總表必須涵蓋每個 commands/*.md slug。
+
+    比對方式：字面檢查 '## /maigo:<slug>' 是否出現在總表文字中。
+    """
+    r = CheckResult("commands/*.md → docs/reference/commands.md coverage")
+    cmds_dir = ROOT / "commands"
+    ref_path = ROOT / "docs" / "reference" / "commands.md"
+    if not cmds_dir.is_dir():
+        r.note("commands/ 目錄不存在，跳過")
+        return r
+    if not ref_path.is_file():
+        r.note("docs/reference/commands.md 不存在，跳過")
+        return r
+    ref_text = ref_path.read_text(encoding="utf-8")
+    for path in sorted(cmds_dir.glob("*.md")):
+        slug = path.stem
+        if f"## `/maigo:{slug}`" not in ref_text:
+            r.fail(f"docs/reference/commands.md 未涵蓋命令：## `/maigo:{slug}`")
+    return r
+
+
 def check_skills_docs_alignment() -> CheckResult:
     """Each skills/<name>/SKILL.md must align with the 6-step publish path.
 
@@ -450,6 +472,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_skill_crossrefs,
     check_version_sync,
     check_commands_docs_alignment,
+    check_commands_reference_coverage,
     check_skills_docs_alignment,
     check_agents_docs_alignment,
     check_skills_graph,
