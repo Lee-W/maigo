@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.25.1 (2026-06-18)
+
+### Fix
+
+- **verify_completion**: skip non-test collection errors and cap retry loop
+- **memory-propose-confirm**: treat unanswered propose as deferred, not skipped
+
 ## v0.25.0 (2026-06-16)
 
 ### Feat
