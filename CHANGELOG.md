@@ -5,6 +5,18 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.26.0 (2026-06-18)
+
+### Feat
+
+- **orchestrator-voice**: act autonomously after batch go-ahead
+- **validate_plugin**: check docs/reference/commands.md covers every command
+
+### Fix
+
+- close memory-loading per-project gap and verify_completion silent-skip
+- **docs**: quote mermaid node labels in address-comments flowchart
+
 ## v0.25.1 (2026-06-18)
 
 ### Fix
