@@ -248,6 +248,25 @@ class TestMain:
         assert result["decision"] == "approve"
         assert "偵測不到" in result["reason"]
 
+    def test_uv_lock_present_but_uv_not_in_path(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        # uv.lock exists but uv is not in PATH — should approve with explicit message.
+        # Isolate has_git_modifications so the early-return branch (no git changes)
+        # cannot short-circuit before we reach the uv-not-in-PATH branch.
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(verify_completion.shutil, "which", lambda cmd: None)
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "approve"
+        assert "uv 不在 PATH" in result["reason"]
+
     def test_run_command_succeeds(
         self,
         tmp_path: Path,

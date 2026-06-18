@@ -230,19 +230,18 @@ Soyo 或 Anon 在 turn 輸出末尾加 `## Memory propose` 段，格式如下：
 
 ## 載入語意
 
-Reader agent 啟動時：
+Reader agent 啟動時依序讀**兩層** index：
 
-1. `cat ~/.config/maigo/memory/MEMORY.md`
-2. 讀 index 的每一行 `- [Title](file.md) — description`
-3. 判斷哪些 entry 的 description 跟當前 task keyword / 主題 overlap
-4. 讀相關 entry 的全文，當作 task context 一部分
+1. `cat ~/.config/maigo/memory/MEMORY.md`（cross-project）
+2. `cat ~/.claude/projects/<current-project>/memory/MEMORY.md`（per-project，若存在）
+3. 讀兩層 index 的每一行 `- [Title](file.md) — description`，合併後判斷哪些 entry 的 description 跟當前 task keyword / 主題 overlap
+4. 讀相關 entry 的全文（**兩層合計上限 10 筆**），當作 task context 一部分
 5. 在輸出開頭印 `## Loaded memory entries`，列出用了哪些（沒用就寫「（無相關 entry）」）
 
-**以下情況都當「沒記憶」處理，繼續做事，不報錯、不要求使用者建立：**
+**Fallback：兩層各自獨立，任一層不影響另一層：**
 
-- `~/.config/maigo/memory/` 不存在
-- `MEMORY.md` 不存在或是空的
-- index 裡沒有任何跟當前 task 相關的 entry
+- 某一層目錄不存在、`MEMORY.md` 不存在或是空的、或 index 無相關 entry → 該層當「沒記憶」，另一層照常
+- **兩層皆無相關記憶**才整體當「沒記憶」處理，繼續做事，不報錯、不要求使用者建立
 
 ## Validation
 

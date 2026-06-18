@@ -225,6 +225,13 @@ def main() -> None:
     custom_cmd = read_config_line(claude_dir / "test-command")
     cmd = shlex.split(custom_cmd) if custom_cmd else detect_test_command(cwd)
 
+    if not custom_cmd and (cwd / "uv.lock").is_file() and shutil.which("uv") is None:
+        emit(
+            "approve",
+            "立希 (Taki)：偵測到 uv.lock 但 uv 不在 PATH，已跳過 test 驗證——裝 uv 或在 .claude/test-command 指定可跑的指令。",
+        )
+        return
+
     if cmd is None:
         emit("approve", "立希 (Taki)：偵測不到 test 設定，跳過（no-op）")
         return
