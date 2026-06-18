@@ -16,12 +16,17 @@ description: This skill should be used by all maigo agents at startup, before be
 
 ## 標準 5 步流程
 
-啟動後、正式開始工作之前，先載入跨專案記憶：
+啟動後、正式開始工作之前，先載入記憶（兩層）：
 
-1. **`cat ~/.config/maigo/memory/MEMORY.md`** — 讀 index 全文
-2. **讀 index 每行** `- [Title](file.md) — description`，判斷哪些 description 跟當前 task 的 keyword / 主題有 overlap
-3. **相關性排序**：根據當前任務的關鍵字與 description 的匹配度進行排序
-4. **限量載入**：若相關條目過多，僅 Read 最相關的前 10 筆 entry 全文，當作這次工作的 context
+1. **依序讀兩個 index**：
+   - **Cross-project**：`cat ~/.config/maigo/memory/MEMORY.md`
+   - **Per-project**：`cat ~/.claude/projects/<current-project>/memory/MEMORY.md`（若存在）
+
+   `<current-project>` 是當前專案路徑 slug 化的結果（與 `validate_memory.py` 相同的枚舉方式——即 `~/.claude/projects/` 下對應的目錄名，例如 `-Users-weilee-Programming-personal-maigo`）。
+
+2. **讀 index 每行** `- [Title](file.md) — description`（兩層 index 合併），判斷哪些 description 跟當前 task 的 keyword / 主題有 overlap
+3. **相關性排序**：把**兩層合併後**的候選 entry 依匹配度排序
+4. **限量載入**：若相關條目過多，僅 Read 最相關的前 10 筆 entry 全文——**10 筆是兩層合計上限，不是每層各 10**；當作這次工作的 context
 5. **在輸出開頭印 `## Loaded memory entries` 段**，列出用了哪些 entry
 
 ## Schema 自檢（lazy）
@@ -37,9 +42,12 @@ description: This skill should be used by all maigo agents at startup, before be
 
 ## Fallback 規則（不報錯、不抱怨、繼續做事）
 
-- `~/.config/maigo/memory/` 不存在 → 當「沒記憶」處理
-- `MEMORY.md` 不存在或是空的 → 當「沒記憶」處理
-- index 裡完全沒有跟當前 task 相關的 entry → 當「沒記憶」處理
+兩層各自獨立 fallback，任一層不影響另一層：
+
+- 某一層目錄不存在 → 該層當「沒記憶」，另一層照常讀
+- 某一層 `MEMORY.md` 不存在或是空的 → 該層當「沒記憶」，另一層照常讀
+- 某一層 index 裡完全沒有跟當前 task 相關的 entry → 該層當「沒記憶」，另一層照常讀
+- **兩層皆無相關記憶**才整體當「沒記憶」處理
 
 不要求使用者建立 memory 目錄或 index。
 
