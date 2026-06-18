@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供十個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十二個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -238,6 +238,28 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 
 步驟 1–4 orchestrator 直跑（要跟使用者多輪互動）；步驟 5 才委派 agent 流程。**不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push，只產回覆草稿讓使用者自己貼。
 
+## `/maigo:triage-issue` — 批次 triage GitHub issue
+
+從 maintainer 視角批次掃 inbound issue：🐱 樂奈抓 metadata、🩵 燈寫 triage rubric、🟡 爽世下 verdict（READY / NEEDS_INFO / DUP / CLOSE），輸出 `gh` 指令草稿但不主動寫 GitHub。🟣 立希不上場（issue 沒 diff 可跑）。
+
+```
+/maigo:triage-issue <issue-1> <issue-2> ...   # 多 issue 批次（空白或逗號分隔）
+/maigo:triage-issue <github-issue-url> ...    # 接受 URL 形式
+```
+
+| 步驟 | 誰 | 做什麼 |
+|------|-----|--------|
+| 1 | 🐱 樂奈 | 抓每條 issue 的 lightweight metadata，排 triage queue |
+| 2 | 🐱 樂奈 | 每條 issue 抓完整 body + comments + 找潛在 dup |
+| 3 | 🩵 燈 | 寫 `.maigo/triage-rubric.md`（category + why + potential dup） |
+| 4 | 🟡 爽世 | 套 `strict-triage` skill，下 verdict + 產 `gh` 草稿 |
+| 5 | Orchestrator | 呈現 per-issue 報告，等使用者 next |
+| 6 | Orchestrator | 整批結束後輸出 roll-up summary |
+
+**read-only，不寫 GitHub**——不下 label、不 close、不 reply、不 assign；只產草稿讓使用者自己執行。
+
+→ Source: [`commands/triage-issue.md`](../commands/triage-issue.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -251,6 +273,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | Compliance audit（只看規範 / 安全） | `/maigo:review --mode=compliance-only <ref>` |
 | 寫 PR title / description | `/maigo:describe-pr` |
 | 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
+| 批次分類 / 標記 GitHub issue | `/maigo:triage-issue` |
 | 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
