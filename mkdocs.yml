@@ -54,6 +54,7 @@ nav:
       - failure-handling: skills/failure-handling.md
       - github-title-description: skills/github-title-description.md
       - pr-context-cache: skills/pr-context-cache.md
+      - maigo-self-check: skills/maigo-self-check.md
       - memory-loading: skills/memory-loading.md
       - memory-propose-confirm: skills/memory-propose-confirm.md
       - narration: skills/narration.md

@@ -44,6 +44,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`narration`](../skills/narration.md) | orchestrator | 全部 `/maigo:*` 命令 | maigo orchestrator 的旁白——🌙 Doloris / 🌑 Mortis 在開場 / 收場 / 卡關節點框住整場演出 |
 | [`teammate-flow`](../skills/teammate-flow.md) | orchestrator | `/maigo:go`、`/maigo:team` | MyGO!!!!! 五人協作的共通流程骨架——sequential 段（🐱 樂奈 → 🩵 燈 → 🎀 愛音）、Orchestrator 守則、commit message draft 規則、失敗處理與 memory confirm flow 引用 |
 | [`doc-link-convention`](../skills/doc-link-convention.md) | Soyo | review 觸及 `agents/` / `commands/` / `skills/` 的 PR 時 | Maigo source 檔的跨檔 link 強制用絕對 GitHub URL，避免 `mkdocs build --strict` 因 include-markdown rewrite 抓不到 page 而 abort |
+| [`maigo-self-check`](../skills/maigo-self-check.md) | Taki | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:crystallize` | diff 動到 agents/commands/skills/docs/mkdocs.yml 時，以 validate_plugin + mkdocs --strict 取代純 pytest 作為驗證標準 |
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
 | [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
@@ -93,6 +94,7 @@ graph LR
         doc_link["doc-link-convention"]
         airflow_aware["airflow-aware"]
         commitizen_aware["commitizen-aware"]
+        maigo_self_check["maigo-self-check"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -125,6 +127,11 @@ graph LR
     crystallize --> memory_loading
     crystallize --> failure_handling
     crystallize --> doc_link
+    go --> maigo_self_check
+    team --> maigo_self_check
+    quick --> maigo_self_check
+    crystallize --> maigo_self_check
+    taki --> maigo_self_check
 
     raana --> memory_loading
     tomori --> memory_loading
