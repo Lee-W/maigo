@@ -133,65 +133,20 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 
 ## Recurring must-fix patterns
 
-These are cross-cutting patterns that surface frequently enough to be named; treat them as
-supplements to the 9-item checklist, not replacements.
+Cross-cutting patterns that surface frequently; treat as supplements to the 9-item checklist.
+Full rationale and recipes in `references/recurring-patterns.md` — read it when a pattern applies.
 
-### Commit body is a contract — verify it matches the diff
-
-A commit body that states a runtime behaviour ("X defaults to Y", "we now raise on Z",
-"ordering is guaranteed") is a **contract** future bisect users will trust. When body prose
-says "X happens", the diff must show X happening.
-
-How to apply during review:
-
-1. For each behavioral claim in the commit body (defaults, fallbacks, raise conditions,
-   ordering, validation rules) grep / read the relevant code path to verify.
-2. If code does not match: **must-fix**. Either implement the promised behaviour (Option A)
-   or rewrite the commit body to describe what the code actually does (Option B). Do not
-   accept "this is just docs".
-3. Pre-release status does **not** downgrade this. Wire-format mutations are acceptable
-   pre-release, but the commit body's promise about behaviour must still align with the diff.
-
-### Underscore-private exception that consumers must `isinstance`-check is de-facto public API
-
-When a module defines private exception classes (`_FooError`, `_BarError`) and a consumer
-must `isinstance`-check one of them to distinguish failure modes, that one exception is
-**already public API** — the underscore is a lie.
-
-Two-step signal to watch for:
-
-1. Multiple exception types exist behind a common wrapper (e.g., `_PollFailure(exc)`).
-2. A consumer must inspect `.exc` and branch on its concrete type.
-
-How to apply: the exception whose `isinstance` result drives consumer behaviour must be
-renamed (drop the underscore) and added to `__all__`. Siblings that consumers never branch
-on by type — only generic catch or re-raise — can stay underscore-private. Selective
-promotion is the discipline; do not broadcast the whole hierarchy.
-
-> Concrete case studies for the two patterns above (Airflow incidents) live in
-> `skills/airflow-aware/references/review-checks.md` — read them when reviewing an
-> Airflow diff and a worked example helps.
-
-### 測試要預設用 parametrize——疊 assert 與近重複 test method 是 must-fix
-
-寫測試時，預設就把「同一呼叫只差輸入 / 期望的多條 assert」與「只差輸入 / 期望的近重複 test method」收成 `@pytest.mark.parametrize`，不要等被要求。
-
-Review 時看到以下情形，當 must-fix 退回：
-
-- **疊 assert**：同一個 test method 裡連續 assert 同性質的結果，失敗時只報第一條，看不出哪些 case 過 / 不過。
-- **近重複 test method**：複製貼上的 test，只差輸入與期望值，邏輯結構完全相同。
-
-退回要求：拆成 `@pytest.mark.parametrize`，每個 case 用 `pytest.param(..., id=...)` 標清楚 case 名稱，方便失敗時一眼定位。
-
-### 不要框框式區段分隔註解
-
-程式碼與腳本不要用 `# ----------` 橫幅或 `# --- 區段名 ---` 這類框框式區段分隔註解。
-
-Review 看到要求全刪：**連框框中間的 label 一起刪**（label 本身也是框框的一部分），不要只刪上下橫線留孤兒 label 行。靠函式邊界、邏輯順序、空行分段即可。
-
-### Concurrent PR 根本修法優先
-
-發現另一個 concurrent PR 在 SDK/library 層修同一問題的根本（例如改用 SDK 提供的 credential 類別，取代手動 URL path 拼接），而當前 PR 只在 test / workaround 層修症狀時——在 comment 裡肯定當前解法「not wrong」，但明確指向 SDK 層的根本修法，說明後者 ready 後當前 PR 會被 supersede。傾向推薦架構層解法而非繞路補丁。
+- **Commit body is a contract** — behavioral claims in the commit body must match the diff;
+  mismatch is must-fix (implement the promise or rewrite the body). Details: `references/recurring-patterns.md`.
+- **Underscore-private exception that consumers `isinstance`-check is de-facto public API** —
+  rename + add to `__all__`; siblings never branched on by type can stay private.
+  Details + Airflow case studies: `references/recurring-patterns.md` and
+  `skills/airflow-aware/references/review-checks.md`.
+- **測試要預設用 parametrize** — 疊 assert 或近重複 test method → must-fix，拆成
+  `@pytest.mark.parametrize` + `pytest.param(..., id=...)` 標 case 名稱。
+- **不要框框式區段分隔註解** — `# ----` / `# --- 區段名 ---` 全刪含 label，靠函式邊界與空行分段。
+- **Concurrent PR 根本修法優先** — 有 SDK 層根本修法時肯定當前解但明確指向根本修法，說明 supersede 關係。
+  Details: `references/recurring-patterns.md`.
 
 ## Design integrity checks (references)
 
