@@ -107,7 +107,7 @@ ignore_missing_imports = true
 maigo/
 ├── agents/                          # 5 位團員（人設 + 角色）
 │   └── Raana.md / Tomori.md / Anon.md / Soyo.md / Taki.md
-├── commands/                        # /maigo:<name> 入口（go / team / quick / review / remember / memory / retro / describe-pr / address-comments / doctor）
+├── commands/                        # /maigo:<name> 入口（完整清單以 commands/*.md + reference/commands.md 為準）
 ├── skills/                          # 跨 agent/command 共用的 process
 │   └── strict-review/ / teammate-flow/ / commit-message/ / failure-handling/ / memory-loading/ / memory-propose-confirm/ / narration/ / pr-context-cache/ / github-title-description/ / doc-link-convention/ / airflow-aware/ / commitizen-aware/
 ├── hooks/

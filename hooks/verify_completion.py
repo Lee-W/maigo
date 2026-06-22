@@ -293,31 +293,31 @@ def main() -> None:
 
     # No parseable failures at this point. If the output looks like a
     # collection / usage / config error (the suite never ran — e.g. a
-    # uv-workspace monorepo root that needs `--project`), treat it like
-    # build-env: skip with guidance. Checked here (not before extract_failures)
-    # so a summary that mixes errors *and* real failures still blocks on the
-    # failures above. Import/syntax errors in the user's own code are caught
-    # earlier by FATAL_MARKER_RE and still block.
+    # uv-workspace monorepo root that needs `--project`), block with guidance.
+    # A Stop hook must not approve completion when the configured suite did not
+    # actually run. Checked here (not before extract_failures) so a summary that
+    # mixes errors *and* real failures still blocks on the failures above.
+    # Import/syntax errors in the user's own code are caught earlier by
+    # FATAL_MARKER_RE and still block.
     collection_match = COLLECTION_ERROR_RE.search(output)
     if collection_match:
         emit(
-            "approve",
-            f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑——不是 test 失敗。常見於 uv-workspace monorepo 根目錄要用 `--project`。跳過——在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 永久關閉本 worktree 的檢查。",
+            "block",
+            f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑。常見於 uv-workspace monorepo 根目錄要用 `--project`。在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。",
         )
 
     # Non-zero exit we couldn't attribute to any test name (and not a
     # recognized build-env / collection / config error). Block so the operator
-    # sees it — but route through the retry log so a genuinely unparseable
-    # command can't loop forever: after RETRY_LIMIT consecutive such blocks,
-    # approve with a warning to get human intervention. The key is stable per
-    # command so distinct commands count independently.
+    # sees it. Route through the retry log only to make repeated attempts
+    # obvious; do not approve, because a non-zero test command is not verified.
+    # The key is stable per command so distinct commands count independently.
     tail = output[-OUTPUT_TAIL_CHARS:] if len(output) > OUTPUT_TAIL_CHARS else output
     unparsed_key = f"__unparsed_nonzero__:{' '.join(cmd)}"
     counts = _record_and_count(_retry_log_path(cwd), {unparsed_key})
     if counts.get(unparsed_key, 0) >= RETRY_LIMIT:
         emit(
-            "approve",
-            f"⚠️ RETRY LIMIT REACHED: 立希 (Taki)：`{' '.join(cmd)}` exit {exit_code} 已連續 ≥ {RETRY_LIMIT} 次無法 parse failure（本次含），停止重試以免無限迴圈，放行——請人工介入確認。依 skills/failure-handling 的「無限迴圈防護」。若這是 collection / 設定問題，在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 關閉本 worktree 的檢查。Raw tail:\n{tail}",
+            "block",
+            f"⚠️ RETRY LIMIT REACHED: 立希 (Taki)：`{' '.join(cmd)}` exit {exit_code} 已連續 ≥ {RETRY_LIMIT} 次無法 parse failure（本次含）。停止重試以免無限迴圈，請人工介入確認。依 skills/failure-handling 的「無限迴圈防護」。若這是 collection / 設定問題，在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。Raw tail:\n{tail}",
         )
     emit(
         "block",

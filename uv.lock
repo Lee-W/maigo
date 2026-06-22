@@ -355,6 +355,7 @@ dev = [
     { name = "pytest" },
 ]
 docs = [
+    { name = "mkdocs" },
     { name = "mkdocs-include-markdown-plugin" },
     { name = "mkdocs-material" },
 ]
@@ -369,6 +370,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.0" },
 ]
 docs = [
+    { name = "mkdocs", specifier = ">=1.6,<2" },
     { name = "mkdocs-include-markdown-plugin", specifier = ">=6" },
     { name = "mkdocs-material", specifier = ">=9" },
 ]

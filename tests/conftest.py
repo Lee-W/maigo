@@ -123,6 +123,19 @@ def make_docs_command_shim(tmp_path: Path, name: str = "bar") -> Path:
     return p
 
 
+def make_command_overviews(
+    tmp_path: Path, command_names: list[str] | None = None
+) -> None:
+    """Write minimal README.md and docs/index.md command overview sections."""
+    command_names = command_names or ["bar"]
+    command_list = "、".join(f"`/maigo:{name}`" for name in command_names)
+    content = f"完整 {len(command_names)} 個命令（含 {command_list}）。\n"
+    (tmp_path / "README.md").write_text(content, encoding="utf-8")
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(exist_ok=True)
+    (docs_dir / "index.md").write_text(content, encoding="utf-8")
+
+
 def make_skill(tmp_path: Path, name: str = "baz") -> Path:
     """Write a minimal valid skill directory to tmp_path/skills/<name>/SKILL.md.
 
@@ -249,6 +262,7 @@ def plugin_tree(tmp_path: Path) -> Path:
     make_docs_agent_shim(tmp_path)
     make_command_file(tmp_path)
     make_docs_command_shim(tmp_path)
+    make_command_overviews(tmp_path)
     make_skill(tmp_path)
     make_docs_skill_shim(tmp_path)
     make_mkdocs_yml(tmp_path)

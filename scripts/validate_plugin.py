@@ -90,6 +90,61 @@ def check_hooks_json() -> CheckResult:
     return r
 
 
+def check_hooks_schema() -> CheckResult:
+    """Validate the hook config contract beyond JSON syntax."""
+    r = CheckResult("hooks/hooks.json schema")
+    path = ROOT / "hooks" / "hooks.json"
+    if not path.is_file():
+        r.note("hooks/hooks.json 不存在，跳過")
+        return r
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        r.fail("hooks.json JSON 壞掉，跳過 schema 檢查")
+        return r
+
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict):
+        r.fail("缺少 object 型別的 `hooks` 頂層欄位")
+        return r
+
+    allowed_events = {"SessionStart", "TeammateIdle", "Stop"}
+    for event, configs in hooks.items():
+        if event not in allowed_events:
+            r.fail(f"未知 hook event `{event}`")
+        if not isinstance(configs, list):
+            r.fail(f"{event}: event config 必須是 list")
+            continue
+        for cfg_index, cfg in enumerate(configs):
+            if not isinstance(cfg, dict):
+                r.fail(f"{event}[{cfg_index}]: config 必須是 object")
+                continue
+            handlers = cfg.get("hooks")
+            if not isinstance(handlers, list) or not handlers:
+                r.fail(f"{event}[{cfg_index}]: 缺少非空 `hooks` list")
+                continue
+            for hook_index, hook in enumerate(handlers):
+                prefix = f"{event}[{cfg_index}].hooks[{hook_index}]"
+                if not isinstance(hook, dict):
+                    r.fail(f"{prefix}: hook 必須是 object")
+                    continue
+                if hook.get("type") != "command":
+                    r.fail(f"{prefix}: type 必須是 `command`")
+                command = hook.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    r.fail(f"{prefix}: command 必須是非空字串")
+                elif "${CLAUDE_PLUGIN_ROOT}/" not in command:
+                    r.fail(f"{prefix}: command 必須使用 `${{CLAUDE_PLUGIN_ROOT}}/`")
+                timeout = hook.get("timeout")
+                if timeout is not None and (
+                    not isinstance(timeout, int)
+                    or isinstance(timeout, bool)
+                    or timeout <= 0
+                ):
+                    r.fail(f"{prefix}: timeout 必須是正整數")
+    return r
+
+
 def check_agent_frontmatter() -> CheckResult:
     r = CheckResult("agents/*.md frontmatter")
     agents_dir = ROOT / "agents"
@@ -274,6 +329,34 @@ def check_commands_reference_coverage() -> CheckResult:
         slug = path.stem
         if f"## `/maigo:{slug}`" not in ref_text:
             r.fail(f"docs/reference/commands.md 未涵蓋命令：## `/maigo:{slug}`")
+    return r
+
+
+def check_command_overview_coverage() -> CheckResult:
+    """README and docs home must not drift from the command catalog."""
+    r = CheckResult("README / docs/index command overview coverage")
+    cmds_dir = ROOT / "commands"
+    if not cmds_dir.is_dir():
+        r.note("commands/ 目錄不存在，跳過")
+        return r
+
+    slugs = sorted(path.stem for path in cmds_dir.glob("*.md"))
+    expected_count_texts = {
+        "README.md": f"完整 {len(slugs)} 個命令",
+        "docs/index.md": f"完整 {len(slugs)} 個命令",
+    }
+    for rel, expected_count in expected_count_texts.items():
+        path = ROOT / rel
+        if not path.is_file():
+            r.fail(f"{rel} 不存在")
+            continue
+        text = path.read_text(encoding="utf-8")
+        if expected_count not in text:
+            r.fail(f"{rel}: 缺 `{expected_count}`")
+        for slug in slugs:
+            needle = f"`/maigo:{slug}`"
+            if needle not in text:
+                r.fail(f"{rel}: command overview 未提及 {needle}")
     return r
 
 
@@ -534,6 +617,7 @@ def check_skills_graph() -> CheckResult:
 CHECKS: list[Callable[[], CheckResult]] = [
     check_plugin_json,
     check_hooks_json,
+    check_hooks_schema,
     check_agent_frontmatter,
     check_command_frontmatter,
     check_skill_frontmatter,
@@ -543,6 +627,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_version_sync,
     check_commands_docs_alignment,
     check_commands_reference_coverage,
+    check_command_overview_coverage,
     check_skills_docs_alignment,
     check_agents_docs_alignment,
     check_skills_graph,

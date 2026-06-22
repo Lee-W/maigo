@@ -61,7 +61,7 @@ claude --plugin-dir /path/to/maigo
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
 ```
 
-完整 10 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:doctor`）詳見 [Commands reference](reference/commands.md)。
+完整 13 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](reference/commands.md)。
 
 ## 文件導覽
 

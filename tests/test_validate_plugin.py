@@ -9,6 +9,8 @@ import pytest
 
 import scripts.validate_plugin as validate_plugin
 from tests.conftest import (
+    make_command_file,
+    make_command_overviews,
     make_docs_skill_shim,
     make_mkdocs_yml,
     make_skill,
@@ -245,6 +247,111 @@ class TestCheckHookScripts:
 
 
 # ---------------------------------------------------------------------------
+# check_hooks_schema
+# ---------------------------------------------------------------------------
+
+
+class TestCheckHooksSchema:
+    def _write_hooks_json(self, tmp_path: Path, data: dict) -> None:
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir(exist_ok=True)
+        (hooks_dir / "hooks.json").write_text(json.dumps(data), encoding="utf-8")
+
+    def test_valid_schema_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        self._write_hooks_json(
+            tmp_path,
+            {
+                "hooks": {
+                    "Stop": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/check.py",
+                                    "timeout": 30,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_hooks_schema()
+        assert result.passed
+
+    def test_unknown_event_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        self._write_hooks_json(
+            tmp_path,
+            {
+                "hooks": {
+                    "TypoEvent": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/check.py",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_hooks_schema()
+        assert not result.passed
+        assert any("TypoEvent" in e for e in result.errors)
+
+    def test_non_command_type_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write_hooks_json(
+            tmp_path,
+            {
+                "hooks": {
+                    "Stop": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "prompt",
+                                    "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/check.py",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_hooks_schema()
+        assert not result.passed
+        assert any("type" in e and "command" in e for e in result.errors)
+
+    def test_missing_plugin_root_placeholder_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write_hooks_json(
+            tmp_path,
+            {
+                "hooks": {
+                    "Stop": [
+                        {
+                            "hooks": [
+                                {"type": "command", "command": "python3 hooks/check.py"}
+                            ]
+                        }
+                    ]
+                }
+            },
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_hooks_schema()
+        assert not result.passed
+        assert any("CLAUDE_PLUGIN_ROOT" in e for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
 # check_skill_crossrefs
 # ---------------------------------------------------------------------------
 
@@ -425,6 +532,34 @@ class TestCheckSkillsDocsAlignment:
         result = validate_plugin.check_skills_docs_alignment()
         assert not result.passed
         assert any("catalog" in e for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
+# check_command_overview_coverage
+# ---------------------------------------------------------------------------
+
+
+class TestCheckCommandOverviewCoverage:
+    def test_all_commands_mentioned_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_command_file(tmp_path, "go")
+        make_command_file(tmp_path, "review")
+        make_command_overviews(tmp_path, ["go", "review"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_overview_coverage()
+        assert result.passed
+
+    def test_missing_command_slug_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_command_file(tmp_path, "go")
+        make_command_file(tmp_path, "review")
+        make_command_overviews(tmp_path, ["go"])
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_overview_coverage()
+        assert not result.passed
+        assert any("/maigo:review" in e for e in result.errors)
 
 
 # ---------------------------------------------------------------------------

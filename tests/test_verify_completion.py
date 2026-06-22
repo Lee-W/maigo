@@ -409,9 +409,9 @@ class TestMainRetryWarning:
 
 class TestMainCollectionError:
     """A test command that errors during collection / config (suite never ran)
-    must be treated as a skip, not a blocking test failure — otherwise a
-    uv-workspace monorepo root (bare `uv run pytest` needs `--project`) loops
-    forever with no parseable failure name.
+    must block with guidance. A Stop hook cannot verify completion when a
+    uv-workspace monorepo root needs `--project` and bare `uv run pytest`
+    never runs the suite.
     """
 
     CONFTEST_ERROR = (
@@ -429,7 +429,7 @@ class TestMainCollectionError:
             "pytest: error: unrecognized arguments: --bogus",
         ],
     )
-    def test_collection_error_approves_with_guidance(
+    def test_collection_error_blocks_with_guidance(
         self,
         output: str,
         tmp_path: Path,
@@ -448,7 +448,7 @@ class TestMainCollectionError:
         )
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result["decision"] == "block"
         assert "collection" in result["reason"]
 
     @pytest.mark.parametrize(
@@ -493,8 +493,8 @@ class TestMainCollectionError:
 
 class TestMainUnparsedNonZero:
     """A non-zero exit with no parseable failures and no recognized error class
-    blocks the first times, but must approve after RETRY_LIMIT so it cannot
-    loop forever.
+    blocks every time. After RETRY_LIMIT it adds a warning so the agent stops
+    retrying blindly and asks for human intervention.
     """
 
     OPAQUE_FAILURE = "something went wrong but no test name here\nexit\n"
@@ -525,7 +525,7 @@ class TestMainUnparsedNonZero:
         assert result["decision"] == "block"
         assert "無法 parse failure" in result["reason"]
 
-    def test_repeated_unparsed_breaks_out(
+    def test_repeated_unparsed_blocks_with_retry_warning(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -535,5 +535,5 @@ class TestMainUnparsedNonZero:
         payload = {"cwd": str(tmp_path)}
         run_hook_main(verify_completion, payload, monkeypatch, capsys)
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result["decision"] == "block"
         assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
