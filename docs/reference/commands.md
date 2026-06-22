@@ -233,10 +233,11 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | 4 | Orchestrator | 寫 `.maigo/pr-comments.md`，分組 work item + 提路由計畫，AskUserQuestion 確認 |
 | 5 | (route) | 逐 work item 跑 `/maigo:quick` / `/maigo:go` / `/maigo:team` 的完整流程 |
 | 6 | Orchestrator | finale——處理對照 + 回覆草稿（不送出）+ commit message 草稿 |
+| 7 | Orchestrator | 學習收尾——萃取 convention 形狀 comment → 確認 → 寫 type:project 記憶 |
 
 **路由原則：** 單檔機械性修正 → `quick`；跨檔 / 動行為 → `go`；大且低風險想省牆鐘 → `team`。**預設盡量走 `quick`**，不確定偏 `go`。
 
-步驟 1–4 orchestrator 直跑（要跟使用者多輪互動）；步驟 5 才委派 agent 流程。**不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push，只產回覆草稿讓使用者自己貼。
+步驟 1–4 orchestrator 直跑（要跟使用者多輪互動）；步驟 5 才委派 agent 流程；步驟 7 也是 orchestrator 直跑，會（經使用者確認後）寫 `~/.config/maigo/memory/`。**不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push，只產回覆草稿讓使用者自己貼。
 
 ## `/maigo:triage-issue` — 批次 triage GitHub issue
 

@@ -16,7 +16,12 @@ flowchart TD
     Quick --> Finale[Orchestrator finale<br/>處理對照 + 回覆草稿 + commit msg]
     Go --> Finale
     Team --> Finale
-    Finale --> Done([完成])
+    Finale --> Learn[Orchestrator step 7<br/>靜默萃取 convention 候選]
+    Learn -- 0 候選 --> Done([完成])
+    Learn -- 有候選 --> Ask{使用者勾選<br/>multiSelect}
+    Ask -- 全不勾 --> Done
+    Ask -- 勾了 --> Write[reuse remember 5+6<br/>寫 type:project 記憶]
+    Write --> Done
 
     classDef gate fill:#FFC857,stroke:#333,color:#000
     classDef block fill:#FF6F91,stroke:#333,color:#000

@@ -201,21 +201,56 @@ C3  [conversation]  @reviewer
 
 3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
 
+### 7. 學習收尾——從處理過的 comment 萃取慣例
+
+全部 work item 走完、Finale summary 印完後，orchestrator **親自**過一遍已處理（`done`）的 comment，
+篩出「值得記住的教訓」。**靜默進行**——不額外問「要不要做學習收尾」；候選為 0 就無聲結束。
+不開新 agent——orchestrator 直跑（不 delegate），pattern 同步驟 1–4。
+
+**篩選啟發式（orchestrator 自己先過一輪，再攤給使用者勾，不替使用者拍板）：**
+
+收進候選（convention 形狀、會再犯）：
+
+- reviewer 指出的是**通用慣例 / 設計原則**（命名、結構、錯誤處理風格、測試策略…），非單點 bug
+- 描述帶「以後 / 每次 / 慣例 / 一律 / 都要」語氣，或同類 comment 在這次 PR 出現多筆
+
+排除（不收）：
+
+- 一次性 typo / rename / 純 bug fix（改完就沒了，記了也用不到）
+- 純提問型 comment（C3 那種）
+
+orchestrator 印出候選清單（每筆一句「為什麼值得記 + 建議 type:project」），
+用 **AskUserQuestion**（multiSelect）讓使用者勾哪些真的要記；一筆都沒勾 / 候選為 0 →
+印「本次沒有要記住的慣例」正常結束，不寫任何記憶。
+
+**step 7 的失敗或使用者取消不 rollback 前序**——前面的 comment 處理與 commit 已落地、不受影響。
+
+使用者勾選的每一筆，**依序各跑一輪 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 5+6** 寫入
+（type 預填 `project`——這是能被 Soyo 當 review item 4 的唯一可行 type；name/body 由 comment
+提煉，使用者可在 remember 步驟 5 改）。**每筆獨立——某筆在 remember 步驟 5 取消只跳過該筆、繼續往下一筆，不中止其餘**。
+寫入路徑、rollback、同 slug 處理全交給 remember 既有規格，**不在此另寫一份**。
+
+**crystallize 提示（不自動執行）：** 若某筆候選明顯是「反覆出現、夠結構化」（這次 PR 多筆同主題，
+或使用者表示常踩），在寫完記憶後**加一行提示**：「這條看起來會反覆出現——之後可考慮
+`/maigo:crystallize` 把它畢業成常駐 skill（review 會自動逐條擋）。」**只提示、不代跑**——
+crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
+
 ## Memory propose confirm flow
 
 address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不會產生 `## Memory propose`。
 步驟 5 委派出去的 `/maigo:quick` / `/maigo:go` / `/maigo:team` **各自帶自己的 Memory propose confirm flow**——orchestrator 跑該 route 時連同它的 confirm flow 一起照規格走，不在這裡另寫一份。
+步驟 7 是 orchestrator 親自的學習收尾，不走 propose-confirm，而是 reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 5+6 寫入。
 
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **讀不到 PR 一定擋**——步驟 1 的 gate 是硬規則，沒有 PR 不准往下跑。
-- **步驟 1–4 orchestrator 親自跑、不開新 agent**——pattern 跟 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) / [`/maigo:memory`](https://github.com/Lee-W/maigo/blob/main/commands/memory.md) / [`/maigo:retro`](https://github.com/Lee-W/maigo/blob/main/commands/retro.md) 一致；步驟 2–4 要跟使用者多輪互動，必須由 orchestrator 掌握。
+- **步驟 1–4 及 7 orchestrator 親自跑、不開新 agent**——pattern 跟 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) / [`/maigo:memory`](https://github.com/Lee-W/maigo/blob/main/commands/memory.md) / [`/maigo:retro`](https://github.com/Lee-W/maigo/blob/main/commands/retro.md) 一致；步驟 2–4 要跟使用者多輪互動，必須由 orchestrator 掌握。
 - **不替使用者決定哪些要處理**——步驟 3 由使用者挑，orchestrator 不自作主張全收或全略。
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 quick / go / team 的 agent 流程。
 - **不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push、不開 / 關 PR；只產草稿。
-- **唯一會寫的 artefact 檔案是 `.maigo/pr-comments.md`**——triage / 進度追蹤用。
+- **repo 內唯一寫的 artefact 是 `.maigo/pr-comments.md`**——triage / 進度追蹤用；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
 
 ## 與其他命令的差異
 
