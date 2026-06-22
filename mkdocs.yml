@@ -46,6 +46,7 @@ nav:
       - /maigo:address-comments: commands/address-comments.md
       - /maigo:triage-issue: commands/triage-issue.md
       - /maigo:doctor: commands/doctor.md
+      - /maigo:repo-audit: commands/repo-audit.md
   - Skills (source):
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md

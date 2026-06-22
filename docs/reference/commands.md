@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供十二個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十三個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -260,6 +260,29 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 
 → Source: [`commands/triage-issue.md`](../commands/triage-issue.md)
 
+## `/maigo:repo-audit` — repo 自身內部健診
+
+read-only 掃描 repo 積壓狀態：已合併可刪的 branch、未關 PR、程式碼 TODO/FIXME。
+Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklist，不執行任何寫入。
+🌑 Mortis 一句結算。
+
+```
+/maigo:repo-audit
+```
+
+| 資料源 | 指令 | 行動 |
+|--------|------|------|
+| 已合併可刪的 branch | `git branch --merged main` | 列出，不刪除 |
+| 未關 PR | `gh pr list --state open` | 列出，不關閉（`gh` 缺則跳過） |
+| TODO / FIXME 積壓 | `grep -rn -E "TODO\|FIXME"` | 列出，不修改 |
+
+**與 doctor / triage-issue 的差異**：
+`/maigo:doctor` 診斷的是**環境依賴**（gh, git, python 是否可用）；
+`/maigo:triage-issue` 處理的是 **inbound GitHub issue**（maintainer 視角的 triage）；
+`/maigo:repo-audit` 關注的是 **repo 自身的積壓**（branch / PR / TODO 清理）。
+
+→ Source: [`commands/repo-audit.md`](../commands/repo-audit.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -274,6 +297,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | 寫 PR title / description | `/maigo:describe-pr` |
 | 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
 | 批次分類 / 標記 GitHub issue | `/maigo:triage-issue` |
+| 定期清 repo（已合併 branch / 未關 PR / TODO 積壓） | `/maigo:repo-audit` |
 | 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |
