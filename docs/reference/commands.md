@@ -85,7 +85,7 @@ Maigo 提供十三個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 ## `/maigo:review` — Review 既有變更
 
-Anon 不上場，只有 Raana → Tomori → Soyo → Taki：
+Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真人 review 學習慣例：
 
 ```
 /maigo:review https://github.com/org/repo/pull/123    # GitHub PR（需要 gh CLI）
@@ -108,6 +108,8 @@ Anon 不上場，只有 Raana → Tomori → Soyo → Taki：
 | 2 | Tomori | **寫 `.maigo/review-rubric.md`**（不是實作計畫，是 reviewer 對照基準） |
 | 3 | Soyo | 拿 rubric 對 diff 嚴格 review |
 | 4 | Taki | checkout 變更，跑 test / lint / type check |
+| 4.5 | Orchestrator | 裁決 gate——有 findings 才觸發，逐條表態；只有「不適用+理由」才寫記憶 |
+| 5 | Orchestrator | 學習收尾——GitHub PR 有既有 review 才觸發，萃取慣例候選、使用者勾選後寫記憶 |
 
 ### 為什麼需要 rubric
 
@@ -123,6 +125,25 @@ Anon 不上場，只有 Raana → Tomori → Soyo → Taki：
 | 外部 PR（別人的 code） | 方向 + 為什麼；exact code 是 author 的事 |
 
 詳見 `skills/strict-review/SKILL.md` 的 "Adapting per context" 表。
+
+### 裁決校準（§4.5）與 input-not-waiver
+
+report 後裁決 gate 讓使用者逐條表態：採納 / 駁回（一般）/ 標記本 repo 不適用 + 理由。
+**只有「不適用+理由」才寫 type:project 記憶**（路徑：Soyo propose → confirm）——
+純駁回不寫、採納不寫。
+
+寫入的 entry 是 **review item 4 的 input，不是 waiver**：
+不降 must-fix 門檻、不取代 9 項 checklist 任何一項。
+依 `skills/strict-review` 的「Memory is input, not waiver」——「使用者標過不適用」不等於下次自動放行。
+
+### 學習收尾（§5）與 `/maigo:address-comments` 的差異
+
+| 項目 | `/maigo:review` §5 | `/maigo:address-comments` §7 |
+|------|---------------------|-------------------------------|
+| 意見來源 | PR 上既有真人 review | 此次處理的 comments |
+| 有無實作 | 沒有（只讀 GitHub） | 有——逐項走 quick / go / team |
+| 抓取時機 | review 完後 | address-comments 全流程後 |
+| 路徑 | reuse remember 5+6 | reuse remember 5+6 |
 
 ## `/maigo:remember` — 寫入跨專案記憶
 

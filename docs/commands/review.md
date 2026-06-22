@@ -8,7 +8,13 @@ flowchart TD
     ModeCheck -- 否 --> Taki[立希 Taki<br/>checkout + 驗證]
     Skip --> Report([輸出 review report])
     Taki --> Report
-    Report --> ReReview{使用者要 re-review?}
+    Report --> Decide{有 Soyo findings?<br/>裁決 gate}
+    Decide -- 否/沉默/採納/駁回 --> Learn{source 是 GitHub PR<br/>且有既有 review?}
+    Decide -- 有不適用+理由 --> SoyoPropose[Soyo propose<br/>input-not-waiver entry]
+    SoyoPropose --> Learn
+    Learn -- 否 --> ReReview{使用者要 re-review?}
+    Learn -- 是 --> LearnStep[orchestrator 萃取候選<br/>AskUserQuestion 勾選<br/>reuse remember 5+6]
+    LearnStep --> ReReview
     ReReview -- 是 --> Raana
     ReReview -- 否 --> Done([結束])
 
