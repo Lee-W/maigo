@@ -5,6 +5,19 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.27.0 (2026-06-22)
+
+### Feat
+
+- add subagent overload / unavailability handling to failure-handling
+- add /maigo:repo-audit command for repo internal housekeeping
+- add markdown relative-link existence check to validate_plugin
+- add maigo-self-check skill for structure-change verification
+
+### Refactor
+
+- slim strict-review skill via references extraction
+
 ## v0.26.0 (2026-06-18)
 
 ### Feat
