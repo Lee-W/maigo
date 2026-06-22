@@ -437,6 +437,76 @@ def check_doc_link_convention() -> CheckResult:
     return r
 
 
+_FENCED_CODE_RE = re.compile(r"```.*?```", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+
+
+def _strip_code_spans(text: str) -> str:
+    """把 fenced code block 與 inline code span 替換成空白，避免把範例連結誤判。
+
+    fenced code block（``` ... ```）：保留換行符，其餘換空格。
+    inline code span（`...`）：整段換成等長空格（不含換行）。
+    """
+
+    def blank_fenced(m: re.Match) -> str:  # type: ignore[type-arg]
+        return "\n" * m.group(0).count("\n")
+
+    def blank_inline(m: re.Match) -> str:  # type: ignore[type-arg]
+        return " " * len(m.group(0))
+
+    text = _FENCED_CODE_RE.sub(blank_fenced, text)
+    text = _INLINE_CODE_RE.sub(blank_inline, text)
+    return text
+
+
+def check_relative_links() -> CheckResult:
+    """Markdown 相對連結的目標檔必須存在。
+
+    掃描 agents/*.md、commands/*.md、skills/**/*.md、docs/**/*.md 及 repo root *.md。
+    只驗非 http / 非 # 錨點 / 非絕對路徑的相對連結；placeholder 與 glob 樣式跳過。
+    fenced code block 內的連結（範例 / ❌ 反例）一律跳過。
+    """
+    r = CheckResult("markdown 相對連結目標存在")
+    # 不處理 title-attribute 語法 [text](url "title") 與 reference-style links [text][ref]
+    link_re = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+    md_files: set[Path] = set()
+    for pattern in (
+        "agents/*.md",
+        "commands/*.md",
+        "skills/**/*.md",
+        "docs/**/*.md",
+    ):
+        md_files.update(ROOT.glob(pattern))
+    for p in ROOT.glob("*.md"):
+        md_files.add(p)
+
+    for path in sorted(md_files):
+        raw = path.read_text(encoding="utf-8")
+        # 移除 fenced code block 與 inline code span，避免把範例連結誤判為失效連結
+        text = _strip_code_spans(raw)
+        for m in link_re.finditer(text):
+            target = m.group(1).strip()
+            # 跳過 http/https、純錨點、mailto、絕對路徑
+            if "://" in target:
+                continue
+            if target.startswith("#"):
+                continue
+            if target.startswith("mailto:"):
+                continue
+            if target.startswith("/"):
+                continue
+            # 剝掉 #anchor，只留檔案部分
+            file_part = target.split("#", 1)[0].strip()
+            # 跳過 placeholder / glob / 範例（含 <> * 反引號 空白 ... 省略號）
+            if not file_part or re.search(r"[<>*`\s]|\.\.\.", file_part):
+                continue
+            resolved = (path.parent / file_part).resolve()
+            if not resolved.exists():
+                r.fail(f"{path.relative_to(ROOT)} 的連結 '{target}' 指向不存在的路徑")
+    return r
+
+
 def check_skills_graph() -> CheckResult:
     """docs/reference/skills.md 的 mermaid 相依圖必須涵蓋每一個 skill。
 
@@ -477,6 +547,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_agents_docs_alignment,
     check_skills_graph,
     check_doc_link_convention,
+    check_relative_links,
 ]
 
 

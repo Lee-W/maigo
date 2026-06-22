@@ -476,6 +476,79 @@ class TestCheckSkillsGraph:
         assert result.notes
 
 
+class TestCheckRelativeLinks:
+    def _make_md(self, tmp_path: Path, subpath: str, content: str) -> Path:
+        p = tmp_path / subpath
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_existing_relative_link_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._make_md(tmp_path, "docs/foo.md", "hello")
+        self._make_md(tmp_path, "docs/index.md", "[Foo](foo.md)\n")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert result.passed
+
+    def test_nonexistent_relative_link_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._make_md(tmp_path, "docs/index.md", "[Missing](missing.md)\n")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert not result.passed
+        assert any("missing.md" in e for e in result.errors)
+
+    @pytest.mark.parametrize(
+        "link_content",
+        [
+            pytest.param("[Foo](<path/to/file.md>)\n", id="placeholder-angle-bracket"),
+            pytest.param("[Foo](*.md)\n", id="placeholder-glob-star"),
+            pytest.param("[Foo](...)\n", id="placeholder-ellipsis"),
+            pytest.param("[Foo](https://example.com/foo.md)\n", id="http"),
+            pytest.param("[Foo](#section)\n", id="anchor-only"),
+            pytest.param("[Email](mailto:foo@example.com)\n", id="mailto"),
+            pytest.param("[Foo](/docs/foo.md)\n", id="absolute-path"),
+        ],
+    )
+    def test_skip_cases_pass(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, link_content: str
+    ):
+        self._make_md(tmp_path, "docs/index.md", link_content)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert result.passed
+
+    def test_anchor_suffix_stripped_existing_file_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._make_md(tmp_path, "docs/foo.md", "# Section\nhello")
+        self._make_md(tmp_path, "docs/index.md", "[Foo](foo.md#section)\n")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert result.passed
+
+    def test_link_in_fenced_code_block_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        content = "```\n[Missing](missing.md)\n```\n"
+        self._make_md(tmp_path, "docs/index.md", content)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert result.passed
+
+    def test_link_in_inline_code_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        content = "See `[Title](missing.md)` for details.\n"
+        self._make_md(tmp_path, "docs/index.md", content)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_relative_links()
+        assert result.passed
+
+
 # ---------------------------------------------------------------------------
 # main() happy-path integration (M-1)
 # ---------------------------------------------------------------------------
