@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.29.0 (2026-06-23)
+
+### Feat
+
+- **review**: learn conventions from existing reviews and waiver decisions
+
 ## v0.28.0 (2026-06-22)
 
 ### Feat
