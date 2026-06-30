@@ -64,6 +64,7 @@ nav:
       - doc-link-convention: skills/doc-link-convention.md
       - strict-triage: skills/strict-triage.md
       - copyable-deliverable: skills/copyable-deliverable.md
+      - github-reply-draft: skills/github-reply-draft.md
   - Changelog: changelog.md
 
 markdown_extensions:

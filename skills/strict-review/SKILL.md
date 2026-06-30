@@ -157,6 +157,19 @@ details and recipes in `references/design-integrity.md`:
 - **No "experimental" hedge** — answer a lock-in concern with a technical argument or a design fix, not a label.
 - **Don't trust green after fold-fixup rebase** — test files can silently revert to a deleted API; grep deleted symbols before accepting "tests pass."
 
+## Review judgment: when NOT to flag (references)
+
+Five principles for calibrating whether a finding is a real must-fix and how
+much change a comment warrants; details in `references/review-judgment.md`:
+
+- **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
+- **Don't escalate coverage gap to correctness bug** — verify reachability + not-by-design before calling it a bug.
+- **Don't adopt regression framing uncritically** — verify the claim against HEAD; reply-only may be correct.
+- **Proportionality** — COMMENTED nit does not justify a cross-hierarchy refactor; do the minimum proportionate change.
+- **Don't flag squash-before-merge history** — pre-merge commit count / fixups vanish on merge; flag content violations, not history shape.
+
+Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
+
 ## What this skill does NOT cover
 
 - Writing or editing code (reviewer has read-only tools)

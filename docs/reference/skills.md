@@ -48,6 +48,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
 | [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
+| [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
 
 ## Skill 相依圖
 
@@ -95,6 +96,7 @@ graph LR
         airflow_aware["airflow-aware"]
         commitizen_aware["commitizen-aware"]
         maigo_self_check["maigo-self-check"]
+        github_reply_draft["github-reply-draft"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -124,6 +126,8 @@ graph LR
     triage --> strict_triage
     triage --> copyable
     address --> failure_handling
+    address --> github_reply_draft
+    review --> github_reply_draft
     crystallize --> memory_loading
     crystallize --> failure_handling
     crystallize --> doc_link
