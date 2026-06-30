@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.31.0 (2026-06-30)
+
+### Feat
+
+- **skills**: graduate three recurring conventions into existing skills
+
 ## v0.30.0 (2026-06-30)
 
 ### Feat
