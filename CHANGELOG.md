@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.30.0 (2026-06-30)
+
+### Feat
+
+- add github-reply-draft skill and review-judgment refinements
+
 ## v0.29.0 (2026-06-23)
 
 ### Feat
