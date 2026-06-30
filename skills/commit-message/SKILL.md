@@ -92,6 +92,7 @@ When the caller **presents the commit message to the user** as a deliverable (ra
 ## Trailers
 
 - **No `Co-Authored-By` trailer.** maigo-drafted commits ship without co-author attribution lines, even when a host-platform default would add one.
+- **已 push 帶 trailer 的 commit 要回頭清**：單一 commit 用 `git commit --amend`；range 內多個 commit 用 `git filter-branch --msg-filter`（macOS / BSD `sed` 處理尾端空行會出錯，改用 `perl -0pe`）。清完用 `--force-with-lease` push，並驗 tree 內容不變、刪掉 `refs/original` 備份。
 
 ## What this skill does NOT cover
 

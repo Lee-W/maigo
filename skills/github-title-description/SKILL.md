@@ -145,6 +145,10 @@ reference docs go stale silently; use `gh pr view`, `git show HEAD:<path>`, or
 `gh pr diff <n>` to confirm. Details and a per-claim-type recipe in
 `references/verification-discipline.md`.
 
+## No AI attribution
+
+PR body 不加任何 AI / Claude 署名——不寫「🤖 Generated with Claude Code」之類字句，即使 host 工具 / 平台預設會塞。與 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的 Trailers 段同精神（commit 不加 `Co-Authored-By`）：產出對外保持中性、不留 AI 痕跡。
+
 ## What this skill does NOT cover
 
 - 開 PR（這是 caller / 使用者 的 `gh pr create` 或 GitHub UI）
