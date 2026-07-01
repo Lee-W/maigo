@@ -147,6 +147,22 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
 - **不要框框式區段分隔註解** — `# ----` / `# --- 區段名 ---` 全刪含 label，靠函式邊界與空行分段。
 - **Concurrent PR 根本修法優先** — 有 SDK 層根本修法時肯定當前解但明確指向根本修法，說明 supersede 關係。
   Details: `references/recurring-patterns.md`.
+- **Naming: by what it is, not its first caller's use case** — a name coupled to one caller's context misleads and blocks reuse; generalize it.
+- **Naming: private helper name carries the domain noun** — behavioral qualifiers ("once", "dedup") go in the docstring, not the name.
+
+## Test conventions (references)
+
+Seven test-writing / test-review patterns for mock assertions, sequence
+coverage, boundary pairing, and forced-churn discipline; details and worked
+examples in `references/test-conventions.md`:
+
+- **Mock assertions** — prefer `m.method.mock_calls == [mock.call(...)]` over `assert_called_once_with`.
+- **Full-sequence assertions** — assert the whole iterable/list, not head+tail+length.
+- **Cap-boundary pairs** — a numeric cap needs both an at-cap (allowed) and one-over-cap (trips) test.
+- **No thin test helpers** — assert only the field the function under test decides; skip one-use wrapper helpers.
+- **Minimize forced test churn** — keep an existing test's diff to the forced minimum; add a new test for new behavior.
+- **Build the fixture, don't defer** — a missing example fixture is not "can't test"; build the smallest purpose-built one.
+- **Log assertion when the log IS the observable** — Airflow's "no caplog" rule is about scraping vs. checking logic, not a ban on asserting an operator-visibility log call via a mocked logger.
 
 ## Design integrity checks (references)
 
@@ -159,7 +175,7 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag (references)
 
-Five principles for calibrating whether a finding is a real must-fix and how
+Eight principles for calibrating whether a finding is a real must-fix and how
 much change a comment warrants; details in `references/review-judgment.md`:
 
 - **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
@@ -167,6 +183,9 @@ much change a comment warrants; details in `references/review-judgment.md`:
 - **Don't adopt regression framing uncritically** — verify the claim against HEAD; reply-only may be correct.
 - **Proportionality** — COMMENTED nit does not justify a cross-hierarchy refactor; do the minimum proportionate change.
 - **Don't flag squash-before-merge history** — pre-merge commit count / fixups vanish on merge; flag content violations, not history shape.
+- **Prove a security/authz guard is load-bearing by removing it** — delete the guard, run the security test, confirm the flip, then restore.
+- **Ground scope claims in the actual checker** — run the linter/hook and quote its output; never extrapolate a count from a raw grep.
+- **A "minimize changes" instruction never licenses keeping a disproven fact** — fix the wrong token, keep the rest minimal.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

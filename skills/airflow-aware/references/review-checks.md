@@ -78,6 +78,39 @@ file in the diff. Missing → flag as **Request changes** (not Block).
 **Do not** require newsfragments for changes under `providers/` or `airflow-ctl/`
 — their release managers regenerate the changelog from `git log`.
 
+## Don't proliferate example Dags — fold into an existing one
+
+When a PR demonstrates a new trigger / operator / scheduling pattern,
+**extend an existing example Dag** (more watchers / more tasks / more
+schedule entries in the same Dag) instead of adding new Dag files or new
+`with DAG(...)` blocks in the same file. Airflow's "Examples Refurbish"
+effort actively tries to reduce the total number of example Dags; adding new
+ones works against that, even when the new Dag is scoped tightly to the
+feature.
+
+How to apply:
+
+- For an opt-in feature on an existing class (e.g. a new trigger variant),
+  keep the same example Dag id and same `with DAG(...)` block; add
+  additional `Asset` / `AssetWatcher` / trigger instances alongside the
+  original ones. A single Dag scheduled by `[asset_old, asset_new1,
+  asset_new2]` fires on any.
+- Update the file's module docstring to explain both patterns in one place.
+- Update any doc references (e.g. `event-scheduling.rst`) to point at the
+  single consolidated example, not "alongside the X case".
+- Only add a brand-new example file when the feature genuinely cannot be
+  shown alongside an existing example — and even then, confirm first.
+
+**When NOT to flag in review:** only raise this when the new Dag is
+**clearly duplicative** of an existing demo. Skip it when the new feature's
+semantics make folding impossible — e.g. a fan-out (1→N) pattern needs a
+coarser-cadence producer than any existing hourly producer, so it cannot be
+attached as a watcher to existing rollup (N→1) examples. If the only way to
+fold would break existing example semantics or produce a degenerate demo
+(e.g. an identity fan-out), do not list it even as a nit. Most reviewers
+don't care about that level of consolidation when folding would force a
+worse demo.
+
 ## uv.lock drift diagnostic (extended recipe)
 
 The SKILL.md §3 covers the summary. Use this section when you need the full

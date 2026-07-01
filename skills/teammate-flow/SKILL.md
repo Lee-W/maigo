@@ -64,6 +64,10 @@ draft 必須採 CC 格式（`type(scope): subject`）。
 
 **不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
 
+若使用者或後續步驟確實要跑 git 操作（stage / amend / 診斷 diff 大小），
+依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
+的 staging（不用 `git add -A`）、不 `cd`、unreleased commit 的 amend 慣例。
+
 ### `/maigo:go` vs `/maigo:team` — 選哪個
 
 兩個命令的 review 嚴格度一模一樣（🟡 爽世完整 9 項 + 🟣 立希）；差別只在 §5 之後：

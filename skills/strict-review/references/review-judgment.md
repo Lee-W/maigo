@@ -94,3 +94,68 @@ These are pre-merge artefacts that vanish on merge.
 - Commit messages that contain content violations (e.g. a forbidden
   `Co-Authored-By: <agent>` line, or a body that misstates the scope of the
   change) — these are content problems, not history shape problems.
+
+---
+
+## 6. Prove a security/authz guard is load-bearing by removing it
+
+When pushing back on a reviewer's "this code path isn't hit / this is dead
+code" comment about a security or authorization guard, prove the guard is
+load-bearing empirically — temporarily delete it, run the relevant security
+test, confirm the result flips (e.g. `403` → `200`), then restore the guard.
+
+A static argument ("removing this makes an empty-list check vacuously true,
+so it's a bypass") is persuasive but not as convincing as demonstrating it.
+The reply should carry "verified: removing it flips
+`test_unauthorized_returns_403` to 200" instead of a chain of asserted
+call-graph behavior.
+
+How to apply: edit out the guard, run the authz/security test, observe the
+flip, then restore the guard (e.g. `git checkout HEAD -- <file>`). This
+extends the "verify empirically" instinct from DB/library WHY-claims to
+authorization defenses specifically — and it's also how to avoid adopting a
+reviewer's framing unchecked (see §3 above): demonstrate, don't just argue.
+
+---
+
+## 7. Ground scope claims ("N other similar issues exist") in the actual checker
+
+Before claiming "there are N other similar issues" in a fix or PR summary,
+run the actual checker (linter, type-checker, custom hook) and quote its
+output. Never extrapolate a countable scope claim from a raw `grep` pattern.
+
+A `grep` for a superficial pattern (e.g. a config key name) can massively
+over- or under-count real violations if the actual checker has narrower
+semantics (e.g. it only walks a specific AST node type, or only applies
+under a specific decorator). The actual tool defines what counts as a
+violation — a grep pattern is only a hint.
+
+How to apply:
+
+- If a checker exists for the issue → run it and quote its output verbatim.
+- If no checker exists → state explicitly "based on grep, may include false
+  positives" rather than presenting the count as authoritative.
+- Applies to `/maigo:fix` summaries, `/maigo:review` findings, and PR
+  descriptions — anywhere a countable scope claim is made.
+
+---
+
+## 8. A "minimize changes" instruction never licenses keeping a disproven fact
+
+When something has been empirically verified (e.g. via checking release tags
+that a symbol was introduced in a specific version, absent from every prior
+release), a later "don't change existing content too much" instruction — or
+even the user's own earlier assertion to the contrary — does not justify
+preserving the wrong wording.
+
+Minimal-diff discipline and deference to the user's framing are about *style
+and scope*, not *truth*. Burying an established fact to shrink a diff, or to
+match a stated preference, just forces a re-correction later and erodes
+trust in the verification step.
+
+How to apply: when a minimize-changes constraint collides with something
+already verified to be wrong, change exactly the incorrect token and nothing
+else, and add one line explaining why that single change is non-negotiable.
+Don't silently conform to someone's framing when the evidence contradicts
+it — surface the conflict instead of hiding it inside a "kept it minimal"
+diff.

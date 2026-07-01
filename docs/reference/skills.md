@@ -49,6 +49,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
 | [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
 | [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
+| [`git-workflow`](../skills/git-workflow.md) | — (orchestrator 直跑) | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:address-comments`（commit-assembly 步驟） | Git commit 組裝慣例：明確 stage 檔案（不用 `-A`）、不 `cd`（用絕對路徑 / `git -C`）、unreleased commit 的 polish 用 amend（含 tangled-hunk 例外）、CI 分支上修 CI 失敗、對正確 baseline（merge target）量 diff 大小 |
 
 ## Skill 相依圖
 
@@ -97,6 +98,7 @@ graph LR
         commitizen_aware["commitizen-aware"]
         maigo_self_check["maigo-self-check"]
         github_reply_draft["github-reply-draft"]
+        git_workflow["git-workflow"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -110,6 +112,10 @@ graph LR
     teammate_flow --> commit_message
     teammate_flow --> failure_handling
     teammate_flow --> memory_propose
+    teammate_flow --> git_workflow
+    quick --> git_workflow
+    address --> git_workflow
+    git_workflow --> commit_message
 
     go --> strict_review
     team --> strict_review

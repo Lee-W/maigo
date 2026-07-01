@@ -65,6 +65,7 @@ nav:
       - strict-triage: skills/strict-triage.md
       - copyable-deliverable: skills/copyable-deliverable.md
       - github-reply-draft: skills/github-reply-draft.md
+      - git-workflow: skills/git-workflow.md
   - Changelog: changelog.md
 
 markdown_extensions:

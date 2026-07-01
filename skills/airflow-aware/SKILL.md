@@ -111,6 +111,11 @@ section of `references/review-checks.md`.
 These are extracted from the "Coding rules" section of `AGENTS.md`. They are listed here
 because they are the conventions agents most frequently overlook.
 
+For the extended recipes on import placement (top-level vs `TYPE_CHECKING` vs
+lazy), class-docstring `:param` conventions, user-facing docstring wording,
+and the "no `logical_date` in Airflow 3 examples" authoring rule, read
+`references/code-style.md`.
+
 - **No `assert` in production code** — use a real exception (e.g., `ValueError`, `RuntimeError`).
 - **Do not add new `raise AirflowException`** — use a more specific exception class instead.
 - **`session` parameter must be keyword-only** and the callee must not call `session.commit()`;

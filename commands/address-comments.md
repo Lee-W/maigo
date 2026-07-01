@@ -182,7 +182,8 @@ C3  [conversation]  @reviewer
   - **各自獨立 commit（預設）**：直接用 inner route 草擬的 commit message 落地（本 repo 偵測為 CC，subject 為 `type(scope): ...`）。
   - **fixup! commit（使用者在步驟 4 選擇）**：subject 改為 `fixup! <原 PR 主題>`，讓 `git rebase --autosquash` 接得起來。
 
-  **仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。
+  **仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。落地時的 staging（明確列檔、不用 `git add -A`）、
+  不 `cd`（用絕對路徑 / `git -C`）依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)。
 
 ### 6. Finale
 

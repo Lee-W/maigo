@@ -53,3 +53,46 @@ promotion is the discipline; do not broadcast the whole hierarchy.
 類別，取代手動 URL path 拼接），而當前 PR 只在 test / workaround 層修症狀時——在 comment
 裡肯定當前解法「not wrong」，但明確指向 SDK 層的根本修法，說明後者 ready 後當前 PR 會被
 supersede。傾向推薦架構層解法而非繞路補丁。
+
+---
+
+## Naming: name by what it is, not by its first caller's use case
+
+Flag a name that encodes the calling context rather than the operation it
+performs. Name a function/method/variable by what it **intrinsically does**,
+not by the use case of its first/current caller.
+
+Example: a helper named after a domain-specific use case (e.g. something
+read as partition-specific) may in fact compute a generic operation (e.g.
+"calendar day + timetable timezone → UTC instant") that only touched that
+domain because its first caller happened to compare the result against a
+domain value. An over-coupled name misleads the next reader, blocks reuse,
+and pretends the abstraction is narrower than it actually is (it can also
+provoke a wrong placement debate — "why does the base class have this
+narrow concept?" — when the real issue is just the name).
+
+How to apply: before accepting a name, ask "what does this compute,
+independent of who calls it?" If the name only makes sense given one caller,
+flag it for a rename to the general operation. Verb-first naming
+(`resolve_`, `compute_`, `get_`, `build_`, `find_`, `extract_`) generally
+reads better once decoupled from the specific caller.
+
+## Naming: a private helper's name must carry the domain noun
+
+Flag a private helper name built from an adjective/adverb pair with no
+object — it forces the reader to guess the subject. A name like
+`_warn_unreachable_once` drops *what* is unreachable; `_warn_unreachable_asset_partition`
+carries the domain noun (asset partition) the helper actually acts on.
+
+Push behavioral/implementation qualifiers like "once" / "deduplicated" into
+the docstring rather than the name, and align the name with sibling methods
+in the same class (e.g. match an established `_resolve_asset_partition_status`
+phrasing pattern).
+
+How to apply: when naming (or reviewing the name of) a private helper, ask
+"what does it act *on*?" and put that noun in the name; check sibling
+methods for the established noun phrasing and match it. Keep dedup /
+idempotency / "once" notes for the docstring. This complements the "name by
+what it is, not its use case" pattern above — that one warns against
+coupling a name to its first caller; this one warns against dropping the
+domain object and leaving only a behavioral qualifier.
