@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供十三個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十四個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -51,7 +51,9 @@ Maigo 提供十三個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 ## `/maigo:doctor` — 環境與配置診斷
 
-檢查外部依賴（gh, python, git）、記憶層目錄、以及當前專案的 Taki (Verifier) 是否能正確跑起測試。
+檢查外部依賴（gh, python, git）、記憶層目錄、當前專案的 Taki (Verifier) 是否能正確跑起測試，
+以及 retry / failure log 統計（`.maigo/soyo-must-fix.jsonl` / `.maigo/test-failures.jsonl`
+各 key 觸發次數 + 最近 3 筆，read-only）。
 
 ```
 /maigo:doctor
@@ -282,9 +284,28 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 
 → Source: [`commands/triage-issue.md`](../commands/triage-issue.md)
 
+## `/maigo:take-issue` — 把 READY issue 接進實作
+
+接住 `/maigo:triage-issue` 判定 READY 之後斷掉的那一段：orchestrator 前置抓 issue
+body/comments，萃取 acceptance criteria，交給標準 teammate-flow（🐱 樂奈探索 → 🩵 燈寫
+plan，須引用 issue 編號與 acceptance criteria → 🎀 愛音實作 → 🟡 爽世 review → 🟣 立希驗證）。
+
+```
+/maigo:take-issue <issue 編號或 URL>
+```
+
+| 步驟 | 誰 | 做什麼 |
+|------|-----|--------|
+| 1 | Orchestrator | `gh issue view` 抓 body/comments，萃取需求敘述；不是 READY 形狀就建議先 triage |
+| 2-6 | teammate-flow | 依 [`skills/teammate-flow`](../skills/teammate-flow.md) 標準五段 |
+| 7 | Orchestrator | 草擬帶 issue 參照的 commit，不自動 push / 開 PR |
+
+→ Source: [`commands/take-issue.md`](../commands/take-issue.md)
+
 ## `/maigo:repo-audit` — repo 自身內部健診
 
-read-only 掃描 repo 積壓狀態：已合併可刪的 branch、未關 PR、程式碼 TODO/FIXME。
+read-only 掃描 repo 積壓狀態：已合併可刪的 branch、未關 PR、程式碼 TODO/FIXME、
+skill 健診（孤兒 / 重疊候選 / 指向失效）。
 Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklist，不執行任何寫入。
 🌑 Mortis 一句結算。
 
@@ -297,6 +318,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 | 已合併可刪的 branch | `git branch --merged main` | 列出，不刪除 |
 | 未關 PR | `gh pr list --state open` | 列出，不關閉（`gh` 缺則跳過） |
 | TODO / FIXME 積壓 | `grep -rn -E "TODO\|FIXME"` | 列出，不修改 |
+| Skill 健診（孤兒 / 重疊 / 指向失效） | 讀 `skills/*/SKILL.md` + grep | 列出，不合併、不刪除 |
 
 **與 doctor / triage-issue 的差異**：
 `/maigo:doctor` 診斷的是**環境依賴**（gh, git, python 是否可用）；
@@ -319,7 +341,8 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 | 寫 PR title / description | `/maigo:describe-pr` |
 | 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
 | 批次分類 / 標記 GitHub issue | `/maigo:triage-issue` |
-| 定期清 repo（已合併 branch / 未關 PR / TODO 積壓） | `/maigo:repo-audit` |
+| 把 triage 判定 READY 的 issue 接進實作 | `/maigo:take-issue` |
+| 定期清 repo（已合併 branch / 未關 PR / TODO 積壓 / skill 健診） | `/maigo:repo-audit` |
 | 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |

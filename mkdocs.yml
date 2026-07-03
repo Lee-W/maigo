@@ -45,6 +45,7 @@ nav:
       - /maigo:describe-pr: commands/describe-pr.md
       - /maigo:address-comments: commands/address-comments.md
       - /maigo:triage-issue: commands/triage-issue.md
+      - /maigo:take-issue: commands/take-issue.md
       - /maigo:doctor: commands/doctor.md
       - /maigo:repo-audit: commands/repo-audit.md
   - Skills (source):
