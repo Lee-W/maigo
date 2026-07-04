@@ -5,6 +5,19 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.33.0 (2026-07-04)
+
+### Feat
+
+- **validation**: enforce attributed command dialogue
+- **doctor**: report retry / failure statistics from .maigo hook logs
+- **commands**: add /maigo:take-issue to bridge triage verdicts into implementation
+- **repo-audit**: add skill health-check data source (orphans / overlaps / dead pointers)
+
+### Refactor
+
+- **commands**: slim review, address-comments, crystallize via references extraction
+
 ## v0.32.0 (2026-07-01)
 
 ### Feat
