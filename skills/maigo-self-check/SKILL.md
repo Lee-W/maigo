@@ -47,8 +47,14 @@ uv run mkdocs build --strict
 | mermaid 相依圖缺 skill 節點 | `validate_plugin.py` |
 | 相對 link 在 include-markdown rewrite 後炸 strict-mode | `mkdocs build --strict` |
 | docs nav 指到不存在的 page | `mkdocs build --strict` |
+| command 檔缺「掛名」角色台詞（引號旁邊沒有角色 emoji / 名字） | `validate_plugin.py` |
 
 pytest 測的是 Python 行為；上述問題都在 plugin 結構層——pytest 對它們是盲的。
+
+新增 / 改 `commands/*.md` 時，至少保留一段**掛名**角色台詞（MyGO!!!!! 濃度慣例）——單純
+「有「」引號」不算數，旁邊要看得到角色 emoji / 名字（或是 `> 「...」` blockquote 標題引言），
+不能只是 UI/error 訊息引號。機器兜底由 `validate_plugin.py` 的
+`check_command_persona_quotes` 檢查，不必自己記著掃。
 
 ## 兩條都必須綠才算完成
 

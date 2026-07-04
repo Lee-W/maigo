@@ -34,9 +34,10 @@ body + comments 整理成需求敘述：acceptance criteria 從 body 與 maintai
 ### 2. Teammate flow
 
 依 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)
-走完整流程——🐱 樂奈探索（帶著步驟 1 的 issue context）→ 🩵 燈寫 plan（**必須引用 issue 編號
-與萃取出的 acceptance criteria**）→ 使用者確認 → 🎀 愛音實作 → 🟡 爽世完整 9 項 review →
-🟣 立希驗證。流程細節不在此重抄。
+走完整流程——🐱 樂奈探索（帶著步驟 1 的 issue context，「看完了。相關的在這三個檔案。」）→
+🩵 燈寫 plan（**必須引用 issue 編號與萃取出的 acceptance criteria**，「……讓我先理清楚它想
+做什麼。」）→ 使用者確認 → 🎀 愛音實作 → 🟡 爽世完整 9 項 review → 🟣 立希驗證。流程細節
+不在此重抄。
 
 ### 3. 收尾
 

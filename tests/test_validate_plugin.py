@@ -189,6 +189,119 @@ class TestCheckAgentFrontmatter:
 
 
 # ---------------------------------------------------------------------------
+# check_command_persona_quotes
+# ---------------------------------------------------------------------------
+
+
+class TestCheckCommandPersonaQuotes:
+    def test_commands_dir_missing_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert result.passed
+        assert any("不存在" in n for n in result.notes)
+
+    def test_missing_quote_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n# bar\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert not result.passed
+        assert any("bar.md" in e for e in result.errors)
+
+    def test_quote_without_persona_marker_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """引號存在但旁邊沒有角色 emoji / 名字（如純 UI/error 訊息）——必須擋下。"""
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+            "# bar\n\n不存在 / 空 → 印友善訊息：「目前無跨專案記憶。」並結束。\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert not result.passed
+        assert any("bar.md" in e for e in result.errors)
+
+    def test_quote_present_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_command_file(tmp_path, "bar")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert result.passed
+
+    def test_blockquote_epigraph_without_attribution_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """go.md 樣式：`> 「...」` blockquote epigraph，即使沒有 —— <emoji> 附加歸屬也算數。"""
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+            "# bar\n\n> 「測試台詞。」\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert result.passed
+
+    def test_marker_on_preceding_line_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """repo-audit.md 樣式：角色 emoji 在緊鄰的前一個非空白行，隔了一個 code fence。"""
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+            "# bar\n\n```\n🌑 Mortis：<結算句>\n```\n\n- 全乾淨：「這次是乾淨的。就這樣。」\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert result.passed
+
+    def test_multiline_quote_with_marker_on_preceding_line_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """crystallize.md:30-31 樣式：引號跨行收尾，掛名 marker 在前一個非空白行（regression）。"""
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+            "# bar\n\n的輕量模式（愛音實作 + 輕量 🟡 爽世 4 項 review）。\n\n"
+            "為什麼這樣切：這是「跨行台詞範例\n延續到下一行才收尾。」也是這樣。\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert result.passed
+
+    def test_unterminated_quote_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """只有開口沒收尾的殘缺引號——即使旁邊掛了角色 emoji，也不能算數。"""
+        cmds_dir = tmp_path / "commands"
+        cmds_dir.mkdir()
+        (cmds_dir / "bar.md").write_text(
+            "---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+            "# bar\n\n🎀 愛音：「這句沒有結尾\n\n下一段是別的內容，跟這句引號無關。\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_command_persona_quotes()
+        assert not result.passed
+        assert any("bar.md" in e for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
 # check_hook_scripts
 # ---------------------------------------------------------------------------
 

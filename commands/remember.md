@@ -93,6 +93,8 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
 
    d. 回報使用者：寫了哪兩個檔、type、name、slug
 
+   e. 收場一句：`🌙 Doloris：「<name>」，願它留在該留的地方——這次，不會被遺忘。`
+
 ## 失敗 / 中斷處理（rollback 規則）
 
 - **使用者在 AskUserQuestion 階段打斷 / 取消**（包含第四題 triggered skills 詢問階段）：不寫任何檔（包含 MEMORY.md）；回報「未寫入，已取消」。

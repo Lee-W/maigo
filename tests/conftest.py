@@ -91,15 +91,19 @@ def make_docs_agent_shim(tmp_path: Path, name: str = "foo") -> Path:
 def make_command_file(tmp_path: Path, name: str = "bar") -> Path:
     """Write a minimal valid command markdown file to tmp_path/commands/<name>.md.
 
-    Minimal valid structure: frontmatter with description field, plus the
-    mkdocs-include-start marker required by check_commands_docs_alignment.
+    Minimal valid structure: frontmatter with description field, the
+    mkdocs-include-start marker required by check_commands_docs_alignment,
+    plus a 🎀-prefixed 「」 persona-quote line required by
+    check_command_persona_quotes (the emoji must precede the quote on the
+    same line — a bare 「」 quote with no adjacent persona marker fails).
     Returns the path to the created file.
     """
     cmds_dir = tmp_path / "commands"
     cmds_dir.mkdir(exist_ok=True)
     p = cmds_dir / f"{name}.md"
     p.write_text(
-        f"---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n# {name}\n",
+        f"---\ndescription: test command\n---\n\n<!-- mkdocs-include-start -->\n\n"
+        f"# {name}\n\n🎀 愛音：「測試台詞。」\n",
         encoding="utf-8",
     )
     return p

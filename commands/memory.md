@@ -43,6 +43,8 @@ allowed-tools: Read, Bash(cat:*), Bash(ls:*), Bash(test:*)
 
 6. table 末尾印一行 footer：「共 N 筆。詳全文：`cat ~/.config/maigo/memory/<slug>.md`」
 
+7. 收場一句：`🌑 Mortis：「共 N 筆」。你手上的，就這些了。`（N 帶入實際筆數）
+
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。

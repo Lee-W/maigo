@@ -187,6 +187,72 @@ def check_command_frontmatter() -> CheckResult:
     return r
 
 
+_PERSONA_MARKER_RE = re.compile(
+    r"🐱|🩵|🎀|🟡|🟣|🌙|🌑|樂奈|Raana|Tomori|愛音|Anon|爽世|Soyo|立希|Taki|Doloris|Mortis|燈"
+)
+_BLOCKQUOTE_EPIGRAPH_RE = re.compile(r"^> 「[^「」]+」", re.MULTILINE)
+# 用整份文件掃出「真的有收尾」的引號 span（[^「」]+ 允許跨行，如 crystallize.md:30-31 的
+# 跨行台詞），而不是逐行看「有沒有 `「` 這個字」——後者會誤放行「只有開口沒收尾」的殘缺引號。
+_QUOTE_SPAN_RE = re.compile(r"「[^「」]+」")
+
+
+def _quote_is_persona_attributed(text: str, lines: list[str], match: re.Match) -> bool:
+    """這段（已確認收尾的）引號是否掛名——同行引號開口前，或緊鄰的前一個非空白 / 非 fence 分隔行。"""
+    offset = match.start()
+    line_index = text.count("\n", 0, offset)
+    line_start = text.rfind("\n", 0, offset) + 1
+    col = offset - line_start
+    line = lines[line_index]
+    if _PERSONA_MARKER_RE.search(line[:col]):
+        return True
+    j = line_index - 1
+    while j >= 0 and lines[j].strip() in ("", "```"):
+        j -= 1
+    return j >= 0 and bool(_PERSONA_MARKER_RE.search(lines[j]))
+
+
+def check_command_persona_quotes() -> CheckResult:
+    """每個 commands/*.md 至少一段「掛名」且「有收尾」的「」角色台詞（MyGO!!!!! 濃度慣例）。
+
+    「有收尾」＝ 用整份文件的字元 offset 比對 `「[^「」]+」`（非空、可跨行），只有開口
+    `「` 沒有對應 `」` 的殘缺引號不算數。
+
+    「掛名」＝ 同一行「」引號開口前，或緊鄰的前一個非空白 / 非 code-fence 分隔行，看得到
+    角色 emoji 或名字；或整段是 `> 「...」` 形式的 blockquote 標題引言（epigraph，如
+    `doctor.md` / `go.md`）。
+
+    這只是「引號附近找得到角色線索」的機械判斷，不是完整語意驗證真的是角色開口說的話——
+    純 UI/error 訊息引號、旁邊完全沒有角色 emoji / 名字的（如 `memory.md` 印的友善提示
+    文案）不算數，會被擋下。
+
+    已知殘餘缺口（非本次擋下範圍，先記著）：`address-comments.md` / `crystallize.md` /
+    `triage-issue.md` 目前是靠引號附近**巧合**提到角色名通過（例如順帶提到「Soyo」但那段
+    引號其實是技術名詞，不是角色開口說的話），不是真的有掛名台詞——之後動這幾個檔時留意
+    別刪掉那個巧合來源，最好找機會補一句真台詞。
+    """
+    r = CheckResult("commands/*.md 至少一段掛名角色「」台詞")
+    cmds_dir = ROOT / "commands"
+    if not cmds_dir.is_dir():
+        r.note("commands/ 目錄不存在，跳過")
+        return r
+    for path in sorted(cmds_dir.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        if _BLOCKQUOTE_EPIGRAPH_RE.search(text):
+            continue
+        lines = text.split("\n")
+        if any(
+            _quote_is_persona_attributed(text, lines, m)
+            for m in _QUOTE_SPAN_RE.finditer(text)
+        ):
+            continue
+        r.fail(
+            f"{path.relative_to(ROOT)}: 缺掛名角色台詞——「」引號旁邊看不到角色 emoji / "
+            "名字（也沒有 blockquote epigraph），或引號沒有收尾。MyGO!!!!! 濃度慣例要求"
+            "台詞要掛名且完整，不能只是 UI/error 訊息引號"
+        )
+    return r
+
+
 def check_skill_frontmatter() -> CheckResult:
     r = CheckResult("skills/*/SKILL.md frontmatter")
     skills_dir = ROOT / "skills"
@@ -620,6 +686,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_hooks_schema,
     check_agent_frontmatter,
     check_command_frontmatter,
+    check_command_persona_quotes,
     check_skill_frontmatter,
     check_hook_scripts,
     check_pre_commit_config,
