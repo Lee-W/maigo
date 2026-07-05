@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.34.0 (2026-07-05)
+
+### Feat
+
+- **agents**: retier Raana to sonnet and Taki to haiku
+
 ## v0.33.0 (2026-07-04)
 
 ### Feat
