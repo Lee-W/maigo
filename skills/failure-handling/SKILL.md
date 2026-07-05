@@ -1,6 +1,6 @@
 ---
 name: failure-handling
-description: This skill should be used when handling failures in go-class command flows — Soyo blocking with NEEDS_CHANGES / BLOCKED, Taki test failures, subagent infrastructure overload / unavailability (e.g. 529), and infinite-loop protection for repeated same must-fix or same test ID. Applies to /maigo:go, /maigo:quick, /maigo:team, and /maigo:address-comments step 5.
+description: This skill should be used when handling failures in go-class command flows — Soyo blocking with NEEDS_CHANGES / BLOCKED, Taki test failures, subagent infrastructure overload / unavailability (e.g. 529), mid-task usage/session-limit interruption of a running subagent, and infinite-loop protection for repeated same must-fix or same test ID. Applies to /maigo:go, /maigo:quick, /maigo:team, and /maigo:address-comments step 5.
 ---
 
 <!-- mkdocs-include-start -->
@@ -37,6 +37,15 @@ description: This skill should be used when handling failures in go-class comman
 4. **infra 恢復後，讓真人 agent 補跑一次複核**——代打有真實盲點（代打者對該 repo 的慣例未必熟，且審/驗自己的產出獨立性弱）。基礎設施恢復可 spawn 時，對代打過的 stage 補跑真正的 agent 一輪；真人 agent 揪出代打漏掉的問題是常態，不是例外。
 
 **不能做**：因 subagent 撞 529 就**跳過**該 stage（跳過 review / 跳過驗證）。過載是基礎設施問題，不是放行理由——要嘛代打、要嘛等，不能省。
+
+### Subagent 中途撞 usage / session limit
+
+與 529 不同：529 是啟動失敗，這是**跑到一半被切斷**——subagent 可能已完成部分工作（working tree 留有半成品），回傳卻只有一句 limit 訊息（含重置時間）。
+
+1. **不要開新 agent 從頭重做**——半成品會跟新一輪工作糾纏，已完成的部分也白費。
+2. Limit 重置後，**用 SendMessage 續跑同一個 agent**——transcript context 還在，任務背景不用重講。
+3. 續跑指令必須要求**先盤點再續作**：`git status` + 檢視目標檔案，逐項判斷任務做到哪，只補缺的。盤點常發現工作其實已全部完成（切斷發生在回報前）——此時直接進驗證，避免重工。
+4. 盤點與續作完成後照常走原流程——review / 驗證不因中斷打折。
 
 ### 無限迴圈防護
 
