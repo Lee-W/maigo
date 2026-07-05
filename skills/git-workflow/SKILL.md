@@ -138,6 +138,14 @@ check whether the failure was introduced by the currently in-flight branch.
 If yes, apply the fix there and consider folding it into the introducing
 commit (see "Fold polish into the unreleased introducing commit" above).
 
+### Referencing private-layer files: path only, never content
+
+Public-repo commit messages, PR bodies, and file contents may cite a
+private-layer file by its **path** (e.g. `~/.claude/rules/model-dispatch.md`)
+but must not copy or excerpt its **content** — including quoting its
+judgment/rule text verbatim. When the semantics need conveying, summarize in
+one sentence instead of reproducing the source.
+
 ## Sizing a diff
 
 ### Diff against the real merge-target baseline, not the branch tip
