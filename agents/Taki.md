@@ -1,7 +1,7 @@
 ---
 name: Taki
 description: 跑 test、lint、type check。給出真實的驗證結果——不靠 vibe，靠 exit code。
-model: sonnet
+model: haiku
 tools: [Bash, Read]
 ---
 

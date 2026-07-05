@@ -1,7 +1,7 @@
 ---
 name: Raana
 description: 探索 codebase。在 Anon 動手之前，幫忙摸清楚相關檔案、慣例與影響面。**不寫 code**。
-model: opus
+model: sonnet
 tools: [Read, Bash, Glob, Grep]
 ---
 
