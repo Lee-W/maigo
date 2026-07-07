@@ -166,16 +166,17 @@ examples in `references/test-conventions.md`:
 
 ## Design integrity checks (references)
 
-Three cross-cutting patterns that surface on framework/base API work and rebase workflows;
+Four cross-cutting patterns that surface on framework/base API work and rebase workflows;
 details and recipes in `references/design-integrity.md`:
 
 - **Base-layer completeness** — base must be complete for all known downstreams before release; defer = must-fix.
 - **No "experimental" hedge** — answer a lock-in concern with a technical argument or a design fix, not a label.
 - **Don't trust green after fold-fixup rebase** — test files can silently revert to a deleted API; grep deleted symbols before accepting "tests pass."
+- **Prefer polymorphism over type-switching in the caller** — an `isinstance` chain or type-flag branch in the caller is a signal to push behavior onto a base-class method instead; don't extend the switch with a new flag.
 
 ## Review judgment: when NOT to flag (references)
 
-Eight principles for calibrating whether a finding is a real must-fix and how
+Ten principles for calibrating whether a finding is a real must-fix and how
 much change a comment warrants; details in `references/review-judgment.md`:
 
 - **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
@@ -186,6 +187,8 @@ much change a comment warrants; details in `references/review-judgment.md`:
 - **Prove a security/authz guard is load-bearing by removing it** — delete the guard, run the security test, confirm the flip, then restore.
 - **Ground scope claims in the actual checker** — run the linter/hook and quote its output; never extrapolate a count from a raw grep.
 - **A "minimize changes" instruction never licenses keeping a disproven fact** — fix the wrong token, keep the rest minimal.
+- **Prefer conforming new code to an existing checker over extending the checker** — a local annotation fix beats a cross-cutting change to checker logic.
+- **Verify installed-package evidence against the commit actually under test** — confirm the `.venv` matches the commit's lockfile and Python-version marker before citing package source.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

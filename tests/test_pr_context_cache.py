@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,9 @@ def _fields(diff: str = "diff content", source: str = "my-branch") -> dict[str, 
         "linked_issues": "n/a",
         "ci_status": "n/a",
         "diff_stat": "1 file changed",
+        "review_threads": "n/a",
+        "reviews": "n/a",
+        "comments": "n/a",
         "diff_sha": hashlib.sha256(diff.encode()).hexdigest(),
         "diff": diff,
     }
@@ -181,6 +185,93 @@ class TestMainCacheFlow:
         assert pcc.main(["my-branch", "--rubric", str(rubric)]) == 0
         assert capsys.readouterr().out.startswith("cache_hit: false")
         assert rubric.is_file()
+
+
+class TestRenderReviewThreads:
+    def test_marks_unresolved_open(self):
+        nodes = [
+            {
+                "isResolved": False,
+                "path": "src/foo.py",
+                "line": 10,
+                "comments": {"nodes": [{"author": {"login": "tp"}, "body": "why isinstance here?"}]},
+            },
+            {
+                "isResolved": True,
+                "path": "src/bar.py",
+                "line": 20,
+                "comments": {"nodes": [{"author": {"login": "wei"}, "body": "fixed"}]},
+            },
+        ]
+        rendered = pcc.render_review_threads(nodes)
+        assert "[OPEN]" in rendered
+        assert "[RESOLVED]" in rendered
+        assert "src/foo.py:10" in rendered
+        assert "tp: why isinstance here?" in rendered
+
+    def test_empty_returns_na(self):
+        assert pcc.render_review_threads([]) == "n/a"
+
+
+class TestRenderReviews:
+    def test_renders_author_state_body(self):
+        raw = json.dumps(
+            {"reviews": [{"author": {"login": "tp"}, "state": "CHANGES_REQUESTED", "body": "please fix"}]}
+        )
+        rendered = pcc.render_reviews(raw)
+        assert "tp **CHANGES_REQUESTED**: please fix" in rendered
+
+    def test_empty_returns_na(self):
+        assert pcc.render_reviews(json.dumps({"reviews": []})) == "n/a"
+
+    def test_blank_input_returns_na(self):
+        assert pcc.render_reviews("") == "n/a"
+
+
+class TestRenderComments:
+    def test_renders_author_body(self):
+        raw = json.dumps({"comments": [{"author": {"login": "wei"}, "body": "did you check TP's thread?"}]})
+        rendered = pcc.render_comments(raw)
+        assert "wei: did you check TP's thread?" in rendered
+
+    def test_empty_returns_na(self):
+        assert pcc.render_comments(json.dumps({"comments": []})) == "n/a"
+
+
+class TestFetchReviewThreads:
+    def test_missing_owner_or_name_returns_na(self):
+        assert pcc.fetch_review_threads("", "repo", "1") == "n/a"
+        assert pcc.fetch_review_threads("owner", "", "1") == "n/a"
+
+    def test_parses_graphql_response(self, monkeypatch: pytest.MonkeyPatch):
+        graphql_response = json.dumps(
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    {
+                                        "isResolved": False,
+                                        "path": "a.py",
+                                        "line": 5,
+                                        "comments": {
+                                            "nodes": [
+                                                {"author": {"login": "tp"}, "body": "concern here"}
+                                            ]
+                                        },
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        )
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: graphql_response)
+        rendered = pcc.fetch_review_threads("owner", "repo", "42")
+        assert "[OPEN]" in rendered
+        assert "a.py:5" in rendered
 
 
 class TestRunFailure:

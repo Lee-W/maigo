@@ -31,7 +31,16 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source> \
 
 stdout 第一行是 `cache_hit: true|false`，其後是 cache 區段全文——
 含 Source / PR number / Title / Body（截 500 行）/ Linked issues / CI status /
-Diff stat / Diff sha / Full diff（截 2000 行）。
+Diff stat / **Review threads（inline review thread，含 resolve 狀態）/ Review
+summaries（`gh pr view --json reviews`）/ Conversation comments（`gh pr view
+--json comments`）** / Diff sha / Full diff（截 2000 行）。
+
+Review threads / summaries / comments 只在 `<source>` 是 PR 時抓（branch / range
+diff 沒有對應的 GitHub review thread 可抓）。**未解決（`[OPEN]`）的 thread 在輸出
+裡會被特別標出**——下結論前先檢查這些 thread 對照目前 diff 是否已經處理，
+避免漏看 reviewer 留下但尚未收斂的架構意見（真實事故：只抓 diff + PR body +
+reviewDecision，漏看某 PR 上一位 reviewer 對 `isinstance`-based type-switch 設計
+留下的 OPEN thread，直到使用者問「有沒有看 TP 說了什麼」才補回）。
 
 ## 行為摘要
 

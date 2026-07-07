@@ -194,3 +194,21 @@ its `isinstance` result drove consumer behaviour, making it de-facto public API.
 Fix: rename only `_AckTimeout` → `AckTimeout` (add to `__all__`); the siblings that
 consumers never branch on by type stay underscore-private. Selective promotion is
 the discipline; do not broadcast the whole hierarchy.
+
+### Tests must feed production-path inputs, not pre-aligned ones — the partition-backfill tz case
+
+In apache/airflow's AIP-76 partitioned backfill, the production paths that feed
+`from_date`/`to_date` into the timetable — CLI `--from-date/--to-date` via `parsedate`,
+API `from_date/to_date` via `coerce_datetime` — always attach the core `default_timezone`
+(UTC in standard deployments), never the Dag's timetable timezone. A test asserting
+tz-boundary behavior (cross-timezone daily backfill not dropping the first day, sub-day
+window not widening) must feed the bound in that same production shape — a
+UTC-midnight-aware datetime (e.g. `pendulum.datetime(2026,2,15,tz="UTC")`) — not a bound
+pre-aligned to the timetable's own timezone (e.g. `pendulum.datetime(2026,2,15,tz="Asia/Taipei")`),
+which bypasses the internal wall-clock rebase and can pass while hiding a real gap.
+Case study: PR #68718's `test_create_backfill_partitioned_non_utc_boundary` fed a
+pre-aligned Taipei bound, baseline ran green, but a UTC-hosted Taipei `0 0 * * *` Dag
+was silently dropping its first partition day — 9 runs instead of 10 — caught only
+because reviewer phanikumv flagged it. When a diff touches partition/backfill
+tz-boundary tests specifically, ask "what does the production path actually feed?"
+and check the test input matches that shape.

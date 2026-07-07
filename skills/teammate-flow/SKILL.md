@@ -84,6 +84,33 @@ draft 必須採 CC 格式（`type(scope): subject`）。
 
 不確定時不要因「謹慎」自動退回 go——team 的並行不犧牲嚴格度。
 
+## Worktree safety in parallel batch review
+
+適用範圍：用 `Workflow` tool 對**多個 PR** 做並行 fan-out（🐱 樂奈 → 🩵 燈 → 🟡 爽世）
+的場景——跟 `/maigo:review` 既有的「一次一個 PR」序列 queue
+（[`skills/strict-review/references/review-batch-queue.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)）
+是不同的路徑。
+
+**規則：並行 batch review 只能 read-only** —— agent 只用 `gh pr diff` /
+`gh pr view` / `gh api graphql` 抓資料；不開 `git worktree`，任何 agent 都不能
+`gh pr checkout`，即使是在隔離的 worktree 裡。
+
+背景是兩次真實事故：
+
+1. 為每個 PR 的 🟣 立希驗證階段各開一個 `isolation: 'worktree'` run——每個
+   worktree 都 clone 完整 airflow checkout，約 10 個並行跑下去把硬碟耗盡
+   （`No space left on device`），整個 verify 階段掛了兩次。
+2. 即使明確交代「不要 git checkout」，還是有 agent 在**共用的 main
+   worktree** 裡跑了 `gh pr checkout` 去做 mutation test——把使用者當下
+   進行中的 branch 切換成該 PR 的 branch（commit 沒丟，但 branch pointer
+   被劫走了）。
+
+**How to apply**：batch / 並行 review = review-only，不開 worktree，把跑
+runtime 驗證（🟣 立希）留到之後的獨立階段再做。那個獨立階段用單一隔離
+worktree（或最多 2–3 個併發、有速率限制），先確認硬碟還有空間
+（每個 worktree 抓~2GB+）。**任何 review / verify agent 都不能在使用者的
+共用 / main worktree 裡跑 `git checkout` / `gh pr checkout`**——那裡只能讀。
+
 ## 失敗處理
 
 詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。

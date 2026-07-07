@@ -159,3 +159,64 @@ else, and add one line explaining why that single change is non-negotiable.
 Don't silently conform to someone's framing when the evidence contradicts
 it — surface the conflict instead of hiding it inside a "kept it minimal"
 diff.
+
+---
+
+## 9. Prefer conforming new code to an existing checker over extending the checker
+
+When new code makes an existing AST-based lint/sync checker blind to a
+field/attribute it used to detect, the default fix is to change the **new
+code** to match the checker's existing detection convention (e.g. add a type
+annotation the checker's AST walk already looks for), not to extend the
+checker's detection logic with a new fallback path.
+
+Reasoning: changing checker logic has cross-cutting side effects (it affects
+every other class going through the same rule), while conforming the new
+code is a local, predictable change.
+
+Case study: apache/airflow's `check_partition_mapper_defaults_in_sync.py`
+walks class-body `AnnAssign` nodes to compare mapper fields between core and
+SDK. When `FixedKeyMapper` was rewritten with a manual `__init__`, the
+checker stopped detecting its `downstream_key` field. The fix was to add a
+`downstream_key: str` class-body annotation to `FixedKeyMapper` (mirroring
+how `PartitionMapper.max_downstream_keys: int | None = None` is already
+declared) rather than teaching the checker's `extract_class_field_names` to
+also parse `__init__` parameters as a fallback — the annotation-only fix let
+a prek-hook workaround be fully reverted.
+
+---
+
+## 10. Verify installed-package evidence against the commit actually under test
+
+Before citing "the source code of an installed package" as evidence for a
+mechanism claim, confirm that installation matches the **lockfile and
+runtime environment of the commit actually being verified** — not just
+whatever's in the host's `.venv`.
+
+Two traps:
+
+1. The host `.venv` may have been synced against a different branch's
+   lockfile entirely.
+2. The same lockfile can resolve different package versions per Python
+   version (marker-based resolution — e.g. apache/airflow's `uv.lock`
+   resolves sphinx 8.1.3 for py3.10 but 9.1.0 for py3.12).
+
+Checklist:
+
+- (a) `git rev-parse HEAD` + `git status` to confirm the working tree is the
+  commit under test.
+- (b) Read dependency versions via `git show <commit>:<lockfile>` (a
+  commit-object read, immune to what's currently checked out) rather than
+  trusting the live filesystem.
+- (c) Before citing external package source, confirm the actual resolved
+  version for the runtime environment in play (including the Python-version
+  marker) — if it doesn't match, go pull the correct version from PyPI/GitHub
+  tags rather than reading the host `.venv`'s copy.
+
+Case study: while investigating a PR #69445 docs-build warning, the first
+pass cited Sphinx fallback code read from the host `.venv` (sphinx 9.1.0,
+sphinx-argparse still at main's lockfile version 0.5.2), but the actual
+reproduction ran under breeze `--python 3.10` against the PR's own lockfile
+(sphinx 8.1.3) — the conclusion happened to still hold, but the evidence
+chain had a hole that only got caught by someone asking "are you sure you're
+on the right commit?".

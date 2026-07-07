@@ -148,3 +148,42 @@ On any branch that went through fold-fixup + conflict resolution:
 - Do **not** accept "tests are green" as sufficient evidence.
 - Run: `git grep '<known-deleted-symbol>' -- '**/test_*.py'`
   Any hit = must-fix. Point at this file for the repair procedure.
+
+---
+
+## Part D — Prefer polymorphism over type-switching in the caller
+
+### Rule
+
+When a caller does `isinstance(x, A)` or branches on a boolean type-flag
+(`is_rollup`, `is_temporal`) to decide behavior, that's a signal to push the
+behavior onto the objects instead — a method on the base class (sensible
+default + per-subclass override/delegation) rather than a caller-side type
+test.
+
+Do **not** invent a new marker/flag (e.g. `is_fan_out`) to extend an existing
+type-switch — that's doubling down on the anti-pattern, not fixing it.
+
+### How to apply during review
+
+When you see `isinstance` chains or type-flag branching added or extended in
+a caller:
+
+1. Ask: could this be a method on the base class instead, with each subclass
+   providing (or delegating to) its own implementation?
+2. If a reviewer's fix proposal adds a new flag to an existing type-switch
+   rather than replacing the switch, flag it as still the anti-pattern — the
+   fix should collapse the branching, not extend it.
+3. Prefer designs where adding a new subclass requires **zero** caller
+   changes.
+
+### Concrete reference
+
+An apache/airflow `partition_date` PR repeatedly had `isinstance`/`is_temporal`/
+`is_fan_out` branching in the scheduler pushed back on during review ("fan out
+is not doing something too special, why do we need special handling here
+instead of a generalized solution?"). This drove the design to a single
+`to_partition_date` method on `PartitionMapper` that composite mappers
+(`Rollup` → its `upstream_mapper`, `FanOut` → its `downstream_mapper`, `Chain`
+→ its last mapper) each delegate to — new mapper types then need zero caller
+changes.

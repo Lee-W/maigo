@@ -30,12 +30,33 @@ This skill encodes the short, durable style. It pairs with [`github-title-descri
    - `pyproject.toml` has `[tool.commitizen]` → Conventional Commits expected.
    - `.cz.toml` / `.cz.json` / `cz.yaml` → Conventional Commits expected.
    - `commitlint.config.js` / `.commitlintrc*` → usually Conventional Commits.
-   - None of the above → freeform.
+   - Repo has a documented convention that explicitly bans/avoids Conventional
+     Commits (e.g. apache/airflow's `AGENTS.md` bans CC-style prefixes on
+     commit subjects and enforces it via a `commit-msg` prek hook
+     `check-no-conventional-commit-message`) → follow that repo convention;
+     stay freeform / plain-imperative there.
+   - None of the above (no CC tooling signal, no documented ban) →
+     **default to Conventional Commits** (`<type>(<scope>): <description>`).
+     This is the maigo user's personal drafting preference for their own
+     repos when the repo itself has no opinion either way.
+
+So the detection order is: (1) repo has CC tooling signal → CC. (2) repo
+explicitly bans/doesn't use CC → follow the repo. (3) no signal either way →
+default to CC.
+
+### Conventional Commits type / scope reference
+
+- **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
+  `chore`, `build`, `ci`, `revert`.
+- **Scope**: lowercase, short, project-specific (e.g. `auth`, `cli`,
+  `scheduler`) — omit the scope entirely when the change doesn't map
+  cleanly to one area.
 
 ## Subject rules
 
 - **One line, ≤70 chars**, user-impact framing — what changes for the user / operator / Dag author, not which files were touched.
-- **Match the branch's existing subject style on amend**. If HEAD already uses `feat(scope):` form, the amend keeps it; if HEAD is freeform, stay freeform. Do **not** introduce Conventional Commits prefixes where they were not already in use, and do not strip them from a repo that uses them.
+- **Match the branch's existing subject style on amend**. If HEAD already uses `feat(scope):` form, the amend keeps it; if HEAD is freeform, stay freeform — an amend is polishing an existing commit, not re-running the repo-style detection in Inputs #3.
+- **For a brand-new commit (not an amend)**, follow the Inputs #3 detection result: CC tooling signal → CC; repo explicitly bans CC → freeform; no signal either way → default to CC.
 - **Verb-first** ("Add", "Fix", "Allow", "Reject", "Block") is more direct than noun-first.
 - **No file names in the subject** — `"Refactor auth.py"` is bad; `"Reject empty emails at signup"` is good.
 

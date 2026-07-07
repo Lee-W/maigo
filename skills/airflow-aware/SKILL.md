@@ -44,6 +44,24 @@ class, and never expand "Directed Acyclic Graph". **Code tokens stay as-is**: cl
 `dag_id`, `airflow dags list`, `dag_processing/`, `DAG_FOLDER`. See the "Naming" section of
 `AGENTS.md` when in doubt.
 
+#### Naming hook false positives
+
+The airflow-workspace naming hook (fires on Edit/Write, reports "RULE VIOLATION",
+commands "Fix all occurrences now") is a **pure string match** — it fires on any
+all-caps `DAG` spelling anywhere in the file, with no awareness of the naming rule's
+own exceptions (Python code tokens, CLI commands, paths/config keys, URLs, anti-pattern
+quotes that intentionally show the wrong form — all of these must stay literal).
+
+When it fires:
+
+1. `grep -n` list every hit in the file.
+2. Classify each hit as prose-violation vs literal-exception against the exception list above.
+3. Only fix the prose violations. If every hit is a literal exception, say so explicitly
+   in the reply (with the classification) and don't touch the file.
+
+Note: a file that *discusses* this naming rule itself (like this skill file) will always
+trip the hook — that's expected, not a bug to fix.
+
 ### 3. Environment — Breeze + uv + prek
 
 Do **not** run `pytest`, `mypy`, or `pre-commit` directly on the host.
@@ -65,6 +83,23 @@ prek run --all-files
 Scratch scripts go in `dev/` — not in repo root or `scripts/`.
 
 Note: `prek` is the runner currently specified by upstream. It is compatible with the same hooks as `pre-commit`.
+
+#### `uv run --project` vs `--directory` danger zone
+
+In an Airflow worktree, `uv run --directory "$WT" <cmd>` is safe — it uses the
+existing venv for that directory and does not trigger a re-resolve.
+
+`uv run --project "$WT" <cmd>` only becomes dangerous when `$WT` is the
+**whole worktree root**: that triggers a full workspace-level dependency
+resolve, which pulls in `apache-airflow[all]` → `apache-airflow-providers-jdbc`
+→ `jpype1`. Building `jpype1` needs Java, and macOS's default `/usr/bin/java`
+is an empty stub, so the build fails at CMake's `find_package(Java)` step.
+
+`uv run --project airflow-core <cmd>` (pointing at a monorepo **sub-project
+name**, not a worktree path — as in the example above) is a different, safe
+usage: it resolves only that sub-project's dependency set, not the whole
+workspace. Don't conflate the two — the danger is specific to `--project` at
+a worktree root, not to `--project` itself.
 
 #### `verify_completion` in this repo
 
