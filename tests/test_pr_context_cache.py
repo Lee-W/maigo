@@ -194,7 +194,11 @@ class TestRenderReviewThreads:
                 "isResolved": False,
                 "path": "src/foo.py",
                 "line": 10,
-                "comments": {"nodes": [{"author": {"login": "tp"}, "body": "why isinstance here?"}]},
+                "comments": {
+                    "nodes": [
+                        {"author": {"login": "tp"}, "body": "why isinstance here?"}
+                    ]
+                },
             },
             {
                 "isResolved": True,
@@ -216,7 +220,15 @@ class TestRenderReviewThreads:
 class TestRenderReviews:
     def test_renders_author_state_body(self):
         raw = json.dumps(
-            {"reviews": [{"author": {"login": "tp"}, "state": "CHANGES_REQUESTED", "body": "please fix"}]}
+            {
+                "reviews": [
+                    {
+                        "author": {"login": "tp"},
+                        "state": "CHANGES_REQUESTED",
+                        "body": "please fix",
+                    }
+                ]
+            }
         )
         rendered = pcc.render_reviews(raw)
         assert "tp **CHANGES_REQUESTED**: please fix" in rendered
@@ -230,7 +242,13 @@ class TestRenderReviews:
 
 class TestRenderComments:
     def test_renders_author_body(self):
-        raw = json.dumps({"comments": [{"author": {"login": "wei"}, "body": "did you check TP's thread?"}]})
+        raw = json.dumps(
+            {
+                "comments": [
+                    {"author": {"login": "wei"}, "body": "did you check TP's thread?"}
+                ]
+            }
+        )
         rendered = pcc.render_comments(raw)
         assert "wei: did you check TP's thread?" in rendered
 
@@ -257,7 +275,10 @@ class TestFetchReviewThreads:
                                         "line": 5,
                                         "comments": {
                                             "nodes": [
-                                                {"author": {"login": "tp"}, "body": "concern here"}
+                                                {
+                                                    "author": {"login": "tp"},
+                                                    "body": "concern here",
+                                                }
                                             ]
                                         },
                                     }
