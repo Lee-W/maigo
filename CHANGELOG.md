@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.37.0 (2026-07-07)
+
+### Feat
+
+- **crystallize**: guard against unscoped checklist items and out-of-repo destinations
+
 ## v0.36.0 (2026-07-07)
 
 ### Feat
