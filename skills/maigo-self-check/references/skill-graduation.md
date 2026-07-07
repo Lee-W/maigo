@@ -46,6 +46,18 @@ Read this file when executing the corresponding crystallize step.
   本體留摘要與觸發條件，展開內容放 references 檔（progressive disclosure：
   SKILL.md 觸發就付 token，references 檔被 Read 才付）。
 
+  **落點必須真的在 maigo plugin repo 裡**：propose「併進既有 skill」前，先確認
+  目標 skill 的檔案路徑落在 maigo plugin repo 自己的 `skills/` 目錄下（`ls` 該
+  路徑 + 確認它在 maigo repo 樹內），不能只看 `Skill` 工具列出的名字或
+  `git remote -v` 的 URL——使用者機器上可能還有其他掛了 skill 的地方（例如
+  `~/.claude/skills/` 底下的個人 skill、或某個未初始化、`origin` 剛好也指到
+  maigo GitHub URL 的無關 scratch repo），光看名字或 remote URL 容易誤判成
+  「maigo 自己的另一份 checkout」。crystallize 的 validate_plugin.py /
+  mkdocs build --strict 只驗證得到 maigo repo 自己的 `skills/` 樹，畢業進其他
+  地方的 skill 完全不會被這兩道驗證覆蓋到，等於整個 skill-side 驗證形同虛設。
+  確認落點不在 maigo repo 裡 → 該候選跳過（留在記憶層），不要硬套用這份
+  checklist 的機制。
+
 ## Step 4 — 公開性檢查
 
 **公開性檢查**（propose 前先跑，每筆候選都做）：
@@ -82,6 +94,15 @@ Read this file when executing the corresponding crystallize step.
 跨檔 link **一律用絕對 GitHub URL**，遵守
 [`skills/doc-link-convention`](https://github.com/Lee-W/maigo/blob/main/skills/doc-link-convention/SKILL.md)——
 dual-context 檔的相對 link 會炸 `mkdocs build --strict`。
+
+**窄範圍檢查項目要 scope-gate 或降級成 case study**：畢業進常駐 checklist 檔案
+（例如 `airflow-aware/references/review-checks.md` 的 §10.x）的新項目，若只適用於
+特定功能區塊或特定檔案（不是每次 review 都相關），要嘛比照該檔案裡已有 scope gate
+的項目（例：「若 diff 觸及 `<特定檔案清單>`才觸發」）加一個明確的觸發條件，要嘛
+直接寫成該檔案裡的 case study 段落（需要時才讀，不是每次都列出來的編號項目）。
+沒有 scope gate 的窄範圍規則會在每次 review 都出現，稀釋 checklist 的訊噪比——
+實例：crystallize 畢業一筆 partition/backfill tz-boundary 測試慣例時，一開始寫成
+沒有 scope gate 的 §10.7，被使用者指出「太 specific 了」後改列為 case study。
 
 ## 中斷 / rollback 處理矩陣（atomic：skill side 綠才動 memory）
 
