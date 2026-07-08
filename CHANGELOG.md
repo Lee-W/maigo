@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.38.1 (2026-07-08)
+
+### Fix
+
+- **verify**: log setup failures for doctor
+
 ## v0.38.0 (2026-07-08)
 
 ### Feat
