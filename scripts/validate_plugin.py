@@ -513,6 +513,45 @@ def check_agents_docs_alignment() -> CheckResult:
     return r
 
 
+def check_agent_model_tier_alignment() -> CheckResult:
+    """agents/*.md frontmatter 的 `model` 值須與 docs/reference/agents.md 表格一致。
+
+    表格 row 形式：`| **<Name>** | <model> | ... |`。抓不到該 agent 的 row，或抓到的
+    model 值與 frontmatter 不同，都視為 drift（retier 沒同步 docs 就會被這裡擋下）。
+    docs/reference/agents.md 不存在則跳過（沒有可比對的表）。
+    """
+    r = CheckResult("agents/*.md model ↔ docs/reference/agents.md tier 表一致")
+    agents_dir = ROOT / "agents"
+    catalog_path = ROOT / "docs" / "reference" / "agents.md"
+    if not agents_dir.is_dir():
+        r.note("agents/ 目錄不存在，跳過")
+        return r
+    if not catalog_path.is_file():
+        r.note("docs/reference/agents.md 不存在，跳過")
+        return r
+    catalog_text = catalog_path.read_text(encoding="utf-8")
+    for path in sorted(agents_dir.glob("*.md")):
+        fm = parse_frontmatter(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(ROOT)
+        if fm is None or "model" not in fm:
+            continue  # check_agent_frontmatter already flags missing frontmatter/model
+        name = fm.get("name", path.stem)
+        fm_model = fm["model"]
+        m = re.search(
+            rf"\*\*{re.escape(name)}\*\*\s*\|\s*([a-zA-Z0-9_-]+)\s*\|", catalog_text
+        )
+        if not m:
+            r.fail(f"{rel}: docs/reference/agents.md 表格找不到 `{name}` 的 model row")
+            continue
+        doc_model = m.group(1)
+        if doc_model != fm_model:
+            r.fail(
+                f"{rel}: frontmatter model=`{fm_model}` 但 "
+                f"docs/reference/agents.md 表格寫 `{doc_model}`"
+            )
+    return r
+
+
 def check_version_sync() -> CheckResult:
     """plugin.json version must equal pyproject.toml [project].version.
 
@@ -685,6 +724,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_hooks_json,
     check_hooks_schema,
     check_agent_frontmatter,
+    check_agent_model_tier_alignment,
     check_command_frontmatter,
     check_command_persona_quotes,
     check_skill_frontmatter,

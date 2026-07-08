@@ -1,13 +1,17 @@
 # Agents Reference
 
-Maigo 五位 agent 分屬兩種 model tier，對應任務性質：
+Maigo 五位 agent 依任務性質各自配置 model tier：
 
 | Agent | Model | 為什麼 |
 |-------|-------|-------|
-| **Raana** / **Tomori** | opus | 探索與計畫的品質直接決定後續所有 agent 的上限；這兩步若粗糙，Anon / Soyo / Taki 都會被拖下水。值得花 token。 |
-| **Anon** / **Soyo** / **Taki** | sonnet | 結構化任務（按 plan 寫、按 checklist 審、按 exit code 驗），sonnet 已足夠；用 opus 等於浪費。 |
+| **Tomori** | opus | 計畫的品質直接決定後續所有 agent 的上限；這步若粗糙，Raana 探索之後的 Anon / Soyo / Taki 都會被拖下水。值得花 token。 |
+| **Raana** | sonnet | 探索是結構化任務（讀檔、抓慣例、回報影響面），sonnet 已足夠。 |
+| **Anon** | sonnet | 按 plan 寫 code，結構化任務，sonnet 已足夠。 |
+| **Soyo** | sonnet | 按 checklist 審查，結構化任務，sonnet 已足夠。 |
+| **Taki** | haiku | 跑 test / lint / type check、讀 exit code 回報，機械任務，haiku 即可，省 token。 |
 
-要改 model 對應，編輯各 agent 檔 frontmatter 的 `model:` 欄位。
+要改 model 對應，編輯各 agent 檔 frontmatter 的 `model:` 欄位——`scripts/validate_plugin.py`
+會檢查 frontmatter 與這張表是否一致，改了記得同步更新表格，否則 validator 會擋下。
 
 ## 兩位旁白：🌙 Doloris / 🌑 Mortis
 

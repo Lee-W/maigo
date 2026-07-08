@@ -221,6 +221,29 @@ def make_skills_catalog(tmp_path: Path, skill_names: list[str] | None = None) ->
     return p
 
 
+def make_agents_model_catalog(
+    tmp_path: Path, agent_models: dict[str, str] | None = None
+) -> Path:
+    """Write a minimal docs/reference/agents.md model-tier table.
+
+    Required by check_agent_model_tier_alignment — each agent must appear as a
+    table row `| **<Name>** | <model> | ... |`.
+    Returns the path to the created catalog file.
+    """
+    agent_models = agent_models or {"foo": "sonnet"}
+    rows = "\n".join(
+        f"| **{name}** | {model} | — |" for name, model in agent_models.items()
+    )
+    docs_ref_dir = tmp_path / "docs" / "reference"
+    docs_ref_dir.mkdir(parents=True, exist_ok=True)
+    p = docs_ref_dir / "agents.md"
+    p.write_text(
+        f"# Agents Reference\n\n| Agent | Model | 為什麼 |\n|---|---|---|\n{rows}\n",
+        encoding="utf-8",
+    )
+    return p
+
+
 def make_hooks(tmp_path: Path) -> Path:
     """Write a minimal valid hooks/ directory to tmp_path/hooks/.
 

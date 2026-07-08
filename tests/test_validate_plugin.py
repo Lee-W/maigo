@@ -9,6 +9,7 @@ import pytest
 
 import scripts.validate_plugin as validate_plugin
 from tests.conftest import (
+    make_agents_model_catalog,
     make_command_file,
     make_command_overviews,
     make_docs_skill_shim,
@@ -186,6 +187,78 @@ class TestCheckAgentFrontmatter:
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_agent_frontmatter()
         assert result.passed
+
+
+# ---------------------------------------------------------------------------
+# check_agent_model_tier_alignment
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAgentModelTierAlignment:
+    def test_agents_dir_missing_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_agent_model_tier_alignment()
+        assert result.passed
+        assert any("不存在" in n for n in result.notes)
+
+    def test_docs_page_missing_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        (agents / "foo.md").write_text(
+            "---\nname: foo\ndescription: d\nmodel: sonnet\ntools: [Read]\n---\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_agent_model_tier_alignment()
+        assert result.passed
+        assert any("不存在" in n for n in result.notes)
+
+    def test_matching_model_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        (agents / "foo.md").write_text(
+            "---\nname: foo\ndescription: d\nmodel: sonnet\ntools: [Read]\n---\n",
+            encoding="utf-8",
+        )
+        make_agents_model_catalog(tmp_path, {"foo": "sonnet"})
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_agent_model_tier_alignment()
+        assert result.passed
+
+    def test_mismatched_model_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """frontmatter 說 opus，docs 表還寫舊值 sonnet——retier 沒同步 docs 的情境。"""
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        (agents / "foo.md").write_text(
+            "---\nname: foo\ndescription: d\nmodel: opus\ntools: [Read]\n---\n",
+            encoding="utf-8",
+        )
+        make_agents_model_catalog(tmp_path, {"foo": "sonnet"})
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_agent_model_tier_alignment()
+        assert not result.passed
+        assert any("opus" in e and "sonnet" in e and "foo" in e for e in result.errors)
+
+    def test_missing_row_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        (agents / "foo.md").write_text(
+            "---\nname: foo\ndescription: d\nmodel: sonnet\ntools: [Read]\n---\n",
+            encoding="utf-8",
+        )
+        make_agents_model_catalog(tmp_path, {"other-agent": "sonnet"})
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_agent_model_tier_alignment()
+        assert not result.passed
+        assert any("foo" in e for e in result.errors)
 
 
 # ---------------------------------------------------------------------------
