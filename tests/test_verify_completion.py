@@ -450,6 +450,33 @@ class TestMainCollectionError:
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
         assert "collection" in result["reason"]
+        log = tmp_path / "retry-log" / "test-failures.jsonl"
+        assert log.is_file()
+        assert "__collection__:" in log.read_text(encoding="utf-8")
+
+    def test_repeated_collection_error_emits_retry_warning(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, self.CONFTEST_ERROR),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
 
     @pytest.mark.parametrize(
         "output",
@@ -484,6 +511,38 @@ class TestMainCollectionError:
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
+
+
+# ---------------------------------------------------------------------------
+# main() fatal import / syntax error retry log
+# ---------------------------------------------------------------------------
+
+
+class TestMainFatalError:
+    def test_fatal_error_is_recorded(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion,
+            "run_command",
+            lambda cmd, cwd: (1, "ModuleNotFoundError: No module named 'x'"),
+        )
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion, "_RETRY_LOG_BASE", tmp_path / "retry-log"
+        )
+        payload = {"cwd": str(tmp_path)}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+        assert "ModuleNotFoundError" in result["reason"]
+        log = tmp_path / "retry-log" / "test-failures.jsonl"
+        assert "__fatal__:ModuleNotFoundError" in log.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

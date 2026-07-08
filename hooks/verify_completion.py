@@ -205,6 +205,22 @@ def _record_and_count(log_path: Path, failures: set[str]) -> dict[str, int]:
     return record_and_count(log_path, failures, "failures")
 
 
+def _retry_warning(counts: dict[str, int], keys: set[str], label: str) -> str:
+    over_limit = {
+        key: counts.get(key, 0) for key in keys if counts.get(key, 0) >= RETRY_LIMIT
+    }
+    if not over_limit:
+        return ""
+    lines = "\n".join(
+        f"  - {key} ({count} 次)" for key, count in sorted(over_limit.items())
+    )
+    return (
+        f"⚠️ RETRY LIMIT REACHED: {label} 已連續紅 ≥ {RETRY_LIMIT} 次"
+        f"（本次含），考慮停下找使用者介入：\n{lines}\n"
+        f"依 skills/failure-handling 的「無限迴圈防護」。\n\n"
+    )
+
+
 def main() -> None:
     raw = sys.stdin.read()
     try:
@@ -251,9 +267,12 @@ def main() -> None:
 
     fatal_match = FATAL_MARKER_RE.search(output)
     if fatal_match:
+        fatal_key = f"__fatal__:{fatal_match.group(1)}:{' '.join(cmd)}"
+        counts = _record_and_count(_retry_log_path(cwd), {fatal_key})
+        warning = _retry_warning(counts, {fatal_key}, "import / collection 錯")
         emit(
             "block",
-            f"立希 (Taki)：`{' '.join(cmd)}` 出現 {fatal_match.group(1)}（import / collection 錯，不是 test 失敗）。先修這個。",
+            f"{warning}立希 (Taki)：`{' '.join(cmd)}` 出現 {fatal_match.group(1)}（import / collection 錯，不是 test 失敗）。先修這個。",
         )
 
     actual = extract_failures(output)
@@ -301,9 +320,12 @@ def main() -> None:
     # FATAL_MARKER_RE and still block.
     collection_match = COLLECTION_ERROR_RE.search(output)
     if collection_match:
+        collection_key = f"__collection__:{collection_match.group(0)}:{' '.join(cmd)}"
+        counts = _record_and_count(_retry_log_path(cwd), {collection_key})
+        warning = _retry_warning(counts, {collection_key}, "test collection / 設定錯")
         emit(
             "block",
-            f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑。常見於 uv-workspace monorepo 根目錄要用 `--project`。在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。",
+            f"{warning}立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑。常見於 uv-workspace monorepo 根目錄要用 `--project`。在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。",
         )
 
     # Non-zero exit we couldn't attribute to any test name (and not a
