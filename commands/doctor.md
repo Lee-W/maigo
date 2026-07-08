@@ -43,32 +43,7 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 3. **Orchestrator**：讀 retry / failure log，彙整統計（不存在 / 空 → 印正常訊息，不中止）：
 
 ```bash
-python3 - <<'PY'
-import json, collections, pathlib
-
-SOURCES = {
-    ".maigo/soyo-must-fix.jsonl": "must_fix_keys",
-    ".maigo/test-failures.jsonl": "failures",
-}
-for path, field in SOURCES.items():
-    p = pathlib.Path(path)
-    entries = []
-    if p.is_file():
-        for line in p.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-    if not entries:
-        print(f"{path}: 無紀錄（正常，尚未觸發過 retry）")
-        continue
-    counts = collections.Counter(k for e in entries for k in e.get(field, []))
-    print(f"{path}（{len(entries)} 筆）：" + ", ".join(f"{k}×{c}" for k, c in counts.most_common()))
-    for e in entries[-3:]:
-        print(f"  最近：{e.get('ts')} — {e.get(field)}")
-PY
+python3 scripts/retry_log_summary.py
 ```
 
 4. **Orchestrator**：
