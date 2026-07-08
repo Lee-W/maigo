@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.39.0 (2026-07-08)
+
+### Feat
+
+- **review**: add cross-session review board and reviewer pre-verification
+
 ## v0.38.1 (2026-07-08)
 
 ### Fix
