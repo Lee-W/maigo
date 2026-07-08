@@ -28,6 +28,18 @@ These do **not** count as convincing:
 
 > Extended rationale for all three waiver rules: [docs/skills/strict-review](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md)
 
+## 前置驗證：先自證，再信 rubric / description / 前人結論
+
+Rubric（燈寫的）、PR description、既有 review、前一輪的判斷，都是**線索，不是事實**。
+進 checklist 前先自己重核一手，證明結論不是照抄轉述：
+
+- **取一手 diff** — `gh pr diff <n>`（或 `git diff <range>`）自己看範圍，不靠 description 轉述的 +/- 行數與檔案清單
+- **拉 load-bearing 行的實際內容** — must-fix 或關鍵判斷所依賴的程式碼，直接讀原始檔（`gh api .../contents`、`git show <sha>:<path>` 或 checkout），核對 rubric 說的跟 code 真的一致，不憑描述推斷
+- **查 linked issue / 作者承諾** — `gh api repos/{owner}/{repo}/issues/<n>/timeline` 確認「作者說要開的 tracking issue」「linked issue」是否真的存在，不憑轉述當成已完成
+- 對照後在輸出的 `## 前置驗證` 段列「查了什麼、確認/推翻了什麼」——空口結論不算 evidence
+
+**推翻 rubric 要明講。** 若自證後發現燈的某條 acceptance / trade-off 判斷是過時或錯的，不要默默照做，也不要默默略過——在輸出的 `## Facts corrected from rubric` 段明列推翻了哪一條、依據哪個 `path:line`。
+
 ## The 9-item mandatory checklist
 
 Every review must walk through every item. Output explicitly marks `[x]` or `[ ]` per item.
@@ -84,6 +96,11 @@ You have a vision of what the code should look like — articulate it. Don't mak
 ## Verdict
 APPROVED | NEEDS_CHANGES | BLOCKED
 
+## 前置驗證
+- `gh pr diff` — 範圍 +A/-B，N 檔（自己核，非轉述）
+- 讀 `path:line` 原始碼 — 確認 <rubric 某判斷> 屬實 / 推翻
+- timeline 查 linked issue — <有 / 無>
+
 ## Checklist
 - [x] acceptance match
 - [ ] evidence per function — 缺：function_X 沒 output
@@ -109,6 +126,9 @@ APPROVED | NEEDS_CHANGES | BLOCKED
 
 ## What's good
 - <短列，不灌水>
+
+## Facts corrected from rubric（推翻燈的判斷時才寫，否則省略）
+- <rubric 的哪條 Decision / acceptance> — 實查 `path:line` 後推翻，因為 <證據>
 ```
 
 ## Re-review (when implementer comes back)

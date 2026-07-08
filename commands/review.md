@@ -16,9 +16,11 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 /maigo:review <pr-1> <pr-2> ...         # 多 PR 批次（空白或逗號分隔）
 /maigo:review <branch-name>             # 本地 branch（跟 main / 預設 base 比）
 /maigo:review <commit-range>            # 例：HEAD~3..HEAD 或 main..feature
+/maigo:review --refresh-board           # 只刷新持久 board、列出該看的，不進 review
 ```
 
 不給參數 → 預設 `HEAD` 對 `main`（review 你目前 branch 的所有變更）。
+`--refresh-board` 見 `skills/strict-review/references/review-batch-queue.md`「持久 review board」。
 
 **模式（optional）：**
 
@@ -36,7 +38,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 ## 多 PR 批次與狀態前置處理
 
 `/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後一次一個 review；每完成一個 PR 等使用者 go-ahead 才推進。完整排序規則、queue 表格式、merged/closed/draft 前置處理表、一次一個 PR 的 go-ahead 規則，見
-`skills/strict-review/references/review-batch-queue.md`。
+`skills/strict-review/references/review-batch-queue.md`。長期跨 session 追一批 PR 時用同檔的「持久 review board」（`.maigo/review-board.md` + `--refresh-board`）——queue 是 per-run，board 記得跨 session 的狀態轉移（含「你回過但作者又推新東西」）。
 
 ## 雙語輸出
 
@@ -160,6 +162,7 @@ repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal
   把 review report 完整呈現給使用者後再觸發 confirm flow；
   不要在使用者讀完 report 之前插入確認問題。
 - **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、PR 與 PR 間等 go-ahead——細節見「## 多 PR 批次與狀態前置處理」；不要一次 fire 多個 review，不要自己決定 draft 要不要看。
+- **持久 board**：使用者長期追一批 PR 時維護 `.maigo/review-board.md`（跨 session）；每跑完一顆回寫該行狀態，`--refresh-board` 只刷新不 review——細節見 `skills/strict-review/references/review-batch-queue.md`「持久 review board」。board 決定誰該看，review 負責看，兩者不重疊。
 - **雙語自動觸發**：repo-detect 回報 `apache/airflow` 時 orchestrator 自動加 `--bilingual`；偵測非 Airflow repo 但使用者顯式傳 `--bilingual` 也照樣執行——`--bilingual` 純粹是輸出層 flag，不會改變 agent 行為。
 - orchestrator 草擬要貼到 PR 的回覆 / comment 時，遵守 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)——放單一 fenced code block 供複製。
 - 草擬 GitHub PR review thread 回覆時，依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)——預設簡短、不引 SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
