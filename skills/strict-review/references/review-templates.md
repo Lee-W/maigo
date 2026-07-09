@@ -35,6 +35,8 @@ file when writing the rubric or assembling the final report.
 ```markdown
 # Review: <PR title / branch / range>
 
+**PR:** <url>   <!-- GitHub PR 一律附完整連結；branch/range 無 PR 則省略 -->
+
 ## Context（樂奈）
 <變更摘要 + 周邊 context 一段>
 
