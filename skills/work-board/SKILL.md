@@ -49,12 +49,13 @@ description: This skill should be used when reading, writing, or migrating `.mai
 ### 行文法
 
 ```text
-- [ ] <型別emoji> #<n 或 owner/repo#n> (<相對人>) **<狀態詞>** — <一句話理由> → `<下一步命令>` — "<title>"
+- [ ] <型別emoji> #<n 或 owner/repo#n> (<相對人>) **<狀態詞>** — <一句話理由> → `<下一步命令>` 📄 `<產物路徑>` — "<title>"
 ```
 
 - **型別 emoji**：🐛 issue ｜ 🔀 你的 PR ｜ 👀 在審的 PR
 - **相對人**：issue / PR 的 author；自己的 PR 寫 `(你)`
 - **`→ 下一步命令`**：只有 🎯 區的行有——看到就能複製執行，這是「最好讀寫」的核心
+- **`📄 產物路徑`**（optional）：指向這項的本地產物（review-<n>.md / triage 筆記等），相對 board.html 的路徑；`board_render.py` 渲染成卡片上可點的「📄 review」連結。沒產物就省略
 - **checkbox**：`[x]` ＝「這項我**親自**處理過了」（學習閘門訊號，見 §5）；與所在分區正交
 - **🧠 標記**：學習盤點已完成，不重複學
 - **跨 repo**：board 綁 cwd repo（header 記 `gh repo view --json nameWithOwner` 結果）；

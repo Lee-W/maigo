@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Render `.maigo/board.md` into a self-contained, read-only `.maigo/board.html`.
+"""
+Render `.maigo/board.md` into a self-contained, read-only `.maigo/board.html`.
 
 `/maigo:board`（skills/work-board）的閱讀層：把 board.md 的行文法（型別 emoji /
 `#n` / 相對人 / 狀態詞 / 下一步命令 / checkbox / 🧠 標記）畫成一個球權三欄
@@ -22,9 +23,25 @@ from __future__ import annotations
 import argparse
 import html
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Embedded style for pandoc-rendered linked-doc pages (review/triage artifacts).
+DOC_STYLE = """<style>
+body{max-width:860px;margin:2rem auto;padding:0 1.2rem;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans CJK TC",sans-serif;color:#1a1a1a}
+h1{font-size:1.5rem;border-bottom:2px solid #eee;padding-bottom:.4rem}
+h2{font-size:1.15rem;margin-top:1.8rem;color:#0b6}
+code{background:#f4f4f4;padding:.1em .35em;border-radius:4px;font-size:.9em}
+pre{background:#f4f4f4;padding:.8rem;border-radius:6px;overflow-x:auto}
+a{color:#0969da}
+blockquote{border-left:3px solid #ddd;margin:0;padding-left:1rem;color:#555}
+table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.3rem .6rem}
+@media(prefers-color-scheme:dark){body{background:#0d1117;color:#c9d1d9}h1{border-color:#30363d}code,pre{background:#161b22}h2{color:#3fb950}a{color:#58a6ff}}
+</style>"""
 
 TITLE_RE = re.compile(r"^#\s*Work Board\s*—\s*(?P<repo>\S+)\s*$")
 SECTION_HEADER_RE = re.compile(r"^##\s*(?P<emoji>\S+)\s+(?P<rest>.+)$")
@@ -40,6 +57,7 @@ LINE_PREFIX_RE = re.compile(
     r"\s*(?P<rest>.*)$"
 )
 COMMAND_RE = re.compile(r"→\s*`(?P<cmd>[^`]+)`")
+DOC_RE = re.compile(r"📄\s*`(?P<doc>[^`]+)`")
 TITLE_TAIL_RE = re.compile(r'"(?P<title>[^"]*)"\s*$')
 REF_OWNER_REPO_RE = re.compile(r"^(?P<slug>[\w.-]+/[\w.-]+)#(?P<num>\d+)$")
 REF_BARE_RE = re.compile(r"^#(?P<num>\d+)$")
@@ -64,6 +82,7 @@ class BoardItem:
     learned: bool = False
     reason: str = ""
     command: str = ""
+    doc: str = ""
     title: str = ""
 
 
@@ -94,6 +113,11 @@ def parse_line(line: str) -> BoardItem:
     if cmd_m:
         rest = rest[: cmd_m.start()] + rest[cmd_m.end() :]
 
+    doc_m = DOC_RE.search(rest)
+    doc = doc_m.group("doc") if doc_m else ""
+    if doc_m:
+        rest = rest[: doc_m.start()] + rest[doc_m.end() :]
+
     reason = re.sub(r"^\s*—\s*", "", rest)
     reason = re.sub(r"\s*—\s*$", "", reason).strip()
 
@@ -108,6 +132,7 @@ def parse_line(line: str) -> BoardItem:
         learned=bool(m.group("learned")),
         reason=reason,
         command=command,
+        doc=doc,
         title=title,
     )
 
@@ -140,7 +165,8 @@ def parse_board(text: str) -> tuple[str, list[Section]]:
 
 
 def issue_url(repo: str, ref: str) -> str:
-    """Best-effort GitHub URL for *ref* (`#n` against *repo*, or `owner/repo#n`).
+    """
+    Best-effort GitHub URL for *ref* (`#n` against *repo*, or `owner/repo#n`).
 
     GitHub's `/issues/<n>` URL redirects to `/pull/<n>` when `n` is actually a
     PR, so a single `/issues/<n>` link works for both 🐛/🔀/👀 rows.
@@ -182,11 +208,16 @@ def render_card(item: BoardItem, repo: str) -> str:
             "</div>"
         )
 
-    title_html = (
-        f'<div class="title">&ldquo;{html.escape(item.title)}&rdquo;</div>'
-        if item.title
-        else ""
-    )
+    title_html = f'<div class="title">&ldquo;{html.escape(item.title)}&rdquo;</div>' if item.title else ""
+
+    doc_html = ""
+    if item.doc:
+        escaped_doc = html.escape(item.doc)
+        doc_html = (
+            '<div class="doc-row">'
+            f'<a class="doc-link" href="{escaped_doc}" target="_blank" rel="noopener">📄 review</a>'
+            "</div>"
+        )
 
     return (
         f'<div class="card {check_class}">'
@@ -201,15 +232,13 @@ def render_card(item: BoardItem, repo: str) -> str:
         f'<div class="reason">{html.escape(item.reason)}</div>'
         f"{cmd_html}"
         f"{title_html}"
+        f"{doc_html}"
         "</div>"
     )
 
 
 def render_column(emoji: str, items: list[BoardItem], repo: str) -> str:
-    cards = (
-        "\n".join(render_card(item, repo) for item in items)
-        or '<p class="empty">（空）</p>'
-    )
+    cards = "\n".join(render_card(item, repo) for item in items) or '<p class="empty">（空）</p>'
     title = KANBAN_TITLES.get(emoji, emoji)
     css_class = KANBAN_CLASSES.get(emoji, "extra")
     return (
@@ -240,12 +269,8 @@ def render_html(repo: str, sections: list[Section]) -> str:
         else:
             extra.append(section)
 
-    columns_html = "\n".join(
-        render_column(emoji, kanban[emoji], repo) for emoji in KANBAN_ORDER
-    )
-    extra_html = "\n".join(
-        render_extra_section(section, repo) for section in extra if section.items
-    )
+    columns_html = "\n".join(render_column(emoji, kanban[emoji], repo) for emoji in KANBAN_ORDER)
+    extra_html = "\n".join(render_extra_section(section, repo) for section in extra if section.items)
 
     repo_label = html.escape(repo) if repo else "(unknown repo)"
 
@@ -316,6 +341,9 @@ h1 {{ font-size: 1.3rem; margin: 0 0 1rem; }}
 .check {{ font-size: 1rem; }}
 .ref-link {{ color: var(--accent); text-decoration: none; font-weight: 600; }}
 .ref-link:hover {{ text-decoration: underline; }}
+.doc-row {{ margin-top: 6px; }}
+.doc-link {{ color: var(--muted); text-decoration: none; font-size: 0.85em; font-weight: 600; }}
+.doc-link:hover {{ text-decoration: underline; }}
 .who {{ color: var(--muted); }}
 .badge.learned {{ margin-left: auto; }}
 .column-todo .status {{ color: var(--todo); font-weight: 600; }}
@@ -380,6 +408,68 @@ function fallbackSelect(btn) {{
 """
 
 
+def materialize_docs(sections: list[Section], base_dir: Path) -> int:
+    """
+    Render each linked `📄 *.md` artifact to a sibling `.html` and repoint the link.
+
+    Paths in `item.doc` are relative to the rendered board (i.e. *base_dir*). For every
+    doc that ends in `.md` and exists, run pandoc to produce `<same>.html` next to it and
+    rewrite `item.doc` to the `.html` path so the card links to a readable page. Degrades
+    gracefully: no pandoc, or a missing source, leaves the `.md` link untouched.
+    """
+    if not shutil.which("pandoc"):
+        sys.stderr.write("board_render: pandoc 不在 PATH，📄 連結維持指向 .md（不 render）\n")
+        return 0
+
+    items = [it for sec in sections for it in sec.items if it.parsed and it.doc.endswith(".md")]
+    if not items:
+        return 0
+
+    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as fh:
+        fh.write(DOC_STYLE)
+        header = fh.name
+
+    rendered: dict[str, str] = {}
+    try:
+        for it in items:
+            src = (base_dir / it.doc).resolve()
+            html_rel = it.doc[: -len(".md")] + ".html"
+            if it.doc in rendered:
+                it.doc = html_rel
+                continue
+            if not src.is_file():
+                continue
+            dst = src.with_suffix(".html")
+            proc = subprocess.run(
+                [
+                    "pandoc",
+                    str(src),
+                    "-s",
+                    "-f",
+                    "gfm",
+                    "-t",
+                    "html",
+                    "-H",
+                    header,
+                    "--metadata",
+                    f"title={src.stem}",
+                    "-o",
+                    str(dst),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode == 0:
+                rendered[it.doc] = html_rel
+                it.doc = html_rel
+            else:
+                sys.stderr.write(f"board_render: pandoc 失敗 {src.name}: {proc.stderr.strip()[:120]}\n")
+    finally:
+        Path(header).unlink(missing_ok=True)
+
+    return len(rendered)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("board", nargs="?", default=".maigo/board.md")
@@ -396,8 +486,9 @@ def main(argv: list[str] | None = None) -> int:
     text = board_path.read_text(encoding="utf-8")
     repo, sections = parse_board(text)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    rendered = materialize_docs(sections, output_path.parent)
     output_path.write_text(render_html(repo, sections), encoding="utf-8")
-    print(f"wrote {output_path}")
+    print(f"wrote {output_path}" + (f" (+{rendered} linked docs)" if rendered else ""))
     return 0
 
 

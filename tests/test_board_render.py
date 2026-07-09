@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 import scripts.board_render as br
 
 FIXTURE_BOARD = """\
@@ -33,8 +32,7 @@ FIXTURE_BOARD = """\
 class TestParseLine:
     def test_ready_issue_with_command(self):
         item = br.parse_line(
-            "- [ ] 🐛 #123 (alice) **READY** — triage 完可接 → "
-            '`/maigo:take-issue 123` — "fix xxx"'
+            '- [ ] 🐛 #123 (alice) **READY** — triage 完可接 → `/maigo:take-issue 123` — "fix xxx"'
         )
         assert item.parsed
         assert not item.checked
@@ -49,21 +47,76 @@ class TestParseLine:
 
     def test_checked_status_with_spaces(self):
         item = br.parse_line(
-            "- [x] 👀 #789 (bob) **↩︎ 回你的球** — 你回過後又推新 commit → "
-            '`/maigo:review 789` — "…"'
+            '- [x] 👀 #789 (bob) **↩︎ 回你的球** — 你回過後又推新 commit → `/maigo:review 789` — "…"'
         )
         assert item.checked
         assert item.status == "↩︎ 回你的球"
         assert item.command == "/maigo:review 789"
 
     def test_no_command_line(self):
-        item = br.parse_line(
-            '- [ ] 🔀 #460 (你) **等 review** — 最後活動是你 07-08 — "…"'
-        )
+        item = br.parse_line('- [ ] 🔀 #460 (你) **等 review** — 最後活動是你 07-08 — "…"')
         assert item.parsed
         assert item.command == ""
         assert item.reason == "最後活動是你 07-08"
         assert item.title == "…"
+
+    def test_doc_link_with_command(self):
+        item = br.parse_line(
+            "- [ ] 👀 #300 (bob) **APPROVE_WITH_NITS** — 測試綠 → "
+            '`貼 nit→approve` 📄 `../files/review-300.md` — "streaming log"'
+        )
+        assert item.command == "貼 nit→approve"
+        assert item.doc == "../files/review-300.md"
+        assert item.reason == "測試綠"
+        assert item.title == "streaming log"
+        assert "doc-link" in br.render_card(item, "apache/airflow")
+
+    def test_doc_link_without_command(self):
+        item = br.parse_line(
+            '- [x] 👀 #366 (bob) **你已 APPROVE** — 無新活動 📄 `../files/review-366.md` — "states"'
+        )
+        assert item.command == ""
+        assert item.doc == "../files/review-366.md"
+        assert item.reason == "無新活動"
+        assert item.title == "states"
+
+    def test_no_doc_link(self):
+        item = br.parse_line('- [ ] 👀 #239 (jason) **APPROVE** — 待送 → `approve on GH` — "gradle"')
+        assert item.doc == ""
+        assert "doc-link" not in br.render_card(item, "apache/airflow")
+
+
+class TestMaterializeDocs:
+    def _sections(self, doc: str):
+        item = br.parse_line(f'- [ ] 👀 #1 (bob) **APPROVE** — ok 📄 `{doc}` — "t"')
+        return [br.Section(emoji="🎯", name="你的球", items=[item])], item
+
+    def test_no_pandoc_leaves_md_untouched(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(br.shutil, "which", lambda _: None)
+        sections, item = self._sections("review-1.md")
+        assert br.materialize_docs(sections, tmp_path) == 0
+        assert item.doc == "review-1.md"
+
+    def test_non_md_doc_ignored(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        sections, item = self._sections("review-1.html")
+        assert br.materialize_docs(sections, tmp_path) == 0
+        assert item.doc == "review-1.html"
+
+    def test_md_repointed_to_html(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        (tmp_path / "review-1.md").write_text("# hi", encoding="utf-8")
+        calls = {}
+
+        def fake_run(cmd, **kw):
+            calls["out"] = cmd[cmd.index("-o") + 1]
+            Path(calls["out"]).write_text("<html></html>", encoding="utf-8")
+            return __import__("subprocess").CompletedProcess(cmd, 0, "", "")
+
+        monkeypatch.setattr(br.subprocess, "run", fake_run)
+        sections, item = self._sections("review-1.md")
+        assert br.materialize_docs(sections, tmp_path) == 1
+        assert item.doc == "review-1.html"
 
     def test_learned_badge(self):
         item = br.parse_line('- [x] 👀 #700 (dave) **APPROVE** 🧠 — merged 07-07 — "…"')
@@ -116,16 +169,10 @@ class TestParseBoard:
 
 class TestIssueUrl:
     def test_bare_ref_uses_header_repo(self):
-        assert (
-            br.issue_url("Lee-W/maigo", "#123")
-            == "https://github.com/Lee-W/maigo/issues/123"
-        )
+        assert br.issue_url("Lee-W/maigo", "#123") == "https://github.com/Lee-W/maigo/issues/123"
 
     def test_owner_repo_ref_ignores_header_repo(self):
-        assert (
-            br.issue_url("Lee-W/maigo", "other/repo#9")
-            == "https://github.com/other/repo/issues/9"
-        )
+        assert br.issue_url("Lee-W/maigo", "other/repo#9") == "https://github.com/other/repo/issues/9"
 
     def test_bare_ref_without_repo_header_returns_empty(self):
         assert br.issue_url("", "#123") == ""
@@ -148,23 +195,17 @@ class TestRenderCard:
         assert '<span class="badge learned">🧠</span>' in rendered
 
     def test_unchecked_item_has_unchecked_class(self):
-        item = br.parse_line(
-            '- [ ] 🐛 #130 (carol) **NEEDS_INFO** — 等回報者補資訊 — "…"'
-        )
+        item = br.parse_line('- [ ] 🐛 #130 (carol) **NEEDS_INFO** — 等回報者補資訊 — "…"')
         rendered = br.render_card(item, "Lee-W/maigo")
         assert 'class="card unchecked"' in rendered
 
     def test_ref_renders_github_link(self):
-        item = br.parse_line(
-            '- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"'
-        )
+        item = br.parse_line('- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"')
         rendered = br.render_card(item, "Lee-W/maigo")
         assert 'href="https://github.com/Lee-W/maigo/issues/123"' in rendered
 
     def test_command_renders_copy_button(self):
-        item = br.parse_line(
-            '- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"'
-        )
+        item = br.parse_line('- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"')
         rendered = br.render_card(item, "Lee-W/maigo")
         assert "copy-btn" in rendered
         assert "/maigo:take-issue 123" in rendered
@@ -220,9 +261,7 @@ class TestMain:
         assert br.main([str(board), str(out)]) == 0
         assert out.is_file()
 
-    def test_missing_board_file_exits_1(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture
-    ):
+    def test_missing_board_file_exits_1(self, tmp_path: Path, capsys: pytest.CaptureFixture):
         missing = tmp_path / "nope.md"
         assert br.main([str(missing)]) == 1
         assert "不存在" in capsys.readouterr().err
