@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.41.0 (2026-07-09)
+
+### Feat
+
+- **board**: link and auto-render review docs from the work board
+
+### Fix
+
+- **review**: require the original PR link in review report templates
+
 ## v0.40.0 (2026-07-09)
 
 ### Feat
