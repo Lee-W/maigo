@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.40.0 (2026-07-09)
+
+### Feat
+
+- add work board command
+
 ## v0.39.0 (2026-07-08)
 
 ### Feat
