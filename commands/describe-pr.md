@@ -75,6 +75,17 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
   - 「若要直接開 PR：`gh pr create --title '<title>' --body-file -`（接 stdin 貼 description）」
   - 若燈的草稿標出 `<待補：...>`，列出來提醒使用者補。
 
+### 4. Work Board 回寫
+
+本命令本身不開 PR；只有使用者明確表示 PR 已開、或提供 PR URL / 編號時，才依
+[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
+更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+
+- 新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`
+- title 用實際 PR title；理由寫最後活動是你或剛開 PR
+
+回寫時必須保留原 checkbox 與 `🧠` 標記。沒有 PR 編號時不猜、不寫 board。
+
 ## 失敗處理
 
 - base / branch 的問題（找不到 base、HEAD == base、無 commit）在**步驟 1 前置**就判掉，不啟動燈。

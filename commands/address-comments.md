@@ -169,6 +169,18 @@ orchestrator 印出候選清單（每筆一句「為什麼值得記 + 建議 typ
 `/maigo:crystallize` 把它畢業成常駐 skill（review 會自動逐條擋）。」**只提示、不代跑**——
 crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 
+### 8. Work Board 回寫
+
+全部處理完成後，依
+[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
+更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+
+- 當前 branch 對應的 🔀 你的 PR 行進 ⏳ `等 review`
+- 理由寫「已處理 selected review comments」或更精簡的實際摘要
+- 若仍有 blocked work item，狀態可留 🎯 `有新 comment`，下一步仍是 `/maigo:address-comments`
+
+回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
+
 ## Memory propose confirm flow
 
 address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不會產生 `## Memory propose`。

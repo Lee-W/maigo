@@ -28,7 +28,7 @@ cd /path/to/your/project
 claude --plugin-dir /path/to/maigo
 ```
 
-進 Claude Code 後輸入 `/` 應該能看到 `/maigo:go`、`/maigo:team`、`/maigo:review`。
+進 Claude Code 後輸入 `/` 應該能看到 `/maigo:go`、`/maigo:team`、`/maigo:review`、`/maigo:board`。
 
 ### 持久化載入
 
@@ -59,14 +59,15 @@ claude --plugin-dir /path/to/maigo
 /maigo:go <task>          # 5 人順序：探索 → 計畫 → 實作 → review → 驗證
 /maigo:team <task>        # 同上，但 Soyo + Taki 並行（省 ~30% 牆鐘）
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
+/maigo:board              # 跨 session 看現在球在誰手上
 ```
 
-完整 14 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](reference/commands.md)。
+完整 15 個命令（含 `/maigo:quick`、`/maigo:board`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](reference/commands.md)。
 
 ## 文件導覽
 
 - [Getting Started](guides/getting-started.md) — 第一次裝 Maigo 的 5 分鐘入門
-- [Commands reference](reference/commands.md) — 三個命令的完整流程
+- [Commands reference](reference/commands.md) — 每個命令的完整流程、合流邏輯、場景對照
 - [Hooks reference](reference/hooks.md) — SessionStart / TeammateIdle / Stop hook 行為與設定
 - [Skills reference](reference/skills.md) — skill 機制與目前 catalog
 - [Agents reference](reference/agents.md) — 五位 agent 的 model tier 選擇邏輯

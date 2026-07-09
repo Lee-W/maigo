@@ -46,6 +46,16 @@ body + comments 整理成需求敘述：acceptance criteria 從 body 與 maintai
 草擬 commit（body 帶 issue 參照，如 `Fixes #<n>` 或 repo 既有慣例）——**不自動 commit、不
 push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md) 產 PR title/description。
 
+### 4. Work Board 回寫
+
+依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
+更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+
+- 開工時：🐛 issue 行標 `IN_PROGRESS`，旁註 branch 名，留在 🎯
+- 收尾若已開 PR 或使用者提供 PR 編號：新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`，issue 行旁註 linked PR
+
+回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
+
 ## 失敗處理
 
 依 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。

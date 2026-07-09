@@ -50,6 +50,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
 | [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
 | [`git-workflow`](../skills/git-workflow.md) | — (orchestrator 直跑) | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:address-comments`（commit-assembly 步驟） | Git commit 組裝慣例：明確 stage 檔案（不用 `-A`）、不 `cd`（用絕對路徑 / `git -C`）、unreleased commit 的 polish 用 amend（含 tangled-hunk 例外）、CI 分支上修 CI 失敗、對正確 baseline（merge target）量 diff 大小 |
+| [`work-board`](../skills/work-board.md) | orchestrator | `/maigo:board`、`/maigo:review`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:address-comments`、`/maigo:describe-pr` | `.maigo/board.md` 行文法、球權判定、upsert 回寫合約、舊 review-board 遷移、checkbox → `--learn` 學習閘門 |
 
 ## Skill 相依圖
 
@@ -63,9 +64,11 @@ graph LR
         go["/maigo:go"]
         team["/maigo:team"]
         quick["/maigo:quick"]
+        board["/maigo:board"]
         review["/maigo:review"]
         describe["/maigo:describe-pr"]
         triage["/maigo:triage-issue"]
+        take_issue["/maigo:take-issue"]
         address["/maigo:address-comments"]
         crystallize["/maigo:crystallize"]
     end
@@ -99,6 +102,7 @@ graph LR
         maigo_self_check["maigo-self-check"]
         github_reply_draft["github-reply-draft"]
         git_workflow["git-workflow"]
+        work_board["work-board"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -127,12 +131,18 @@ graph LR
 
     review --> pr_cache
     review --> copyable
+    board --> work_board
+    review --> work_board
     describe --> gtd
     describe --> copyable
+    describe --> work_board
     triage --> strict_triage
     triage --> copyable
+    triage --> work_board
+    take_issue --> work_board
     address --> failure_handling
     address --> github_reply_draft
+    address --> work_board
     review --> github_reply_draft
     crystallize --> memory_loading
     crystallize --> failure_handling

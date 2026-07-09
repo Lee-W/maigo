@@ -37,6 +37,7 @@ nav:
       - /maigo:go: commands/go.md
       - /maigo:team: commands/team.md
       - /maigo:quick: commands/quick.md
+      - /maigo:board: commands/board.md
       - /maigo:review: commands/review.md
       - /maigo:remember: commands/remember.md
       - /maigo:memory: commands/memory.md
@@ -67,6 +68,7 @@ nav:
       - copyable-deliverable: skills/copyable-deliverable.md
       - github-reply-draft: skills/github-reply-draft.md
       - git-workflow: skills/git-workflow.md
+      - work-board: skills/work-board.md
   - Changelog: changelog.md
 
 markdown_extensions:

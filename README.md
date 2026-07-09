@@ -48,7 +48,7 @@ cd /path/to/your/project
 claude --plugin-dir /path/to/maigo
 ```
 
-進 Claude Code 後輸入 `/` 應該能看到 `/maigo:go`、`/maigo:team`、`/maigo:review`。
+進 Claude Code 後輸入 `/` 應該能看到 `/maigo:go`、`/maigo:team`、`/maigo:review`、`/maigo:board`。
 
 ### 持久化載入
 
@@ -79,9 +79,10 @@ claude --plugin-dir /path/to/maigo
 /maigo:go <task>          # 5 人順序：探索 → 計畫 → 實作 → review → 驗證
 /maigo:team <task>        # 同上，但 Soyo + Taki 並行（省 ~30% 牆鐘）
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
+/maigo:board              # 跨 session 看現在球在誰手上
 ```
 
-完整 14 個命令（含 `/maigo:quick`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)。
+完整 15 個命令（含 `/maigo:quick`、`/maigo:board`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)。
 
 ## Hook 自動行為
 

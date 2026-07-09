@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供十四個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -198,6 +198,23 @@ orchestrator 判斷兩條路徑：
 
 → [Memory reference](memory.md)
 
+## `/maigo:board` — 跨 session Work Board
+
+把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依球權分成
+🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed，並重生 `.maigo/board.html` 給瀏覽器閱讀。
+
+```
+/maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
+/maigo:board                # 刷新全板、只印 🎯 + 計數
+/maigo:board --all          # 印整板
+/maigo:board --learn        # 盤點已勾但未 🧠 的項目
+/maigo:board --drop <n...>  # 不追了，移除行
+```
+
+board 只決定「下一步誰該動」；實際 review、triage、take issue、address comments
+仍交給各自命令。行文法、球權判定、回寫合約與舊 `.maigo/review-board.md` 遷移規則見
+[work-board skill](../skills/work-board.md)。
+
 ## `/maigo:crystallize` — 把成熟的記憶條目畢業成 skill
 
 記憶層是扁平、relevance-ranked、capped 10 筆的事實儲存；有些條目其實是「反覆出現的慣例 / workflow」，塞在 memory 裡只被當事實載入、相關條目一多還會被擠出前 10 筆。`/maigo:crystallize` 把這類條目**畢業**成常駐 skill——trigger 命中就一定在 context、結構化、可被 command / agent 引用。
@@ -335,6 +352,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 | 加新 feature / 修 bug | `/maigo:go` |
 | 同上但想省牆鐘時間 | `/maigo:team` |
 | Review 同事的 PR | `/maigo:review <pr-url>` |
+| 看目前哪些 issue / PR 輪到自己處理 | `/maigo:board` |
 | 上線前最後一道把關自己的 branch | `/maigo:review` |
 | Review 介面 / 設計層（不要求功能完成） | `/maigo:review --mode=design-preview <ref>` |
 | Compliance audit（只看規範 / 安全） | `/maigo:review --mode=compliance-only <ref>` |
