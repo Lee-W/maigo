@@ -208,7 +208,11 @@ def render_card(item: BoardItem, repo: str) -> str:
             "</div>"
         )
 
-    title_html = f'<div class="title">&ldquo;{html.escape(item.title)}&rdquo;</div>' if item.title else ""
+    title_html = (
+        f'<div class="title">&ldquo;{html.escape(item.title)}&rdquo;</div>'
+        if item.title
+        else ""
+    )
 
     doc_html = ""
     if item.doc:
@@ -238,7 +242,10 @@ def render_card(item: BoardItem, repo: str) -> str:
 
 
 def render_column(emoji: str, items: list[BoardItem], repo: str) -> str:
-    cards = "\n".join(render_card(item, repo) for item in items) or '<p class="empty">（空）</p>'
+    cards = (
+        "\n".join(render_card(item, repo) for item in items)
+        or '<p class="empty">（空）</p>'
+    )
     title = KANBAN_TITLES.get(emoji, emoji)
     css_class = KANBAN_CLASSES.get(emoji, "extra")
     return (
@@ -269,8 +276,12 @@ def render_html(repo: str, sections: list[Section]) -> str:
         else:
             extra.append(section)
 
-    columns_html = "\n".join(render_column(emoji, kanban[emoji], repo) for emoji in KANBAN_ORDER)
-    extra_html = "\n".join(render_extra_section(section, repo) for section in extra if section.items)
+    columns_html = "\n".join(
+        render_column(emoji, kanban[emoji], repo) for emoji in KANBAN_ORDER
+    )
+    extra_html = "\n".join(
+        render_extra_section(section, repo) for section in extra if section.items
+    )
 
     repo_label = html.escape(repo) if repo else "(unknown repo)"
 
@@ -415,17 +426,30 @@ def materialize_docs(sections: list[Section], base_dir: Path) -> int:
     Paths in `item.doc` are relative to the rendered board (i.e. *base_dir*). For every
     doc that ends in `.md` and exists, run pandoc to produce `<same>.html` next to it and
     rewrite `item.doc` to the `.html` path so the card links to a readable page. Degrades
-    gracefully: no pandoc, or a missing source, leaves the `.md` link untouched.
+    gracefully: no pandoc, a missing source, or a `.doc` that resolves outside *base_dir*
+    (absolute path / `../` escape) leaves the `.md` link untouched and does not write
+    anywhere on disk.
     """
     if not shutil.which("pandoc"):
-        sys.stderr.write("board_render: pandoc 不在 PATH，📄 連結維持指向 .md（不 render）\n")
+        sys.stderr.write(
+            "board_render: pandoc 不在 PATH，📄 連結維持指向 .md（不 render）\n"
+        )
         return 0
 
-    items = [it for sec in sections for it in sec.items if it.parsed and it.doc.endswith(".md")]
+    items = [
+        it
+        for sec in sections
+        for it in sec.items
+        if it.parsed and it.doc.endswith(".md")
+    ]
     if not items:
         return 0
 
-    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as fh:
+    base_resolved = base_dir.resolve()
+
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".html", delete=False, encoding="utf-8"
+    ) as fh:
         fh.write(DOC_STYLE)
         header = fh.name
 
@@ -436,6 +460,11 @@ def materialize_docs(sections: list[Section], base_dir: Path) -> int:
             html_rel = it.doc[: -len(".md")] + ".html"
             if it.doc in rendered:
                 it.doc = html_rel
+                continue
+            if not src.is_relative_to(base_resolved):
+                sys.stderr.write(
+                    f"board_render: 📄 `{it.doc}` 逃出 base_dir，略過 render\n"
+                )
                 continue
             if not src.is_file():
                 continue
@@ -463,7 +492,9 @@ def materialize_docs(sections: list[Section], base_dir: Path) -> int:
                 rendered[it.doc] = html_rel
                 it.doc = html_rel
             else:
-                sys.stderr.write(f"board_render: pandoc 失敗 {src.name}: {proc.stderr.strip()[:120]}\n")
+                sys.stderr.write(
+                    f"board_render: pandoc 失敗 {src.name}: {proc.stderr.strip()[:120]}\n"
+                )
     finally:
         Path(header).unlink(missing_ok=True)
 

@@ -54,7 +54,9 @@ class TestParseLine:
         assert item.command == "/maigo:review 789"
 
     def test_no_command_line(self):
-        item = br.parse_line('- [ ] 🔀 #460 (你) **等 review** — 最後活動是你 07-08 — "…"')
+        item = br.parse_line(
+            '- [ ] 🔀 #460 (你) **等 review** — 最後活動是你 07-08 — "…"'
+        )
         assert item.parsed
         assert item.command == ""
         assert item.reason == "最後活動是你 07-08"
@@ -81,7 +83,9 @@ class TestParseLine:
         assert item.title == "states"
 
     def test_no_doc_link(self):
-        item = br.parse_line('- [ ] 👀 #239 (jason) **APPROVE** — 待送 → `approve on GH` — "gradle"')
+        item = br.parse_line(
+            '- [ ] 👀 #239 (jason) **APPROVE** — 待送 → `approve on GH` — "gradle"'
+        )
         assert item.doc == ""
         assert "doc-link" not in br.render_card(item, "apache/airflow")
 
@@ -117,6 +121,66 @@ class TestMaterializeDocs:
         sections, item = self._sections("review-1.md")
         assert br.materialize_docs(sections, tmp_path) == 1
         assert item.doc == "review-1.html"
+
+    def test_pandoc_failure_leaves_md_and_warns(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        (tmp_path / "review-1.md").write_text("# hi", encoding="utf-8")
+
+        def fake_run(cmd, **kw):
+            return __import__("subprocess").CompletedProcess(cmd, 1, "", "boom")
+
+        monkeypatch.setattr(br.subprocess, "run", fake_run)
+        sections, item = self._sections("review-1.md")
+        assert br.materialize_docs(sections, tmp_path) == 0
+        assert item.doc == "review-1.md"
+        assert "pandoc 失敗" in capsys.readouterr().err
+
+    def test_missing_source_skipped_safely(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        sections, item = self._sections("nope.md")
+        assert br.materialize_docs(sections, tmp_path) == 0
+        assert item.doc == "nope.md"
+
+    def test_duplicate_doc_dedup_shares_rendered_html(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        (tmp_path / "review-1.md").write_text("# hi", encoding="utf-8")
+
+        def fake_run(cmd, **kw):
+            out = cmd[cmd.index("-o") + 1]
+            Path(out).write_text("<html></html>", encoding="utf-8")
+            return __import__("subprocess").CompletedProcess(cmd, 0, "", "")
+
+        monkeypatch.setattr(br.subprocess, "run", fake_run)
+        item1 = br.parse_line(
+            '- [ ] 👀 #1 (bob) **APPROVE** — ok 📄 `review-1.md` — "t"'
+        )
+        item2 = br.parse_line(
+            '- [ ] 👀 #2 (bob) **APPROVE** — ok 📄 `review-1.md` — "t"'
+        )
+        sections = [br.Section(emoji="🎯", name="你的球", items=[item1, item2])]
+        assert br.materialize_docs(sections, tmp_path) == 1
+        assert item1.doc == "review-1.html"
+        assert item2.doc == "review-1.html"
+
+    def test_absolute_and_escaping_doc_paths_rejected(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(br.shutil, "which", lambda _: "/usr/bin/pandoc")
+        outside = tmp_path.parent / "outside.md"
+        outside.write_text("# secret", encoding="utf-8")
+
+        sections_abs, item_abs = self._sections(str(outside))
+        assert br.materialize_docs(sections_abs, tmp_path) == 0
+        assert item_abs.doc == str(outside)
+        assert not outside.with_suffix(".html").exists()
+
+        sections_rel, item_rel = self._sections("../outside.md")
+        assert br.materialize_docs(sections_rel, tmp_path) == 0
+        assert item_rel.doc == "../outside.md"
+        assert not outside.with_suffix(".html").exists()
+
+        err = capsys.readouterr().err
+        assert "逃出 base_dir" in err
 
     def test_learned_badge(self):
         item = br.parse_line('- [x] 👀 #700 (dave) **APPROVE** 🧠 — merged 07-07 — "…"')
@@ -169,10 +233,16 @@ class TestParseBoard:
 
 class TestIssueUrl:
     def test_bare_ref_uses_header_repo(self):
-        assert br.issue_url("Lee-W/maigo", "#123") == "https://github.com/Lee-W/maigo/issues/123"
+        assert (
+            br.issue_url("Lee-W/maigo", "#123")
+            == "https://github.com/Lee-W/maigo/issues/123"
+        )
 
     def test_owner_repo_ref_ignores_header_repo(self):
-        assert br.issue_url("Lee-W/maigo", "other/repo#9") == "https://github.com/other/repo/issues/9"
+        assert (
+            br.issue_url("Lee-W/maigo", "other/repo#9")
+            == "https://github.com/other/repo/issues/9"
+        )
 
     def test_bare_ref_without_repo_header_returns_empty(self):
         assert br.issue_url("", "#123") == ""
@@ -195,17 +265,23 @@ class TestRenderCard:
         assert '<span class="badge learned">🧠</span>' in rendered
 
     def test_unchecked_item_has_unchecked_class(self):
-        item = br.parse_line('- [ ] 🐛 #130 (carol) **NEEDS_INFO** — 等回報者補資訊 — "…"')
+        item = br.parse_line(
+            '- [ ] 🐛 #130 (carol) **NEEDS_INFO** — 等回報者補資訊 — "…"'
+        )
         rendered = br.render_card(item, "Lee-W/maigo")
         assert 'class="card unchecked"' in rendered
 
     def test_ref_renders_github_link(self):
-        item = br.parse_line('- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"')
+        item = br.parse_line(
+            '- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"'
+        )
         rendered = br.render_card(item, "Lee-W/maigo")
         assert 'href="https://github.com/Lee-W/maigo/issues/123"' in rendered
 
     def test_command_renders_copy_button(self):
-        item = br.parse_line('- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"')
+        item = br.parse_line(
+            '- [ ] 🐛 #123 (alice) **READY** — x → `/maigo:take-issue 123` — "t"'
+        )
         rendered = br.render_card(item, "Lee-W/maigo")
         assert "copy-btn" in rendered
         assert "/maigo:take-issue 123" in rendered
@@ -261,7 +337,9 @@ class TestMain:
         assert br.main([str(board), str(out)]) == 0
         assert out.is_file()
 
-    def test_missing_board_file_exits_1(self, tmp_path: Path, capsys: pytest.CaptureFixture):
+    def test_missing_board_file_exits_1(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ):
         missing = tmp_path / "nope.md"
         assert br.main([str(missing)]) == 1
         assert "不存在" in capsys.readouterr().err
