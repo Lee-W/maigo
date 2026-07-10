@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.41.1 (2026-07-10)
+
+### Fix
+
+- **board**: reject doc paths escaping the board directory
+
 ## v0.41.0 (2026-07-09)
 
 ### Feat
