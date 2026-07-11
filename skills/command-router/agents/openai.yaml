@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maigo Command Router"
+  short_description: "Route Maigo workflows in Codex sessions"
+  default_prompt: "Use $command-router to run maigo:retro for this session."

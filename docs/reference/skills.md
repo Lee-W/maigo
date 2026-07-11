@@ -32,6 +32,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 
 | Skill | Owner agent | Consumers | 摘要 |
 |-------|-------------|-----------|------|
+| [`command-router`](../skills/command-router.md) | orchestrator | Codex sessions | 把 `maigo:*` pseudo-command dispatch 到 `commands/*.md`，並映射 Codex 的互動、分工與驗證能力；不複製 command 行為 |
 | [`strict-review`](../skills/strict-review.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
 | [`airflow-aware`](../skills/airflow-aware.md) | — (知識層) | 任何 skill（在 apache-airflow contributor checkout 時由 repo-detect hook 自動載入） | Airflow contributor 慣例：Dag 命名規則、Breeze/uv 環境、Ruff/Mypy 風格、coding rules、pytest patterns、PR hygiene（英文） |
 | [`commitizen-aware`](../skills/commitizen-aware.md) | — (知識層) | 任何 skill（在 commitizen-tools/commitizen contributor checkout 時由 repo-detect hook 自動載入） | commitizen contributor 慣例：uv + poe 任務、Conventional Commits 自舉、ruff/mypy lint、pytest、PR guidelines（英文） |
@@ -84,6 +85,7 @@ graph LR
     repo_detect["hooks/repo_detect.py<br/>(SessionStart)"]
 
     subgraph Skills
+        command_router["command-router"]
         teammate_flow["teammate-flow"]
         narration_s["narration"]
         orchestrator_voice["orchestrator-voice"]
@@ -109,6 +111,7 @@ graph LR
     pr_cache_script["scripts/pr_context_cache.py"]
 
     Commands --> narration_s
+    command_router --> narration_s
     narration_s --> orchestrator_voice
 
     go --> teammate_flow

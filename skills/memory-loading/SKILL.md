@@ -1,6 +1,6 @@
 ---
 name: memory-loading
-description: This skill should be used by all maigo agents at startup, before beginning work, to load relevant cross-project memory entries with relevance-based ordering and a 10-entry cap. Consumers: Raana, Tomori, Soyo, and any future agent that reads ~/.config/maigo/memory/.
+description: "This skill should be used by all maigo agents at startup, before beginning work, to load relevant cross-project memory entries with relevance-based ordering and a 10-entry cap. Consumers: Raana, Tomori, Soyo, and any future agent that reads ~/.config/maigo/memory/."
 ---
 
 <!-- mkdocs-include-start -->

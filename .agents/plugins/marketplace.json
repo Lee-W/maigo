@@ -1,0 +1,20 @@
+{
+  "name": "maigo",
+  "interface": {
+    "displayName": "Maigo"
+  },
+  "plugins": [
+    {
+      "name": "maigo",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

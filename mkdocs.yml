@@ -50,6 +50,7 @@ nav:
       - /maigo:doctor: commands/doctor.md
       - /maigo:repo-audit: commands/repo-audit.md
   - Skills (source):
+      - command-router: skills/command-router.md
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
       - commitizen-aware: skills/commitizen-aware.md

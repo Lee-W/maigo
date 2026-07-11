@@ -1,0 +1,39 @@
+{
+  "name": "maigo",
+  "version": "0.41.1+codex.20260710082458",
+  "description": "MyGO!!!!! \u9a45\u52d5\u7684\u901a\u7528\u958b\u767c agent flow\u3002\u5927\u5bb6\u4e00\u8d77\u8ff7\u5931\u5427\u3002",
+  "license": "MIT",
+  "author": {
+    "name": "Wei Lee"
+  },
+  "homepage": "https://lee-w.github.io/maigo/",
+  "repository": "https://github.com/Lee-W/maigo",
+  "skills": "./skills/",
+  "keywords": [
+    "multi-agent",
+    "workflow",
+    "review",
+    "mygo",
+    "codex",
+    "claude-code"
+  ],
+  "interface": {
+    "displayName": "Maigo",
+    "shortDescription": "MyGO!!!!! \u9a45\u52d5\u7684\u901a\u7528\u958b\u767c\u5354\u4f5c\u6d41\u7a0b",
+    "longDescription": "\u4ee5 MyGO!!!!! \u4e94\u4eba\u5206\u5de5\u4e32\u8d77\u63a2\u7d22\u3001\u898f\u5283\u3001\u5be6\u4f5c\u3001\u5be9\u67e5\u8207\u9a57\u8b49\uff0c\u4e26\u63d0\u4f9b PR review\u3001issue triage\u3001\u5de5\u4f5c\u770b\u677f\u8207\u8de8\u5c08\u6848\u8a18\u61b6\u6d41\u7a0b\u3002",
+    "developerName": "Wei Lee",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Planning",
+      "Implementation",
+      "Review",
+      "Verification",
+      "Memory"
+    ],
+    "defaultPrompt": [
+      "maigo:go \u63cf\u8ff0\u4f60\u8981\u5b8c\u6210\u7684\u958b\u767c\u4efb\u52d9",
+      "maigo:review <PR URL | branch | commit range>",
+      "maigo:retro"
+    ]
+  }
+}
