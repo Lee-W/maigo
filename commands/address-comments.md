@@ -173,7 +173,7 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 
 全部處理完成後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
-更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+更新 `.maigo/board.md`：
 
 - 當前 branch 對應的 🔀 你的 PR 行進 ⏳ `等 review`
 - 理由寫「已處理 selected review comments」或更精簡的實際摘要

@@ -49,7 +49,7 @@ push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github
 ### 4. Work Board 回寫
 
 依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
-更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+更新 `.maigo/board.md`：
 
 - 開工時：🐛 issue 行標 `IN_PROGRESS`，旁註 branch 名，留在 🎯
 - 收尾若已開 PR 或使用者提供 PR 編號：新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`，issue 行旁註 linked PR

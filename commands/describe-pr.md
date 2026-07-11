@@ -79,7 +79,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 
 本命令本身不開 PR；只有使用者明確表示 PR 已開、或提供 PR URL / 編號時，才依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
-更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+更新 `.maigo/board.md`：
 
 - 新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`
 - title 用實際 PR title；理由寫最後活動是你或剛開 PR

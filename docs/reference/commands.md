@@ -201,12 +201,14 @@ orchestrator 判斷兩條路徑：
 ## `/maigo:board` — 跨 session Work Board
 
 把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依球權分成
-🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed，並重生 `.maigo/board.html` 給瀏覽器閱讀。
+🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed。`--serve` 用 mkdocs 起本地 live reload
+網頁——改 `board.md` 存檔，瀏覽器直接看到新內容。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
 /maigo:board                # 刷新全板、只印 🎯 + 計數
 /maigo:board --all          # 印整板
+/maigo:board --serve        # 起本地 live reload 網頁（mkdocs，見 work-board skill）
 /maigo:board --learn        # 盤點已勾但未 🧠 的項目
 /maigo:board --drop <n...>  # 不追了，移除行
 ```

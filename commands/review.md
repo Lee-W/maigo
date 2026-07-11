@@ -42,7 +42,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 若只是要把一批 PR 放進跨 session board，改用 `/maigo:board <pr-1> <pr-2> ...`。
 長期跨 session 追一批 PR 時用
 [`/maigo:board`](https://github.com/Lee-W/maigo/blob/main/commands/board.md) 的 Work Board
-（`.maigo/board.md` + `.maigo/board.html`）——queue 是 per-run，board 記得跨 session 的狀態轉移
+（`.maigo/board.md`，`/maigo:board --serve` 起本地 live reload 頁面）——queue 是 per-run，board 記得跨 session 的狀態轉移
 （含「你回過但作者又推新東西」）。
 
 ## 雙語輸出
@@ -150,7 +150,7 @@ repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal
 
 GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
-更新 `.maigo/board.md`，並重生 `.maigo/board.html`：
+更新 `.maigo/board.md`：
 
 - 本地 verdict 尚未送 GitHub → 👀 行留在 🎯，狀態詞寫 `BLOCKED` / `NEEDS_CHANGES` /
   `APPROVE_WITH_NITS` / `APPROVE`

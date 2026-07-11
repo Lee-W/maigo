@@ -1,0 +1,259 @@
+"""Tests for scripts.board_serve."""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+
+import scripts.board_serve as bs
+
+
+class TestScaffold:
+    def test_creates_config_and_css(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        site_dir = tmp_path / "site-out"
+
+        config_path = bs.scaffold(maigo_dir, site_dir)
+
+        assert config_path == maigo_dir / "_serve" / "mkdocs.yml"
+        assert config_path.is_file()
+        assert (maigo_dir / "_serve" / "board-style.css").is_file()
+
+    def test_config_points_docs_dir_at_parent(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+        text = config_path.read_text(encoding="utf-8")
+
+        assert "docs_dir: ..\n" in text
+        assert str(tmp_path / "site-out") in text
+
+    def test_config_has_tasklist_extension_for_real_checkboxes(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+        text = config_path.read_text(encoding="utf-8")
+
+        assert "pymdownx.tasklist" in text
+        assert "custom_checkbox: true" in text
+
+    def test_config_excludes_its_own_yaml_from_docs(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+        text = config_path.read_text(encoding="utf-8")
+
+        assert "exclude_docs" in text
+        assert "_serve/mkdocs.yml" in text
+
+    def test_css_styles_task_list_items(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+        css = (maigo_dir / "_serve" / "board-style.css").read_text(encoding="utf-8")
+
+        assert ".task-list-item" in css
+        assert 'input[type="checkbox"]' in css
+
+    def test_does_not_overwrite_existing_config(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        config_path = maigo_dir / "_serve" / "mkdocs.yml"
+        config_path.write_text("# 使用者自訂內容\n", encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "another-site-out")
+
+        assert config_path.read_text(encoding="utf-8") == "# 使用者自訂內容\n"
+
+    def test_does_not_overwrite_existing_css(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        css_path = maigo_dir / "_serve" / "board-style.css"
+        css_path.write_text("/* 使用者自訂樣式 */\n", encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        assert css_path.read_text(encoding="utf-8") == "/* 使用者自訂樣式 */\n"
+
+
+class TestRepoHasMkdocs:
+    def test_true_when_uv_run_succeeds(self, monkeypatch):
+        def fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 0, "mkdocs, version 1.6.1", "")
+
+        monkeypatch.setattr(bs.subprocess, "run", fake_run)
+        assert bs.repo_has_mkdocs() is True
+
+    def test_false_when_uv_run_fails(self, monkeypatch):
+        def fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 2, "", "error: Failed to spawn")
+
+        monkeypatch.setattr(bs.subprocess, "run", fake_run)
+        assert bs.repo_has_mkdocs() is False
+
+    def test_false_when_uv_missing(self, monkeypatch):
+        def fake_run(cmd, **kwargs):
+            raise OSError("uv not found")
+
+        monkeypatch.setattr(bs.subprocess, "run", fake_run)
+        assert bs.repo_has_mkdocs() is False
+
+    def test_false_on_timeout(self, monkeypatch):
+        def fake_run(cmd, **kwargs):
+            raise subprocess.TimeoutExpired(cmd, 15)
+
+        monkeypatch.setattr(bs.subprocess, "run", fake_run)
+        assert bs.repo_has_mkdocs() is False
+
+
+class TestBuildServeCommand:
+    def test_uses_uv_run_when_repo_has_mkdocs(self, monkeypatch, tmp_path: Path):
+        monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: True)
+        config_path = tmp_path / "mkdocs.yml"
+
+        cmd = bs.build_serve_command(config_path, "localhost:8000")
+
+        assert cmd[:2] == ["uv", "run"]
+        assert "mkdocs" in cmd
+        assert str(config_path) in cmd
+        assert "localhost:8000" in cmd
+
+    def test_falls_back_to_uvx_with_pymdown_extensions(
+        self, monkeypatch, tmp_path: Path
+    ):
+        monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: False)
+        config_path = tmp_path / "mkdocs.yml"
+
+        cmd = bs.build_serve_command(config_path, "localhost:8000")
+
+        assert cmd[0] == "uvx"
+        assert "--with" in cmd
+        assert "pymdown-extensions" in cmd
+        assert str(config_path) in cmd
+
+
+class TestMain:
+    def test_missing_maigo_dir_exits_1(self, tmp_path: Path, capsys):
+        missing = tmp_path / "nope"
+        assert bs.main([str(missing)]) == 1
+        assert "不存在" in capsys.readouterr().err
+
+    def test_warns_but_continues_when_board_md_missing(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        monkeypatch.setattr(bs.subprocess, "call", lambda cmd: 0)
+
+        result = bs.main([str(maigo_dir)])
+
+        assert result == 0
+        assert "board.md" in capsys.readouterr().err
+
+    def test_prints_board_url_and_launches_serve_command(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "board.md").write_text("# Work Board\n", encoding="utf-8")
+        recorded = {}
+
+        def fake_call(cmd):
+            recorded["cmd"] = cmd
+            return 0
+
+        monkeypatch.setattr(bs.subprocess, "call", fake_call)
+        monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: True)
+
+        result = bs.main([str(maigo_dir), "--addr", "localhost:9999"])
+
+        assert result == 0
+        assert "localhost:9999" in " ".join(recorded["cmd"])
+        out = capsys.readouterr().out
+        assert "http://localhost:9999/board/" in out
+
+    def test_site_dir_removed_after_serve_exits(self, tmp_path: Path, monkeypatch):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "board.md").write_text("# Work Board\n", encoding="utf-8")
+        created: list[Path] = []
+        real_mkdtemp = bs.tempfile.mkdtemp
+
+        def recording_mkdtemp(*args, **kwargs):
+            path = real_mkdtemp(*args, **kwargs)
+            created.append(Path(path))
+            return path
+
+        monkeypatch.setattr(bs.tempfile, "mkdtemp", recording_mkdtemp)
+        monkeypatch.setattr(bs.subprocess, "call", lambda cmd: 0)
+        monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: True)
+
+        result = bs.main([str(maigo_dir)])
+
+        assert result == 0
+        assert len(created) == 1
+        assert not created[0].exists()
+
+    def test_site_dir_removed_even_on_keyboard_interrupt(
+        self, tmp_path: Path, monkeypatch
+    ):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "board.md").write_text("# Work Board\n", encoding="utf-8")
+        created: list[Path] = []
+        real_mkdtemp = bs.tempfile.mkdtemp
+
+        def recording_mkdtemp(*args, **kwargs):
+            path = real_mkdtemp(*args, **kwargs)
+            created.append(Path(path))
+            return path
+
+        def raising_call(cmd):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(bs.tempfile, "mkdtemp", recording_mkdtemp)
+        monkeypatch.setattr(bs.subprocess, "call", raising_call)
+        monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: True)
+
+        result = bs.main([str(maigo_dir)])
+
+        assert result == 0
+        assert len(created) == 1
+        assert not created[0].exists()
+
+    def test_site_dir_removed_when_scaffold_raises_before_serve(
+        self, tmp_path: Path, monkeypatch
+    ):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "board.md").write_text("# Work Board\n", encoding="utf-8")
+        created: list[Path] = []
+        real_mkdtemp = bs.tempfile.mkdtemp
+
+        def recording_mkdtemp(*args, **kwargs):
+            path = real_mkdtemp(*args, **kwargs)
+            created.append(Path(path))
+            return path
+
+        def raising_scaffold(maigo_dir, site_dir):
+            raise PermissionError("scaffold 沒有寫入權限（模擬 chmod 555 .maigo/）")
+
+        monkeypatch.setattr(bs.tempfile, "mkdtemp", recording_mkdtemp)
+        monkeypatch.setattr(bs, "scaffold", raising_scaffold)
+
+        with pytest.raises(PermissionError):
+            bs.main([str(maigo_dir)])
+
+        assert len(created) == 1
+        assert not created[0].exists()
