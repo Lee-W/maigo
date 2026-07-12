@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.43.0 (2026-07-12)
+
+### Feat
+
+- **skills**: add model-dispatch and harness-discipline skills
+
 ## v0.42.0 (2026-07-11)
 
 ### Feat
