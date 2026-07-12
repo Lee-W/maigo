@@ -54,3 +54,13 @@ live in [`skills/narration`](skills/narration/SKILL.md).
 - 「失敗應該擋下整個 turn」→ hook
 - 「失敗只是品質下降、人可自決定要不要做」→ skill 段落
 - 兩者都要：先 skill 寫清楚 narrative、hook 做最小 regex 兜底
+
+## Verification quirks
+
+- **ruff 只能經 pre-commit 跑**：`uv run ruff` 會 `Failed to spawn`；改用
+  `uv run pre-commit run --files <files>`。注意 `--all-files` 不掃 untracked 檔，
+  新增檔案要明確列進 `--files`。
+- **工具邊界**：venv 工具（`pytest` / `mkdocs` / `pre-commit`）一律用 `uv run` 執行；
+  `hooks/` 底下的腳本與 stdlib-only script 用 `python3` 直接執行，不經 `uv run`。
+- **Version bump 由 CI 執行**：`cz bump` 是 CI 的職責，不屬於任何 plan / 任務步驟 /
+  open question——規劃或交辦時不得把手動 bump 列為待辦項目。

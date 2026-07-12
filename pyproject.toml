@@ -26,6 +26,7 @@ name = "cz_conventional_commits"
 version_provider = "uv"
 version_files = [
   '.claude-plugin/plugin.json:"version"',
+  '.codex-plugin/plugin.json:"version"',
   '.pre-commit-config.yaml:rev:.+Commitizen',
 ]
 version_scheme = "semver"

@@ -70,6 +70,8 @@ nav:
       - github-reply-draft: skills/github-reply-draft.md
       - git-workflow: skills/git-workflow.md
       - work-board: skills/work-board.md
+      - model-dispatch: skills/model-dispatch.md
+      - harness-discipline: skills/harness-discipline.md
   - Changelog: changelog.md
 
 markdown_extensions:

@@ -15,6 +15,17 @@ description: This skill should be used when handling failures in go-class comman
 2. 愛音修完後，**必須附上每條 must-fix 的對應 diff 與 evidence**（不接受「都改好了」這種模糊回報）
 3. 重新請爽世 review。爽世會逐條對照——任何一條沒清就維持 BLOCKED
 
+### 修正輪閉環
+
+套用任何 review 修正後，一律**送回同一位 reviewer** 複驗——同一個 context 才抓得到這輪
+修正本身引入的新矛盾；換一個沒看過前情的 reviewer，等於失去對照歷史的能力。
+
+1. **修到 PASS 為止**——每一輪修正都可能引入新缺陷，改完就收工等於沒驗；verdict 未達
+   對應 command 的通過門檻前，流程不算完成。
+2. **reviewer 無法續用**（原 agent session 已結束、必須開新 agent）時，**視同重新審查**：
+   附上完整前情——原始 diff、前幾輪 must-fix 清單、目前已套用的修正——不能只給「這是修正
+   後的版本」讓新 reviewer 從零判斷。
+
 ### 立希驗證紅
 
 1. 把 failure 完整貼給愛音 (Anon)（command + exit code + output）

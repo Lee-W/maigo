@@ -52,6 +52,8 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
 | [`git-workflow`](../skills/git-workflow.md) | — (orchestrator 直跑) | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:address-comments`（commit-assembly 步驟） | Git commit 組裝慣例：明確 stage 檔案（不用 `-A`）、不 `cd`（用絕對路徑 / `git -C`）、unreleased commit 的 polish 用 amend（含 tangled-hunk 例外）、CI 分支上修 CI 失敗、對正確 baseline（merge target）量 diff 大小 |
 | [`work-board`](../skills/work-board.md) | orchestrator | `/maigo:board`、`/maigo:review`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:address-comments`、`/maigo:describe-pr` | `.maigo/board.md` 行文法、球權判定、upsert 回寫合約、舊 review-board 遷移、checkbox → `--learn` 學習閘門 |
+| [`model-dispatch`](../skills/model-dispatch.md) | orchestrator | orchestrator 在 **Claude Code harness** 下 spawn subagent 時 | 檔位政策（haiku/sonnet/opus 三檔用途）、升降級規則、兩輪重試預算、SendMessage 換檔位限制 |
+| [`harness-discipline`](../skills/harness-discipline.md) | orchestrator | orchestrator 在 **Claude Code harness** 下執行任何 `/maigo:*` 命令時 | 委派門檻（≥4 檔/≥400 行/≥3 檔同修）、回報合約、task-state 防失焦、驗證獨立性（fresh-context 驗證） |
 
 ## Skill 相依圖
 
@@ -105,6 +107,8 @@ graph LR
         github_reply_draft["github-reply-draft"]
         git_workflow["git-workflow"]
         work_board["work-board"]
+        model_dispatch["model-dispatch"]
+        harness_discipline["harness-discipline"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -113,6 +117,10 @@ graph LR
     Commands --> narration_s
     command_router --> narration_s
     narration_s --> orchestrator_voice
+    Commands --> harness_discipline
+    harness_discipline --> model_dispatch
+    harness_discipline --> teammate_flow
+    harness_discipline --> failure_handling
 
     go --> teammate_flow
     team --> teammate_flow
