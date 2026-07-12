@@ -1,1 +1,0 @@
-tests/test_codex_plugin.py::test_codex_manifest_is_valid_and_matches_project_version
