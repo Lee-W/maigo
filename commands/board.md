@@ -23,6 +23,8 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 /maigo:board --all          # 刷新後印整板
 /maigo:board --serve        # 起本地 live reload 網頁（mkdocs），改 board.md 存檔即所見
 /maigo:board --learn        # 對已勾但未 🧠 的項目跑學習盤點
+/maigo:board --check <n...> # 標記「我親自處理過」，作為 --learn 訊號
+/maigo:board --uncheck <n...> # 取消「我親自處理過」標記
 /maigo:board --drop <n...>  # 不追了，直接移除對應行
 ```
 
@@ -75,12 +77,18 @@ URL 若指到其他 repo，行內保留 `owner/repo#n` 全稱。
 
 跑 `python3 scripts/board_serve.py`：
 
-- 首跑在 `.maigo/_serve/` 生成最小 mkdocs scaffold（config ＋ CSS；gitignored 工作區，
-  已存在不覆寫）；`docs_dir` 直指 `.maigo/` 本身——board.md 跟 📄 連結的 .md 由同一個
-  server 渲染，沒有另外的 render 步驟
-- 啟動優先序：repo venv 有 mkdocs → `uv run mkdocs serve`；沒有 → `uvx`（帶
-  `pymdown-extensions`，checkbox 渲染需要）
-- 印出 board 頁網址；`- [ ]` 渲染成真正的 checkbox（唯讀，勾選還是只能改 `board.md`）
+- 首跑在 `.maigo/_serve/` 生成 MkDocs Material scaffold（config ＋ CSS；gitignored
+  工作區）；未修改的舊版會自動升級，使用者自訂版會保留並提示合併
+- 導覽只顯示 Work Board；不把 `.maigo/` 所有 report 排在頁面上方
+- 每個球權 section 渲染成「我處理過／項目／作者／改動／狀態／現況／下一步」七欄表格，
+  不做 Kanban 橫向分欄；GitHub item 與 📄 report 皆可直接點開
+- PR 行從 GitHub `additions` / `deletions` 寫入 `Δ +A/-D`；頁面可搜尋、依類型 / 狀態篩選，
+  並在各球權 section 內依作者、標題或改動量排序，不回寫真相層
+- 啟動優先序：repo venv 有 MkDocs Material 與 pymdown-extensions →
+  `uv run mkdocs serve`；沒有 → `uvx` 臨時取得套件
+- checkbox 與 `🧠` 學習狀態在表格內保留（唯讀，勾選還是只能改 `board.md`）
+- 每列的「操作」選單可複製 `--check` / `--uncheck` / `--drop` 命令；網頁本身
+  不開寫檔 API、不直接修改 `board.md`
 - 改真相層 `board.md` 存檔，served 頁面幾秒內自動更新（mkdocs 內建 live reload）
 - 細節、退場門見 [`skills/work-board` §6](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
 
@@ -93,7 +101,17 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 
 學習閘門只負責進料，不取代 `/maigo:crystallize`。
 
-### 7. `--drop`
+### 7. `--check` / `--uncheck`
+
+`--check <n...>` 把對應行的 `[ ]` 改為 `[x]`，表示「這項是使用者親自處理的」；
+`--uncheck <n...>` 改回 `[ ]`。兩者都可接裸編號或 `owner/repo#n`，且：
+
+- 只改 checkbox，保留 section、整行內容與 `🧠`
+- 已是目標狀態時視為成功（idempotent）
+- 找不到的 target 列出錯誤，其他 target 照常處理
+- `--check` 完成後若該行沒有 `🧠`，照常提示可跑 `/maigo:board --learn`
+
+### 8. `--drop`
 
 `--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後直接移除，
 不是移到 ✅。

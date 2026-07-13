@@ -201,8 +201,10 @@ orchestrator 判斷兩條路徑：
 ## `/maigo:board` — 跨 session Work Board
 
 把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依球權分成
-🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed。`--serve` 用 mkdocs 起本地 live reload
-網頁——改 `board.md` 存檔，瀏覽器直接看到新內容。
+🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed。`--serve` 用 MkDocs Material 起本地 live reload
+網頁：導覽只留工作板，各球權分區以七欄表格呈現，包含獨立作者欄與 PR
+改動行數；支援搜尋、類型 / 狀態篩選與 section 內排序，不用 Kanban。改 `board.md`
+存檔後瀏覽器直接更新。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
@@ -210,12 +212,17 @@ orchestrator 判斷兩條路徑：
 /maigo:board --all          # 印整板
 /maigo:board --serve        # 起本地 live reload 網頁（mkdocs，見 work-board skill）
 /maigo:board --learn        # 盤點已勾但未 🧠 的項目
+/maigo:board --check <n...> # 標記為使用者親自處理過
+/maigo:board --uncheck <n...> # 取消處理標記
 /maigo:board --drop <n...>  # 不追了，移除行
 ```
 
 board 只決定「下一步誰該動」；實際 review、triage、take issue、address comments
 仍交給各自命令。行文法、球權判定、回寫合約與舊 `.maigo/review-board.md` 遷移規則見
 [work-board skill](../skills/work-board.md)。
+
+`--serve` 的列操作選單只複製 `--check` / `--uncheck` / `--drop` 命令；網頁不會
+直接寫回 `board.md`。
 
 ## `/maigo:crystallize` — 把成熟的記憶條目畢業成 skill
 

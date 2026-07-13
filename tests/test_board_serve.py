@@ -21,6 +21,7 @@ class TestScaffold:
         assert config_path == maigo_dir / "_serve" / "mkdocs.yml"
         assert config_path.is_file()
         assert (maigo_dir / "_serve" / "board-style.css").is_file()
+        assert (maigo_dir / "_serve" / "board-interactions.js").is_file()
 
     def test_config_points_docs_dir_at_parent(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
@@ -42,6 +43,20 @@ class TestScaffold:
         assert "pymdownx.tasklist" in text
         assert "custom_checkbox: true" in text
 
+    def test_config_uses_material_with_board_only_navigation(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+        text = config_path.read_text(encoding="utf-8")
+
+        assert "name: material" in text
+        assert "- 工作板: board.md" in text
+        assert "navigation.tabs" not in text
+        assert "board_serve_hook.py" in text
+        assert "extra_javascript" in text
+        assert "board-interactions.js" in text
+
     def test_config_excludes_its_own_yaml_from_docs(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
@@ -59,8 +74,75 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "site-out")
         css = (maigo_dir / "_serve" / "board-style.css").read_text(encoding="utf-8")
 
-        assert ".task-list-item" in css
-        assert 'input[type="checkbox"]' in css
+        assert ".work-table" in css
+        assert ".work-status" in css
+        assert ".work-command" in css
+        assert ".work-controls" in css
+        assert ".diff-add" in css
+
+    def test_upgrades_unmodified_legacy_scaffold(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        (serve_dir / "mkdocs.yml").write_text(
+            "site_name: Work Board\n"
+            "docs_dir: ..\n"
+            "site_dir: /tmp/old\n"
+            "extra_css:\n  - _serve/board-style.css\n"
+            "exclude_docs: |\n  _serve/mkdocs.yml\n"
+            "markdown_extensions:\n"
+            "  - pymdownx.tasklist:\n      custom_checkbox: true\n",
+            encoding="utf-8",
+        )
+        (serve_dir / "board-style.css").write_text(
+            "/* maigo work-board serve 樣式（scaffold） */\n.task-list-item {}\n",
+            encoding="utf-8",
+        )
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        assert "maigo-board-scaffold: 5" in config_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 5" in (serve_dir / "board-style.css").read_text(
+            encoding="utf-8"
+        )
+
+    def test_upgrades_v3_config_without_discarding_custom_settings(
+        self, tmp_path: Path
+    ):
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        config_path = serve_dir / "mkdocs.yml"
+        config_path.write_text(
+            "# maigo-board-scaffold: 3\n"
+            "site_name: Custom Board\n"
+            "docs_dir: ..\n"
+            "site_dir: /tmp/old\n"
+            "extra_css:\n  - _serve/board-style.css\n"
+            "exclude_docs: |\n  _serve/mkdocs.yml\n",
+            encoding="utf-8",
+        )
+
+        bs.scaffold(maigo_dir, tmp_path / "new-site")
+        text = config_path.read_text(encoding="utf-8")
+
+        assert "maigo-board-scaffold: 5" in text
+        assert "site_name: Custom Board" in text
+        assert f"site_dir: {tmp_path / 'new-site'}" in text
+        assert "board-interactions.js" in text
+
+    def test_interactions_copy_commands_without_writing_board(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+        script = (maigo_dir / "_serve" / "board-interactions.js").read_text(
+            encoding="utf-8"
+        )
+
+        assert "navigator.clipboard.writeText" in script
+        assert "data-copy-command" in script
+        assert "fetch(" not in script
 
     def test_does_not_overwrite_existing_config(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
@@ -129,7 +211,7 @@ class TestBuildServeCommand:
         assert str(config_path) in cmd
         assert "localhost:8000" in cmd
 
-    def test_falls_back_to_uvx_with_pymdown_extensions(
+    def test_falls_back_to_uvx_with_material_and_pymdown_extensions(
         self, monkeypatch, tmp_path: Path
     ):
         monkeypatch.setattr(bs, "repo_has_mkdocs", lambda: False)
@@ -139,6 +221,7 @@ class TestBuildServeCommand:
 
         assert cmd[0] == "uvx"
         assert "--with" in cmd
+        assert "mkdocs-material" in cmd
         assert "pymdown-extensions" in cmd
         assert str(config_path) in cmd
 
