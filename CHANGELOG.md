@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.44.0 (2026-07-13)
+
+### Feat
+
+- **skills**: crystallize graduated memory conventions into skills
+- **board**: make work tracking easier to scan and manage
+
 ## v0.43.0 (2026-07-12)
 
 ### Feat
