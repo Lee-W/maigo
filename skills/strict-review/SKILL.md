@@ -180,6 +180,10 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
   rename + add to `__all__`; siblings never branched on by type can stay private.
   Details + Airflow case studies: `references/recurring-patterns.md` and
   `skills/airflow-aware/references/review-checks.md`.
+- **New public symbol must export at the same surface as its siblings** — a new
+  Enum/class/type consumed by a user-facing kwarg must be reachable from the same
+  top-level import as the sibling class that uses it; missing `__all__` / lazy-import
+  entries is must-fix, not nit. Details: `references/recurring-patterns.md`.
 - **測試要預設用 parametrize** — 疊 assert 或近重複 test method → must-fix，拆成
   `@pytest.mark.parametrize` + `pytest.param(..., id=...)` 標 case 名稱。
 - **不要框框式區段分隔註解** — `# ----` / `# --- 區段名 ---` 全刪含 label，靠函式邊界與空行分段。
@@ -214,11 +218,11 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag (references)
 
-Ten principles for calibrating whether a finding is a real must-fix and how
+Twenty principles for calibrating whether a finding is a real must-fix and how
 much change a comment warrants; details in `references/review-judgment.md`:
 
 - **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
-- **Don't escalate coverage gap to correctness bug** — verify reachability + not-by-design before calling it a bug.
+- **Don't escalate coverage gap to correctness bug** — verify reachability + not-by-design (and blast radius — a removed guard isn't automatically must-fix) before calling it a bug.
 - **Don't adopt regression framing uncritically** — verify the claim against HEAD; reply-only may be correct.
 - **Proportionality** — COMMENTED nit does not justify a cross-hierarchy refactor; do the minimum proportionate change.
 - **Don't flag squash-before-merge history** — pre-merge commit count / fixups vanish on merge; flag content violations, not history shape.
@@ -227,6 +231,16 @@ much change a comment warrants; details in `references/review-judgment.md`:
 - **A "minimize changes" instruction never licenses keeping a disproven fact** — fix the wrong token, keep the rest minimal.
 - **Prefer conforming new code to an existing checker over extending the checker** — a local annotation fix beats a cross-cutting change to checker logic.
 - **Verify installed-package evidence against the commit actually under test** — confirm the `.venv` matches the commit's lockfile and Python-version marker before citing package source.
+- **Judge only the current/latest diff state** — commit history and prior review rounds are irrelevant to the verdict.
+- **Don't silently overwrite a prior round's verdict** — a stricter new verdict needs discriminating evidence; surface conflicts to the user instead.
+- **Verify a cited convention belongs to the same architectural layer** — a same-codebase precedent from a different layer is a category error, not support.
+- **Calibrate naming-nit persistence by visibility** — one round then drop for private names; public API naming drift is worth pushing on.
+- **Verify a hard-limit claim before asserting "impossible" or "breaking"** — check release status and actual tool capability before foreclosing an option.
+- **A reviewer's "strict / validate / enforce" wording may not match the schema** — check the underlying data model and sibling commands before implementing literally.
+- **Don't demand a thin wrapper validate the wrapped library's own semantics** — and don't flag an eager-to-lazy init refactor as breaking without a concrete consumer signal.
+- **Rank designs by the actual cadence of their cost path** — verify trigger frequency in code, not by feel; verify assumed costs too.
+- **Verify a mechanism claim empirically** — write a small isolated repro before publishing a "why this works/breaks" explanation.
+- **Trace the introducing commit before reverting a shared signature** — a type error at a changed signature's use site is usually an incomplete rollout, not a wrong change.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

@@ -58,6 +58,57 @@ description: This skill should be used when handling failures in go-class comman
 3. 續跑指令必須要求**先盤點再續作**：`git status` + 檢視目標檔案，逐項判斷任務做到哪，只補缺的。盤點常發現工作其實已全部完成（切斷發生在回報前）——此時直接進驗證，避免重工。
 4. 盤點與續作完成後照常走原流程——review / 驗證不因中斷打折。
 
+### 等待自己開的背景 agent
+
+用 Agent tool 開的背景 agent 完成時會自動發 task-notification 把 orchestrator 叫回來，**不需要
+排 ScheduleWakeup 去輪詢**。ScheduleWakeup 是 `/loop` dynamic mode 專用工具，不是等待自己 spawn
+的背景任務的機制——同一條教訓在不同 `/maigo:address-comments` 場次重複違反過，根因是
+orchestrator 自己跑 `/maigo:*` 流程前沒有主動查一次 memory（見
+[`skills/memory-loading`](https://github.com/Lee-W/maigo/blob/main/skills/memory-loading/SKILL.md)
+consumer 清單已補上 orchestrator）。
+
+背景 subagent 若寫了一個等待「從未被建立過的哨兵檔案」的假迴圈（例如輪詢一個不存在的 flag
+檔案直到自己的 Bash timeout 打斷它），**不要重新 spawn 這個 agent**——用 SendMessage 直接告訴它
+(1) 那個假旗標檔案不會被任何東西建立，停掉那個迴圈；(2) 明確給出它自己啟動的背景任務的真實
+output 檔案路徑或 task id，叫它直接讀那個檔案或用 TaskOutput 查真實狀態。
+
+### Subagent 拒絕 relay 而卡死
+
+Orchestrator 用 `SendMessage` 把 Soyo 的 must-fix 轉給一個正在跑的 Anon 時，Anon 可能把這個
+relay 當成「沒有使用者直接授權的 coordinator 訊息」而拒絕執行，即使 orchestrator 事後確認授權
+也持續卡住。
+
+**How to apply**：對於一個一行、完整指定的簡單修正（import 移動、rename、單行邏輯），
+orchestrator 直接 inline 套用，不要再 relay 一次。真的需要委派時，開一個**全新**的 Agent()
+（乾淨 context、無 relay 框架），不要對已卡死的 agent 再 SendMessage——同類任務由全新 agent
+執行通常不會被拒絕。
+
+### 先定位層級再修，不要直接 patch 工具原始碼
+
+當某個 maigo / hook / 共用工具在**特定 repo** 表現異常時，先追高層再考慮改工具本身：
+
+1. 這個 repo 是否已有對應的 `repo-aware` skill（如 `airflow-aware`、`commitizen-aware`）在處理這類摩擦？有 → 修法大概率在該 skill 或它引用的 seed。
+2. maigo 的 `SessionStart` `repo_detect` hook 是否已經替這個 repo seed 了對應的 `.claude/<config>`？檢查 `hooks/repo_detect.py` 的 `REPO_RULES` → `claude_config_seeds`；若有，可能只是這個 worktree 建立在該功能之前，手動補寫一次 seed 檔即可。
+3. 這個工具是否已支援 opt-in / opt-out 設定檔（如 `skip-test-verification`、`test-command`、`known-test-failures`）？有就用它。
+
+三層都確認缺席後才考慮動工具原始碼——patch 共用工具的 blast radius 是跨 repo 的，一個為
+某 repo 環境限制調校的「修法」會改變所有沒有那個限制的其他 repo 的行為。
+
+### Stop hook 假陽性迴圈
+
+當 Stop-hook 的 test verifier 因為**環境 / collection 層**問題（不是變更本身壞掉）逐輪重新觸發：
+
+1. **先確認一次成因**——是 host 環境結構性壞掉（bootstrap / install-time 失敗），還是單純
+   monorepo scope 抓錯 test 指令。前者才適用「寫 skip 檔」；後者且變更有真正新行為要覆蓋時，
+   應該修對應的 `.claude/test-command` 成正確 scoped 指令、寫一個真的 test 去測，不要圖方便
+   直接跳過驗證。
+2. 環境結構性壞掉、且已經用該 repo 的真實 runner 確認過一次是綠的 → 立刻寫
+   `.claude/skip-test-verification`（帶非空、非註解的原因說明）disarm 該 worktree 的 verifier，
+   不要每輪重新解釋同一個假陽性——任何一次回覆都會重新觸發 Stop hook，逐輪重複解釋等於空轉。
+3. 使用者明確說「忽略這個 hook」時，**輸出零字元**——連 `.`、`[ignored]`、空白都不行。任何輸出
+   都會結束該輪、讓 harness 重跑 Stop hook、hook 再次擋下，形成迴圈。等使用者修 hook 設定 /
+   中斷 session / 送新任務，不要逐次確認每次觸發。
+
 ### 無限迴圈防護
 
 - 爽世連續擋 **2 次**同一條 must-fix → 停下，請使用者介入（可能是計畫本身有問題）

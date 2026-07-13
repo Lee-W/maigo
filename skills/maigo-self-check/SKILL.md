@@ -56,6 +56,19 @@ pytest 測的是 Python 行為；上述問題都在 plugin 結構層——pytest
 不能只是 UI/error 訊息引號。機器兜底由 `validate_plugin.py` 的
 `check_command_persona_quotes` 檢查，不必自己記著掃。
 
+## 改 `references/*.md` 時：跟 SKILL.md 摘要同步
+
+幫某個 skill 的 `references/*.md` 加新內容時，兩件事一起做，缺一都算沒改完：
+
+1. **改之前**先看該 reference 檔開頭宣告的範圍（例如「Read this file when ...」）是否覆蓋新主題。
+   題材對不上就不要硬塞——擴大宣告範圍，或改放進更貼切的位置（往往是 SKILL.md 本體裡已經在談同主題的段落）。
+2. **改之後**同步 SKILL.md 本體對這份 reference 檔案的摘要（列出的條數、bullet 清單）——SKILL.md
+   是永遠會被載入的主體，reference 檔是 on-demand；摘要沒同步，新內容等於沒人看得到。
+
+**為什麼**：`/maigo:crystallize` 一次批次畢業多筆記憶時踩過兩次——`references/*.md` 加了新內容，
+但 SKILL.md 本體的條數摘要（如「Three cross-cutting patterns」）沒跟著改成新的數字。這條檢查
+不限 crystallize；`/maigo:quick`、`/maigo:go` 只要動到 `skills/` 都算。
+
 ## 兩條都必須綠才算完成
 
 任何一條紅 → 驗證未通過，不算 Taki PASS。回報實際錯誤，不跳過、不假裝綠。

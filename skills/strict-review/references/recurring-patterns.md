@@ -47,6 +47,32 @@ promotion is the discipline; do not broadcast the whole hierarchy.
 
 ---
 
+## New public symbol must export at the same surface as its siblings
+
+When a diff introduces a new public Enum / class / type intended for user-facing
+call sites (e.g., a kwarg value type), it must be reachable from the same
+top-level import surface as the sibling symbol whose kwarg consumes it. If
+`Foo` is reachable via `from pkg import Foo`, a new `Bar` used as
+`direction=Bar.FORWARD` on `Foo` must also be reachable via `from pkg import Bar`
+— not from a deeper internal path.
+
+How to apply during review (checklist item 4 — convention conformance):
+
+1. Identify the sibling symbol(s) — typically the class whose kwarg/parameter
+   consumes the new symbol.
+2. Grep how the sibling is exported (`__all__`, top-level re-import,
+   lazy-import / `TYPE_CHECKING` table).
+3. Verify the new symbol matches the sibling on every export surface. Missing
+   entries → **must-fix**, not nit. A docstring example using a deep-path
+   import is part of the same gap — it confirms the symbol isn't reachable
+   from the surface a user expects.
+
+Asymmetric import depth signals an oversight, not a deliberate design choice —
+users typing the new kwarg instinctively reach for the same import root they
+already use for the surrounding class.
+
+---
+
 ## Concurrent PR 根本修法優先
 
 發現另一個 concurrent PR 在 SDK/library 層修同一問題的根本（例如改用 SDK 提供的 credential

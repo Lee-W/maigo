@@ -62,6 +62,21 @@ When it fires:
 Note: a file that *discusses* this naming rule itself (like this skill file) will always
 trip the hook — that's expected, not a bug to fix.
 
+#### Historical archival files are exempt — never rewrite past entries
+
+`airflow-core/docs/migrations-ref.rst` and `RELEASE_NOTES.rst` /
+`CHANGELOG.rst` (including provider `changelog.rst` files) reproduce
+historical record verbatim — a migration revision's original message, or a
+past PR's shipped title. Existing all-caps/lowercase spellings in those
+**past entries** are not to be rewritten to `Dag`, even when a naming-rule
+hook fires on them. Rewriting them silently changes the historical record and
+breaks the `git log` ↔ release-note correspondence for past PRs. When scoped
+to fixing something else in one of these files (e.g. a spell-check nit),
+touch only the offending line; ignore the naming hook for pre-existing
+all-caps occurrences elsewhere in the same file — don't pre-emptively "fix"
+them. **New** entries appended to these files still follow the normal Dag
+naming rule; only existing historical rows are exempt.
+
 ### 3. Environment — Breeze + uv + prek
 
 Do **not** run `pytest`, `mypy`, or `pre-commit` directly on the host.
@@ -83,6 +98,29 @@ prek run --all-files
 Scratch scripts go in `dev/` — not in repo root or `scripts/`.
 
 Note: `prek` is the runner currently specified by upstream. It is compatible with the same hooks as `pre-commit`.
+
+#### Before building a new prek hook: surface the genericity/fragility trade-off first
+
+Before adding a new prek hook, answer two questions **up front** and surface
+them to the user for sign-off — don't wait until the hook is fully
+implemented (with tests, registered in `.pre-commit-config.yaml`) before the
+user gets a chance to reconsider:
+
+1. Do sibling checks already exist for a similar concern? A CI gate scoped to
+   only one provider/module when siblings have no equivalent check is an
+   inconsistent precedent worth calling out.
+2. Will the check false-positive on a small, unrelated change (a doc
+   reformat, a cross-reference restyling)? A brittle detection heuristic
+   costs more in false-positive triage than it saves.
+
+Beyond that up-front check, prefer **dynamic discovery over hardcoded
+references** — e.g. walk a migration chain via its own directory/API rather
+than hardcoding specific revision IDs, so a new entry added later is
+automatically in scope without a script edit. And stop to simplify when a
+hook's design starts accreting per-version matrices, baseline files, or
+regenerate-baseline flags — a design that doubles in complexity in one
+session usually has a simpler alternative (e.g. collapsing to a single
+linear walk with no baseline) that gives the same coverage.
 
 #### `uv run --project` vs `--directory` danger zone
 
@@ -147,9 +185,13 @@ These are extracted from the "Coding rules" section of `AGENTS.md`. They are lis
 because they are the conventions agents most frequently overlook.
 
 For the extended recipes on import placement (top-level vs `TYPE_CHECKING` vs
-lazy), class-docstring `:param` conventions, user-facing docstring wording,
-and the "no `logical_date` in Airflow 3 examples" authoring rule, read
-`references/code-style.md`.
+lazy, plain name over alias, shadowing-parameter rename), class-docstring
+`:param` conventions (including dropping boilerplate `__init__` lead-ins),
+user-facing docstring wording, naming/constant conventions, raise-vs-document
+validation posture, dropping manually-enumerated invariants once a check
+enforces them, mypy `Optional` narrowing via branch restructure, new prek
+hook script conventions, and the "no `logical_date` in Airflow 3 examples"
+authoring rule, read `references/code-style.md`.
 
 - **No `assert` in production code** — use a real exception (e.g., `ValueError`, `RuntimeError`).
 - **Do not add new `raise AirflowException`** — use a more specific exception class instead.
@@ -190,6 +232,37 @@ no stale references remain.
 Why: apache/airflow PR #64571 (`Window` / `RollupMapper`) and the partition-mapper
 refactor both shipped with example + docs in the same PR; missing either was flagged in
 round-1 review.
+
+#### QA / status-doc conventions
+
+When drafting or reviewing a manual QA plan, feature-coverage matrix, or
+status doc for a feature that ships:
+
+- **Don't add a "serialization round-trip" manual QA item.** The scheduler
+  only ever reads serialized Dags, so every functional test in the plan
+  already exercises the deserialized form implicitly — a broken round-trip
+  would make those functional checks fail first. Field-level lossless
+  round-trip belongs in a pytest unit test, not a manual QA row. The one
+  legitimate manual touch is a first-time smoke glance at the
+  `serialized_dag` JSON when a brand-new param ships — that's dev smoke, not
+  a recurring QA item.
+- **Don't leave "not done yet" signals in a status/QA doc meant to record
+  completed work** — drop header decorations like `✅ merged` / `🚧` / `❌ not
+  native`, and avoid absence-wording for deliberately-scoped behavior
+  (`not implemented`, `scoped out`, `ad-hoc`/`throwaway` for a fixture).
+  Describe an intentionally-scoped feature positively as the current design,
+  not as a gap measured against something that was never built. An **empty**
+  results column (template waiting to be filled) is fine — that's not a
+  not-done signal. Once a results column is actually **filled**, a per-row
+  `✅ Pass (...)` marking the verification method is good practice — the
+  no-decoration rule governs headers/progress marks and "not done" phrasing,
+  not a factual pass/fail record.
+- **A defect found in the example Dag / test fixture while QA-ing a feature
+  is in scope to fix**, not just to log. If the bug is in the shipped example
+  producer/consumer rather than the feature under test, fix it and fold the
+  fix into the same PR (ask before editing the shared artifact) — a broken
+  example is a broken user-facing artifact, and fixing it is part of
+  finishing the QA.
 
 ### 7. Testing
 
@@ -261,6 +334,16 @@ separate axis covered by the SDK/Core release-state framing memory
 (check release tags via `git tag --contains <sha>` **and** `git show
 <tag>:<file>` to confirm).
 
+#### Design-integrity checks (references)
+
+Four more framework/base-API design patterns — declarative type-pairing
+guards over override proxies, symmetric paired-parameter naming, the two
+independent cost axes of a new hot-loop extension surface, and closing a
+framework-internal sum-type structurally rather than visibly — are in
+`references/design-integrity.md`. Read it when designing or reviewing a new
+base/framework API, a type-pairing guard, or an extension point on the
+scheduler/triggerer/API hot loop.
+
 ### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 When `airflow-aware` is loaded during a **review task** (🟡 Soyo running
@@ -278,6 +361,79 @@ sub-check states. The file covers:
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
 are review-only and do not gate other tasks.
+
+### 11. CLI / REST / docs / backport conventions
+
+#### CLI and REST design consistency
+
+Before designing a new CLI command's semantic, filter, or default, **grep
+sibling commands first** — cross-command consistency outranks a per-command
+UX win. If a proposed behavior diverges from how sibling commands treat the
+same semantic field (e.g. a date-range filter, an end-date clamp), be able to
+explain *why* this command deviates; if you can't, align with the siblings
+instead. Do this before implementation, not after review blocks it.
+
+When adding a REST endpoint that parallels an existing CLI command, name it
+after the **CLI's verb** and the existing REST verb vocabulary, not a more
+literally-accurate coined word — e.g. `clearPartitions` (mirroring CLI
+`airflow partitions clear` and REST `clearDagRuns`) beats a technically-more-
+precise `resetPartitionFields`. Consistency across the user-facing surface
+beats per-endpoint pedantic accuracy.
+
+#### Docs authoring
+
+- **"When to use X vs Y" comparison docs** need why (X's core value
+  proposition), when (bullets mapped to concrete operator/API names with doc
+  links), a mirrored "use Y instead when…" list, and a one-line rule of thumb
+  at the end. Find the *real* axis of difference before writing the
+  difference section — a surface feature comparison that both sides share
+  equally hasn't found the axis yet (e.g. two "agent" operators don't differ
+  by whether they have tools/MCP if both do; they differ by where the loop
+  executes and who controls the tools).
+- **User-facing doc snippets teach the canonical import** — e.g.
+  `from airflow.sdk import dag, task` — not a provider-internal compatibility
+  shim path, which is only for in-package shipped code.
+- **Section headers/labels name the specific things being compared**, not a
+  generic count or umbrella ("Two styles of X" teaches nothing — name the
+  styles). Keep internal-component words (e.g. "scheduler") out of
+  user-facing prose; phrase from the Dag author's observable perspective.
+- **`providers/<x>/docs/index.rst` has a hand-written prologue followed by an
+  auto-generated block** (marked by an "AUTOMATICALLY GENERATED" comment)
+  that gets overwritten at release time. Reordering/placement feedback on
+  this file is answered by editing **above** the marker (usually a short
+  lead-in sentence), never by moving content at or after it.
+- When a new parameter/flag changes user-visible API semantics (e.g. how a
+  special character is interpreted in a query param), the **public
+  description / OpenAPI spec must be updated in the same change** as the
+  code — not left describing the old semantics. Regenerate the spec + client
+  after editing.
+- **zh-TW locale content**: call it "Taiwanese Mandarin", never "Traditional
+  Chinese" — this applies to commit messages, PR text, docs, and comments
+  produced for this repo. When translating a UI string, check the repo's
+  existing zh-TW translations for established terminology before coining a
+  new term.
+
+#### Partitioned / scheduling-range API granularity
+
+Don't type a partitioned/scheduling-range API parameter at `date` granularity
+(`datetime.date`) — take `datetime` bounds and walk the timetable's own
+cadence instead. A `date`-typed parameter makes a sub-day window structurally
+inexpressible, and day-bound expansion logic then silently widens any window
+to the whole local day even for an hourly-cadence timetable. When adding or
+reviewing timetable/backfill range behavior: pass datetimes and honor bounds
+as both-ends-inclusive instants; always add a sub-day cron case
+(`"0 * * * *"`) to the tests — day-grained tests alone give a false green on
+day-bound bugs.
+
+#### Backport judgment
+
+When a backport branch's drift-check fails because it references something
+(a file, a test site) that doesn't exist on that branch, check whether the
+**underlying capability** is already present on the branch before deciding
+the check should just be narrowed in scope. If the capability shipped but
+the newer test coverage for it didn't get backported, the right move is
+usually to backport the source PR that added the missing coverage — not to
+shrink the check to stop noticing the gap.
 
 ## Composing with other skills
 

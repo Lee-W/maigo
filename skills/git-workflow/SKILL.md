@@ -172,11 +172,52 @@ current commit" (an amend), not "vs. the merge target". Verify empirically
 against `git show`/`git diff` output — don't assert sizing from memory of
 the working tree.
 
+## Pushing and opening a PR
+
+**A widget selection is not authorization to open a PR.** Never run `gh pr create`
+(including `gh pr create --web`, which only opens a pre-filled browser tab) unless
+the user explicitly asks for it in the current turn. Picking a multi-choice option
+like "Commit and open PR" from an AskUserQuestion-style widget is ambiguous for the
+PR-creation half specifically — confirm once more (plain text is fine) immediately
+before calling `gh pr create`. After committing and pushing a branch, default to
+stopping there: report the branch/compare URL and ask if a PR should be opened.
+
+## Worktree hygiene (references)
+
+Ten conventions for worktree lifecycle and git-attribution — sibling-layout
+naming, when to open a separate worktree for a pre-existing issue, batch
+cleanup safety, squash-merge-aware "already merged" checks, and not
+over-attributing surprising git state (commits/rebases/wrong commit subject)
+to a rogue agent when it's more likely the user working in parallel or an
+unverified delegate report. Details and recipes in
+`references/worktree-hygiene.md`:
+
+- **Sibling layout** — worktrees live as siblings of the main checkout
+  (`<repo>-<topic>`, branch `<topic>`), not nested under a tool's default path.
+- **Pre-existing fix → new worktree off upstream/main**, not folded into the
+  current feature branch (proportionality counter-case for trivial diffs).
+- **Batch cleanup**: show the exact command list before running; don't chain
+  many worktree/branch ops in one shell call (timeout risk).
+- **Squash-merge "already merged" check** needs `gh search prs`, not
+  `git branch --merged` (squash breaks ancestry).
+- **Don't over-attribute unexpected git state to a rogue agent** — verify
+  quietly (reflog, staged files) before alarming; on a delegated task, verify
+  git state (reflog/log/status) before committing on top of it.
+- **Verify the landed commit subject** with `git log --oneline -1` after every
+  commit — don't trust the tool's echoed command string.
+- **"Fix the commit message" on a tmp/mislabeled branch** means squash the
+  whole branch into one commit, not reword just the tip.
+
+Read `references/worktree-hygiene.md` when opening/cleaning up worktrees or
+when git history looks surprising after a delegated task.
+
 ## What this skill does NOT cover
 
 - Drafting the commit message text itself — see
   [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md).
 - Deciding *whether* to commit at all, or when in a flow the commit happens
   (e.g. after Soyo + Taki pass) — that's the calling command's own policy.
-- Pushing / PR creation — separate step, separate skill
+- Drafting the PR title / description content itself — separate skill
   ([`github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md)).
+  This skill only governs *when* it's okay to actually run `gh pr create`
+  (see "Pushing and opening a PR" above).

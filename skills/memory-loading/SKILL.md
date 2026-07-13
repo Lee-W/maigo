@@ -1,6 +1,6 @@
 ---
 name: memory-loading
-description: "This skill should be used by all maigo agents at startup, before beginning work, to load relevant cross-project memory entries with relevance-based ordering and a 10-entry cap. Consumers: Raana, Tomori, Soyo, and any future agent that reads ~/.config/maigo/memory/."
+description: "This skill should be used by all maigo agents at startup, before beginning work, to load relevant cross-project memory entries with relevance-based ordering and a 10-entry cap. Consumers: Raana, Tomori, Soyo, the orchestrator itself, and any future agent that reads ~/.config/maigo/memory/."
 ---
 
 <!-- mkdocs-include-start -->
@@ -8,11 +8,16 @@ description: "This skill should be used by all maigo agents at startup, before b
 # Memory Loading
 
 **Owner**: all agents
-**Consumers**: [`agents/Raana.md`](https://github.com/Lee-W/maigo/blob/main/agents/Raana.md)、[`agents/Tomori.md`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md)、[`agents/Soyo.md`](https://github.com/Lee-W/maigo/blob/main/agents/Soyo.md)
+**Consumers**: [`agents/Raana.md`](https://github.com/Lee-W/maigo/blob/main/agents/Raana.md)、[`agents/Tomori.md`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md)、[`agents/Soyo.md`](https://github.com/Lee-W/maigo/blob/main/agents/Soyo.md)、orchestrator 本身
 
 ## 為什麼這個 skill 存在
 
 三個 agent 在啟動時都要做相同的「讀記憶 → schema 自檢 → fallback」流程，但過去各自在 agent prompt 裡重複寫。這個 skill 是三者共通行為的 single source of truth。
+
+**orchestrator 自己也是 consumer**：orchestrator 開始跑任何 `/maigo:*` 流程前，也要主動查一次
+memory，不能只靠 delegate 給 Raana/Tomori/Soyo 時才觸發這個 skill——曾經因為只有 delegate 對象
+會查記憶，orchestrator 自己重複違反同一條「背景 agent 不用 ScheduleWakeup 輪詢」的教訓，兩次都
+沒查過記憶就重犯（見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)「等待自己開的背景 agent」段）。
 
 ## 標準 5 步流程
 
