@@ -225,10 +225,6 @@ def check_command_persona_quotes() -> CheckResult:
     純 UI/error 訊息引號、旁邊完全沒有角色 emoji / 名字的（如 `memory.md` 印的友善提示
     文案）不算數，會被擋下。
 
-    已知殘餘缺口（非本次擋下範圍，先記著）：`address-comments.md` / `crystallize.md` /
-    `triage-issue.md` 目前是靠引號附近**巧合**提到角色名通過（例如順帶提到「Soyo」但那段
-    引號其實是技術名詞，不是角色開口說的話），不是真的有掛名台詞——之後動這幾個檔時留意
-    別刪掉那個巧合來源，最好找機會補一句真台詞。
     """
     r = CheckResult("commands/*.md 至少一段掛名角色「」台詞")
     cmds_dir = ROOT / "commands"

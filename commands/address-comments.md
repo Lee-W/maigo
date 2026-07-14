@@ -116,6 +116,8 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 1. 確認計畫：`照計畫跑` / `我要調整路由或分組` / `取消`。選「調整」→ 收使用者修改後重印計畫再確認；選「取消」→ 不動任何檔（triage 檔可留著）並結束。
 2. **Commit 格式**：`各自獨立 commit（預設）` / `fixup! commit（autosquash 用）`。
 
+🎀 愛音：「OK，路由都排好了！那就照順序，一條一條把它們收掉吧。」
+
 ### 5. 逐 work item 實作
 
 使用者確認後，orchestrator 依 triage 檔的順序，逐個 work item 跑它被指定的 route：
