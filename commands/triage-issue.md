@@ -81,6 +81,8 @@ gh api repos/<owner>/<repo>/issues/<N>/timeline --paginate              # linked
 
 ### 4. 爽世 (Soyo) — 套 strict-triage 給 verdict
 
+🟡 爽世：「每一條都該有它的位置。該往前的往前，該停下的，就停在這裡吧。♪」
+
 依 [`skills/strict-triage`](https://github.com/Lee-W/maigo/blob/main/skills/strict-triage/SKILL.md) 操作：
 
 - 預設 NEEDS_INFO，9 項 checklist 逐項標
