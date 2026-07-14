@@ -78,6 +78,9 @@
       tables.forEach((table) => {
         const body = table.tBodies[0];
         [...body.rows].sort(compareRows).forEach((row) => body.append(row));
+        table.closest(".work-table-wrap").hidden = ![...body.rows].some(
+          (row) => !row.hidden,
+        );
       });
       count.textContent = `顯示 ${visible} / ${rows.length}`;
     }

@@ -35,6 +35,17 @@ def test_parse_item_extracts_action_artifact_and_learning_state():
     assert first.deletions == 45
 
 
+def test_parse_item_accepts_markdown_whitespace_variations():
+    item = hook.parse_item(
+        "  -   [ ]   🐛   #123   (alice)   **READY** — ready to start"
+    )
+
+    assert item is not None
+    assert item.item == "#123"
+    assert item.person == "alice"
+    assert item.status == "READY"
+
+
 def test_render_board_uses_section_tables_and_scan_friendly_columns():
     rendered = hook.render_board(BOARD)
 
@@ -49,6 +60,23 @@ def test_render_board_uses_section_tables_and_scan_friendly_columns():
     assert "<th>球權</th>" not in rendered
     assert "- [ ] 🐛 #123" not in rendered
     assert 'class="work-controls"' in rendered
+
+
+def test_render_board_keeps_blank_lines_and_comments_in_one_section_table():
+    board = """\
+# Work Board — Lee-W/maigo
+## 🎯 你的球（2）
+- [ ] 🐛 #123 (alice) **READY** — ready — "first"
+
+<!-- refresh note -->
+- [ ] 🐛 #124 (bob) **待 triage** — new — "second"
+"""
+
+    rendered = hook.render_board(board)
+
+    assert rendered.count('<table class="work-table">') == 1
+    assert rendered.count("<tr data-kind=") == 2
+    assert "<!-- refresh note -->" in rendered
 
 
 def test_render_board_links_github_items_and_local_artifacts():
