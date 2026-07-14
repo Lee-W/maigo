@@ -142,6 +142,7 @@ class TestScaffold:
 
         assert "navigator.clipboard.writeText" in script
         assert "data-copy-command" in script
+        assert 'table.closest(".work-table-wrap").hidden' in script
         assert "fetch(" not in script
 
     def test_does_not_overwrite_existing_config(self, tmp_path: Path):

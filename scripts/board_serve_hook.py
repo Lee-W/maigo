@@ -12,10 +12,10 @@ BOARD_REPO_RE = re.compile(
     r"^# Work Board — (?P<repo>[\w.-]+/[\w.-]+)\s*$", re.MULTILINE
 )
 ITEM_RE = re.compile(
-    r"^- \[(?P<checked>[ xX])\] "
-    r"(?P<kind>🐛|🔀|👀) "
-    r"(?P<item>(?:[\w.-]+/[\w.-]+)?#\d+) "
-    r"\((?P<person>[^)]*)\) "
+    r"^\s*-\s+\[(?P<checked>[ xX])\]\s+"
+    r"(?P<kind>🐛|🔀|👀)\s+"
+    r"(?P<item>(?:[\w.-]+/[\w.-]+)?#\d+)\s+"
+    r"\((?P<person>[^)]*)\)\s+"
     r"\*\*(?P<status>[^*]+)\*\*"
     r"(?P<tail>.*)$"
 )
@@ -257,17 +257,20 @@ def render_table(items: list[BoardItem], default_repo: str | None) -> str:
 
 
 def render_board(markdown: str) -> str:
-    """Replace each contiguous group of canonical board items with a table."""
+    """Replace each board section's canonical items with one sortable table."""
     repo_match = BOARD_REPO_RE.search(markdown)
     default_repo = repo_match.group("repo") if repo_match else None
     lines = markdown.splitlines()
     output: list[str] = []
     pending: list[BoardItem] = []
+    deferred: list[str] = []
 
     def flush() -> None:
         if pending:
             output.extend(["", render_table(pending, default_repo), ""])
             pending.clear()
+            output.extend(deferred)
+            deferred.clear()
 
     controls_added = False
     for line in lines:
@@ -277,6 +280,12 @@ def render_board(markdown: str) -> str:
         item = parse_item(line)
         if item is not None:
             pending.append(item)
+            continue
+        if pending and (not line.strip() or line.lstrip().startswith("<!--")):
+            # Blank lines and invisible notes are harmless inside a section. Keep
+            # them after the table instead of fragmenting one sortable list into
+            # multiple one-row tables.
+            deferred.append(line)
             continue
         flush()
         output.append(line)
