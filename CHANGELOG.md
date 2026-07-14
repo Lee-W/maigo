@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.44.1 (2026-07-14)
+
+### Fix
+
+- **board**: keep served lists sortable across formatting gaps
+
 ## v0.44.0 (2026-07-13)
 
 ### Feat
