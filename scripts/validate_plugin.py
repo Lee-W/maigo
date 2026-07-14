@@ -331,25 +331,32 @@ def check_pre_commit_config() -> CheckResult:
 
 
 def check_skill_crossrefs() -> CheckResult:
-    r = CheckResult("agents / commands 引用的 skill 真的存在")
+    r = CheckResult("agents / commands / skills 引用的 skill 真的存在")
     skills_dir = ROOT / "skills"
     if not skills_dir.is_dir():
         r.note("skills/ 不存在，跳過")
         return r
     available = {p.name for p in skills_dir.iterdir() if p.is_dir()}
     ref_re = re.compile(r"skills/([a-z0-9_-]+)(?:/|\b)")
+
+    def _check_refs(path: Path) -> None:
+        text = path.read_text(encoding="utf-8")
+        for m in ref_re.finditer(text):
+            skill = m.group(1)
+            if skill not in available:
+                r.fail(f"{path.relative_to(ROOT)} 引用了不存在的 skill: skills/{skill}")
+
     for d in ("agents", "commands"):
         target = ROOT / d
         if not target.is_dir():
             continue
         for path in target.glob("*.md"):
-            text = path.read_text(encoding="utf-8")
-            for m in ref_re.finditer(text):
-                skill = m.group(1)
-                if skill not in available:
-                    r.fail(
-                        f"{path.relative_to(ROOT)} 引用了不存在的 skill: skills/{skill}"
-                    )
+            _check_refs(path)
+
+    for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
+        skill_file = skill_dir / "SKILL.md"
+        if skill_file.is_file():
+            _check_refs(skill_file)
     return r
 
 

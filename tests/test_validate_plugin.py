@@ -599,6 +599,37 @@ class TestCheckSkillCrossrefs:
         result = validate_plugin.check_skill_crossrefs()
         assert result.passed
 
+    def test_skill_referencing_missing_skill_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """skills/*/SKILL.md 本身引用不存在的 skill 也要擋下（不只 agents/commands）。"""
+        make_skill(tmp_path, "foo")
+        skill_file = tmp_path / "skills" / "foo" / "SKILL.md"
+        skill_file.write_text(
+            skill_file.read_text(encoding="utf-8")
+            + "\nSee [bar](https://github.com/Lee-W/maigo/blob/main/skills/bar/SKILL.md).\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skill_crossrefs()
+        assert not result.passed
+        assert any("bar" in e and "foo/SKILL.md" in e for e in result.errors)
+
+    def test_skill_referencing_existing_skill_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        make_skill(tmp_path, "foo")
+        make_skill(tmp_path, "bar")
+        skill_file = tmp_path / "skills" / "foo" / "SKILL.md"
+        skill_file.write_text(
+            skill_file.read_text(encoding="utf-8")
+            + "\nSee [bar](https://github.com/Lee-W/maigo/blob/main/skills/bar/SKILL.md).\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skill_crossrefs()
+        assert result.passed
+
 
 # ---------------------------------------------------------------------------
 # check_plugin_json — empty JSON reports all missing fields (S-1)
