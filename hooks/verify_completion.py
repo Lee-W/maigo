@@ -21,10 +21,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit  # noqa: E402
 from _retry_log import record_and_count  # noqa: E402
+from _token_usage import LOG_PATH, format_one_line, summarize  # noqa: E402
 
 TEST_TIMEOUT_SEC = 90
 GIT_TIMEOUT_SEC = 5
@@ -221,6 +223,15 @@ def _retry_warning(counts: dict[str, int], keys: set[str], label: str) -> str:
     )
 
 
+def approve_with_usage(reason: str, cwd: Path, session_id: object) -> NoReturn:
+    """Approve and append local usage metadata when the hook can correlate it."""
+    if isinstance(session_id, str) and session_id:
+        usage = summarize(cwd / LOG_PATH, session_id=session_id)
+        reason = f"{reason}\n{format_one_line(usage)}"
+    emit("approve", reason)
+    raise AssertionError("emit() must exit")
+
+
 def main() -> None:
     raw = sys.stdin.read()
     try:
@@ -230,39 +241,48 @@ def main() -> None:
 
     cwd = Path(data.get("cwd") or os.getcwd()).resolve()
     claude_dir = cwd / ".claude"
+    session_id = data.get("session_id")
 
     if not has_git_modifications(cwd):
-        emit("approve", "立希 (Taki)：本次 session 無未提交的檔案修改，跳過 test 驗證")
+        approve_with_usage(
+            "立希 (Taki)：本次 session 無未提交的檔案修改，跳過 test 驗證",
+            cwd,
+            session_id,
+        )
 
     skip_reason = read_config_line(claude_dir / "skip-test-verification")
     if skip_reason is not None:
-        emit("approve", f"verify_completion 跳過：{skip_reason}")
+        approve_with_usage(f"verify_completion 跳過：{skip_reason}", cwd, session_id)
 
     custom_cmd = read_config_line(claude_dir / "test-command")
     cmd = shlex.split(custom_cmd) if custom_cmd else detect_test_command(cwd)
 
     if not custom_cmd and (cwd / "uv.lock").is_file() and shutil.which("uv") is None:
-        emit(
-            "approve",
+        approve_with_usage(
             "立希 (Taki)：偵測到 uv.lock 但 uv 不在 PATH，已跳過 test 驗證——裝 uv 或在 .claude/test-command 指定可跑的指令。",
+            cwd,
+            session_id,
         )
         return
 
     if cmd is None:
-        emit("approve", "立希 (Taki)：偵測不到 test 設定，跳過（no-op）")
+        approve_with_usage(
+            "立希 (Taki)：偵測不到 test 設定，跳過（no-op）", cwd, session_id
+        )
         return
 
     known = read_known_failures(claude_dir / "known-test-failures")
     exit_code, output = run_command(cmd, cwd)
 
     if exit_code == 0:
-        emit("approve", f"立希 (Taki)：`{' '.join(cmd)}` 通過")
+        approve_with_usage(f"立希 (Taki)：`{' '.join(cmd)}` 通過", cwd, session_id)
 
     build_env_match = BUILD_ENV_ERROR_RE.search(output)
     if build_env_match:
-        emit(
-            "approve",
+        approve_with_usage(
             f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 host build env（{build_env_match.group(0)!r}），不是 test 失敗。跳過——修 host build env，或在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 永久關閉本 worktree 的檢查。",
+            cwd,
+            session_id,
         )
 
     fatal_match = FATAL_MARKER_RE.search(output)
@@ -305,9 +325,10 @@ def main() -> None:
         )
 
     if actual and not new_failures:
-        emit(
-            "approve",
+        approve_with_usage(
             f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
+            cwd,
+            session_id,
         )
 
     # No parseable failures at this point. If the output looks like a

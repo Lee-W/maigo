@@ -1,6 +1,6 @@
 # Hooks Reference
 
-Maigo 註冊三個 hook，定義在 `hooks/hooks.json`。
+Maigo 註冊四個 hook，定義在 `hooks/hooks.json`。
 只要 plugin 載入就自動生效，使用者不用設定。
 
 ## SessionStart — `hooks/repo_detect.py`
@@ -105,6 +105,33 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
 
 完成後跑 `python3 scripts/validate_plugin.py` 確認 skill cross-ref 通過（check #8 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。
 
+## PostToolUse — `hooks/token_usage.py`
+
+只匹配 `Agent` 工具。foreground subagent 完成時，直接讀 Claude Code
+`tool_response.usage` 提供的 metadata，寫入目前 repo 的 `.maigo/token-usage.jsonl`。
+不重新送內容給模型、不跑 tokenizer，也不自行估算。
+
+每行一筆 JSON：
+
+```json
+{"ts":"2026-07-16T12:00:00Z","session_id":"...","agent_id":"...","agent_type":"maigo:Soyo","model":"claude-sonnet","input_tokens":8320,"output_tokens":1230,"cache_creation_input_tokens":400,"cache_read_input_tokens":2500}
+```
+
+以 `session_id + agent_id` 去重。下列情況靜默略過：
+
+- `status` 不是 `completed`（包含 background agent 的 `async_launched`）
+- harness 沒提供 `usage`
+- malformed input、無法建立 `.maigo/` 或寫檔失敗
+- Codex plugin（Codex manifest 不安裝 Claude Code lifecycle hook）
+
+Stop hook 成功放行時會依 `session_id` 彙整並附上一行摘要；資料不完整時只報
+「已追蹤 N agents」，不宣稱是完整總量。完整本機彙整可執行：
+
+```bash
+python3 scripts/token_usage_summary.py              # 最近 7 天，含角色／model 分組
+python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
+```
+
 ## TeammateIdle — `hooks/teammate_quality_check.py`
 
 agent 跑完輸出送回 orchestrator 時觸發。
@@ -162,7 +189,8 @@ backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 
 ## Stop — `hooks/verify_completion.py`
 
-任務宣告完成前觸發。即使 orchestrator 想跳過 Taki 也擋下。
+任務宣告完成前觸發。即使 orchestrator 想跳過 Taki 也擋下。成功 approve 時，若 input
+帶有 `session_id`，會附上該 session 的 token usage 一行摘要；不會把完整 JSONL 放進訊息。
 
 ### 偵測順序
 
@@ -236,4 +264,8 @@ python3 -c "import json,sys; print(json.dumps({'teammate_role':'Soyo','teammate_
 # 模擬 Stop 觸發
 python3 -c "import json,sys; print(json.dumps({'cwd':'/path/to/project'}))" \
   | python3 hooks/verify_completion.py
+
+# 模擬 foreground Agent usage metadata
+python3 -c "import json; print(json.dumps({'hook_event_name':'PostToolUse','tool_name':'Agent','session_id':'demo','cwd':'/path/to/project','tool_input':{'subagent_type':'maigo:Soyo'},'tool_response':{'status':'completed','agentId':'agent-1','resolvedModel':'claude-sonnet','usage':{'input_tokens':100,'output_tokens':20}}}))" \
+  | python3 hooks/token_usage.py
 ```
