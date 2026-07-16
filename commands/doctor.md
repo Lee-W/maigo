@@ -1,5 +1,5 @@
 ---
-description: 診斷 Maigo 環境與專案配置。檢查 gh CLI、記憶層目錄、Taki (Verifier) 是否能跑、以及 retry / failure log 統計（哪個環節最常卡）。
+description: 診斷 Maigo 環境與專案配置。檢查 gh CLI、記憶層目錄、Taki (Verifier) 是否能跑、retry / failure log 與 token usage metadata。
 allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Bash(git --version:*), Bash(ls:*), Bash(test:*), Bash(cat:*), Read, Task
 ---
 
@@ -29,6 +29,9 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
    （🟣 立希 test failure 觸發，`verify_completion.py` 寫入），彙整各 key 的觸發次數 + 最近
    3 筆摘要。**兩個 log 都是相對當前 repo 的 `.maigo/` 底下**，不存在或是空的 → 印正常訊息
    （新環境 / 還沒觸發過 retry 本來就不該有），不算 error。
+5. **Token usage**（read-only）：讀 `.maigo/token-usage.jsonl`，彙整最近 7 天總量並依角色／model
+   分組。只採用 harness 已提供的 foreground subagent metadata；背景 agent、Codex 或舊版 harness
+   沒資料時標示 unavailable，不自行估算、不算 error。
 
 ## 流程
 
@@ -46,7 +49,14 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 python3 scripts/retry_log_summary.py
 ```
 
-4. **Orchestrator**：
+4. **Orchestrator**：讀 token usage metadata（Claude Code plugin 安裝環境用
+   `${CLAUDE_PLUGIN_ROOT}` 定位；在 Maigo repo 開發時可直接用 `scripts/`）：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
+```
+
+5. **Orchestrator**：
    - 彙整報告。
    - 針對缺失項給予具體的「改進」建議（不使用「優化」）。
 
@@ -73,6 +83,9 @@ python3 scripts/retry_log_summary.py
 - `.maigo/soyo-must-fix.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
 - `.maigo/test-failures.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
 - 最近 3 筆：<ts — key>
+
+## 🪙 Token Usage
+- <一行 metadata 摘要；無資料時說明 unavailable，不推估>
 
 ## 📢 建議
 - ...

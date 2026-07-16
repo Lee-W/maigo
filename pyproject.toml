@@ -18,7 +18,7 @@ pythonpath = ["."]
 python_version = "3.13"
 
 [[tool.mypy.overrides]]
-module = ["_frontmatter", "_hook_io", "_retry_log"]
+module = ["_frontmatter", "_hook_io", "_retry_log", "_token_usage"]
 ignore_missing_imports = true
 
 [tool.commitizen]

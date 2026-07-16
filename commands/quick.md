@@ -35,7 +35,7 @@ Test 不顯式喊 Taki——stop hook 在任務完成前自動跑測試兜底。
    - Anon 自己看周邊 1-2 個檔抓慣例，不做大範圍探索
    - 不寫 plan.md
 2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫，應該不對。」
-3. **Stop hook 自動跑 test** — 不顯式呼叫 Taki
+3. **Stop hook 自動跑 test** — 不顯式呼叫 Taki；成功訊息會附本 session 的一行 token usage
 4. **Orchestrator** — Stop hook 綠後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。（本 repo 是 CC repo，draft 採 `type(scope): subject` 格式）**不自動跑 git commit**。
 
 ## Soyo 輕量 checklist（9 項 → 4 項）

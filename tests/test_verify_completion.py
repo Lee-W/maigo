@@ -248,6 +248,39 @@ class TestMain:
         assert result["decision"] == "approve"
         assert "偵測不到" in result["reason"]
 
+    def test_approve_includes_session_usage(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        log = tmp_path / ".maigo" / "token-usage.jsonl"
+        log.parent.mkdir()
+        log.write_text(
+            json.dumps(
+                {
+                    "session_id": "session-1",
+                    "input_tokens": 1_200,
+                    "output_tokens": 300,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 500,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = run_hook_main(
+            verify_completion,
+            {"cwd": str(tmp_path), "session_id": "session-1"},
+            monkeypatch,
+            capsys,
+        )
+
+        assert result["decision"] == "approve"
+        assert "Token usage：input 1.2k" in result["reason"]
+        assert "已追蹤 1 agents" in result["reason"]
+
     def test_uv_lock_present_but_uv_not_in_path(
         self,
         tmp_path: Path,

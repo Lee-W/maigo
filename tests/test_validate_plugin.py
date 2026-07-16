@@ -466,6 +466,30 @@ class TestCheckHooksSchema:
         result = validate_plugin.check_hooks_schema()
         assert result.passed
 
+    def test_post_tool_use_event_is_supported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write_hooks_json(
+            tmp_path,
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "Agent",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/check.py",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        assert validate_plugin.check_hooks_schema().passed
+
     def test_unknown_event_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         self._write_hooks_json(
             tmp_path,
