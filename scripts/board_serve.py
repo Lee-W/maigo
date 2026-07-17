@@ -43,9 +43,10 @@ SERVE_DIRNAME = "_serve"
 CONFIG_NAME = "mkdocs.yml"
 CSS_NAME = "board-style.css"
 JS_NAME = "board-interactions.js"
-SCAFFOLD_VERSION = 5
+SCAFFOLD_VERSION = 6
 V3_CSS_SHA256 = "00ca2aabe9c85d5d73a5b6b16cf2f31a4acff990bcaefa7bc57a8fca5c9749b8"
 V4_CSS_SHA256 = "6f578df0d1a502058fc711ed41d31e880112a87cdfb8b9c83e5024a0f1e9937e"
+V5_CSS_SHA256 = "ba51242c20d0153113bc6cca445f4dd91fc983620b34af3c3c20c4bb6cca94ef"
 
 CONFIG_TEMPLATE = """\
 # maigo-board-scaffold: {version}
@@ -85,7 +86,7 @@ markdown_extensions:
 """
 
 CSS_TEMPLATE = """\
-/* maigo-board-scaffold: 5
+/* maigo-board-scaffold: 6
    maigo work-board serve 樣式——首跑自動生成，改壞了刪掉這個檔案，
    下次跑 board_serve.py 會重新生成預設版本；正常改動請直接編輯這個檔案。 */
 :root {
@@ -192,25 +193,41 @@ CSS_TEMPLATE = """\
   line-height: 1.4;
   white-space: nowrap;
 }
-.status-danger {
+.status-blocked {
   background: color-mix(in srgb, #e53935 16%, transparent);
   color: #c62828;
 }
-.status-positive {
-  background: color-mix(in srgb, #2e7d32 16%, transparent);
-  color: #2e7d32;
-}
-.status-attention {
+.status-act {
   background: color-mix(in srgb, #ef6c00 16%, transparent);
   color: #d65f00;
 }
-.status-neutral {
+.status-wip {
+  background: color-mix(in srgb, #1565c0 16%, transparent);
+  color: #1565c0;
+}
+.status-wait {
   background: color-mix(in srgb, var(--md-default-fg-color) 9%, transparent);
   color: var(--md-default-fg-color);
 }
-[data-md-color-scheme="slate"] .status-danger { color: #ff8a80; }
-[data-md-color-scheme="slate"] .status-positive { color: #80d88a; }
-[data-md-color-scheme="slate"] .status-attention { color: #ffb36b; }
+.status-done {
+  background: color-mix(in srgb, #2e7d32 16%, transparent);
+  color: #2e7d32;
+}
+.status-unknown {
+  background: color-mix(in srgb, #e53935 8%, transparent);
+  color: #c62828;
+  border: 1px solid #c62828;
+}
+.stale {
+  margin-left: 0.15rem;
+  font-size: 0.65rem;
+}
+[data-md-color-scheme="slate"] .status-blocked { color: #ff8a80; }
+[data-md-color-scheme="slate"] .status-act { color: #ffb36b; }
+[data-md-color-scheme="slate"] .status-wip { color: #82b1ff; }
+[data-md-color-scheme="slate"] .status-wait { color: var(--md-default-fg-color); }
+[data-md-color-scheme="slate"] .status-done { color: #80d88a; }
+[data-md-color-scheme="slate"] .status-unknown { color: #ff8a80; border-color: #ff8a80; }
 .work-command {
   display: block;
   width: fit-content;
@@ -382,6 +399,10 @@ def _upgrade_generated_config(text: str, site_dir: Path) -> str:
         text = text.replace(
             "# maigo-board-scaffold: 4", f"# maigo-board-scaffold: {SCAFFOLD_VERSION}"
         )
+    elif "# maigo-board-scaffold: 5" in text:
+        text = text.replace(
+            "# maigo-board-scaffold: 5", f"# maigo-board-scaffold: {SCAFFOLD_VERSION}"
+        )
     return text
 
 
@@ -433,7 +454,18 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
         and "maigo-board-scaffold: 4" in css_text
         and hashlib.sha256(css_text.encode()).hexdigest() == V4_CSS_SHA256
     )
-    if not css_exists or upgrade_css or upgrade_v3_css or upgrade_v4_css:
+    upgrade_v5_css = (
+        css_exists
+        and "maigo-board-scaffold: 5" in css_text
+        and hashlib.sha256(css_text.encode()).hexdigest() == V5_CSS_SHA256
+    )
+    if (
+        not css_exists
+        or upgrade_css
+        or upgrade_v3_css
+        or upgrade_v4_css
+        or upgrade_v5_css
+    ):
         css_path.write_text(CSS_TEMPLATE, encoding="utf-8")
 
     js_source = Path(__file__).with_name("board_interactions.js")
@@ -446,7 +478,13 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
                 "board_serve: 保留自訂 `_serve/mkdocs.yml`；"
                 "要套用新表格設計，請合併預設 scaffold 或刪除該檔重建\n"
             )
-    if css_exists and not upgrade_css and not upgrade_v3_css and not upgrade_v4_css:
+    if (
+        css_exists
+        and not upgrade_css
+        and not upgrade_v3_css
+        and not upgrade_v4_css
+        and not upgrade_v5_css
+    ):
         css_text = css_path.read_text(encoding="utf-8")
         if "maigo-board-scaffold:" not in css_text:
             sys.stderr.write(
@@ -462,6 +500,11 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
             sys.stderr.write(
                 "board_serve: 保留自訂的 v4 `board-style.css`；"
                 "列操作選單樣式需手動合併\n"
+            )
+        elif "maigo-board-scaffold: 5" in css_text:
+            sys.stderr.write(
+                "board_serve: 保留自訂的 v5 `board-style.css`；"
+                "5-tier 狀態色與 💤 badge 樣式需手動合併\n"
             )
 
     return config_path

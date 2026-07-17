@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依「你的球 / 等別人 / merged-closed」分區刷新；`--serve` 用 mkdocs 起本地 live reload 閱讀層。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_serve.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_serve.py:*), Bash(python3 scripts/board_state.py:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -25,7 +25,7 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 /maigo:board --learn        # 對已勾但未 🧠 的項目跑學習盤點
 /maigo:board --check <n...> # 標記「我親自處理過」，作為 --learn 訊號
 /maigo:board --uncheck <n...> # 取消「我親自處理過」標記
-/maigo:board --drop <n...>  # 不追了，直接移除對應行
+/maigo:board --drop <n...>  # 不追了，軟刪移到 🗄️ 已放棄（tombstone，留痕 7 天）
 ```
 
 `targets` 可混用裸編號、GitHub issue URL、GitHub PR URL。裸編號以當前 repo 判定；
@@ -53,14 +53,18 @@ URL 若指到其他 repo，行內保留 `owner/repo#n` 全稱。
 
 ### 3. 刷新分區
 
-除 `--learn` 外，每次都刷新 board 上所有抓得到的項目：
+除 `--learn` 外，每次都刷新 board 上所有抓得到的項目：把每項的 `type` / `gh_meta` /
+`prior_status`（讀自現有 board 行）組成 JSON 陣列，餵給
+[`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+的 `classify()` 分類，取回 `bucket` / `status` / `tier` / `next_action` 逐行回寫：
 
-- 🐛 issue：依 READY / NEEDS_INFO / IN_PROGRESS / 有新回覆等狀態落到 🎯 或 ⏳；closed 進 ✅
-- 🔀 你的 PR：draft、CI 紅、changes requested、有新 comment 都是 🎯；等 review 是 ⏳；merged/closed 進 ✅
-- 👀 在審的 PR：沿用 strict-review 的 review board 判定；Active / 回你的球是 🎯，Off-board 是 ⏳
+```bash
+echo '<[{type, gh_meta, prior_status}, ...]>' | python3 scripts/board_state.py --you <login>
+```
 
 三張完整球權判定表、排序與 ✅ 保留天數見
-[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
+[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
+`classify()` 是判定邏輯的唯一正典，本命令不再自行複述規則。
 
 ### 4. 輸出
 
@@ -113,8 +117,10 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 
 ### 8. `--drop`
 
-`--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後直接移除，
-不是移到 ✅。
+`--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後**軟刪**——
+狀態詞改為 `已放棄`，整行移到 `🗄️ 已放棄` section（tombstone，留痕 7 天），不是直接刪除、
+也不是移到 ✅。保留原 checkbox 與 `🧠` 狀態。7 天後的清除（purge）本輪不做，
+沒有 `--purge` flag。
 
 ## 與其他命令的差異
 

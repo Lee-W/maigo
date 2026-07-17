@@ -101,8 +101,8 @@ class TestScaffold:
 
         config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
 
-        assert "maigo-board-scaffold: 5" in config_path.read_text(encoding="utf-8")
-        assert "maigo-board-scaffold: 5" in (serve_dir / "board-style.css").read_text(
+        assert "maigo-board-scaffold: 6" in config_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 6" in (serve_dir / "board-style.css").read_text(
             encoding="utf-8"
         )
 
@@ -126,7 +126,7 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "new-site")
         text = config_path.read_text(encoding="utf-8")
 
-        assert "maigo-board-scaffold: 5" in text
+        assert "maigo-board-scaffold: 6" in text
         assert "site_name: Custom Board" in text
         assert f"site_dir: {tmp_path / 'new-site'}" in text
         assert "board-interactions.js" in text
