@@ -194,6 +194,19 @@ def test_malformed_line_is_left_untouched():
     assert malformed in hook.render_board(malformed)
 
 
+def test_render_board_explains_checkbox_is_orthogonal_to_tiers():
+    rendered = hook.render_board(BOARD)
+
+    assert "正交" in rendered
+    assert "--learn" in rendered
+    assert "打勾不會換分區" in rendered
+
+    header_index = rendered.index("# Work Board")
+    note_index = rendered.index("正交")
+    first_table_index = rendered.index('<table class="work-table">')
+    assert header_index < note_index < first_table_index
+
+
 def test_hook_only_changes_board_page():
     page = SimpleNamespace(file=SimpleNamespace(src_uri="review-9.md"))
     assert hook.on_page_markdown(BOARD, page) == BOARD
