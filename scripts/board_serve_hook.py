@@ -37,6 +37,19 @@ KIND_LABELS = {
     "👀": "Review PR",
 }
 
+CHECKBOX_NOTE = """\
+<details class="board-checkbox-note" markdown="1">
+<summary>打勾 checkbox 是什麼意思？</summary>
+
+打勾 `[ ]`/`[x]` 只代表「我親自處理過了」，會影響之後 `--learn` 記憶學習閘門的判斷；
+跟項目在哪個分區（🎯/⏳/✅）完全**正交**——**打勾不會換分區**。
+
+真正讓項目換分區的，是你在 GitHub 上的實際動作（push 修正、回覆、送出 review）
+加上下次 `/maigo:board` 刷新——分區是依最新 GitHub 狀態自動判定的，不是手動控制的。
+
+</details>
+"""
+
 FILTER_CONTROLS = """\
 <div class="work-controls" aria-label="Work Board 篩選與排序">
   <label class="search-control"><span>搜尋</span><input id="board-search" type="search" placeholder="標題、作者、狀態…"></label>
@@ -297,7 +310,13 @@ def render_board(markdown: str) -> str:
             deferred.clear()
 
     controls_added = False
+    note_added = False
     for line in lines:
+        if not note_added and line.startswith("# ") and not line.startswith("## "):
+            output.append(line)
+            output.extend(["", CHECKBOX_NOTE, ""])
+            note_added = True
+            continue
         if line.startswith("## ") and not controls_added:
             output.extend(["", FILTER_CONTROLS, ""])
             controls_added = True

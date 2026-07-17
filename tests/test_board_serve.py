@@ -101,10 +101,84 @@ class TestScaffold:
 
         config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
 
-        assert "maigo-board-scaffold: 6" in config_path.read_text(encoding="utf-8")
-        assert "maigo-board-scaffold: 6" in (serve_dir / "board-style.css").read_text(
+        assert "maigo-board-scaffold: 7" in config_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 7" in (serve_dir / "board-style.css").read_text(
             encoding="utf-8"
         )
+
+    def test_upgrades_unmodified_v5_css_to_current(self, tmp_path: Path):
+        """Regression: `V5_CSS_SHA256` must match the real, byte-for-byte v5
+        `CSS_TEMPLATE` (pinned as a fixture) — a wrong constant makes every
+        genuine pre-existing v5 install look "user-customized" and silently
+        stops receiving CSS upgrades forever."""
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        v5_css = (Path(__file__).parent / "fixtures" / "board_serve_v5.css").read_text(
+            encoding="utf-8"
+        )
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(v5_css, encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        upgraded = css_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 7" in upgraded
+        assert "status-blocked" in upgraded
+
+    def test_preserves_genuinely_modified_v5_css(self, tmp_path: Path, capsys):
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(
+            "/* maigo-board-scaffold: 5\n   使用者自訂過的版本 */\n.custom {}\n",
+            encoding="utf-8",
+        )
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        assert css_path.read_text(encoding="utf-8") == (
+            "/* maigo-board-scaffold: 5\n   使用者自訂過的版本 */\n.custom {}\n"
+        )
+        assert "v5" in capsys.readouterr().err
+
+    def test_upgrades_unmodified_v6_css_to_current(self, tmp_path: Path):
+        """Regression: `V6_CSS_SHA256` must match the real, byte-for-byte v6
+        `CSS_TEMPLATE` (pinned as a fixture) — same failure mode as the v5
+        constant bug this mirrors: a wrong hash makes every genuine
+        pre-existing v6 install look "user-customized" forever."""
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        v6_css = (Path(__file__).parent / "fixtures" / "board_serve_v6.css").read_text(
+            encoding="utf-8"
+        )
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(v6_css, encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        upgraded = css_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 7" in upgraded
+        assert "font-size: 0.88rem" in upgraded
+
+    def test_preserves_genuinely_modified_v6_css(self, tmp_path: Path, capsys):
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(
+            "/* maigo-board-scaffold: 6\n   使用者自訂過的版本 */\n.custom {}\n",
+            encoding="utf-8",
+        )
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        assert css_path.read_text(encoding="utf-8") == (
+            "/* maigo-board-scaffold: 6\n   使用者自訂過的版本 */\n.custom {}\n"
+        )
+        assert "v6" in capsys.readouterr().err
 
     def test_upgrades_v3_config_without_discarding_custom_settings(
         self, tmp_path: Path
@@ -126,7 +200,7 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "new-site")
         text = config_path.read_text(encoding="utf-8")
 
-        assert "maigo-board-scaffold: 6" in text
+        assert "maigo-board-scaffold: 7" in text
         assert "site_name: Custom Board" in text
         assert f"site_dir: {tmp_path / 'new-site'}" in text
         assert "board-interactions.js" in text
@@ -156,6 +230,30 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "another-site-out")
 
         assert config_path.read_text(encoding="utf-8") == "# 使用者自訂內容\n"
+
+    def test_scaffolds_root_index_redirect_to_board(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+        index_text = (maigo_dir / "index.md").read_text(encoding="utf-8")
+
+        assert 'window.location.replace("board/")' in index_text
+        assert "<script>" in index_text
+
+    def test_index_redirect_is_always_overwritten(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        index_path = maigo_dir / "index.md"
+        index_path.write_text("# 手動改過的內容\n", encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "another-site-out")
+
+        assert 'window.location.replace("board/")' in index_path.read_text(
+            encoding="utf-8"
+        )
 
     def test_does_not_overwrite_existing_css(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"

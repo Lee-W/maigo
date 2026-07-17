@@ -1,0 +1,257 @@
+/* maigo-board-scaffold: 5
+   maigo work-board serve 樣式——首跑自動生成，改壞了刪掉這個檔案，
+   下次跑 board_serve.py 會重新生成預設版本；正常改動請直接編輯這個檔案。 */
+:root {
+  --board-border: color-mix(in srgb, var(--md-default-fg-color) 16%, transparent);
+  --board-muted: color-mix(in srgb, var(--md-default-fg-color) 62%, transparent);
+}
+.md-grid {
+  max-width: 92rem;
+}
+.md-content__inner > blockquote:first-of-type {
+  margin: 0 0 1.75rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--board-border);
+  border-left: 0.25rem solid var(--md-accent-fg-color);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--md-accent-fg-color) 7%, transparent);
+}
+.work-table-wrap {
+  width: 100%;
+  margin: 0.5rem 0 2rem;
+  overflow-x: auto;
+  border: 1px solid var(--board-border);
+  border-radius: 0.55rem;
+}
+.md-typeset .work-table {
+  display: table;
+  width: 100%;
+  min-width: 58rem;
+  margin: 0;
+  border: 0;
+  font-size: 0.72rem;
+}
+.md-typeset .work-table th {
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--board-border);
+  background: color-mix(in srgb, var(--md-default-fg-color) 5%, transparent);
+  color: var(--board-muted);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.md-typeset .work-table td {
+  padding: 0.8rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--board-border);
+  vertical-align: top;
+}
+.md-typeset .work-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.md-typeset .work-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-accent-fg-color) 5%, transparent);
+}
+.handled-cell {
+  width: 4.5rem;
+  text-align: center !important;
+}
+.item-cell {
+  width: 23%;
+}
+.author-cell {
+  width: 8rem;
+}
+.diff-cell {
+  width: 6.5rem;
+  white-space: nowrap;
+}
+.status-cell {
+  width: 9rem;
+}
+.reason-cell {
+  width: 26%;
+}
+.next-cell {
+  width: 21%;
+}
+.learn-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--md-accent-fg-color);
+}
+.work-item-title {
+  margin-bottom: 0.2rem;
+  font-weight: 700;
+}
+.work-item-id {
+  white-space: nowrap;
+}
+.work-title {
+  line-height: 1.4;
+}
+.work-meta,
+.muted {
+  margin-top: 0.2rem;
+  color: var(--board-muted);
+  font-size: 0.64rem;
+}
+.work-status {
+  display: inline-block;
+  padding: 0.12rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.status-danger {
+  background: color-mix(in srgb, #e53935 16%, transparent);
+  color: #c62828;
+}
+.status-positive {
+  background: color-mix(in srgb, #2e7d32 16%, transparent);
+  color: #2e7d32;
+}
+.status-attention {
+  background: color-mix(in srgb, #ef6c00 16%, transparent);
+  color: #d65f00;
+}
+.status-neutral {
+  background: color-mix(in srgb, var(--md-default-fg-color) 9%, transparent);
+  color: var(--md-default-fg-color);
+}
+[data-md-color-scheme="slate"] .status-danger { color: #ff8a80; }
+[data-md-color-scheme="slate"] .status-positive { color: #80d88a; }
+[data-md-color-scheme="slate"] .status-attention { color: #ffb36b; }
+.work-command {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0.4rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.artifact-link {
+  display: inline-block;
+  margin-bottom: 0.45rem;
+  font-size: 0.66rem;
+}
+.row-actions {
+  position: relative;
+  width: fit-content;
+  margin-top: 0.35rem;
+  font-size: 0.64rem;
+}
+.row-actions summary {
+  color: var(--md-accent-fg-color);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.row-actions summary::-webkit-details-marker {
+  display: none;
+}
+.row-actions-menu {
+  display: grid;
+  min-width: 8rem;
+  margin-top: 0.3rem;
+  overflow: hidden;
+  border: 1px solid var(--board-border);
+  border-radius: 0.35rem;
+  background: var(--md-default-bg-color);
+  box-shadow: 0 0.25rem 0.8rem rgba(0, 0, 0, 0.14);
+}
+.copy-command {
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-bottom: 1px solid var(--board-border);
+  background: transparent;
+  color: var(--md-default-fg-color);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.copy-command:last-child {
+  border-bottom: 0;
+}
+.copy-command:hover {
+  background: color-mix(in srgb, var(--md-accent-fg-color) 8%, transparent);
+}
+.drop-command {
+  color: #c62828;
+}
+[data-md-color-scheme="slate"] .drop-command {
+  color: #ff8a80;
+}
+.learned {
+  margin-left: 0.15rem;
+  font-size: 0.65rem;
+}
+.diff-add {
+  color: #2e7d32;
+  font-variant-numeric: tabular-nums;
+}
+.diff-delete {
+  color: #c62828;
+  font-variant-numeric: tabular-nums;
+}
+[data-md-color-scheme="slate"] .diff-add { color: #80d88a; }
+[data-md-color-scheme="slate"] .diff-delete { color: #ff8a80; }
+.work-controls {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  margin: 0 0 1.5rem;
+  padding: 0.8rem;
+  border: 1px solid var(--board-border);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--md-default-fg-color) 3%, transparent);
+}
+.work-controls label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 8.5rem;
+  color: var(--board-muted);
+  font-size: 0.6rem;
+}
+.work-controls .search-control {
+  flex: 1;
+  min-width: 12rem;
+}
+.work-controls input,
+.work-controls select,
+.work-controls button {
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--board-border);
+  border-radius: 0.35rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font: inherit;
+}
+.work-controls button {
+  cursor: pointer;
+}
+.visible-count {
+  min-width: 5.5rem;
+  padding-bottom: 0.45rem;
+  color: var(--board-muted);
+  font-size: 0.64rem;
+  text-align: right;
+}
+.work-table tr[hidden] {
+  display: none;
+}
+@media (max-width: 76.234375em) {
+  .md-typeset .work-table {
+    min-width: 68rem;
+  }
+  .work-controls {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .work-controls label {
+    flex: 1 1 10rem;
+  }
+}
