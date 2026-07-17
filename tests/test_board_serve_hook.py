@@ -105,8 +105,10 @@ def test_render_board_preserves_checkbox_and_badge_semantics():
 
     assert 'type="checkbox" disabled checked' in rendered
     assert 'title="已完成學習盤點"' in rendered
-    assert "status-danger" in rendered
-    assert "status-positive" in rendered
+    # NEEDS_CHANGES verdict retained (no new author activity) => ⏳ wait tier;
+    # READY => 🎯 act tier. See scripts/board_state.py `_STATUS_META`.
+    assert "status-wait" in rendered
+    assert "status-act" in rendered
 
 
 def test_render_board_exposes_sort_and_filter_metadata():
@@ -128,6 +130,63 @@ def test_render_board_offers_copy_only_check_uncheck_and_drop_commands():
     assert "標記已處理" in rendered
     assert "取消標記" in rendered
     assert "停止追蹤" in rendered
+
+
+def test_status_class_maps_all_five_tiers():
+    # One representative status word per tier — see scripts/board_state.py
+    # `_STATUS_META` (this is the canonical source; this test is the mirror check).
+    assert hook._status_class("CI 紅") == "status-blocked"
+    assert hook._status_class("待 triage") == "status-act"
+    assert hook._status_class("IN_PROGRESS") == "status-wip"
+    assert hook._status_class("等 review") == "status-wait"
+    assert hook._status_class("closed") == "status-done"
+
+
+def test_status_class_unknown_status_is_loud_not_silent_neutral():
+    assert hook._status_class("這不是合法狀態詞") == "status-unknown"
+
+
+def test_render_board_marks_unknown_status_with_warning_text():
+    board = (
+        "# Work Board — Lee-W/maigo\n"
+        "## 🎯 你的球（1）\n"
+        '- [ ] 🐛 #1 (alice) **手改壞的狀態詞** — ??? — "title"\n'
+    )
+
+    rendered = hook.render_board(board)
+
+    assert 'class="work-status status-unknown"' in rendered
+    assert "⚠ 未知狀態" in rendered
+    assert "手改壞的狀態詞" in rendered
+
+
+def test_render_board_renders_stale_badge():
+    board = (
+        "# Work Board — Lee-W/maigo\n"
+        "## ⏳ 等別人（1）\n"
+        '- [ ] 🔀 #100 (你) **CI 等待** Δ +5/-1 💤 — no activity — "title"\n'
+    )
+
+    rendered = hook.render_board(board)
+
+    assert '<span class="stale" title="逾期未更新">💤</span>' in rendered
+
+
+def test_render_board_renders_archived_section_as_its_own_table():
+    board = (
+        "# Work Board — Lee-W/maigo\n"
+        "## 🎯 你的球（1）\n"
+        '- [ ] 🐛 #1 (alice) **READY** — ready — "first"\n'
+        "\n"
+        "## 🗄️ 已放棄（1）\n"
+        '- [ ] 🐛 #99 (eve) **已放棄** — dropped — "second"\n'
+    )
+
+    rendered = hook.render_board(board)
+
+    assert rendered.count('<table class="work-table">') == 2
+    assert "## 🗄️ 已放棄（1）" in rendered
+    assert "status-done" in rendered  # 已放棄 => Tier.DONE
 
 
 def test_malformed_line_is_left_untouched():

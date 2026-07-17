@@ -8,6 +8,13 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import quote
 
+try:
+    from scripts import board_state
+except (
+    ImportError
+):  # pragma: no cover - mkdocs 用檔案路徑直接載入本檔，不經 `scripts` 套件
+    import board_state  # type: ignore[no-redef,import-not-found]
+
 BOARD_REPO_RE = re.compile(
     r"^# Work Board — (?P<repo>[\w.-]+/[\w.-]+)\s*$", re.MULTILINE
 )
@@ -54,6 +61,7 @@ class BoardItem:
     action: str | None
     artifact: str | None
     learned: bool
+    stale: bool
     additions: int | None
     deletions: int | None
 
@@ -75,6 +83,7 @@ def parse_item(line: str) -> BoardItem | None:
     action = action_match.group("action") if action_match else None
     artifact = artifact_match.group("artifact") if artifact_match else None
     learned = "🧠" in tail
+    stale = "💤" in tail
     diff_match = DIFF_RE.search(tail)
     additions = int(diff_match.group("additions")) if diff_match else None
     deletions = int(diff_match.group("deletions")) if diff_match else None
@@ -83,6 +92,7 @@ def parse_item(line: str) -> BoardItem | None:
     tail = ACTION_RE.sub("", tail)
     tail = ARTIFACT_RE.sub("", tail)
     tail = tail.replace("🧠", "")
+    tail = tail.replace("💤", "")
     reason = tail.strip().removeprefix("—").strip()
 
     return BoardItem(
@@ -96,6 +106,7 @@ def parse_item(line: str) -> BoardItem | None:
         action=action,
         artifact=artifact,
         learned=learned,
+        stale=stale,
         additions=additions,
         deletions=deletions,
     )
@@ -120,14 +131,21 @@ def _artifact_url(path: str) -> str | None:
     return "../" + quote(str(artifact), safe="/")
 
 
+_TIER_CLASS = {
+    board_state.Tier.BLOCKED: "status-blocked",
+    board_state.Tier.ACT: "status-act",
+    board_state.Tier.WIP: "status-wip",
+    board_state.Tier.WAIT: "status-wait",
+    board_state.Tier.DONE: "status-done",
+}
+
+
 def _status_class(status: str) -> str:
-    if status in {"CI 紅", "CHANGES_REQUESTED", "BLOCKED", "NEEDS_CHANGES"}:
-        return "status-danger"
-    if status in {"READY", "APPROVE", "APPROVE_WITH_NITS"}:
-        return "status-positive"
-    if status in {"待 triage", "待 review", "有新回覆", "有新 comment", "↩︎ 回你的球"}:
-        return "status-attention"
-    return "status-neutral"
+    """5-tier class 由 `board_state` 查表；不在 enum 內的狀態大聲回 `status-unknown`。"""
+    tier = board_state.tier_for_status(status)
+    if tier is None:
+        return "status-unknown"
+    return _TIER_CLASS[tier]
 
 
 def _command_target(item: str) -> str:
@@ -159,8 +177,11 @@ def render_table(items: list[BoardItem], default_repo: str | None) -> str:
             if item.learned
             else ""
         )
+        stale_badge = (
+            '<span class="stale" title="逾期未更新">💤</span>' if item.stale else ""
+        )
         work_cell = (
-            f'<div class="work-item-title">{item.kind} {item_label} {learned}</div>'
+            f'<div class="work-item-title">{item.kind} {item_label} {learned}{stale_badge}</div>'
             f'<div class="work-title">{title}</div>'
             f'<div class="work-meta">{html.escape(KIND_LABELS[item.kind])}</div>'
         )
@@ -181,10 +202,13 @@ def render_table(items: list[BoardItem], default_repo: str | None) -> str:
             '<input class="learn-checkbox" type="checkbox" disabled'
             f'{checkbox} aria-label="我處理過 {html.escape(item.item)}">'
         )
-        status_cell = (
-            f'<span class="work-status {_status_class(item.status)}">'
-            f"{html.escape(item.status)}</span>"
+        status_class = _status_class(item.status)
+        status_text = (
+            f"⚠ 未知狀態 {html.escape(item.status)}"
+            if status_class == "status-unknown"
+            else html.escape(item.status)
         )
+        status_cell = f'<span class="work-status {status_class}">{status_text}</span>'
         reason_cell = (
             html.escape(item.reason) if item.reason else '<span class="muted">—</span>'
         )
