@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.46.0 (2026-07-17)
+
+### Feat
+
+- **board**: add machine-verifiable status classifier with 5-tier UI
+
+### Fix
+
+- **board**: repair scaffold CSS upgrade path and served page UX
+
 ## v0.45.0 (2026-07-16)
 
 ### Feat
