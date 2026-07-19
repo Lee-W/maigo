@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.47.0 (2026-07-19)
+
+### Feat
+
+- **validate**: catch broken skill-to-skill cross-references
+
 ## v0.46.0 (2026-07-17)
 
 ### Feat
