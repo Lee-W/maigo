@@ -926,6 +926,80 @@ class TestCheckRelativeLinks:
 
 
 # ---------------------------------------------------------------------------
+# check_contributor_mirror
+# ---------------------------------------------------------------------------
+
+
+class TestCheckContributorMirror:
+    def _write(self, tmp_path: Path, filename: str, body: str) -> None:
+        (tmp_path / filename).write_text(body, encoding="utf-8")
+
+    def test_matching_verification_sections_pass_despite_platform_differences(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        shared = "## Verification quirks\n\n- shared rule\n"
+        self._write(tmp_path, "CLAUDE.md", f"# Claude\n\nClaude-only text\n\n{shared}")
+        self._write(tmp_path, "AGENTS.md", f"# Codex\n\nCodex-only text\n\n{shared}")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+
+        assert validate_plugin.check_contributor_mirror().passed
+
+    def test_drifted_verification_sections_fail(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(
+            tmp_path,
+            "CLAUDE.md",
+            "# Claude\n\n## Verification quirks\n\n- Claude rule\n",
+        )
+        self._write(
+            tmp_path,
+            "AGENTS.md",
+            "# Codex\n\n## Verification quirks\n\n- Codex rule\n",
+        )
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+
+        result = validate_plugin.check_contributor_mirror()
+
+        assert not result.passed
+        assert any("不一致" in error for error in result.errors)
+
+    @pytest.mark.parametrize(
+        ("filename", "body", "expected"),
+        [
+            pytest.param("AGENTS.md", "", "AGENTS.md 不存在", id="missing-file"),
+            pytest.param(
+                "AGENTS.md",
+                "# Codex\n\nNo shared section\n",
+                "AGENTS.md 缺",
+                id="missing-section",
+            ),
+        ],
+    )
+    def test_missing_mirror_input_fails(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        filename: str,
+        body: str,
+        expected: str,
+    ):
+        self._write(
+            tmp_path,
+            "CLAUDE.md",
+            "# Claude\n\n## Verification quirks\n\n- shared rule\n",
+        )
+        if body:
+            self._write(tmp_path, filename, body)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+
+        result = validate_plugin.check_contributor_mirror()
+
+        assert not result.passed
+        assert any(expected in error for error in result.errors)
+
+
+# ---------------------------------------------------------------------------
 # main() happy-path integration (M-1)
 # ---------------------------------------------------------------------------
 

@@ -7,7 +7,9 @@
 ```bash
 git clone <your-fork> maigo
 cd maigo
-pre-commit install      # 一次性，之後 commit 自動跑檢查
+uv python install 3.13
+uv sync --group dev --group docs
+uv run pre-commit install      # 一次性，之後 commit 自動跑檢查
 ```
 
 ## 開發流程
@@ -35,7 +37,7 @@ pre-commit install      # 一次性，之後 commit 自動跑檢查
 ### 升版本或大動結構前，跑完整檢查
 
 ```bash
-python3 scripts/validate_plugin.py
+uv run python scripts/validate_plugin.py
 ```
 
 涵蓋的檢查面向（具體項數會隨 plugin 演進變動，**以 `CHECKS` list 與實際輸出為準**）。

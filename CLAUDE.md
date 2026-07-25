@@ -1,5 +1,9 @@
 # maigo contributor instructions for Claude Code agents
 
+> **鏡射檔同步**：`CLAUDE.md` 與 `AGENTS.md` 共用下列 contributor conventions。
+> 修改共同規則時必須同步另一份；平台特定措辭、連結格式與 hook runtime 說明可保留差異，
+> 否則另一端會照舊快照做事。
+
 ## Tone
 
 This project is emoji-friendly. When working in this repository
@@ -60,8 +64,9 @@ live in [`skills/narration`](skills/narration/SKILL.md).
 - **ruff 只能經 pre-commit 跑**：`uv run ruff` 會 `Failed to spawn`；改用
   `uv run pre-commit run --files <files>`。注意 `--all-files` 不掃 untracked 檔，
   新增檔案要明確列進 `--files`。
-- **工具邊界**：venv 工具（`pytest` / `mkdocs` / `pre-commit`）一律用 `uv run` 執行；
-  `hooks/` 底下的腳本與 stdlib-only script 用 `python3` 直接執行，不經 `uv run`。
+- **工具邊界**：venv 工具（`pytest` / `mkdocs` / `pre-commit`）與要求專案 Python 的
+  `scripts/validate_plugin.py` 一律用 `uv run` 執行；`hooks/` 底下的 runtime script
+  與其他 standalone stdlib-only script 用 `python3` 直接執行。
 - **Version bump 由 CI 執行**：`cz bump` 是 CI 的職責，不屬於任何 plan / 任務步驟 /
   open question——規劃或交辦時不得把手動 bump 列為待辦項目。
 - **`scripts/board_serve.py` 的 `V{N}_CSS_SHA256` 常數必須用程式算，不可手填**：每次
