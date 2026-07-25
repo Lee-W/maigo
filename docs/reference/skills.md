@@ -263,7 +263,7 @@ skill 是**目錄**不是單檔。SKILL.md 本體在 skill 觸發時整份進 co
 3. `mkdocs.yml` 的 `Skills (source):` 段加一條 `- <new-name>: skills/<new-name>.md`
 4. 這份 catalog 表加一列（Owner / Consumers / 摘要）
 5. 在 owner agent 的 prompt 加引用：「process 依 `skills/<new-name>/SKILL.md`」
-6. 跑 `python3 scripts/validate_plugin.py`（cross-ref + 上述 alignment 檢查）
+6. 跑 `uv run python scripts/validate_plugin.py`（cross-ref + 上述 alignment 檢查）
    與 `uv run mkdocs build --strict`（doc link rewrite 不報缺檔）
 
 第 1–4 步漏掉任何一條 → `check_skills_docs_alignment` 會擋下。

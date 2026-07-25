@@ -26,16 +26,16 @@ diff 動到以下任一路徑時啟用本 skill：
 ## 驗證指令
 
 ```
-python3 scripts/validate_plugin.py
+uv run python scripts/validate_plugin.py
 uv run mkdocs build --strict
 ```
 
-**為什麼分開用不同執行器**：
+**為什麼都用專案環境**：
 
-- `python3 scripts/validate_plugin.py` — `validate_plugin.py` 只用 stdlib，不需要
-  venv 套件；遵守 maigo 慣例「stdlib-only script 用 `python3`」。
+- `uv run python scripts/validate_plugin.py` — validator 使用專案宣告的 Python
+  版本；不受 host 上較舊的系統 `python3` 影響。
 - `uv run mkdocs build --strict` — mkdocs 是 venv 工具（在 `pyproject.toml` 的
-  dev dependency 裡）；遵守「venv 工具用 `uv run`」。
+  docs dependency 裡）。
 
 ## 這兩條抓的是 pytest 抓不到的東西
 
@@ -48,6 +48,7 @@ uv run mkdocs build --strict
 | 相對 link 在 include-markdown rewrite 後炸 strict-mode | `mkdocs build --strict` |
 | docs nav 指到不存在的 page | `mkdocs build --strict` |
 | command 檔缺「掛名」角色台詞（引號旁邊沒有角色 emoji / 名字） | `validate_plugin.py` |
+| `CLAUDE.md` / `AGENTS.md` 的共同驗證慣例漂移 | `validate_plugin.py` |
 
 pytest 測的是 Python 行為；上述問題都在 plugin 結構層——pytest 對它們是盲的。
 

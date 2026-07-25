@@ -276,6 +276,17 @@ def make_hooks(tmp_path: Path) -> Path:
     return hooks_dir
 
 
+def make_contributor_mirrors(tmp_path: Path) -> None:
+    """Write the shared contributor section required by validate_plugin.py."""
+    section = "## Verification quirks\n\n- shared rule\n"
+    (tmp_path / "CLAUDE.md").write_text(
+        f"# Claude instructions\n\n{section}", encoding="utf-8"
+    )
+    (tmp_path / "AGENTS.md").write_text(
+        f"# Codex instructions\n\n{section}", encoding="utf-8"
+    )
+
+
 @pytest.fixture
 def plugin_tree(tmp_path: Path) -> Path:
     """Build a minimal valid plugin tree under tmp_path.
@@ -295,4 +306,5 @@ def plugin_tree(tmp_path: Path) -> Path:
     make_mkdocs_yml(tmp_path)
     make_skills_catalog(tmp_path)
     make_hooks(tmp_path)
+    make_contributor_mirrors(tmp_path)
     return tmp_path

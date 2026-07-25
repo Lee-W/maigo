@@ -103,7 +103,8 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
    開頭寫 `**Loaded by**: repo-detect hook (SessionStart) when <project> is detected`，
    後接 When to apply / 命名 / 環境 / 測試 / PR 等子段。
 
-完成後跑 `python3 scripts/validate_plugin.py` 確認 skill cross-ref 通過（check #8 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。
+完成後跑 `uv run python scripts/validate_plugin.py` 確認 skill cross-ref 通過
+（validator 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。
 
 ## PostToolUse — `hooks/token_usage.py`
 

@@ -76,7 +76,7 @@ diff 動到 `agents/`、`commands/`、`skills/`、`mkdocs.yml`、`docs/` 任一�
 跑兩條驗證取代（或補充）純 pytest：
 
 ```
-python3 scripts/validate_plugin.py
+uv run python scripts/validate_plugin.py
 uv run mkdocs build --strict
 ```
 

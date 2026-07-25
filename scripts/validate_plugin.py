@@ -7,7 +7,7 @@ command / skill frontmatter, hook script existence + syntax, pre-commit
 config sanity, skill cross-references, plugin↔pyproject version sync, and
 commands/skills ↔ docs alignment.
 
-跑：`python3 scripts/validate_plugin.py`
+跑：`uv run python scripts/validate_plugin.py`
 Exit 0 = 全綠；Exit 1 = 至少一項失敗。輸出最末一行印「全部 N checks 通過」
 或「N/M checks 失敗」——以 N 為準，不必同步任何文件。
 
@@ -722,6 +722,33 @@ def check_skills_graph() -> CheckResult:
     return r
 
 
+def _markdown_h2_section(text: str, heading: str) -> str | None:
+    pattern = rf"^## {re.escape(heading)}\s*$.*?(?=^## |\Z)"
+    match = re.search(pattern, text, re.MULTILINE | re.DOTALL)
+    return match.group(0).strip() if match else None
+
+
+def check_contributor_mirror() -> CheckResult:
+    """CLAUDE.md / AGENTS.md 的共同驗證慣例必須逐字一致。"""
+    r = CheckResult("CLAUDE.md ↔ AGENTS.md Verification quirks sync")
+    sections: dict[str, str] = {}
+    for filename in ("CLAUDE.md", "AGENTS.md"):
+        path = ROOT / filename
+        if not path.is_file():
+            r.fail(f"{filename} 不存在")
+            continue
+        section = _markdown_h2_section(
+            path.read_text(encoding="utf-8"), "Verification quirks"
+        )
+        if section is None:
+            r.fail(f"{filename} 缺 `## Verification quirks` 區段")
+            continue
+        sections[filename] = section
+    if len(sections) == 2 and sections["CLAUDE.md"] != sections["AGENTS.md"]:
+        r.fail("兩份檔案的 `Verification quirks` 不一致，請同步共同規則")
+    return r
+
+
 CHECKS: list[Callable[[], CheckResult]] = [
     check_plugin_json,
     check_hooks_json,
@@ -743,6 +770,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_skills_graph,
     check_doc_link_convention,
     check_relative_links,
+    check_contributor_mirror,
 ]
 
 

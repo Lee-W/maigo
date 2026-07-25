@@ -85,6 +85,10 @@ Maigo 的 `command-router` skill 會載入對應 `commands/*.md` 作為唯一行
 Codex session 有提供多 agent 工具時，Maigo 會依 command 進行分工；若當前 surface 沒有提供，
 則由主 agent 依相同角色順序執行並明說 fallback。重新開啟 session 後才會載入新安裝的 skills。
 
+更新 Maigo 後也要重新開啟既有 Codex session，讓 skills 與 hook path 重新載入。若 Stop hook
+錯誤仍指向已移除的舊版 cache 路徑（例如 `.../maigo/<old-version>/hooks/...`），代表該 session
+仍持有更新前的 plugin root；關閉該 session 後重新開啟，不要把舊版 cache symlink 當成正式修法。
+
 ## 命令快覽
 
 日常 90% 用這三個：

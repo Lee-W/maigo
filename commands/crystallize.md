@@ -137,7 +137,7 @@ manifest 非空 → **一次** spawn 🎀 愛音，把整份 manifest 交給她�
 跑：
 
 ```
-python3 scripts/validate_plugin.py     # stdlib-only → python3
+uv run python scripts/validate_plugin.py
 uv run mkdocs build --strict           # venv 工具 → uv run
 ```
 
