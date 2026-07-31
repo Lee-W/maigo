@@ -241,3 +241,92 @@ How to apply:
   state change, a return value, a side-effect on a model). The exception is
   operator-visibility — diagnostic logs that have no other observable
   channel.
+
+---
+
+## Prefer pytest style over `unittest.TestCase`
+
+Write tests in pytest style — module-level functions with plain `assert`,
+not classes inheriting `unittest.TestCase` with `assertEqual`/`assertTrue`/
+`assertIn` methods.
+
+Why: the user explicitly asked for tests to be written in pytest style
+(plain `assert` + fixtures), not `unittest.TestCase` / `assertEqual` and
+friends — this is a stated preference, not a house style invented for this
+guide.
+
+```python
+# Preferred
+def test_parses_valid_config():
+    result = parse_config(SAMPLE)
+    assert result.name == "x"
+
+# Not preferred
+class TestConfig(unittest.TestCase):
+    def test_parses_valid_config(self):
+        result = parse_config(SAMPLE)
+        self.assertEqual(result.name, "x")
+```
+
+How to apply:
+
+- Assert with plain `assert x == y` / `assert cond`, not `assertEqual` /
+  `assertTrue` / `assertIn` and friends.
+- Use fixtures (`tmp_path`, `monkeypatch`, `@pytest.fixture`) instead of
+  `setUp`/`tearDown` and `mock.patch` context managers.
+- Write tests as module-level functions, not `unittest.TestCase` subclasses.
+- If the repo's runner is still `unittest discover`, migrating requires more
+  than the test files themselves: add pytest as a dev dependency, set
+  `[tool.pytest.ini_options]` (usually `pythonpath = ["."]` so imports
+  resolve — `unittest discover` relies on cwd for that instead), and switch
+  CI from `unittest discover` to `uv run pytest` (or the repo's equivalent).
+
+---
+
+## `MagicMock(spec=[])` does not guarantee attribute absence
+
+`MagicMock(spec=[])` means "mimic an empty list's interface" — it does not
+mean "no attributes." `dir([])` is what `MagicMock` actually consults to
+decide which attributes are allowed, so `spec=[]` behaves like "the full set
+of `list` attributes," not an empty spec. Relying on it to make
+`getattr(mock, "attr", default)` fall back to `default` is unreliable across
+mock versions.
+
+How to apply: to make a specific attribute genuinely absent from a mock, use
+`MagicMock(spec=["allowed_attr_1", "allowed_attr_2"])` — list the attributes
+that **should** be present. `hasattr(mock, "missing_attr")` then reliably
+returns `False` for anything not in that list.
+
+---
+
+## Tests must not fire real external side effects
+
+Tests must never trigger real external side effects — system notifications,
+subprocess calls, writes to the user's home directory / config files. Any
+code path in the system under test that can cause a side effect must be
+mocked or no-op'd, with an **autouse fixture** as the module-level backstop
+so the whole test module defaults to hermetic.
+
+Why: an integration-style test (one that constructs an app object and drives
+a reload/refresh path) is the easiest place to accidentally hit a real side
+effect, because the code path that fires it usually isn't the thing being
+directly tested — it's incidental to building the test fixture. A test that
+builds an app and calls its reload path, without mocking the notification
+call inside it, can end up sending a real OS-level notification on every
+test run; running the failing test repeatedly during debugging multiplies
+into a pile of real notifications with no test-level indication anything is
+wrong.
+
+How to apply:
+
+- Integration-style tests (constructing/mounting/reloading an app object) are
+  the highest-risk spot for incidental real side effects — add an autouse
+  fixture in that test module that no-ops the side-effect entry point (e.g.
+  `monkeypatch.setattr(app_module, "send_notification", lambda *a, **kw: None)`).
+- Don't let tests depend on the machine's real config file (`~/.config/...`);
+  inject a default config object via an autouse fixture instead, otherwise
+  test behavior drifts whenever the local user's config changes.
+- An unexplained side effect outside the test itself (a stray notification, a
+  file that changed) is a signal to suspect the test suite hit a real code
+  path — check for a missing mock before assuming the environment is at
+  fault.

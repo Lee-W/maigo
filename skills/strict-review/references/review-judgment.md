@@ -1,6 +1,6 @@
 # Strict Review — Review Judgment Principles (Extended)
 
-Loaded on demand by `skills/strict-review/SKILL.md` — **twenty principles for when
+Loaded on demand by `skills/strict-review/SKILL.md` — **twenty-one principles for when
 NOT to flag, how to calibrate response size to comment weight, and how to verify
 a claim before escalating or reverting it**.
 Read this file when you are deciding whether a finding is a real must-fix or a
@@ -86,6 +86,25 @@ Steps:
 If the larger refactor is genuinely worth doing, cut it into a separate follow-up
 PR or issue and reference it in the reply. Do not fold it into the current PR to
 look thorough.
+
+The comment's own scale words are part of the ask, not a hedge. When a
+reviewer writes "a short note", "a quick comment", "just mention", or
+similar, that phrasing is an acceptance criterion, not idle politeness —
+producing something far larger reads as not having listened, not as added
+value.
+
+How to apply: translate a scale word into a **measurable** basis instead of
+"write something concise" — the character count of an existing, adjacent
+bullet/entry in the same section is a much more useful target than a vague
+adjective. When reviewing the result, use the same yardstick: compare the
+new content's length against neighboring existing entries, not against how
+smooth the new prose reads on its own. Concrete reference: in one review
+round, a reviewer's comment asked for "a short note" to be added to a docs
+file; the first draft came back several times longer than the neighboring
+bullets in the same section — closer to a subsection than a list item.
+Measuring against those bullets' character counts caught the mismatch, and
+trimming it down to the same order of magnitude lost none of the
+informational content.
 
 ---
 
@@ -442,6 +461,41 @@ loop for the inconsistency (a scheduler timer, a retry policy, a garbage
 collector, a reconciliation pass) before writing the severity language.
 State the actual bound (one-time vs. periodic vs. unbounded, and on what
 cadence) rather than defaulting to the scarier-sounding framing.
+
+---
+
+## 22. Whitelist only closed sets — open sets belong to convention + review
+
+Before proposing or approving automated validation (a test, a schema check,
+a lint rule) that guards some "set of allowed values," classify the axis
+first:
+
+- **Closed, small set** (few values, a new one is a rare and deliberate
+  decision) → worth whitelisting. Requiring a constant to be edited before a
+  new value is accepted is exactly the friction you want as a gate.
+- **Open set** (every new use case naturally introduces a new value) → do
+  **not** whitelist. The list will rot, and every legitimate addition now
+  costs an extra edit somewhere with no corresponding protection gained.
+  Govern this with a convention doc + code review instead.
+
+Concrete reference: in one review round, a reviewer drew exactly this
+distinction within a single classification scheme — one axis (few possible
+values, a new one is a rare and deliberate decision) was worth a whitelist
+test enforcing "exactly one value from this axis per item"; a sibling axis
+in the *same* scheme (every new integration/use-case naturally adds a value)
+was explicitly called out as the wrong place for a whitelist, because it
+would rot and add friction to every future addition. Same taxonomy, two
+axes, opposite answers — from the same reviewer comment.
+
+How to apply: when reviewing (or proposing) "add a test/schema to reject
+invalid values" for some classification axis, ask "does this set grow with
+usage?" If yes, push the rule into a convention document rather than code
+constants. If no, whitelist it, and note in the doc that adding a new value
+is a deliberate decision. Different axes within the same taxonomy can land
+on opposite answers — don't assume every axis in a related group gets the
+same treatment (e.g. one axis of a tagging scheme can be closed while a
+sibling axis is open-ended, and mixing the two rules into a single blanket
+policy produces the wrong call for one of them).
 
 ---
 

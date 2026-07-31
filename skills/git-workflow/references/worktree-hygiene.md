@@ -60,6 +60,41 @@ Two counter-cases:
   choose between "fold it in as a standalone commit" and "keep it split out"
   — don't mechanically default to a worktree for a tiny diff.
 
+## Colliding work: defer the overlapping subset
+
+When starting a batch of approved work, first check for in-flight branches;
+if some items overlap the same files as an active branch, default to **doing
+the non-colliding subset now and deferring the colliding subset**, rather
+than landing everything straight on the default branch to "get it all done
+in one pass."
+
+Why: forcing all items through at once when several collide with an active
+branch's files creates merge conflicts in every touched file once that
+branch lands — a worse outcome than a short delay. Users asked to choose
+consistently pick "do the non-colliding items now, defer the rest" over
+either "do everything now and resolve conflicts myself" or "fold it into the
+existing branch."
+
+How to apply:
+
+- Before starting, run `git diff --name-only main <active-branch>` to
+  compare the **file sets**, not just branch names, for overlap.
+- Defer colliding items until the active branch merges into the default
+  branch; proceed with non-colliding items normally.
+- Report the split explicitly to the user (what's happening now, what's
+  deferred, why) — don't silently skip items.
+- Check whether a deferred refactor/deprecation may already have been picked
+  up incidentally by the active branch — re-doing it would be wasted work.
+- **If work truly must happen in parallel with the in-flight branch (can't be
+  deferred), open a separate `git worktree` — don't run both flows against
+  the same working tree.** Sharing a tree risks switching to the other
+  branch unnoticed and clobbering the other flow's uncommitted staged
+  changes.
+
+This is the same judgment as "when to open a new worktree for a pre-existing
+issue" above — look at what's actually changed before deciding scope, rather
+than defaulting to doing the whole approved list unconditionally.
+
 ## Batch worktree/branch cleanup
 
 Cleaning up multiple worktrees/branches at once is a batch, destructive
