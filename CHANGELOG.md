@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.49.0 (2026-07-31)
+
+### Feat
+
+- **skills**: graduate 29 memory entries into standing skills
+
 ## v0.48.0 (2026-07-31)
 
 ### Feat
