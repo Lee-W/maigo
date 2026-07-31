@@ -248,6 +248,7 @@ much change a comment warrants; details in `references/review-judgment.md`:
 - **Rank designs by the actual cadence of their cost path** — verify trigger frequency in code, not by feel; verify assumed costs too.
 - **Verify a mechanism claim empirically** — write a small isolated repro before publishing a "why this works/breaks" explanation.
 - **Trace the introducing commit before reverting a shared signature** — a type error at a changed signature's use site is usually an incomplete rollout, not a wrong change.
+- **Trace the reconciliation/self-heal loop fully before characterizing a bug's severity** — a mismatch that self-corrects within one cleanup cycle is not the same severity as one that repeats forever; find the actual consumer/cleanup loop before writing the severity language.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

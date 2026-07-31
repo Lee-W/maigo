@@ -67,6 +67,15 @@ inline comment 的 `url` 已由上方 Inline review threads 的 GraphQL query �
 「現在錨定那一行的實際內容」自己 diff 一次——**不要從建議的最終狀態反推意圖**：同一段最終文字
 可能對應完全不同的改動（例如表面像 rename，實際 diff 是拿掉一個沒用到的參數）。
 
+**reviewer 點名的 `file:line` 是他觀察到症狀的位置，不必然是唯一的修法位置**：上一段驗的是
+「這條意見**還有效嗎**」，這段驗的是「改那一處**就夠了嗎**」——兩者都做對，仍可能只修一半。
+若某條意見描述的是**使用者可見行為**（搜尋、篩選、排序、顯示），先枚舉該行為在系統裡有幾個
+**入口**、每個入口綁到哪套實作、各自的資料來源是什麼（DOM / 索引 / API / build 期產生的資料），
+再定 work item 範圍。**只 grep 符號名不算枚舉**——同一個功能的第二套實作往往用不同的符號名，
+grep 不到就會誤判成「範圍封閉」。特別留意 build 步驟（`postbuild`、索引產生腳本）與第三方
+搜尋／索引套件：它們不讀頁面 HTML，改 template 對它們完全無效。
+若枚舉出的入口數 > 1，在步驟 3 列出時就要標明「這條意見有 N 處要改」，不要留到實作階段才發現。
+
 ### 3. 列出來，問哪些要處理
 
 把意見編號列成清單印給使用者，**每條在列出來的當下就帶判斷深度**——現狀分桶
@@ -97,6 +106,13 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 ### 4. 寫 triage + 提路由計畫，確認
 
 把被選中的意見寫進 `.maigo/pr-comments.md`（目錄不存在先 `mkdir -p .maigo`），並擬路由計畫。
+
+**寫入前先確認既有檔案的歸屬**：若 `.maigo/pr-comments.md` 已存在，先讀一次檔頭的 PR 編號/URL。
+若跟本次 PR 不同 → 是前一個 PR 留下的殘留（同一個 worktree 曾跑過別的 PR 的
+address-comments），直接覆寫成本次 PR 的內容，不必詢問使用者（這份檔案本來就是拋棄式的
+進度追蹤 artefact，不是長期記憶）。若跟本次 PR 相同 → 代表這是續跑（例如上次 session 中途
+中斷），保留既有 work item 的 `Status`（`done` / `in-progress` / `blocked`），只在步驟 3 新選中
+但尚未出現在檔案裡的意見上新增條目，不要把已完成的進度覆寫回 `pending`。
 triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（哪種訊號建議走
 `/maigo:quick` / `/maigo:go` / `/maigo:team`）見
 `skills/github-reply-draft/references/comment-fetch-and-triage.md`「Triage 檔模板」與「路由判斷」。
@@ -133,7 +149,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 - 某個 work item 卡死（依該 route 規則停下找使用者）→ 該項標 `blocked`，**其餘 work item 照常繼續**，最後在 summary 點出卡住的那項。
 - **Commit 政策覆寫**：多個 work item 共享 working tree——若不 commit，後一個 work item 的 Anon / Soyo 會看到前一個的未 commit 改動，污染 diff、混淆 review 焦點。**因此覆寫 inner route 的「不自動 `git commit`」預設**（`/maigo:quick` 流程步驟 4、`/maigo:go` / `/maigo:team` 的 finale 規則）：每個 work item 完成、Soyo 過、Stop hook 綠後，orchestrator 依步驟 4 使用者選擇的 commit 格式落地：
 
-  - **各自獨立 commit（預設）**：直接用 inner route 草擬的 commit message 落地（本 repo 偵測為 CC，subject 為 `type(scope): ...`）。
+  - **各自獨立 commit（預設）**：直接用 inner route 草擬的 commit message 落地。subject 格式照 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的偵測決定，**不預設 CC**——target repo 的成文慣例優先於 skill 預設。
   - **fixup! commit（使用者在步驟 4 選擇）**：subject 改為 `fixup! <原 PR 主題>`，讓 `git rebase --autosquash` 接得起來。
 
   **仍不 push、不 amend、不 rebase**——拆 / 合由使用者最後決定。落地時的 staging（明確列檔、不用 `git add -A`）、
