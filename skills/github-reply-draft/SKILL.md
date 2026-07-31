@@ -25,7 +25,9 @@ This skill captures the six conventions that prevent those failures.
 The opening sentence names what changed. If there is a deliberate trade-off,
 one more sentence names it and signals the user can ask for more detail.
 Cut: preamble, restating the reviewer's comment, hedging phrases
-("hopefully this addresses...", "I believe this should...").
+("hopefully this addresses...", "I believe this should..."), verification
+narrative ("I re-ran the comparison and got the same result"), the process
+of what was done, and anything the reviewer can already see from the diff.
 
 The user will ask for more, not less — default short.
 
@@ -118,3 +120,15 @@ Use the wording appropriate to whether a human reviewed the draft before posting
 
 The attribution footer is in addition to any other disclosure in the PR body;
 never skip it to shorten a message.
+
+## Comment fetch & triage, and pre-apply verification (references)
+
+The `gh`/GraphQL queries for pulling inline threads, review summaries, and
+conversation comments, the triage-file template, and the routing table for
+turning selected comments into `/maigo:quick` vs `/maigo:go` work items are
+in `references/comment-fetch-and-triage.md`. The same file also covers two
+pre-apply verification habits: running a full before/after check on a
+reviewer's *suggested* fix (not just their cited example) before applying it
+literally, and checking PR review threads before a "unify / clean up" sweep
+touches a line you didn't write — it may be a reviewer-directed change
+already landed via `fixup!`.

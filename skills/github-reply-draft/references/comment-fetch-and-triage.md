@@ -95,3 +95,18 @@ or writing the triage file.
 
 **預設盡量走 `/maigo:quick`**——多數 review 意見是局部修正。
 不確定 quick 還是 go → 偏 `/maigo:go`（多一輪探索 + 完整 9 項 review，往上靠較安全）。
+
+## 套用前的驗證紀律
+
+**Reviewer 建議的修法也要實跑驗證再套用。** 對方的診斷正確不代表順手給的建議修法沒有副作用
+——reviewer 通常是在 diff 片段裡讀，沒有實際跑過修法對全量資料的效果。套用任何建議修法前，
+先自己跑一次全量前後對照，不只驗 reviewer 舉的那個例子。若建議版本有副作用，改用安全的變體，
+並在回覆裡明講具體反例（哪個輸入、變成什麼、為何誤判）——不要默默改成別的寫法讓對方以為你照做
+了字面建議。回覆本身仍維持 Convention 1 的簡短：反例是對方需要的內容，驗證過程敘述不是，不要
+把「我重跑過一次、結果一致」這類驗證敘述寫進 thread。
+
+**「統一 / 清理」型 sweep 前先查 review threads。** 動到自己（或本輪 agent 鏈）沒寫過的行之前，
+先用 `git log -L` 或查 PR review threads 追它為什麼長這樣——working tree 上「看起來不一致」的
+地方可能是 reviewer 在 inline thread 指定、使用者已用 `fixup!` 落地的刻意改動。PR 進行中時，
+review threads 是「現狀真相」的一部分；用「一致性」理由把它蓋回去，等於默默回退了 reviewer 的
+要求。

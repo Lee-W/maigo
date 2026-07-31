@@ -40,3 +40,38 @@ zh-TW 行文規範（通用，跨專案）：
 - 技術名詞英文穿插無妨（PR / merge / refactor / cache / token / scheduler）
 
 Repo-specific 命名規範（例如 Airflow 的 `Dag` title case + code token 例外）由各 repo 的 domain skill 負責（如 `airflow-aware` §2），這裡不重述——`--bilingual` 自動觸發那條路徑下 domain skill 已經被 repo-detect 載入。
+
+## Delta re-review against a stored report
+
+When a PR that's already been reviewed gets new commits or a new maintainer
+review, don't restart from scratch — do a **delta re-review** against the
+stored report:
+
+1. Read the previous report (`files/.../review-<n>.md`) as baseline.
+2. Pull the current `gh pr diff` + `gh pr view --json commits,reviewDecision`
+   + existing human review threads (GraphQL `reviewThreads{isResolved,...}`
+   plus reviews/comments).
+3. Report, per finding:
+   - **what changed since baseline** — which new commits (watch for a
+     rebase; see below)
+   - **finding-by-finding status** — each prior must-fix/should-fix as
+     addressed / still-open / partial, with `file:line`
+   - **maintainer thread state** — flag any `OPEN` thread that names you
+   - **new concerns** introduced by the new commits
+   - bottom line + updated verdict
+
+Be precise relaying maintainer thread state: "author replied, awaiting
+reviewer re-confirmation" is not the same as "no response" — GitHub's
+`isResolved: false` often just means nobody has clicked Resolve yet.
+
+### A `<oldSha>..<newSha>` compare range spanning a rebase is noise
+
+A pasted GitHub `.../changes/<oldSha>..<newSha>` range that spans a
+**rebase / merge-main-into-branch** makes `gh api compare/<old>...<new>`
+list the entire intervening `main` history (doc links, dependency bumps,
+unrelated PRs) — not the PR's own delta. Before treating that range as "the
+PR's new change," check whether its `.commits` include commits that
+obviously belong to a different, unrelated PR
+(`gh api compare/<old>...<new> --jq '.commits[].commit.message'`). If so,
+it's a rebase — use the current `gh pr diff <n>` (against `main`) instead to
+see the PR's actual delta.

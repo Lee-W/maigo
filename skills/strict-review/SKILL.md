@@ -151,6 +151,11 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 - "我改了類似的地方" / "順便修了別的" doesn't clear a must-fix
 - New problems found in this round still count — being "round 3" is not a reason to relax
 
+When new commits or a new maintainer review arrive on a PR **already
+reviewed before**, do a delta re-review against the stored report rather
+than reviewing from scratch — mechanics and the rebase-range pitfall are in
+`references/review-modes.md`.
+
 **Mutation test 作為修法驗證證據**：光看「新增的斷言轉綠」不夠——測試可能本來就不會失敗，
 或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
 （證明測試真的在守這條修法）→ 復原修法 → 測試轉綠。復原動作依上方「共用 working tree 上的
@@ -191,6 +196,8 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
   Details: `references/recurring-patterns.md`.
 - **Naming: by what it is, not its first caller's use case** — a name coupled to one caller's context misleads and blocks reuse; generalize it.
 - **Naming: private helper name carries the domain noun** — behavioral qualifiers ("once", "dedup") go in the docstring, not the name.
+- **State the rule, don't enumerate a code-derived set** — a comment/docstring listing "all the other X" goes stale as the set grows; require the rule itself. Hitting the same incomplete-enumeration defect a second round is a signal to change approach, not add the N+1th member.
+  Details: `references/recurring-patterns.md`.
 
 ## Test conventions (references)
 

@@ -357,6 +357,9 @@ sub-check states. The file covers:
 - **10.4** `TYPE_CHECKING` guards for heavy type-only imports (Request changes)
 - **10.5** Security finding classification (3-way triage before reporting)
 - **10.6** Newsfragment file presence (Request changes)
+- **10.7** Revert of a recent fix: check for a tracking issue first (judgment gate, scope-gated to revert PRs)
+- **10.8** Self-discovered bugfix: verify upstream doesn't already have it (Request changes, scope-gated)
+- **10.9** Forward-looking code comments need a tracking-issue URL or neutral rewrite (Request changes, scope-gated)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -447,7 +450,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.6, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.9, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

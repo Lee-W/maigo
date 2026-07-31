@@ -182,6 +182,11 @@ PR-creation half specifically — confirm once more (plain text is fine) immedia
 before calling `gh pr create`. After committing and pushing a branch, default to
 stopping there: report the branch/compare URL and ask if a PR should be opened.
 
+**Outward git/GitHub operations are the user's to run, not just PR creation.**
+- Default to drafting (commit message, PR/issue title+body) and stop — never auto-run `git commit` / `git push` / `gh issue create` unless explicitly asked this turn.
+- A "Recommended" pick inside a batch `AskUserQuestion` is not authorization to open an issue — show the draft, wait for "post this".
+- Fixing an already-pushed branch: commit/amend locally and stop; mention `--force-with-lease` but neither run it nor frame it as the recommended next step. Case studies: `references/outward-ops-authority.md`.
+
 ## Worktree hygiene (references)
 
 Ten conventions for worktree lifecycle and git-attribution — sibling-layout

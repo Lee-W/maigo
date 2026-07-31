@@ -215,6 +215,10 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 
+**Upsert 紀律**（單項 upsert 的日期更新、容易被漏掉的獨立檢查、verdict 未必已送出 GitHub）
+三條實務守則見
+[`references/upsert-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/upsert-discipline.md)。
+
 ## 4. 併入遷移（review-board.md 退役）
 
 首次跑 `/maigo:board`（或某回寫命令要寫 board 時）偵測到 `.maigo/review-board.md`
