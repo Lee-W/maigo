@@ -412,6 +412,39 @@ shared signature back can simply relocate the error to a different file.
 
 ---
 
+## 21. Trace the reconciliation/self-heal loop fully before characterizing a bug's severity
+
+Finding a real inconsistency (a hash mismatch, a stale cache entry, a diff
+between two derived states) is not the same as knowing its *duration*. Don't
+stop the analysis at "these two values disagree" — trace what consumes that
+disagreement next: is there a reconciliation loop, a periodic cleanup job, a
+retry, or some other mechanism that notices and resolves it? A bug that
+self-heals within one cleanup cycle is a materially different severity than
+one that repeats forever, and asserting the wrong one either overstates a
+minor gap into a blocking issue or (worse) understates a genuinely unbounded
+problem.
+
+Real case: reviewing a trigger-kwargs decoding fix, a reviewer found that a
+sibling encode/hash path had the same blind spot as the bug just fixed, and
+characterized it as "every single Dag parse re-triggers this" — sound alarming,
+implying perpetual churn. Tracing the full path (the add/remove diff logic,
+then the periodic unreferenced-row cleanup job it feeds into) showed the
+mismatch actually self-corrects within one cleanup interval (a bounded ~60s
+window, config-dependent) after the first parse that notices it — a real but
+one-time, bounded correctness gap, not a perpetual one. The verdict (must-fix)
+still held, but the severity framing the user was given was wrong until this
+was traced through, and it took the user directly questioning "is this really
+still broken?" to trigger tracing it properly.
+
+How to apply: when a finding's severity claim rests on "this keeps happening"
+or "this is permanently broken," find and read the actual consumer/cleanup
+loop for the inconsistency (a scheduler timer, a retry policy, a garbage
+collector, a reconciliation pass) before writing the severity language.
+State the actual bound (one-time vs. periodic vs. unbounded, and on what
+cadence) rather than defaulting to the scarier-sounding framing.
+
+---
+
 ## See also: parallel batch review safety
 
 Read-only discipline for fanning out multiple PRs to parallel reviewers on a

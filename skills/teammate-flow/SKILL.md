@@ -67,8 +67,11 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 Taki 全綠（或 `/maigo:team` 合流 APPROVED + PASS）後，若還有未 commit 的本次變更，
 依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。
 
-本 repo `pyproject.toml` 有 `[tool.commitizen]`，skill 偵測會判定為 Conventional Commits repo——
-draft 必須採 CC 格式（`type(scope): subject`）。
+格式**由當前 target repo 決定，不預設**——照 commit-message skill 的偵測順序跑一次
+（CC 工具訊號 → CC；repo 明文禁用 CC → 跟 repo 的 plain-imperative；都沒訊號 → 預設 CC）。
+maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command 會跑在別的 repo：
+**target repo 的成文慣例優先於 skill 預設**（例：apache/airflow 明禁 CC 前綴，且有
+`check-no-conventional-commit-message` 這個 commit-msg hook 會直接拒收）。
 
 **不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
 
