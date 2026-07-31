@@ -105,6 +105,57 @@ first. When the task is just "check whether a PR merged", prefer querying the
 canonical upstream repo directly rather than a fork under an SSO-enforced org
 that isn't actually needed for that query.
 
+## Shared `.git` across sibling worktrees: stash is a single global stack
+
+All sibling `<repo>-<topic>` worktrees share the main checkout's `.git`, so
+`refs/stash` is **one global stack** — two agents stashing/popping
+concurrently in different worktrees can pop and drop each other's WIP. When
+a parallel task needs a "does this fail without the fix" check, use a
+temporary edit + restore (`git diff > patch; git checkout --; ...; git apply
+patch`) instead of `git stash`. The read-only verification discipline for
+*review* tasks specifically lives in
+[`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)'s
+"共用 working tree 上的審查紀律" section — this note is the underlying
+mechanism (why stash is unsafe at all), and applies beyond review too.
+
+This isn't limited to `refs/stash`: any shared-object-store operation can be
+affected by another session — a sibling worktree's branch has been observed
+rebased twice by something other than the current session, visible only via
+`git reflog` (unrequested `rebase (start): checkout main` events with no
+stash involved). After any commit in a shared-checkout worktree, confirm the
+branch still contains exactly the expected commits (`git log --oneline
+upstream/main..HEAD` or equivalent) — don't assume a stable commit hash
+across the session, and don't assume a reflog-visible rewrite is
+self-inflicted just because no stash was involved.
+
+## Reverify branch and status before any write action
+
+A shared workspace (multiple parallel sessions/terminals against the same
+checkout) can have its current branch, commits, or even a push+merge change
+underneath a session without that session seeing it happen. Don't assume
+the git-status snapshot from the start of the conversation — or the last
+time it was checked — still holds. Before any commit, mass file edit, or an
+assumption that "my earlier changes are still there," re-run `git branch
+--show-current` and `git status`.
+
+**Not even a worktree you just created is private.** A newly-created
+worktree/branch has been observed to already exist on `origin` (matching
+SHA, without the current session ever running `git push`) minutes after
+creation, with an unrequested rebase stuck mid-conflict — no push hook or
+reflog entry explained the source. Before a key operation, in addition to
+`git branch --show-current` + `git status`, also check:
+
+```bash
+ls "$(git rev-parse --git-path rebase-merge)" "$(git rev-parse --git-path MERGE_HEAD)" 2>/dev/null   # in-progress rebase/merge?
+git ls-remote --heads origin <branch>                                                                # does origin already have this branch?
+```
+
+If origin already has the branch, any further amend/reset rewrites an
+already-published ref — ask the user first (see
+[`references/outward-ops-authority.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/outward-ops-authority.md)
+for who runs the eventual push). If a rebase/merge shows up that this
+session didn't start, don't `--abort` it unilaterally — report it first.
+
 ## Don't over-attribute unexpected git state to a rogue agent
 
 On a user's own WIP branch, commits / `fixup!` commits / staging / force-pushes

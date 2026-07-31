@@ -81,6 +81,8 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 ```markdown
 ## 台灣漢語快速結論
 
+**PR:** <url>   <!-- 硬性：原 PR 完整 URL 一律放檔頭 Meta 第一欄 -->
+
 **PR #<N> — <short title>** <APPROVE / REQUEST_CHANGES / BLOCKED>
 <1-3 句：做什麼、能不能上、最大一個 concern>
 
@@ -92,8 +94,6 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 [（既有 Context / Rubric / Verdict / Verification / Bottom line 全段）]
 
 ---
-
-**PR link:** <url>
 
 <Queue / next-step line | batch 結束的 roll-up>
 ```

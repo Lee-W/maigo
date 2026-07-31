@@ -103,6 +103,30 @@ flag it for a rename to the general operation. Verb-first naming
 (`resolve_`, `compute_`, `get_`, `build_`, `find_`, `extract_`) generally
 reads better once decoupled from the specific caller.
 
+## State the rule, don't enumerate a set derivable from code
+
+Flag a comment or docstring that lists "all the other X" or enumerates a
+**set derivable from the code itself** (the types a handler covers, the
+modules following some convention, the call sites of something) instead of
+stating the underlying rule. Ask: will this list grow as the code grows? If
+yes, any enumeration has exactly two fates — incomplete now, or wrong the
+next time someone adds a member. Push for a rewrite that states the rule
+itself (a rule doesn't go stale as the set grows).
+
+**Signal to escalate, not add one more list member**: if the same shape of
+defect — an incomplete enumeration — surfaces a second round after being
+"fixed" by adding the missing member, that's the sign to change approach
+entirely (state the mechanism, drop the list) rather than push for an
+N+1th enumeration.
+
+How to apply: when a diff's comment/docstring lists members of a
+code-derived set, check whether the list's membership is decided by code
+(not a manually-maintained allowlist) — if so, require the rewrite state the
+rule rather than the members. Confirm the rewrite still carries the original
+point (e.g. "intentionally" / "by design") the comment was meant to convey —
+narrowing scope to avoid over-enumeration can silently drop the original
+point along with it.
+
 ## Naming: a private helper's name must carry the domain noun
 
 Flag a private helper name built from an adjective/adverb pair with no

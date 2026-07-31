@@ -78,6 +78,74 @@ file in the diff. Missing → flag as **Request changes** (not Block).
 **Do not** require newsfragments for changes under `providers/` or `airflow-ctl/`
 — their release managers regenerate the changelog from `git log`.
 
+## 10.7 Revert of a recent fix: check for a tracking issue first *(judgment gate — avoid a false-positive regression flag)*
+
+**Scope gate**: only applies when the diff/PR title/description reverts, or
+partially reverts, a commit that landed recently.
+
+Before flagging a PR that reverts a recent fix as a regression, check the PR
+body / linked issue for a tracking issue that lists the revert as a planned
+step. A tightened prek/CI rule sometimes forces code into a worse shape
+temporarily; when the rule is later relaxed, a tracking issue enumerating
+"Revert / Split / Rewrite" items records the planned cleanup. Finding such
+an issue means the revert is a governed wrap-up, not a regression — read the
+tracking issue's content and confirm the revert is actually listed in it
+before treating it as intentional; absence of any such reference is when to
+treat it as a real regression.
+
+## 10.8 Self-discovered bugfix: verify upstream doesn't already have it *(Request changes if evidence is missing)*
+
+**Scope gate**: only applies to a bugfix PR/branch where the bug was
+**self-discovered** (found by the agent itself while working on something
+else), not opened from a tracked issue.
+
+Before investing further in the branch, and again before opening the PR,
+check whether `upstream/main` already has an equivalent fix in flight or
+merged:
+
+```bash
+git fetch upstream main && git log upstream/main --oneline -30 -- <the paths touched>
+gh pr list --search "<keywords>" --state all
+```
+
+The repo's own "Before starting: check for an existing PR" convention is
+written for *taking* an issue, so it's easy to skip for a bug spotted
+directly in `main` — that's exactly the gap this check closes. Re-check
+after a long working session; upstream moves while work is in progress. A
+merged upstream fix means drop the branch (verify how much of the diff still
+adds value — sometimes only a small leftover, like a missing translation
+string, survives); an open PR means review or build on it rather than
+opening a near-duplicate.
+
+## 10.9 Forward-looking code comments need a tracking-issue URL or a neutral rewrite *(Request changes)*
+
+**Scope gate**: only applies when the diff contains a forward-looking phrase
+naming a possible future change with no inline tracking-issue URL — e.g.
+"switch to X if this becomes a problem", "we might revisit this later",
+"could be replaced by Y".
+
+The repo's own
+[`AGENTS.md`](https://github.com/apache/airflow/blob/main/AGENTS.md) "Tracking
+issues for deferred work" section already mandates a tracking issue (with an
+inline URL comment at the workaround site) for the narrower case of a PR
+that ships a **workaround, mitigation, or partial fix** — apply that section
+as the authority for those PRs, and flag a missing tracking-issue URL there
+as Request changes.
+
+For a forward-looking comment **outside** that narrower "workaround" scope
+(a stray aside in otherwise-complete code, or PR-description prose), it
+still needs one of two forms:
+
+- **Real tracking issue** — inline the issue URL.
+- **Neutral trade-off note** — rewrite to describe the design choice and its
+  known consequence, without promising a future fix, when no real follow-up
+  is actually planned. Don't manufacture a placeholder tracking issue just
+  to satisfy this check — delete the promise and state the trade-off
+  instead.
+
+Orphan phrases with neither form are must-fix; apply the same posture to
+PR-description and commit-body text, not just code comments.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,
