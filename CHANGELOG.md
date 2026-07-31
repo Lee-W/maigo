@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.48.0 (2026-07-31)
+
+### Feat
+
+- respect target repo commit style and tighten agent judgment
+- **skills**: graduate outward-ops and review-discipline conventions
+
 ## v0.47.1 (2026-07-25)
 
 ### Fix
