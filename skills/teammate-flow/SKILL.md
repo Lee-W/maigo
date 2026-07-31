@@ -40,6 +40,16 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 Orchestrator 每次轉場 summary 只說一行，但要說清楚「上一位留下了什麼、下一位要接什麼」。
 例如：「🐱 樂奈找到兩個慣例衝突點；🩵 燈會把它們寫進 plan 的 Risks。」
 
+**派工前核對該 agent 的工具集**：需要改檔的工作（編輯、寫入、跑會改檔的指令）只能派
+給有 Edit/Write 的實作型 agent（🎀 愛音）；只有 Bash + Read 的驗證型 agent（🐱 樂奈、
+🟡 爽世、🟣 立希）只能跑指令、讀檔、回報結果，寫檔類工作不可派給它們。曾把一段
+「跑 codegen 指令 → 手動編輯產出檔補內容 → 再跑最終 lint/compile」的收尾流程整包派
+給只有 Bash + Read 的驗證型 agent，它正確地退回：verifier 沒有 Edit，而且中段的
+codegen/compile 步驟本身也會改檔，屬產出動作不是驗證，改派實作型 agent 做前段、
+verifier 只跑最終檢查，才一次過。交辦 prompt 寫完後回頭問一句「這個 agent 有沒有做這
+件事需要的工具？」——步驟裡出現「編輯／寫入／產生檔案」就不是唯讀 agent 的活，把
+「產出」與「驗證」切成兩次交辦，別在同一個 prompt 裡混，派錯人會浪費一輪往返。
+
 ## Orchestrator 守則
 
 ### 旁白
@@ -54,6 +64,13 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 - 不要跳關。即使任務看起來很小，每一步都要走
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code
   的 Stop hook 會自行附上一行 token usage；orchestrator 不讀 usage log、不把統計塞回 prompt
+- 🐱 樂奈探索 / 🩵 燈規劃階段若發現某項要求是重複造輪子、會腐蝕既有設計、或時機未到，
+  **直說並建議砍或延**，不要為了把整份清單做完、或為了功能對稱性而硬做——攤出具體
+  證據（哪裡已覆蓋、會腐蝕什麼、時機為何未到）讓使用者拍板，不擅自省略。「重複造
+  輪子」要看實際覆蓋（讀目標 repo 現況），不憑功能名稱猜。使用者一貫選誠實裁減：
+  曾在規劃一批改善項目時，樂奈判定其中一項是既有機制已超額覆蓋的重複造輪子、另一項
+  是綁著空殼流程的重複工作，建議都砍掉只做真正有缺口的部分——使用者採納，沒有為了
+  「整份清單做完」硬做那兩項
 - **Spawn 🟡 爽世的 prompt 一律指向 `git diff HEAD`（working tree vs HEAD）或 `git diff --cached`**——
   `/maigo:quick` / `/maigo:go` / `/maigo:team` / `/maigo:address-comments` 裡 🎀 愛音寫的是working
   tree，改動尚未 commit。絕不能寫成 `git diff main...HEAD`：那只 diff 已 commit 的 HEAD，會漏掉

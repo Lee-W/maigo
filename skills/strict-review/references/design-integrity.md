@@ -187,3 +187,50 @@ instead of a generalized solution?"). This drove the design to a single
 (`Rollup` → its `upstream_mapper`, `FanOut` → its `downstream_mapper`, `Chain`
 → its last mapper) each delegate to — new mapper types then need zero caller
 changes.
+
+---
+
+## Part E — Prefer pluggable registry abstractions over hardcoded type lists
+
+### Rule
+
+When a design has a fixed `if x in {"a", "b", "c"}` branch over a "kind"
+axis (backend, provider, notifier, source), treat that as a signal the axis
+should be a **pluggable registry** instead — a `register_<kind>()` call plus
+a protocol/interface, so adding a new kind requires zero changes to the core
+dispatch logic.
+
+### How to apply during review / design
+
+1. Flag a hardcoded enumeration of kinds (`if backend in {"x", "y"}`, a dict
+   literal keyed by kind name baked into core logic) as a signal to propose
+   a registry abstraction (protocol + `register_*()` + built-in
+   registrations for the currently-known kinds).
+2. **Generalizing must not change existing behavior.** Keep the existing
+   per-kind test coverage; after the refactor, behavior for every
+   already-supported kind must be provably unchanged (add a fake/unknown
+   kind to a test to pin "the dispatch only looks at the registered kind,
+   not a hardcoded name").
+3. **The abstraction layer can exist before every concrete implementation
+   does.** Even if a given platform/backend's concrete implementation isn't
+   being written this round, the protocol/registry should still be put in
+   place now — "no concrete impl yet, but the plug point exists" — so a
+   future addition is pure registration, zero core changes.
+
+### Concrete reference
+
+A repeated design pattern across several review threads on the same
+personal project: a liveness check that hardcoded a fixed set of process
+names got rewritten as a `register_provider_procs()` registry so new
+process kinds register themselves instead of the core file gaining another
+literal; similarly, a notification path (OS-specific, macOS-only) was
+generalized into a `Notifier` protocol + registry with several
+platform-specific backends as built-in registrations — done specifically
+so a future platform could register a new notifier with zero changes to
+the calling code, even though no second platform was being implemented
+that round.
+
+This complements Part D above (polymorphism over caller-side type-switching)
+— Part D is about *pushing behavior onto existing types*; Part E is about
+*making the set of types itself open for extension* via registration rather
+than a hardcoded enumeration.

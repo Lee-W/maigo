@@ -22,6 +22,10 @@ what was intended.
 
 ## Scoping and staging
 
+Default to one commit per logical concern, and branch before the first
+commit the user will actually test — don't land straight on main. See
+[`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#staging-discipline-one-commit-per-concern-branch-before-its-testable).
+
 ### Stage explicit files, never `git add -A`
 
 When committing a scoped change, stage the specific files by path. Do not
@@ -72,6 +76,10 @@ exist off the same upstream and it's easy to accidentally run a command
 against the wrong one after a `cd`.
 
 ## Commit assembly (amend vs. new commit vs. which branch)
+
+`--amend` only ever operates on HEAD — briefing an amend target needs a HEAD
+check baked in, not just a hash. See
+[`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#amend-target-must-be-head).
 
 ### Fold polish into the unreleased introducing commit
 
@@ -148,6 +156,11 @@ one sentence instead of reproducing the source.
 
 ## Sizing a diff
 
+Editing a single JSON field (a version bump) should stay a 1-line diff — use
+precise string replacement, not a full `json.load`/`json.dump` re-serialize.
+See
+[`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#edit-a-json-field-with-precise-replacement-not-full-re-serialize).
+
 ### Diff against the real merge-target baseline, not the branch tip
 
 When quantifying a change's footprint — "what gets deleted", "is this a big
@@ -189,18 +202,21 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 ## Worktree hygiene (references)
 
-Ten conventions for worktree lifecycle and git-attribution — sibling-layout
-naming, when to open a separate worktree for a pre-existing issue, batch
-cleanup safety, squash-merge-aware "already merged" checks, and not
-over-attributing surprising git state (commits/rebases/wrong commit subject)
-to a rogue agent when it's more likely the user working in parallel or an
-unverified delegate report. Details and recipes in
+Eleven conventions for worktree lifecycle and git-attribution — sibling-layout
+naming, when to open a separate worktree for a pre-existing issue, deferring
+colliding work, batch cleanup safety, squash-merge-aware "already merged"
+checks, and not over-attributing surprising git state (commits/rebases/wrong
+commit subject) to a rogue agent when it's more likely the user working in
+parallel or an unverified delegate report. Details and recipes in
 `references/worktree-hygiene.md`:
 
 - **Sibling layout** — worktrees live as siblings of the main checkout
   (`<repo>-<topic>`, branch `<topic>`), not nested under a tool's default path.
 - **Pre-existing fix → new worktree off upstream/main**, not folded into the
   current feature branch (proportionality counter-case for trivial diffs).
+- **Colliding work gets deferred** — when approved work overlaps an
+  in-flight branch's files, do the non-colliding subset now and defer the
+  rest, rather than forcing everything through and creating merge conflicts.
 - **Batch cleanup**: show the exact command list before running; don't chain
   many worktree/branch ops in one shell call (timeout risk).
 - **Squash-merge "already merged" check** needs `gh search prs`, not

@@ -63,6 +63,19 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 - 使用者說「全部一起看」/ `batch them` / `do them all` → 放掉這個 gate 直到 batch 結束
 - 最後一個 PR 跑完 → queue 行改成最終 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）
 
+## 大批平行 spawn：節流與進度落地
+
+大批平行 spawn subagent 的任務（例如一次 batch review 幾十個 PR）會反覆撞 session
+limit——單一 session 內可能撞多次不同重置點，每次都有整批在飛的 agent 被砍、需重跑。
+平行度開太大時，額度在少數幾波內就燒完；被砍的 agent 若結果沒落地，重跑等於白做。
+
+**How to apply**：
+
+- 縮小每波並行度（撞過就再縮，5-6 個仍可能撞）。
+- **每波一完成就把結果落地到持久檔**（如 `.maigo/board.md` 或 project memory），不要
+  等整批跑完才寫——撞限額時已完成的部分不丟。
+- spawn 前先想好「這波若中途死，重跑的入口在哪」，把待辦與已完成狀態都寫進持久檔。
+
 ## 持久 Work Board（跨 session 追蹤）
 
 上面的 queue 是 **per-run、跑完即棄**。跨 session 追蹤已併入單一

@@ -146,3 +146,91 @@ idempotency / "once" notes for the docstring. This complements the "name by
 what it is, not its use case" pattern above — that one warns against
 coupling a name to its first caller; this one warns against dropping the
 domain object and leaving only a behavioral qualifier.
+
+---
+
+## Concatenated generated files can drift after an EOF-fixer strips trailing blank lines
+
+When a "generated" file is `cat`-concatenation of several source modules, and
+the repo runs a pre-commit `end-of-file-fixer`, that hook strips the trailing
+blank line from **every** source module (leaving each file with exactly one
+trailing newline). If the split places a section's separator blank line at
+the **end of the preceding module** rather than the start of the next one,
+the hook silently removing that trailing line makes the concatenated result
+drift from the source modules — the generated file and its sources no longer
+match.
+
+Why this is easy to miss: a drift-guard test that compares the **working
+tree**'s generated file against `cat`-ing the sources can stay green even
+after the drift happens, if the hook rewrites the source modules *after* the
+test already ran once. The **committed** state can then be inconsistent
+(committed generated file still has the old blank lines; committed sources
+had theirs stripped) while nothing in a normal `git status` flags it — the
+mismatch only surfaces via `git show <commit>:<path>` comparisons.
+
+How to apply:
+
+- When designing a "concatenate source modules into a generated file"
+  pipeline, put each section's separator blank line at the **start of the
+  next module**, not the end of the previous one — each module then ends
+  with real content plus a single newline, which `end-of-file-fixer` leaves
+  untouched, so concatenation still preserves the separator blank lines.
+- Alternatively, accept normalization up front: design both the modules and
+  the generated file to carry no trailing blank line at all, so the
+  drift-guard test is stable either way.
+- When verifying consistency, check the **committed (HEAD) state** too, not
+  just the working tree: `git show HEAD:<generated>` compared against
+  concatenating `git show HEAD:<module>` for each source. A working-tree-only
+  test can pass while the committed state has already drifted.
+- General rule: whenever a repo has an auto-fixing lint/format hook, any
+  pipeline that derives one file from others must be designed to match that
+  hook's normalization rules — otherwise the hook silently pulls the
+  generated file and its sources apart after the fact.
+
+---
+
+## `codespell --write-changes` can mangle bold-split words
+
+`codespell` run with `--write-changes` (a common pre-commit/prek setting)
+edits files automatically. When markdown bold syntax splits a word in two —
+e.g. an abbreviation styled as `**N**otification` — codespell only sees the
+trailing fragment `otification`, misreads it as a typo for `notification`,
+and "corrects" it by inserting the missing letter — producing
+`**N**notification`.
+
+Why this matters: an auto-fixing pre-commit hook doesn't just report errors,
+it **silently rewrites content**. Always diff after such a hook runs; don't
+assume "hook passed" means "content unchanged."
+
+How to apply: add the mangled fragment to `[tool.codespell]`
+`ignore-words-list` in `pyproject.toml` (e.g. `ignore-words-list =
+'otification'`) so codespell treats that fragment as correct spelling. Or
+stay alert around bold-split abbreviations in prose more generally. This is
+a different failure mode from the concatenation drift above (spell-correction
+mangling markup vs. EOF-stripping breaking concatenation) — both fall under
+"auto-fix hooks silently rewrite files," but the fix is per-hook-specific.
+
+---
+
+## Text-processing regexes must be Unicode-aware, not ASCII-only
+
+Regexes that process natural-language text (word-splitting, counting,
+validating) should not use ASCII-only character classes like `[A-Za-z]`.
+
+Why: an ASCII-only word-count regex written as `[0-9A-Za-z]+` silently
+undercounts non-ASCII alphabetic text — French (`élève`), Cyrillic
+(`Привет`), and any other non-ASCII Latin-alphabet text get miscounted or
+dropped, because those characters simply don't match the class.
+
+How to apply:
+
+- Default to Unicode-aware constructs — `\w`, `[^\W_]` — instead of
+  hand-rolled ASCII ranges, for any word-splitting/counting/validation over
+  natural-language text.
+- Test with non-English samples (accented Latin, Cyrillic, etc.), not only
+  English sentences — an English-only test suite cannot catch this class of
+  bug.
+- The same review pass should also check adjacent user-tunable numeric
+  settings (e.g. a configurable reading-speed value): validate for legality
+  (positive, finite) and raise a clear error rather than silently producing
+  a degenerate result.
