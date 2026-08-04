@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.50.0 (2026-08-04)
+
+### Feat
+
+- **skills**: mount orchestrator-voice alongside narration in commands
+
 ## v0.49.0 (2026-07-31)
 
 ### Feat
