@@ -190,6 +190,8 @@ uv run mkdocs build --strict           # venv 工具 → uv run
 
 - **旁白**：開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依
   [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依
+  [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **互動留 orchestrator、寫 skill 下放愛音**：挑候選 / propose / confirm / 退役記憶是
   orchestrator 的活（需對話 context，不下放）；寫 SKILL.md + shim + mkdocs + catalog + 驗證
   批次委派 🎀 愛音、review 交 🟡 爽世——不要自己寫 skill、自己 review。一次 spawn，不 per-entry。

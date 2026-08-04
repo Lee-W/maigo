@@ -145,6 +145,7 @@ board 是本地檔；這不違反本命令「不主動寫 GitHub」原則。回�
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **不能跳過燈**——沒有 rubric / 沒有 classification 的 triage 就是憑感覺
 - **不能跳過樂奈**——沒抓完整 body + comments 就 triage 等於猜
 - 爽世的 verdict 不因為「reporter 是長期貢獻者」放水

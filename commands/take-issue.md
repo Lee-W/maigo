@@ -64,6 +64,8 @@ push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github
 
 - **旁白**：開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依
   [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依
+  [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **步驟 1 orchestrator 親自跑、不開新 agent**；步驟 2 一律用 Task tool 啟動各 agent，不要自己探索 / 實作 / review。
 - **不硬做、不寫 GitHub、不自動 commit**：issue 不是 READY 就建議 `/maigo:triage-issue`；commit 只草擬文字，push / 開 PR 交使用者或 `/maigo:describe-pr`。
 

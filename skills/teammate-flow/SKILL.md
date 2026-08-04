@@ -57,6 +57,11 @@ verifier 只跑最終檢查，才一次過。交辦 prompt 寫完後回頭問一
 Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，
 依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 
+### 對話
+
+對話本體（旁白節點以外）的互動節奏與用詞，依
+[`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
+
 ### 執行規則
 
 - **你（orchestrator）不要自己實作**。每個 agent 都用 Task tool 啟動

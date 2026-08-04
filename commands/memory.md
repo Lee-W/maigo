@@ -48,6 +48,7 @@ allowed-tools: Read, Bash(cat:*), Bash(ls:*), Bash(test:*)
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **不寫任何檔**——read-only。
 - **不 delegate 給任何 agent**。
 - **parse frontmatter 失敗的 entry → 跳過**，印 warning「`<slug>.md` frontmatter 解析失敗，已跳過」，繼續處理其他 entry，不 crash。

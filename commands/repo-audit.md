@@ -120,6 +120,7 @@ gh pr view <number>
 - **D 段是判斷型 advisory**：孤兒 / 重疊 / 指向失效三類都只列出候選，不代使用者拍板合併或刪除。
 - **開場**：🌙 Doloris 帶入（鋪陳語氣，見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)）。
 - **收場**：🌑 Mortis 1 句結算。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 
 ## 與其他命令的差異
 

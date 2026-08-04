@@ -94,6 +94,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **你（orchestrator）不要自己實作**。Taki 用 Task tool 啟動
 - 報告最終由 orchestrator 彙整，不是 Taki 直接輸出
 - 不論任何項目缺失，都要完整跑完所有檢查項目再彙整，不中途停止
