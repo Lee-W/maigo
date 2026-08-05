@@ -214,9 +214,9 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- 當前 branch 對應的 🔀 你的 PR 行進 ⏳ `等 review`
+- 當前 branch 對應的 🔀 你的 PR 行**預設留在 🎯 你的球**，下一步寫 `push ＋ 貼回覆草稿`——步驟 5 的 commit 尚未 push、步驟 6 的回覆草稿尚未送出，球還在使用者手上。只有使用者在這輪之中自行 push 且送出回覆，才移進 ⏳ `等 review`
 - 理由寫「已處理 selected review comments」或更精簡的實際摘要
-- 若仍有 blocked work item，狀態可留 🎯 `有新 comment`，下一步仍是 `/maigo:address-comments`
+- 若仍有 blocked work item，狀態同樣留 🎯，但狀態字改 `有新 comment`，下一步仍是 `/maigo:address-comments`
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
 

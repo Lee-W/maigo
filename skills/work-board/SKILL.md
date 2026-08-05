@@ -211,7 +211,7 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 | `/maigo:triage-issue` | 每個 verdict 出爐 | `READY`→🎯（next: take）；`NEEDS_INFO`→⏳；`DUP`/`CLOSE`→✅ 附理由。board 是本地檔，不違反 triage「不主動寫 GitHub」原則 |
 | `/maigo:take-issue` | 開工時＋收尾 | 開工：issue 行標 `IN_PROGRESS` ＋ branch 名；收尾若開了 PR：新增 🔀 行、issue 行旁註 linked PR |
 | `/maigo:describe-pr` | PR 開出後（若使用者說已開） | 新增/更新對應 🔀 行 → ⏳ `等 review` |
-| `/maigo:address-comments` | 回覆送出後 | 🔀 行 → ⏳ `等 review` |
+| `/maigo:address-comments` | 步驟 8（全部 work item 走完） | commit 未 push（**預設**——該命令不 push、不替使用者回覆）→ 🎯 留著，下一步 `push ＋ 貼回覆草稿`；使用者已自行 push 且回覆已送出 → ⏳ `等 review` |
 
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 
