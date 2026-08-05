@@ -54,6 +54,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`work-board`](../skills/work-board.md) | orchestrator | `/maigo:board`、`/maigo:review`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:address-comments`、`/maigo:describe-pr` | `.maigo/board.md` 行文法、球權判定、upsert 回寫合約、舊 review-board 遷移、checkbox → `--learn` 學習閘門 |
 | [`model-dispatch`](../skills/model-dispatch.md) | orchestrator | orchestrator 在 **Claude Code harness** 下 spawn subagent 時 | 檔位政策（haiku/sonnet/opus 三檔用途）、升降級規則、兩輪重試預算、SendMessage 換檔位限制 |
 | [`harness-discipline`](../skills/harness-discipline.md) | orchestrator | orchestrator 在 **Claude Code harness** 下執行任何 `/maigo:*` 命令時 | 委派門檻（≥4 檔/≥400 行/≥3 檔同修）、回報合約、task-state 防失焦、驗證獨立性（fresh-context 驗證） |
+| [`change-site-enumeration`](../skills/change-site-enumeration.md) | Tomori / Anon / Soyo | Tomori 規劃期、Anon 實作期（不沿用 plan 清單）、Soyo review 期、orchestrator 對使用者宣告 scope 前 | 「有幾處要改」的宣告要由解析權威來源得出，不能由清單轉述 / reviewer 點名位置 / grep 符號名得出；依改動形狀（使用者可見行為 / 平行程式碼收表 / 常數改 arity / 下游對稱性）查表選枚舉方法 |
 
 ## Skill 相依圖
 
@@ -109,6 +110,7 @@ graph LR
         work_board["work-board"]
         model_dispatch["model-dispatch"]
         harness_discipline["harness-discipline"]
+        change_site_enum["change-site-enumeration"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -172,6 +174,9 @@ graph LR
     soyo --> strict_review
     soyo --> strict_triage
     soyo --> doc_link
+    tomori --> change_site_enum
+    anon --> change_site_enum
+    soyo --> change_site_enum
     anon -.->|"## Memory propose 輸出"| memory_propose
     soyo -.->|"## Memory propose 輸出"| memory_propose
     teammate_flow -.->|"流程末端：驗證"| taki

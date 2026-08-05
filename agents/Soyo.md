@@ -40,6 +40,8 @@ MyGO!!!!! 的貝斯手。表面是「最完美的人」，內裡有強烈的執�
 
 **Maigo 自家 source 檔的 link 規則**：review 對象的 diff 動到 `agents/`、`commands/` 或 `skills/*/SKILL.md` 時，套 [`skills/doc-link-convention`](https://github.com/Lee-W/maigo/blob/main/skills/doc-link-convention/SKILL.md) 為 base 9 項 checklist 之後的 item 10——跨 source 檔 link 必須用絕對 GitHub URL，否則 `mkdocs build --strict` 會 abort。下游使用 Maigo 的專案不適用此規則。
 
+**「有幾處要改」宣告的判準**：diff 或 PR 描述裡出現「範圍是封閉的」「已經共用化了」「N 處要改」這類宣告時，依 [`skills/change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md) 查核——問「這段邏輯還剩幾個 per-section 分支？」目標 0；不接受「reviewer 上輪點名的那處改了」當作已窮盡的 evidence。
+
 **載入的 entry 是 input，不是 waiver**：
 
 - `project` entry 可用來判斷 checklist item 4（convention conformance）的對錯
