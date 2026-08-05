@@ -60,6 +60,37 @@ Two counter-cases:
   choose between "fold it in as a standalone commit" and "keep it split out"
   — don't mechanically default to a worktree for a tiny diff.
 
+## Cross-provider/cross-feature batches: one branch and worktree per item
+
+A batch of changes spanning multiple independent items — multiple provider
+packages (even when unified by one theme, e.g. a docs-correctness pass across
+`openai`/`anthropic`/`common.ai`), or several independent sub-features under
+one umbrella topic — should land as **one branch, one sibling worktree, one
+commit per item**, not a single combined branch.
+
+Why: providers (and independent sub-features generally) release and get
+reviewed on their own timeline; bundling them into one branch couples
+otherwise-independent review and merge decisions.
+
+How to apply:
+
+- It's fine to implement centrally in one worktree first — parallel agents
+  editing different providers/items don't collide — then split the result:
+  `git diff --cached -- providers/<name>` exported per item, `git apply
+  --index` into each item's own new worktree for its own commit. There's no
+  requirement to implement centrally first, either — going straight to one
+  `git worktree add <path> -b <branch> upstream/main` per item and delegating
+  each independently is equally valid.
+- Before basing a new split-out worktree on the current in-flight branch,
+  check whether the infrastructure it needs already exists on the default
+  branch (`git diff main..<in-flight-branch> -- <relevant-paths>`). If the
+  dependency is already on the default branch, base the new worktree there
+  instead of on the unmerged branch — basing on in-flight work drags unrelated
+  review noise into the new PR.
+- Name each split-out worktree/branch per the sibling-layout convention above.
+  The combined worktree used for central implementation is an intermediate
+  artifact — remove it once the split verifies clean.
+
 ## Colliding work: defer the overlapping subset
 
 When starting a batch of approved work, first check for in-flight branches;

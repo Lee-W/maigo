@@ -208,6 +208,18 @@ authoring rule, read `references/code-style.md`.
   Note: §10.3 and §10.4 address distinct but adjacent rules — Unix-only module gates and heavy
   type-only imports in multi-process paths; this rule is about the default for eager call sites.
 
+#### Adding a new `provider.yaml` module section: known touchpoint trap
+
+When adding a brand-new `provider.yaml` module-section *type* (a new category
+alongside `sensors`/`operators`/`hooks`/`triggers`/`bundles`/`toolsets` —
+not just a new entry under an existing section), the change spans registry-
+side and validator-side touchpoints, and one specific validator check turns
+CI red if the new section's modules don't live in a directory named after the
+resource type. Full touchpoint list, the trap, and the workaround are in the
+"New provider.yaml module section" recipe in
+[`references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md#new-provideryaml-module-section-registry--validator-touchpoints-narrow--read-only-when-this-applies) —
+read it before implementing, not just at review time.
+
 ### 6. Delivery completeness
 
 User-facing features (new public class / SDK symbol / scheduling behaviour) must ship
@@ -360,6 +372,10 @@ sub-check states. The file covers:
 - **10.7** Revert of a recent fix: check for a tracking issue first (judgment gate, scope-gated to revert PRs)
 - **10.8** Self-discovered bugfix: verify upstream doesn't already have it (Request changes, scope-gated)
 - **10.9** Forward-looking code comments need a tracking-issue URL or neutral rewrite (Request changes, scope-gated)
+- **10.10** Newsfragment content must reflect a genuine capability delta vs upstream (Request changes)
+- **10.11** Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry (Request changes, scope-gated to direct `BaseOperator` subclasses)
+- **10.12** registry `slice`/`first` cutoffs need a sort key (Request changes, scope-gated to `registry/src/*.njk` and its data source)
+- **10.13** New provider, or new major capability surface, needs a governance-gate check (informational, scope-gated)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -450,7 +466,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.9, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.13, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

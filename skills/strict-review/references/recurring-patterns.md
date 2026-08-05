@@ -127,6 +127,54 @@ point (e.g. "intentionally" / "by design") the comment was meant to convey —
 narrowing scope to avoid over-enumeration can silently drop the original
 point along with it.
 
+## Subset assertions miss the orphan-key direction — require set equality
+
+When one table registers all keys of X and one or more downstream tables each
+consume a subset of it, the invariant "every key in X is consumed by *some*
+downstream table" **cannot be expressed with a subset assertion**. A subset
+assertion only guards one direction — that a downstream table doesn't contain
+a key missing from the registry. The direction that actually causes incidents
+is the other one: a key that's in the registry but consumed by **no**
+downstream table gets silently skipped by every consumer, with no exception
+and no stack trace — just a missing piece of output.
+
+Case study (apache/airflow PR #70190, `dev/registry`): a flat registry table
+listed all module-section keys; two disjoint downstream tables each consumed
+part of it. The existing tests only asserted `for k in downstream: assert k
+in flat_table` — the subset direction. The actual defect was a key present in
+the flat table that neither downstream table consumed; two independent
+extractors silently skipped it, and a `KeyError` guard further downstream
+never fired because it only triggers for keys already inside a consuming
+table. The fix (reviewer-specified shape):
+
+```python
+dedicated_path_exemptions = {"transfers", "task-decorators"}   # named, with a comment explaining the exemption
+assert set(FLAT_LEVEL_SECTIONS) == (
+    set(CLASS_LEVEL_SECTIONS) | set(DICT_SHAPED_CLASS_LEVEL_SECTIONS) | dedicated_path_exemptions
+), "<message telling the reader which table to add the new key to>"
+```
+
+How to apply:
+
+- Flag the shape `for k in SMALL: assert k in BIG`. Ask "does BIG have a key
+  that SMALL doesn't cover — what happens to it?" If the answer is "silently
+  skipped," require rewriting to a set-equality assertion.
+- Exemptions must be a **named constant with a comment explaining why**, not
+  written inline in the assertion — the exemption list is itself
+  documentation.
+- The assertion message should tell a future contributor which table to add
+  a new key to, or under what condition it may join the exemption set.
+- **Verification needs a mutation test**: remove a key from one of the
+  downstream tables, confirm the new assertion goes red and names the orphan
+  key, then restore it fully. Without the mutation, there's no way to tell
+  "the assertion is effective" apart from "the assertion is a tautology that
+  can never fail."
+
+Enumeration discipline for "how many sites need this change" more generally
+is the
+[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
+skill.
+
 ## Naming: a private helper's name must carry the domain noun
 
 Flag a private helper name built from an adjective/adverb pair with no

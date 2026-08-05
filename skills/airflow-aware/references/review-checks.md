@@ -146,6 +146,97 @@ still needs one of two forms:
 Orphan phrases with neither form are must-fix; apply the same posture to
 PR-description and commit-body text, not just code comments.
 
+## 10.10 Newsfragment content must reflect a genuine capability delta vs upstream *(Request changes)*
+
+Presence of a newsfragment file (10.6) doesn't mean its content is accurate.
+Before accepting one, diff the branch against `upstream/main` to confirm the
+capability it describes is genuinely new or changed **relative to what's
+already shipping**:
+
+```bash
+git show upstream/main:<file> | grep <symbol>
+git diff upstream/main -- <file>
+```
+
+Two specific traps this catches: a flag/field/behavior added **and removed**
+within the same unreleased PR (net: users never saw it, so its removal isn't
+user-facing and shouldn't be newsfragmented as a removal); and a newsfragment
+describing what reads like a new capability but turns out to be an internal
+rework with the same observable behavior already on `upstream/main` (check the
+actual pre-PR code, not the PR's own framing of "before"). If the net delta is
+"internal rework, no observable change," the newsfragment should be dropped —
+apply the repo's own golden rule (`CLAUDE.md` / `AGENTS.md`: only add a
+newsfragment when certain it's user-facing).
+
+## 10.11 Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry *(Request changes)*
+
+**Scope gate**: only applies when the diff touches a class that directly
+subclasses `BaseOperator`. The `validate_operators_init.py`-style prek hook
+only scans direct subclasses — an operator behind an intermediate base class
+(e.g. a shared `LLMOperator`) isn't scanned and is not valid precedent to cite
+either way.
+
+- **Provision vs rendered-value.** A check that only asks "did the user
+  provide this parameter" (`field is None` / `is not None`) belongs in
+  `__init__` — even when the field is a template field. A check that needs
+  the *rendered* value to answer (is the value itself valid after templating)
+  stays in `execute()`. "It's a template field, so it can only be checked in
+  `execute()`" is not a valid justification for moving a provision check out
+  of `__init__`. Note the hook only sanctions *identity* comparisons
+  (`is None` / `is not None`) as provision checks — a truthiness form
+  (`not field` / `if field`) is still flagged even in `__init__`, so rewrite
+  to the identity form rather than just relocating the check.
+- **Rendered-guard symmetry.** When `execute()` has a rendered-value guard for
+  one template field, every other template field feeding the same downstream
+  call in that function needs the same guard. An asymmetric guard is a
+  defect, not a style choice: standard Jinja renders `{{ none }}` to the
+  string `'None'`, but `NativeEnvironment` deployments
+  (`render_template_as_native_obj=True`) produce a real `None` — the
+  ungated field then falls into the downstream call unguarded, raising the
+  wrong exception type (a bare `TypeError` instead of a clear `ValueError`)
+  with no message distinguishing "not provided" from "rendered to None."
+
+Case study: apache/airflow#70628 — `DocumentLoaderOperator.execute()` guarded
+`file_type`'s rendered value but not `source_path`'s; the ungated
+`source_path` fell into `_resolve_files(None)`, producing
+`TypeError: argument of type 'NoneType' is not iterable` instead of a
+readable error.
+
+## 10.12 registry `slice`/`first` cutoffs need a sort key *(Request changes)*
+
+**Scope gate**: only applies when the diff touches `registry/src/*.njk`
+templates, or the `_data/*.js` layer feeding them.
+
+Any `| slice(0, N)` (or `| first` / `[:N]`) truncation in a registry template
+must be preceded by an explicit sort — sort in the `_data/*.js` layer, not the
+template (nunjucks' `sort` filter doesn't accept a dotted attribute path, so
+sorting there requires flattening first, which is more code for the same
+result). Widening the membership of the collection feeding a slice — a
+broader match condition, an added keyword, a new data source — is a silent
+regression if the cutoff isn't sorted: known providers can drop out of a
+badge/top-N list with no test or build failure to flag it, only a visual
+discrepancy on the built page. When reviewing a change that widens any
+collection with a downstream slice, grep that collection's consumers for a
+truncation point and require a sort key as part of the same change, not a
+follow-up.
+
+## 10.13 New provider, or new major capability surface, needs a governance-gate check *(informational — report separately from the code verdict)*
+
+**Scope gate**: only applies when the diff adds a substantial new
+provider-level capability — a whole new toolset, a new integration surface —
+not an incremental feature or bugfix on an existing provider.
+
+apache/airflow requires a governance step independent of code correctness for
+this class of PR: a dev-list `[DISCUSS]` thread, and a named long-term
+maintainer commitment per `ACCEPTING_PROVIDERS.rst`. A clean code-level
+verdict does not imply the PR is mergeable. Check for the `[DISCUSS]` thread
+on lists.apache.org and a named maintainer commitment *before* treating a
+code APPROVE as "ready to merge" — report governance status as a separate
+line item, not folded into code must-fix, and don't let a code APPROVE imply
+mergeability either. Seen enforced on apache/airflow#68847 (SandboxToolset):
+clean code review (APPROVED, full test/mypy/ruff pass) still blocked without
+the governance thread and a named maintainer.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,
@@ -235,6 +326,60 @@ diff in every worktree.
 4. If another contributor suggests "just commit the lock diff with your feature work,"
    push back: it pollutes the PR diff and creates a force-push risk if `main` re-locks
    before merge.
+
+## New provider.yaml module section: registry + validator touchpoints (narrow — read only when this applies)
+
+**Scope note**: this only applies when a diff introduces a brand-new
+`provider.yaml` **module-section type** — a new category alongside
+`sensors`/`operators`/`hooks`/`triggers`/`bundles`/`toolsets` — not a new
+entry under an existing section. This is rare enough not to warrant a
+standing numbered checklist item; read this recipe when it comes up.
+
+The change spans two subsystems, and one of them can turn CI red if a new
+section is added to the wrong list:
+
+- **Registry side**: `dev/registry/registry_tools/types.py`'s `MODULE_TYPES`
+  (source of truth: `yaml_key` / `level` / `suffixes` / `label` / `icon`) plus
+  its base-class import list; `registry/src/_data/types.json` (generated,
+  drift-checked); CSS in `tokens.css` (a `--color-<type_id>` token) and **five**
+  `main.css` rule families, not just one — `.tab-icon`, `.type-icon`,
+  `.share-bar`, `.provider-card .modules`, and
+  `.provider-detail-page .modules .module .icon`. Missing CSS doesn't error —
+  the badge silently falls through to the bare base rule with no background.
+  Note the two naming conventions: the registry type id uses underscores
+  (`retry_policy`), the `provider.yaml` key uses hyphens (`retry-policies`);
+  CSS uses the type id.
+- **Validator side** (`scripts/in_container/run_provider_yaml_files_check.py`):
+  four hardcoded section lists exist, and they are not equally safe to
+  extend — check `check_duplicates_in_integrations_names_of_hooks_...` and
+  the `registered_modules`/`check_invalid_integration` call sites are safe to
+  add to; a fifth touchpoint pair (`base_class_resource_map` and the
+  `registered_modules` tuple) both need the new `(<BaseClass>, "<yaml-key>")`
+  entry — missing either leaves class-registration unchecked for the new
+  section.
+
+**The trap**: `check_correctness_of_list_of_sensors_operators_hook_trigger_modules`
+runs a completeness assertion whose glob is `**/{resource_type}/*.py` — it
+assumes the module lives in a directory *named after the resource type*. If
+the new section's modules don't (e.g. a hypothetical `retry-policies` module
+living under `policies/retry.py` rather than `retry-policies/`), adding it to
+this list turns CI red with `Items in the right set but not the left`. In
+that case, write a new existence-only `@run_check` function instead (shape:
+`check_hook_class_name_entries_in_connection_types`, collecting
+`python-modules` with `ObjectType.MODULE`) — and register it in the
+unconditional call sequence, not inside `if all_files_loaded:` (that block
+only runs on a full scan; a scoped single-file validation run would silently
+skip the new check and report a false green). "Yaml key ≠ directory name" is
+not unique to a hypothetical new section either — `secrets-backends` modules
+already live under `secrets/`, not `secrets-backends/` — so don't describe
+the directory-matches-key pattern as universal in a comment or PR
+description.
+
+This whole scenario is a worked example of the
+[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
+skill's "shared constant changes tuple arity/field count" row — grep the
+constant name (`MODULE_TYPES`, the hardcoded section lists), not the type
+name, and re-grep after the change to confirm no further site remains.
 
 ---
 

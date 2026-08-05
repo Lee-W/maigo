@@ -44,6 +44,27 @@ description: This skill should be used when about to declare "N sites need chang
 先用上表方法覆核一次；不要把 subagent 轉述的數字未經覆核就寫進對使用者的陳述——規模數字常常是
 使用者接下來做決策（拆 PR、估工時）的依據，錯了要回頭改。
 
+## Scope 邊界：該不該把某處拉進來,看消費者不是看語意
+
+判斷一個 rename 該不該排除在 scope 外時，判準是**這個名字有沒有已經在外的
+消費者**，不是「它描述的東西跟目標欄位是不是同一件事」。
+
+同一個 PR 新增、尚無消費者的符號（欄位、CSS class、常數名），rename 的成本只是
+diff 行數；留下一個對不上目標名字的舊符號，才是把成本轉嫁給下一個查它的人——
+他會 grep 新名字卻找不到對應的樣式/程式碼。
+
+**How to apply**：擬 plan 或路由計畫時，要把某個 rename 標成 out-of-scope 之前，
+先枚舉那個名字的消費者（其他模組、JS、測試、外部 API、已發佈的文件）。枚舉方法
+照上表——只 grep 舊名不算枚舉，舊名 0 命中只證明舊名沒了，不證明新名接得上；沒有
+型別檢查的配對（例如 CSS/模板）要用腳本比對兩端的名字集合。枚舉成 0 個消費者就
+把它拉進 scope，並在 plan 裡寫「無消費者，rename 成本為零」，不要寫理由辯護為何
+不做。
+
+案例：apache/airflow PR #70497，plan 把新欄位改名衍生的 CSS class 排除在外，理由
+寫「class 描述的是表格 widget 而非 yaml 欄位」；reviewer 指出這些 class 是同一 PR
+新增、尚無消費者，rename 現在免費、以後變 dead-name 債，最終照做，8 處 rename、
+0 must-fix。
+
 ## 假訊號
 
 **「有些關鍵字搜得到」不代表修正部分生效**——可能代表你根本沒碰到那條路徑，恰好搜到的詞跟你的
