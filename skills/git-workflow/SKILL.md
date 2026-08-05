@@ -232,6 +232,16 @@ parallel or an unverified delegate report. Details and recipes in
 Read `references/worktree-hygiene.md` when opening/cleaning up worktrees or
 when git history looks surprising after a delegated task.
 
+## Shared worktree state volatility (references)
+
+A shared worktree's branch, commits, or push/PR state can change from
+something other than the current session — in both directions (external
+revert/rebase/deletion *and* external forward progress) — so re-verify live
+before restating a status claim, reusing a cached base ref, or running a
+destructive reset. Recovery recipes, base-ref staleness, and CI/changelog
+proxy traps in
+[`references/shared-worktree-state.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/shared-worktree-state.md).
+
 ## What this skill does NOT cover
 
 - Drafting the commit message text itself — see

@@ -51,6 +51,20 @@ description: This skill should be used when the maigo orchestrator, running in t
   分析自產 log 要用結構化欄位而非 substring、定罪某次改動要跑對照組——七個具體案例
   見 [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)。
 
+### docs-only 批次的例外
+
+上面「寫的人不驗自己的產出」的明文例外：**docs-only 修正批次**（純文字/散文類
+低風險改動）可以用 orchestrator inline 輕量檢查取代 fresh-context subagent——
+prek 局部 hook、grep read-back、diff 範圍確認就夠，不必為此再燒一隻 subagent。
+
+驗證工具本身卡住時（例如 prek 全套 hooks 首跑建環境逾時），不要讓 commit 等
+驗證：`git commit --no-verify` 先落盤，完整驗證丟背景跑，跑完後如實回報結果。
+
+適用邊界：僅限 docs / prose 類低風險改動；程式碼、migration、對外發佈物仍照
+上面「驗證紀律」的原規則派 fresh-context 驗證。用 `--no-verify` commit 先行時
+必須（a）向使用者明說用了 `--no-verify`，（b）背景驗證真的跑完並回報結果，
+不是跳過不管。
+
 ## Scope discipline
 
 執行任務時若發現「相鄰但不在被要求範圍內」的問題，先停下來回報、讓使用者決定，不要
