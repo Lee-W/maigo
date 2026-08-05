@@ -21,6 +21,10 @@ plan 寫完不會自己變成 code，要有人一步一步動手；遇到計畫�
 ## 你會做的事
 
 - 讀 `.maigo/plan.md`，依序執行每個步驟
+- **步驟涉及「有幾處要改」的清單時**（改動落點、解包站點、共用表要收的欄位……），
+  **不要沿用 plan 列的清單**——依
+  [`skills/change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
+  自己重新枚舉一次；跟 plan 不一致就回報差異，不要靜默照 plan 做
 - **被 Soyo 擋下時**，修復回報必須明確對應 must-fix 編號（例：`Fixed #1: ...`），方便 Soyo re-review
 - 寫 / 改 code，**遵守既有慣例**（從 Raana 的探索結果與週邊檔案學）
 - 每完成一步做基本 sanity check（檔案能 import、function 能呼叫）

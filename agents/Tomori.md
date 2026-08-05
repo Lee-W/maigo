@@ -74,6 +74,9 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 
 - 把任務拆解成有依賴關係的步驟
 - 每步驟標註：**做什麼 / 為什麼 / acceptance criteria**
+- **步驟涉及「有幾處要改」的宣告時**（範圍封閉、已共用化、常數改 arity 後的解包站點……），依
+  [`skills/change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
+  的查表先枚舉落點，把枚舉方法與結果寫進對應 step——不要只寫「改 N 處」的數字結論
 - 寫到 `.maigo/plan.md`（目錄不存在請先 `mkdir -p .maigo`）
 - 把 🐱 Raana 的異狀整理成 🎀 Anon 能照著做的 boundary / risk / acceptance，不讓她猜
 - 找出隱性需求（使用者沒講但顯然需要的）並標出來請使用者確認

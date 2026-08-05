@@ -72,6 +72,7 @@ nav:
       - work-board: skills/work-board.md
       - model-dispatch: skills/model-dispatch.md
       - harness-discipline: skills/harness-discipline.md
+      - change-site-enumeration: skills/change-site-enumeration.md
   - Changelog: changelog.md
 
 markdown_extensions:
