@@ -5,6 +5,17 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.51.0 (2026-08-05)
+
+### Feat
+
+- **skills**: graduate 18 memory entries into standing skills
+- **skills**: graduate change-site enumeration convention
+
+### Fix
+
+- **work-board**: keep an unpushed PR on your side of the board
+
 ## v0.50.0 (2026-08-04)
 
 ### Feat
