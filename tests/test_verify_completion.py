@@ -7,9 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import hooks.verify_completion as verify_completion
+from hooks import verify_completion
 from tests.conftest import run_hook_main
-
 
 # ---------------------------------------------------------------------------
 # extract_failures
@@ -100,8 +99,11 @@ class TestReadConfigLine:
 
 
 class TestDetectTestCommand:
-    def test_uv_lock(self, tmp_path: Path):
+    def test_uv_lock(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion.shutil, "which", lambda cmd: f"/usr/bin/{cmd}"
+        )
         assert verify_completion.detect_test_command(tmp_path) == [
             "uv",
             "run",
@@ -109,9 +111,14 @@ class TestDetectTestCommand:
             "-x",
         ]
 
-    def test_pyproject_with_tests_dir(self, tmp_path: Path):
+    def test_pyproject_with_tests_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         (tmp_path / "pyproject.toml").touch()
         (tmp_path / "tests").mkdir()
+        monkeypatch.setattr(
+            verify_completion.shutil, "which", lambda cmd: f"/usr/bin/{cmd}"
+        )
         assert verify_completion.detect_test_command(tmp_path) == ["pytest", "-x"]
 
     def test_pyproject_without_tests_dir_falls_through(self, tmp_path: Path):
@@ -119,9 +126,14 @@ class TestDetectTestCommand:
         # no tests/ dir, no other markers
         assert verify_completion.detect_test_command(tmp_path) is None
 
-    def test_package_json_with_test_script(self, tmp_path: Path):
+    def test_package_json_with_test_script(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         pkg = {"scripts": {"test": "jest"}}
         (tmp_path / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
+        monkeypatch.setattr(
+            verify_completion.shutil, "which", lambda cmd: f"/usr/bin/{cmd}"
+        )
         assert verify_completion.detect_test_command(tmp_path) == [
             "npm",
             "test",
@@ -133,16 +145,22 @@ class TestDetectTestCommand:
         (tmp_path / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
         assert verify_completion.detect_test_command(tmp_path) is None
 
-    def test_cargo_toml(self, tmp_path: Path):
+    def test_cargo_toml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         (tmp_path / "Cargo.toml").touch()
+        monkeypatch.setattr(
+            verify_completion.shutil, "which", lambda cmd: f"/usr/bin/{cmd}"
+        )
         assert verify_completion.detect_test_command(tmp_path) == [
             "cargo",
             "test",
             "--quiet",
         ]
 
-    def test_go_mod(self, tmp_path: Path):
+    def test_go_mod(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         (tmp_path / "go.mod").touch()
+        monkeypatch.setattr(
+            verify_completion.shutil, "which", lambda cmd: f"/usr/bin/{cmd}"
+        )
         assert verify_completion.detect_test_command(tmp_path) == [
             "go",
             "test",
