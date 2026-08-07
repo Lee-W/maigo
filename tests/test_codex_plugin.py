@@ -39,6 +39,12 @@ def test_codex_manifest_is_valid_and_matches_project_version() -> None:
     assert all(len(prompt) <= 128 for prompt in interface["defaultPrompt"])
 
 
+def test_codex_manifest_disables_claude_lifecycle_hooks() -> None:
+    manifest = json.loads(CODEX_MANIFEST.read_text(encoding="utf-8"))
+
+    assert manifest["hooks"] == {"hooks": {}}
+
+
 def test_codex_router_dispatches_every_command() -> None:
     router = ROUTER.read_text(encoding="utf-8")
     commands = sorted((ROOT / "commands").glob("*.md"))

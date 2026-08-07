@@ -47,16 +47,16 @@ live in [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/nar
 
 ## Hooks vs Skills boundary
 
-- **`hooks/`** = machine-enforced checks, but only inside a **Claude Code**
-  session — Claude Code's harness runs the scripts under `hooks/` and blocks
-  the turn automatically. Example: 🩵 Tomori 沒寫 plan path →
+- **`hooks/`** = machine-enforced checks inside a **Claude Code** session —
+  Claude Code's harness runs the scripts under `hooks/` and blocks the turn
+  automatically. Example: 🩵 Tomori 沒寫 plan path →
   `teammate_quality_check.py` block；任務宣告完成沒跑 test →
   `verify_completion.py` block.
-  **Codex has no equivalent hook runtime.** When working as a Codex agent,
-  nothing will stop you from skipping what these scripts check — treat each
-  hook script's logic as a required manual step (read it, or run it directly
-  with `python3 hooks/<script>.py` where that's meaningful) rather than
-  something the environment enforces for you.
+  **Codex 也有 lifecycle hook runtime，但 Maigo 的 Codex manifest 會用空的
+  inline hooks 覆蓋這組 Claude Code 專用 hooks**：兩端支援的事件與 I/O schema
+  不完全相同，直接共用會讓 Codex 把 Claude Code 的合法輸出判成錯誤。Codex command
+  會顯式執行 review / verification；其餘 hook 邏輯仍視為必要的手動步驟（閱讀，或在
+  適用時直接執行 `python3 hooks/<script>.py`），不依賴環境自動攔截。
 - **`skills/`** = 知識共享。Prompt-driven 共用 narrative / convention /
   workflow，靠 command / agent 定義檔用 markdown link 引用進 context 才生效
   ——這點在 Claude Code 與 Codex 都一樣，都是「讀了才知道」，不是機器強制。例：
@@ -66,11 +66,11 @@ live in [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/nar
 
 新增 enforcement 時的判斷：
 
-- 「失敗應該擋下整個 turn」→ hook（Claude Code 專屬機制；Codex 端沒有等價
-  runtime，只能靠 agent 自律照做）
+- 「失敗應該擋下整個 turn」→ hook（Claude Code 由 runtime 強制；Codex manifest
+  刻意不載入這組 Claude Code hooks，改由 command 顯式執行或 agent 手動照做）
 - 「失敗只是品質下降、人可自決定要不要做」→ skill 段落
-- 兩者都要：先 skill 寫清楚 narrative、hook 做最小 regex 兜底（Codex 這半邊
-  沒有 hook 兜底，全靠讀過 skill 之後自律）
+- 兩者都要：先 skill 寫清楚 narrative、hook 做最小 regex 兜底（Claude Code）；
+  Codex command 則需顯式涵蓋同一檢查，否則靠讀過 skill 之後自律
 
 ## Verification quirks
 
