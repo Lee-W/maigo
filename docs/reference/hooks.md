@@ -1,7 +1,10 @@
 # Hooks Reference
 
-Maigo 註冊四個 hook，定義在 `hooks/hooks.json`。
-只要 plugin 載入就自動生效，使用者不用設定。
+Maigo 的 Claude Code plugin 註冊四個 hook，定義在 `hooks/hooks.json`。
+只要 Claude Code plugin 載入就自動生效，使用者不用設定。
+
+Codex manifest 會用空的 inline hooks 覆蓋這組 Claude Code lifecycle hooks；
+Codex command 仍會顯式執行 review / verification，不共用兩端不同的 hook I/O schema。
 
 ## SessionStart — `hooks/repo_detect.py`
 

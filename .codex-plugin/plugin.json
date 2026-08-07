@@ -9,6 +9,9 @@
   "homepage": "https://lee-w.github.io/maigo/",
   "repository": "https://github.com/Lee-W/maigo",
   "skills": "./skills/",
+  "hooks": {
+    "hooks": {}
+  },
   "keywords": [
     "multi-agent",
     "workflow",
