@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.51.2 (2026-08-09)
+
+### Fix
+
+- **hooks**: verify committed work instead of skipping it
+
 ## v0.51.1 (2026-08-07)
 
 ### Fix
