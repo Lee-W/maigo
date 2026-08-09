@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit  # noqa: E402
+from _session_head import record as record_session_head  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -234,6 +235,11 @@ def main() -> None:
         # project this is — every command (go/quick/team/review/address-comments)
         # writes into .maigo/.
         ensure_maigo_ignored(cwd)
+
+        # Record the HEAD this session starts at so the Stop hook can tell a
+        # read-only session from one that committed its work. Must happen
+        # before the rule loop below — a matching rule emits and exits.
+        record_session_head(Path(cwd), data.get("session_id"))
 
         for rule in REPO_RULES:
             try:

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
 import hooks.repo_detect as rd
+from hooks import _session_head
 from tests.conftest import run_hook_main
 
 
@@ -253,6 +255,59 @@ def _raise_timeout_expired(*args, **kwargs):
 # ---------------------------------------------------------------------------
 # ensure_maigo_ignored
 # ---------------------------------------------------------------------------
+
+
+GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "t",
+    "GIT_AUTHOR_EMAIL": "t@t",
+    "GIT_COMMITTER_NAME": "t",
+    "GIT_COMMITTER_EMAIL": "t@t",
+}
+
+
+def _init_repo(path: Path) -> None:
+    subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "init"],
+        cwd=path,
+        capture_output=True,
+        env=GIT_ENV,
+        check=True,
+    )
+
+
+class TestRecordsSessionHead:
+    def test_records_head_for_plain_repo(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    ) -> None:
+        _init_repo(tmp_path)
+
+        run_hook_main(
+            rd, {"cwd": str(tmp_path), "session_id": "sess-1"}, monkeypatch, capsys
+        )
+
+        records = _session_head.read_records(tmp_path / _session_head.LOG_PATH)
+        assert records == {"sess-1": _session_head.current_head(tmp_path)}
+
+    def test_recorded_file_is_git_ignored(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    ) -> None:
+        """The record must not make the working tree look dirty."""
+        _init_repo(tmp_path)
+
+        run_hook_main(
+            rd, {"cwd": str(tmp_path), "session_id": "sess-1"}, monkeypatch, capsys
+        )
+
+        assert (tmp_path / _session_head.LOG_PATH).is_file()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=tmp_path,
+            capture_output=True,
+            check=True,
+        )
+        assert status.stdout.decode().strip() == ""
 
 
 class TestEnsureMaigoIgnored:

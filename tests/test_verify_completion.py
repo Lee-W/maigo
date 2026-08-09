@@ -299,6 +299,46 @@ class TestMain:
         assert "Token usage：input 1.2k" in result["reason"]
         assert "已追蹤 1 agents" in result["reason"]
 
+    def test_clean_tree_and_unmoved_head_skips(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        # Read-only session: nothing to verify, so the suite must not run.
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: False
+        )
+        monkeypatch.setattr(verify_completion, "head_moved", lambda cwd, sid: False)
+        result = run_hook_main(
+            verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys
+        )
+        assert result["decision"] == "approve"
+        assert "無檔案修改" in result["reason"]
+
+    def test_clean_tree_but_moved_head_still_verifies(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        # The session committed its work, so the tree is clean — the suite must
+        # still run. Reaching *any* later branch proves the skip was not taken;
+        # uv-not-in-PATH is the cheapest one that needs no test run.
+        (tmp_path / "uv.lock").touch()
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: False
+        )
+        monkeypatch.setattr(verify_completion, "head_moved", lambda cwd, sid: True)
+        monkeypatch.setattr(verify_completion.shutil, "which", lambda cmd: None)
+        result = run_hook_main(
+            verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys
+        )
+        assert result["decision"] == "approve"
+        assert "無檔案修改" not in result["reason"]
+        assert "uv 不在 PATH" in result["reason"]
+
     def test_uv_lock_present_but_uv_not_in_path(
         self,
         tmp_path: Path,
