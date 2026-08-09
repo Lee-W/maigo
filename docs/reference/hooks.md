@@ -17,10 +17,11 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 
 1. 讀 stdin JSON 取 `cwd`（缺欄位 → fallback `os.getcwd()`）
 2. **確保 `.maigo/` 被 git 忽略**（`ensure_maigo_ignored`，見下）
-3. 對 `REPO_RULES` 內每個 rule，依序跑其 `detectors`
-4. **任一** detector 命中即視為 rule 命中（OR 邏輯）
-5. 命中 → emit `approve` + systemMessage（要求載入 `skills/<skill>/SKILL.md`）
-6. 全部未命中 → emit `approve` + 空 systemMessage（silent）
+3. **記下目前 HEAD**（`_session_head.record`，見下）
+4. 對 `REPO_RULES` 內每個 rule，依序跑其 `detectors`
+5. **任一** detector 命中即視為 rule 命中（OR 邏輯）
+6. 命中 → emit `approve` + systemMessage（要求載入 `skills/<skill>/SKILL.md`）
+7. 全部未命中 → emit `approve` + 空 systemMessage（silent）
 
 ### 目前 registry
 
@@ -47,6 +48,19 @@ commit。
   `.gitignore`、或前次寫入的 exclude）→ 不重複寫；entry 已在 exclude 裡 → 跳過。
 - **fail-open**：非 git repo、git 不存在、timeout 或任何 OS error → 靜默略過，
   不影響 session 啟動。
+
+### Session-start HEAD 記錄
+
+把「session 開始時的 HEAD SHA」寫進 `.maigo/session-head.json`（`{session_id: sha}`），
+供 Stop hook 判斷這個 session 有沒有 commit 過東西。**必須在 rule loop 之前執行**——
+命中 rule 會 emit 並結束 process。
+
+- **為什麼需要**：Stop hook 原本只看 working tree 髒不髒。session 把工作 commit 掉之後
+  tree 是乾淨的，於是驗證被跳過——而那正是最該驗的時刻（東西進了歷史卻沒跑過測試）
+- **不會弄髒 tree**：檔案落在 `.maigo/`，已被上面的 `ensure_maigo_ignored` 排除
+- **上限**：保留最近 200 個 session，超過丟最舊的（dict 插入序）
+- **Fail-quiet**：非 git repo、repo 尚無任何 commit、缺 `session_id`、寫檔失敗 → 不記錄。
+  Stop hook 查不到記錄時視為「不知道」，**不會**因此強制跑 test（見下）
 
 ### `claude_config_seeds`
 
@@ -253,7 +267,12 @@ message 強調「這不是 test fail，是 import 錯」。
 
 - 偵測不到任何專案類型（沒有 `uv.lock` / `pyproject.toml` / `package.json` / `Cargo.toml` / `go.mod`）→ approve（no-op）
 - `.claude/skip-test-verification` 存在 → approve 並記錄原因
-- **本次 session 無未提交的檔案修改**（read-only session）→ approve，跳過 test 驗證。偵測方式：`git status --porcelain` 回傳 exit 0 且 stdout 為空；`returncode != 0`（非 git repo 等）→ fail-open，照常跑 test
+- **本次 session 無檔案修改**（read-only session）→ approve，跳過 test 驗證。**兩個條件都成立**才跳過：
+    1. working tree 乾淨——`git status --porcelain` 回傳 exit 0 且 stdout 為空；`returncode != 0`（非 git repo 等）→ fail-open，照常跑 test
+    2. HEAD 未離開 SessionStart 記下的 SHA（`_session_head.head_moved`）——所以 commit 過的 session 照樣會被驗
+  查不到本 session 的 HEAD 記錄時視為「不知道」→ 只看條件 1，維持舊行為。這是刻意的：
+  部分 harness 不跑 SessionStart hook，若在那裡把「不知道」當成「有改動」，每個唯讀
+  session 都會被拖去跑整套測試
 - stdin JSON 解析失敗或無 `cwd` 欄位 → fallback 到 `os.getcwd()`，照常嘗試偵測；如果偵測不到還是會 no-op approve
 
 ## 觀察 hook 行為

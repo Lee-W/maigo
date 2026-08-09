@@ -2,7 +2,9 @@
 """Maigo Stop hook：任務宣告完成前強制跑 test。
 
 偵測專案類型 → 跑對應 test 指令 → 失敗就 block。即使 orchestrator
-跳過立希也擋下；defense in depth。Host build-env 失敗（CMake、native
+跳過立希也擋下；defense in depth。「本 session 動過東西」= working tree 髒
+**或** HEAD 已離開 SessionStart 記下的 SHA——後者讓已 commit 的工作照樣被驗，
+那正是最該驗的時刻（東西進了歷史卻沒跑過測試）。Host build-env 失敗（CMake、native
 wheel build 等）一律 emit skip——那不是 test 失敗，是 host 環境問題。
 
 支援的設定檔（放在 user 專案的 `.claude/` 下）：
@@ -26,6 +28,7 @@ from typing import NoReturn
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit  # noqa: E402
 from _retry_log import record_and_count  # noqa: E402
+from _session_head import head_moved  # noqa: E402
 from _token_usage import LOG_PATH, format_one_line, summarize  # noqa: E402
 
 TEST_TIMEOUT_SEC = 90
@@ -243,9 +246,9 @@ def main() -> None:
     claude_dir = cwd / ".claude"
     session_id = data.get("session_id")
 
-    if not has_git_modifications(cwd):
+    if not has_git_modifications(cwd) and not head_moved(cwd, session_id):
         approve_with_usage(
-            "立希 (Taki)：本次 session 無未提交的檔案修改，跳過 test 驗證",
+            "立希 (Taki)：本次 session 無檔案修改（working tree 乾淨且 HEAD 未變動），跳過 test 驗證",
             cwd,
             session_id,
         )
