@@ -251,6 +251,40 @@ the claim as-is — a delegate that was explicitly told not to commit/rebase
 can still do so, tangle unrelated changes together, and misreport a bug it
 introduced itself as pre-existing.
 
+## Sweep sibling worktrees for stray contamination after parallel dispatch
+
+When dispatching several delegated agents in parallel, each assigned its own
+sibling `<repo>-<topic>` worktree (e.g. implementing parallel tracks of the
+same issue), a delegate can write to the **wrong** absolute path — a stray
+`cd`, a copy-pasted path from a different track's prompt — and land its early
+edits in a completely unrelated worktree instead of the one it was told to
+use. That worktree's own commits stay untouched, but its working tree picks
+up an uncommitted, unrelated diff that looks like someone else's WIP.
+
+This isn't caught by verifying the target worktree alone — it's clean there
+by the time the delegate finishes, because the delegate typically
+self-corrects and finishes the real work in the right place. The evidence
+only surfaces by checking the *other* worktrees in play:
+
+```bash
+for d in <other-sibling-worktrees>; do
+  git -C "$d" status --porcelain
+done
+```
+
+A worktree that should be untouched showing unstaged modifications is the
+signal. Confirm before discarding: diff the stray files against the
+delegate's actual (correct) output — if byte-identical, it's this class of
+mistake, not independent unrelated work in progress; check `git log --oneline
+-5` in the contaminated worktree to confirm its own commit history is
+untouched. Since these are only unstaged working-tree changes, `git checkout
+--`/`git restore` on just the stray files is safe — it doesn't touch that
+branch's real commits. Don't assume which delegate caused it from directory
+naming alone; a delegate can genuinely have never touched the wrong path
+itself (always-absolute-path tool calls), in which case a separate parallel
+session is the more likely source — verify via file mtimes relative to each
+delegate's actual working window before attributing blame.
+
 ## Verify the landed commit subject, not just the tool's printed output
 
 After every `git commit`, immediately confirm with `git log --oneline -1` (or
