@@ -65,6 +65,25 @@ prek 局部 hook、grep read-back、diff 範圍確認就夠，不必為此再燒
 必須（a）向使用者明說用了 `--no-verify`，（b）背景驗證真的跑完並回報結果，
 不是跳過不管。
 
+### Review 委派的三種場景
+
+「要不要派 review subagent」不是單一判準，依觸發方式分三種：
+
+- 使用者要求審**自己的 branch**（例如「這個 branch 有很多細小的問題，全部抓出來」）
+  → orchestrator **inline** 做：讀檔 + `git diff main..HEAD` + 逐條回報。檔數多也一樣
+  留在主線，不因為量大就改派 subagent——這種場景是互動來回，使用者要邊看邊給意見、
+  隨時插話調整，subagent 回一份不透明報告會打斷這個迴圈。
+- 使用者要求審**別人的 PR**（貼 PR 連結、「review PR NNN」）→ 派 review subagent（如
+  🟡 Soyo / `strict-review`）。
+- 使用者明講 `/maigo:review`（或其他多 agent review 命令）→ 走該命令的 crew 流程，這是
+  opt-in 訊號，蓋掉上面兩條的預設判斷。
+
+**與 `failure-handling` 的 529 代打不是同一件事**：那條講的是 review subagent 因基礎設施
+過載反覆啟動失敗時，orchestrator 主線代打當 fallback（見
+[`failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)
+「Subagent 過載 / 不可用」段），且明示違反分工守則、嚴格度不打折。這裡講的是**預設路由**——
+審自己 branch 本來就該 inline，不是過載才退而求其次的代打。
+
 ## Scope discipline
 
 執行任務時若發現「相鄰但不在被要求範圍內」的問題，先停下來回報、讓使用者決定，不要
