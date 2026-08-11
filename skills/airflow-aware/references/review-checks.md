@@ -87,6 +87,29 @@ file in the diff. Missing → flag as **Request changes** (not Block).
 **Do not** require newsfragments for changes under `providers/` or `airflow-ctl/`
 — their release managers regenerate the changelog from `git log`.
 
+Three related sub-judgments for unreleased-version work:
+
+- **`Guard:` not `Regression:` for a bug caught during the same unreleased feature's own
+  development.** A test or comment describing a bug found and fixed while a feature is
+  still unreleased must not open with `Regression:` — there is no shipped-then-broke
+  baseline, so `Regression:` misleads a reader into thinking a released version broke.
+  Reword to `Guard:` and state plainly that it guards against reintroducing a bug seen in
+  an earlier draft. Reserve `Regression:` for behavior that worked in a released version
+  and then broke.
+- **Mutating an existing Alembic migration file for an unreleased version is acceptable,
+  and preferred over adding a new revision.** Don't flag this as a blocking issue or
+  insist on a new revision just because the migration already exists on `main`. The
+  criterion is "has this migration's version shipped?", not "is this migration in
+  `main`?" — Airflow's "migrations are immutable" rule applies to released versions;
+  additive changes to an in-development version's migration belong in the existing file.
+  Released-version migrations remain immutable — still flag those.
+- **A `_private_ui` route bug fix doesn't need a newsfragment — judge by same-file
+  precedent, not by release status.** Don't resolve this by arguing whether the route
+  already shipped; check `git log` on the route file (e.g.
+  `airflow-core/src/airflow/api_fastapi/core_api/openapi/_private_ui.yaml` endpoints) for
+  a precedent bug-fix commit on the same file and follow what it did, even when the
+  endpoint is confirmed already shipped in a release.
+
 ## 10.7 Revert of a recent fix: check for a tracking issue first *(judgment gate — avoid a false-positive regression flag)*
 
 **Scope gate**: only applies when the diff/PR title/description reverts, or
