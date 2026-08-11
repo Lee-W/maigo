@@ -95,6 +95,13 @@ uv run --project airflow-core ruff check --fix src/
 prek run --all-files
 ```
 
+Reproduce a prek/CI hook failure from the **repo root** — cwd decides which config loads
+and how relative `entry` paths resolve, so a green run from a subdirectory proves
+nothing about CI; a `` Running hooks for `<dist>`: `` line in the output confirms a
+root-level run. The only exception is deliberately picking a directory to dodge
+unrelated noise (e.g. `providers/` to avoid a root lychee SSH failure) — never to make
+the target hook pass.
+
 Scratch scripts go in `dev/` — not in repo root or `scripts/`.
 
 Note: `prek` is the runner currently specified by upstream. It is compatible with the same hooks as `pre-commit`.
