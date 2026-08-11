@@ -30,6 +30,28 @@ conformance, not an optional nit.
 
 ---
 
+## Tests touching global state must reset themselves
+
+A test that registers or mutates **process-global state** (a secrets masker, logging
+config, an environment variable, a module-level cache, a signal handler) is
+responsible for resetting that state itself — don't assume a fixture or a sibling test
+in the same module will handle it.
+
+Criterion: pull the test out to run alone, or move it to run last in its module — does
+the result change? If yes, it's missing a reset.
+
+Why: this class of state is a process-wide singleton, not rebuilt per test function.
+Without an explicit reset, pass/fail depends on execution order relative to other tests
+in the module — green in isolation, red once something reorders the suite (a new test
+added nearby, `-p no:randomly`) — and the test that goes red is often a **sibling**,
+not the one missing the reset, which makes it hard to attribute.
+
+How to apply: when a test needs to touch global state, reset it explicitly (before use,
+and/or via a local teardown) rather than relying on suite ordering. Match whatever
+reset pattern sibling tests in the same file already use.
+
+---
+
 ## Prefer `.mock_calls` equality over `assert_called_once_with`
 
 Default to comparing `.mock_calls` against a list of `mock.call(...)` objects
