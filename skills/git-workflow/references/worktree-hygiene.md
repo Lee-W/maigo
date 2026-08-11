@@ -251,6 +251,25 @@ the claim as-is — a delegate that was explicitly told not to commit/rebase
 can still do so, tangle unrelated changes together, and misreport a bug it
 introduced itself as pre-existing.
 
+## Don't write to a worktree while a dispatched verifier is running there
+
+The read-only discipline in
+[`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)'s
+"共用 working tree 上的審查紀律" covers what a *reviewer* must not do to a
+shared tree. The symmetric rule applies to the orchestrator itself: after
+dispatching a verification/review agent (Taki/Soyo-equivalent) against a
+worktree, don't also `Edit`/`Write`/`commit --amend` that same worktree
+yourself while the delegate is still running — even a one-line, seemingly
+safe fix. A delegate reading the tree mid-edit can observe a transient,
+non-final state (a change appearing then reverting) and can't tell whether
+that was a real regression or just caught the orchestrator's own edit window;
+its final report may then carry an unresolved "can't 100% rule out
+contamination" caveat even when the edit itself was correct.
+
+Apply one of two orderings instead: finish your own edit and let it settle
+(commit) *before* dispatching the verifier, or wait for the currently-running
+verifier to finish before editing the worktree it's using. Don't interleave.
+
 ## Sweep sibling worktrees for stray contamination after parallel dispatch
 
 When dispatching several delegated agents in parallel, each assigned its own
