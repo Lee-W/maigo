@@ -58,6 +58,23 @@ description: This skill should be used when handling failures in go-class comman
 3. 續跑指令必須要求**先盤點再續作**：`git status` + 檢視目標檔案，逐項判斷任務做到哪，只補缺的。盤點常發現工作其實已全部完成（切斷發生在回報前）——此時直接進驗證，避免重工。
 4. 盤點與續作完成後照常走原流程——review / 驗證不因中斷打折。
 
+### task-notification 標記 `status: failed`，不代表工作沒做完
+
+跟 529（啟動失敗）、usage/session limit（有明確 limit 訊息）都不同：這是第三種訊號——subagent
+在收尾寫最終報告時遭遇 API 連線中斷，task-notification 的 `status` 欄位字面上顯示
+`failed`，`summary`/`result` 只留下被截斷的半句話（例："Exit 0, passed. Let's verify final
+git state is clean..."）。**這個 `failed` 字面上看起來像整個任務失敗，但實際常常是：實質工作
+（含 commit）早就做完，中斷只發生在自我確認 / 收尾報告階段。**
+
+1. **先查實際狀態，不要照 `status: failed` 字面重派**——去該 agent 實際操作的目錄/repo 跑
+   `git log --oneline` + `git status --porcelain` + `git diff --stat <base>...HEAD`，對照原始
+   交辦的驗收條件逐項核對，而不是看到 `failed` 就假設一切從零開始。
+2. 若 git 狀態顯示工作（含 commit）已完整——**不要重派 agent 從頭做**，直接把這個結果送進
+   下一階段（review / 驗證），比照「Subagent 中途撞 usage / session limit」第 3-4 點的做法；
+   被截斷的只是它自己的收尾敘述，不是它的產出。
+3. 若 git 狀態顯示工作明顯未完成或矛盾——才視同「跑到一半被切斷」，比照上面 usage/session
+   limit 小節處理（SendMessage 續跑同一 agent，要求先盤點再續作）。
+
 ### 等待自己開的背景 agent
 
 用 Agent tool 開的背景 agent 完成時會自動發 task-notification 把 orchestrator 叫回來，**不需要
