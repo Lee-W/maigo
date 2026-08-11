@@ -178,6 +178,10 @@ still needs one of two forms:
 Orphan phrases with neither form are must-fix; apply the same posture to
 PR-description and commit-body text, not just code comments.
 
+The same judgment also governs log/audit/error message text, not just code comments —
+see `skills/strict-review/references/recurring-patterns.md`'s "Log/audit/error messages
+state what happened, not why it might change later."
+
 ## 10.10 Newsfragment content must reflect a genuine capability delta vs upstream *(Request changes)*
 
 Presence of a newsfragment file (10.6) doesn't mean its content is accurate.
