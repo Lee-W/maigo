@@ -30,6 +30,15 @@ hands, not delegate to the orchestrator.
    moved (amend, branch switch, force-push) since it was last checked; if
    the state doesn't match expectations, investigate (`git reflog`) before
    acting, and report the discrepancy plainly.
+3. **Creating a PR and editing an existing one's description are not the same
+   authorization.** Once the user has explicitly authorized opening a new PR,
+   running `gh pr create` on their behalf is fine. Editing the description of
+   an **existing** PR is different — never run `gh pr edit` on their behalf,
+   no matter what authorization was given for creation. Hand over a complete
+   replacement body in a fenced code block (one block per PR, labeled with the
+   PR number and base branch) and let them paste it themselves; preserve
+   whatever `Generated-by:` wording that PR already carries rather than
+   normalizing it to a different agent-name string.
 
 ## Don't casually open a GitHub issue or PR
 
