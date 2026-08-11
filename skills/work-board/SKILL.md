@@ -294,6 +294,15 @@ maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使�
 12. **只能前景執行**：`--serve` 要一直開著終端機、Ctrl-C 結束，不要背景 detach——
    父行程被 SIGTERM 終止時子行程會孤兒化佔 port。
 
+## 7. 跨 session 接續：`ListAgents` 查不到對應 session 時
+
+使用者說「有個 session 在做 X」，但 `ListAgents` 查不到可觸及的對應 session——session 本身
+消失了不代表工作內容跟著消失。**先查 `.maigo/board.md` 有沒有這個 issue/PR 的 `IN_PROGRESS`
+行**（`/maigo:take-issue` 開工時會旁註 branch 名，見 `commands/take-issue.md` 步驟 4），有的話
+直接用旁註的 branch 名定位 worktree；board 沒記到，才退而找對應 worktree 本身（`.maigo/plan.md`
+是否存在、`git log`/`git status` 做到哪一步）——兩者都能讓 orchestrator 從既有進度接著跑，不必
+等原 session 復活，也不必整個重新走一次 Raana 探索 + Tomori 規劃。
+
 ## What this skill does NOT cover
 
 - `/maigo:board` 的命令面（無參數刷新 / `<targets...>` / `--all` / `--serve` / `--learn` /
