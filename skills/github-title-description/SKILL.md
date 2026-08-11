@@ -49,6 +49,10 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 - **不寫檔名**：「Refactor `auth.py`」← bad；「Reject empty emails before hashing」← good
 - **動詞開頭** 比名詞開頭更直接（「Add X」、「Fix Y」、「Allow Z」）
 
+**字級措辭**（em-dash 取代 `, so`、句首 `Also` 不加逗號、避免抽象名詞改用可量化說法）跟
+[`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
+的 Convention 1 共用，見該處的「Word-level conventions」，這裡不重複寫。
+
 ### Bad → Good 對照
 
 | Bad | Good |

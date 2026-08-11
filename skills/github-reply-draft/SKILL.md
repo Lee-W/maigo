@@ -31,6 +31,17 @@ of what was done, and anything the reviewer can already see from the diff.
 
 The user will ask for more, not less — default short.
 
+**Word-level conventions:**
+
+- Prefer an em-dash over `, so` for casual flow (`reports should stay in sync from now
+  on`, not `, so reports should stay in sync`).
+- No comma after a sentence-starting `Also` before a verb (`Also updated the file`, not
+  `Also, updated the file`).
+- Avoid vague abstract nouns ("window", "a while", "soon", "some buffer") — swap each for
+  the concrete, quantifiable mechanism behind it (a number of seconds, a count, an
+  explicit configurable flag). A vague noun reads as hand-waving; a measurable mechanism
+  is something a reviewer can actually evaluate and implement.
+
 **Good:**
 
 > `validate_email` now raises `ValueError` on empty input instead of propagating `IndexError`.
