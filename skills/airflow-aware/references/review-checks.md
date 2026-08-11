@@ -5,6 +5,15 @@ Loaded on demand by `skills/airflow-aware/SKILL.md` §10 — **review tasks only
 an item 10+ in the checklist output, with the stated Block / Request-changes severity.
 Outside of a review context (quick-fix / refactor), do not gate tasks on these.
 
+## Secrets masker tests: `@pytest.mark.enable_redact` + reset before use
+
+Airflow-specific supplement to `strict-review`'s "Tests touching global state must
+reset themselves" convention (`skills/strict-review/references/test-conventions.md`):
+a test that calls `mask_secret()` must be marked `@pytest.mark.enable_redact` (a global
+autouse fixture otherwise patches redact/mask_secret out) and must call
+`reset_secrets_masker()` before registering its own pattern — otherwise it inherits
+patterns registered by earlier tests and leaks its own secret to whatever runs next.
+
 ## 10.1 Execution API wire-format gate *(Block-level)*
 
 If the diff touches any of:
