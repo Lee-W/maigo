@@ -63,6 +63,27 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 - 使用者說「全部一起看」/ `batch them` / `do them all` → 放掉這個 gate 直到 batch 結束
 - 最後一個 PR 跑完 → queue 行改成最終 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）
 
+## 交付時效
+
+review 報告寫得多完整都不算交付——**貼上 GitHub 才算**。apache/airflow 的 merge 速度
+常快過一輪「深審 → 覆核 → 依新意見改草稿」的循環，窗口關掉的成本不是「晚一點貼」，是
+**歸零**（帶著缺陷 merged 之後只剩開 issue 這條較弱的路，且要重新查證缺陷仍在 main 上）。
+
+- **一顆審完就貼**，不要累積成批等「一起送」。
+- **先貼粗版再補**：must-fix ＋ 一句證據就夠，nit 可後續補留言。完美措辭的邊際價值遠低於
+  時效。
+- **審之前先查 PR state**：`gh pr view <n> --json state,mergedAt,headRefOid`。避免審
+  已 merged 的 PR，也避免審過期的 head。
+- 若同一 PR 上已有其他人提出同樣的點，**改成接話而非重述**，否則就是 reviewer noise。
+
+實證：一次 session 產出 28 份草稿、一份都沒送出，其間有 PR 帶著未送出的 must-fix
+merged（例如 CLI 每次呼叫都分頁抓完整歷史、reject 路徑零測試），也有一份三輪修訂磨到
+很完整，貼之前重查 head 才發現三個發現全部被別人先提且作者已修，整份作廢。**把案例精簡
+成 2–3 個代表性 PR 講清楚後果就夠，不必逐條記過。**
+
+送 review 是掛使用者帳號對外發言，agent 不代送——這條的可執行部分是 agent 側的：主動
+催、先給可直接複製的版本、不主動累積庫存，而非替使用者按下送出。
+
 ## 大批平行 spawn：節流與進度落地
 
 大批平行 spawn subagent 的任務（例如一次 batch review 幾十個 PR）會反覆撞 session
