@@ -60,6 +60,20 @@ Two counter-cases:
   choose between "fold it in as a standalone commit" and "keep it split out"
   — don't mechanically default to a worktree for a tiny diff.
 
+**Reviewer-labeled follow-up on an already-approved PR is a preference, not a
+prohibition.** When a reviewer raises something they themselves label a
+follow-up (not a blocker) on a PR that already has an approval, prefer giving
+it its own PR — adding it to the approved PR is still allowed when a separate
+PR isn't practical, it just resets the approval that PR already earned, so say
+so. If the follow-up depends on something only that PR introduces, don't stack
+a new branch off the PR branch — wait for the merge and start a fresh worktree
++ branch from the default branch instead.
+
+This preference does **not** extend to what the reviewer actually asked about
+in the same thread — fixes for that stay in the same PR even after an
+approval; re-requesting review afterwards is the normal address-comments path,
+not a case for splitting out.
+
 ## Cross-provider/cross-feature batches: one branch and worktree per item
 
 A batch of changes spanning multiple independent items — multiple provider
