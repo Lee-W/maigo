@@ -7,6 +7,29 @@ of the patterns below applies.
 
 ---
 
+## Default new tests to parametrize, and extract repeated setup/cleanup into a fixture
+
+When delivering new tests, self-check two things before calling it done:
+
+- **≥2 tests whose bodies differ only in input/expected value** → merge into
+  `@pytest.mark.parametrize`. Write each case's reason for existing (especially a
+  regression-guard rationale) above the `pytest.param(...)` line — don't leave it in a
+  docstring that disappears once the tests are merged.
+- **Repeated setup/cleanup across tests** → extract to a fixture. Look for the repo's
+  existing shared helper first (e.g. Airflow's `tests_common.test_utils.db.clear_db_*`)
+  rather than writing a fresh `session.execute(delete(...))` per test.
+
+Don't force tests with genuinely different body **structure** (a multi-step sequence,
+a mid-test rollback or state change) into the same parametrize — that turns into a pile
+of `if`/`else` branches, harder to read than separate tests.
+
+How to apply: this is a delivery self-check, not something to wait for a reviewer to
+ask for — apply it before handing the tests over. When reviewing, treat "should this
+have been parametrized / had its setup extracted to a fixture" as part of convention
+conformance, not an optional nit.
+
+---
+
 ## Prefer `.mock_calls` equality over `assert_called_once_with`
 
 Default to comparing `.mock_calls` against a list of `mock.call(...)` objects
