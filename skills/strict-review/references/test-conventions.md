@@ -219,6 +219,30 @@ forced values; put the genuinely-new behavior in a new named test (e.g.
 
 ---
 
+## Verify before aligning a test to new production behavior
+
+When a test goes red because a **production** code path changed behavior (not because
+the test itself has a bug), don't accept a code comment or "this looks intentional" as
+grounds for realigning the test's expected value. Trace to the actual runtime consumer
+and verify the new behavior is genuinely harmless first — **especially for
+credential / authentication fallback logic**, where "the test is now wrong" and "the
+production change silently broke a fallback" look identical from the test's diff alone.
+
+Case study: an Airflow remote-logging provider-dispatch migration dropped a
+conn-id fallback; a test asserting the old fallback started failing, and rewriting it to
+match the new (fallback-free) expectation looked like the obvious fix. Confirmed correct
+only after tracing `AwsGenericHook.conn_config`'s truthiness check — `aws_conn_id=""` is
+equivalent to `None` there (both fall through to boto3's default credential chain), so
+dropping the fallback was actually safe. Without that trace, "the test is green" would
+have been mistaken for "the change is verified."
+
+How to apply: when a test failure traces back to a recent production commit (not a bug
+in the test itself), find that value's actual runtime consumer and verify the behavior
+change has no real user impact **before** changing the test's expected value — treat
+credential/auth fallback paths as the highest-scrutiny case of this pattern.
+
+---
+
 ## A missing fixture is not "can't test" — build one
 
 A test/QA case that merely lacks a shipped example fixture (e.g. an example
