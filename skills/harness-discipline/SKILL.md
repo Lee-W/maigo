@@ -72,7 +72,8 @@ prek 局部 hook、grep read-back、diff 範圍確認就夠，不必為此再燒
 - 使用者要求審**自己的 branch**（例如「這個 branch 有很多細小的問題，全部抓出來」）
   → orchestrator **inline** 做：讀檔 + `git diff main..HEAD` + 逐條回報。檔數多也一樣
   留在主線，不因為量大就改派 subagent——這種場景是互動來回，使用者要邊看邊給意見、
-  隨時插話調整，subagent 回一份不透明報告會打斷這個迴圈。
+  隨時插話調整，subagent 回一份不透明報告會打斷這個迴圈。唯一的例外是 diff 真的巨大
+  （>10k 行、跨多個子系統）**且**使用者這輪還沒表態要怎麼審，此時才考慮改派。
 - 使用者要求審**別人的 PR**（貼 PR 連結、「review PR NNN」）→ 派 review subagent（如
   🟡 Soyo / `strict-review`）。
 - 使用者明講 `/maigo:review`（或其他多 agent review 命令）→ 走該命令的 crew 流程，這是
