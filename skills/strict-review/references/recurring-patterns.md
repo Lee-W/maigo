@@ -305,3 +305,35 @@ must move with it, not disappear along with the function definition — check
 this specifically during review; a comment silently dropped during an inline
 is a defect, not an incidental side effect of tidying up.
 
+---
+
+## Normalize separators by collapsing to one space, never stripping them
+
+When doing "keyword ↔ free text" substring matching, normalizing separators by
+**deleting** them outright manufactures substrings that never existed in the
+original text.
+
+Case study: apache/airflow PR #70498 (`registry/src/_data/providerKeywordMatch.js`).
+Stripping `[-_\s]` entirely turned `"Microsoft Power BI"` into
+`"microsoftpowerbi"` (contains `"ftp"`) and `"microsoft-psrp"` into
+`"microsoftpsrp"` (also contains `"ftp"`) — both false-matched the
+`orchestration` category's `'ftp'` keyword. Collapsing to a **single space**
+(`.replace(/[-_\s]+/g, ' ')`) fixes it while `"pydantic-ai"` / `"pydantic ai"`
+remain equivalent.
+
+Second half of the same lesson: bidirectional substring matching
+(`a.includes(b) || b.includes(a)`) is safe when both sides are slugs, but
+becomes dangerous once one side turns into free text — a short name gets
+swallowed whole by a long keyword (e.g. 3–4 character integration names like
+`"Tpt"`, `"Ttu"`, `"YDB"`, `"Bteq"`). Widening one side's input source means
+removing the reverse half of the check too.
+
+Why: both failure modes produce **silent misclassification** — no crash, no
+stack trace, just a few extra or missing matches that are hard to notice by
+eye.
+
+How to apply: before changing any substring-match normalization or matching
+direction, snapshot the full before/after output (dump to a file, `diff`,
+require exit 0 — restart the process for each dump if the runtime caches
+modules). Zero diff is what makes it safe to ship.
+
