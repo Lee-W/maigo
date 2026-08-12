@@ -234,3 +234,49 @@ This complements Part D above (polymorphism over caller-side type-switching)
 — Part D is about *pushing behavior onto existing types*; Part E is about
 *making the set of types itself open for extension* via registration rather
 than a hardcoded enumeration.
+
+---
+
+## Part F — `None` on an optional parameter always means "use the default"
+
+### Rule
+
+Within one constructor/function signature, `None` on every optional parameter
+must mean the same thing: "use the default." Don't let one parameter's `None`
+secretly mean "disable this behavior" while its siblings' `None` means "use
+the default" — that asymmetry isn't visible from reading the signature or the
+parameter list, only from reading the implementation.
+
+To offer a way to disable a behavior, add a **separate, explicit boolean
+flag**. When the flag and the disabled-via-`None` parameter are both supplied
+and contradict each other, `raise` at construction time (matching the
+constructor's existing eager-validation style) — don't let one silently win.
+
+This escalates from "style" to "must-fix" whenever the parameter in question
+gates masking, encryption, or signature verification — a silent wrong-default
+in that class of parameter has a security consequence, not just a surprising
+API.
+
+### Concrete reference
+
+apache/airflow PR #70830 (`common.ai` provider's `LLMRetryPolicy`):
+`redactor=None` originally meant "turn off secrets masking," while the same
+`__init__`'s `model_id` / `instructions` / `fallback_rules` all treated `None`
+as "use the default." Building kwargs programmatically (`redactor=cfg.get("redactor")`)
+would silently send unmasked exception text to an external LLM provider whenever
+that config key was absent — no exception, no log, the data already sent. Fix:
+`None` went back to meaning "use the default"; disabling moved to a dedicated
+keyword-only `redact_exception: bool = True`, and supplying `redact_exception=False`
+together with an explicit `redactor` raises `ValueError` at construction.
+
+### How to apply during review
+
+1. When a new optional parameter is added (or reviewed), check what `None`
+   means for its siblings in the same signature — match that meaning.
+2. If the intent is "allow turning this off," that's a separate boolean flag,
+   not an overloaded `None`.
+3. When the flag and the parameter can be specified together and disagree,
+   require a construction-time `raise`, not a silent precedence rule.
+4. Treat this as must-fix, not nit, whenever the parameter gates masking,
+   encryption, or signature verification.
+
