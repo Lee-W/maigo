@@ -94,3 +94,29 @@ named function in your own module, export it via `__all__`, and point docs at
 that layer instead. Check docstring `:func:` cross-references for the same
 symbol while you're at it — don't fix only the `.rst`.
 
+---
+
+## Shared examples use the ecosystem-standard endpoint, not a single backend's private path
+
+A doc that supports **multiple backends** must keep its shared (tool-neutral)
+example on the ecosystem-standard API — hardcoding one backend's private
+endpoint in the shared example secretly locks the reader into that backend,
+contradicting the doc's own "any compatible backend works" premise. Per-tool
+tabbed sections, explicitly labeled for one backend, are the place for that
+backend's private paths — leave those as-is.
+
+Case study: apache/airflow PR #69867, `common.ai` self-hosted-models guide.
+The shared `example_agent_self_hosted` hardcoded Ollama's private
+`/api/tags` model-list endpoint — flagged as "too Ollama-focused." Fix:
+switched to `GET /v1/models`, the standard endpoint every OpenAI-compatible
+server (Ollama/vLLM/LM Studio) exposes — which the guide's own "curl check"
+section already recommended. The per-tool tabbed setup sections elsewhere in
+the same guide stayed backend-specific, unchanged.
+
+How to apply: when writing or reviewing a multi-backend provider doc, first
+separate "shared example" from "per-tool section." Shared examples default to
+the ecosystem standard (for OpenAI-compatible servers: `/v1/models`,
+`/v1/chat/completions`, etc.); only a section explicitly labeled for one
+backend's tab uses that backend's private path. A private single-backend
+endpoint showing up in a shared example is the signal to neutralize it.
+
