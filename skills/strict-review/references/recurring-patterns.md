@@ -337,3 +337,27 @@ direction, snapshot the full before/after output (dump to a file, `diff`,
 require exit 0 — restart the process for each dump if the runtime caches
 modules). Zero diff is what makes it safe to ship.
 
+---
+
+## Don't alias imports unless a module-qualified reference is genuinely impossible
+
+Don't write `from x import Y as Z`. Reach for `import module` +
+`module.Y` first, and grep the repo for how the same library is already
+imported before deciding otherwise.
+
+Case study: `from sqlalchemy.exc import TimeoutError as SATimeoutError` was
+rejected on sight. An alias invents a name that exists nowhere else in the
+codebase or in the library's own docs — in that case `from sqlalchemy import exc`
++ `exc.OperationalError` was already the established form elsewhere in the
+same repo. A reviewer-facing name collision is not a good enough reason to
+coin a new identifier.
+
+How to apply: when a symbol would collide with a builtin or another import,
+import the module and qualify the reference instead of aliasing the symbol.
+Only alias when a module-qualified reference is genuinely impossible, and say
+why. This is about *unnecessary* new aliases — an alias already established
+in the surrounding code stays as-is; match the file, don't crusade. Airflow's
+import-placement conventions (top-level vs `TYPE_CHECKING` vs lazy, and this
+alias rule specifically) are also covered in
+[`skills/airflow-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md).
+

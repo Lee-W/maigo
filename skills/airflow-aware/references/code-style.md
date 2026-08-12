@@ -60,6 +60,11 @@ a top-level `from x import get_db_dag` in the *test* module keeps pointing at
 the original — the alias (or the bare re-import) bought nothing and the test
 silently exercises the un-patched symbol.
 
+The general form of this rule — don't alias an import unless a
+module-qualified reference is genuinely impossible — is in
+[`skills/strict-review/references/recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)'s
+"Don't alias imports" section.
+
 ### When a parameter shadows an imported callable it must call, rename the parameter
 
 When a function parameter has the same name as an imported callable the
