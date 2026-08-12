@@ -120,3 +120,30 @@ the ecosystem standard (for OpenAI-compatible servers: `/v1/models`,
 backend's tab uses that backend's private path. A private single-backend
 endpoint showing up in a shared example is the signal to neutralize it.
 
+---
+
+## AI/agent example prompts ask naturally; procedural knowledge goes in `system_prompt`
+
+An AI/agent framework example's `prompt=` should read like a natural user
+question, not an instruction that spells out API paths or steps. Endpoint/
+procedural knowledge belongs in `system_prompt` instead.
+
+Case study: apache/airflow PR #69867, `common.ai` provider. A reviewer pushed
+back on an agent example's `prompt="Call /api/tags and summarize which models
+are available."` with "should we just ask — 'Which models are available' —
+instead of telling how." Resolved to `prompt="Which models are available?"`,
+with the endpoint knowledge moved into `system_prompt` (e.g. "...the server's
+model list is served at `GET /api/tags`."). Verified deterministic
+tool-calling across repeated runs after the change.
+
+Why: an example teaches the user's perspective — the prompt is what a person
+would say, so it should read like human speech; "how to do it" is the agent's
+own configuration layer (`system_prompt` / tool descriptions), not something
+the user should have to say out loud. Grounding the endpoint in
+`system_prompt` also avoids the model guessing at a path (which then hard-fails
+on a 4xx from an HTTP-based tool).
+
+How to apply: when writing or reviewing an example for `common.ai` (or any
+agent framework), keep `prompt=` free of API paths or step-by-step
+instructions. If the model needs grounding, put it in `system_prompt`, and
+verify determinism by actually running the example more than once.
