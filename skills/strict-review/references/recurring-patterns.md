@@ -361,3 +361,27 @@ import-placement conventions (top-level vs `TYPE_CHECKING` vs lazy, and this
 alias rule specifically) are also covered in
 [`skills/airflow-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md).
 
+---
+
+## Log/audit/error messages state what happened, not why it might change later
+
+Don't add clauses to a log/audit/error message that pre-justify a design
+decision or speculate about future changes. Describe current, factual
+behavior only.
+
+Case study: a log/audit message read "This cap is a hardcoded scheduler
+safety limit, not a configurable setting; the remaining backlog will be
+evaluated over subsequent ticks." The middle clause was cut. Editorializing
+about *why* a limitation exists, or pre-empting a future feature request
+("not configurable *yet*"), commits the message to a claim the code doesn't
+actually make ("this will never be configurable") and reads as defensive
+justification rather than information the reader — an operator reading the
+audit trail — actually needs.
+
+How to apply: when drafting or reviewing a log/audit/error message, cut any
+clause explaining *why* a limitation exists or *what might change later* —
+keep only *what happened*. This is YAGNI applied to message text, not just to
+code structure; it applies equally to log messages, not only to code comments
+(see the "forward-looking code comments" check in
+[`skills/airflow-aware/references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+§10.9 for the code-comment counterpart).
