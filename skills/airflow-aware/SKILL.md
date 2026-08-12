@@ -416,9 +416,14 @@ beats per-endpoint pedantic accuracy.
   equally hasn't found the axis yet (e.g. two "agent" operators don't differ
   by whether they have tools/MCP if both do; they differ by where the loop
   executes and who controls the tools).
-- **User-facing doc snippets teach the canonical import** — e.g.
-  `from airflow.sdk import dag, task` — not a provider-internal compatibility
-  shim path, which is only for in-package shipped code.
+- **User-facing doc snippets teach the canonical import, never a symbol that
+  might move** — e.g. `from airflow.sdk import dag, task`, not a
+  provider-internal compatibility shim path meant only for in-package shipped
+  code. The strongest signal a symbol will move again: the repo already has a
+  compat/fallback import chain written for it — that's a reason to keep it
+  out of docs, not a reason it's safe to document. Full criterion and a
+  worked case (name the default in its own module, export via `__all__`) is
+  in [`references/docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md).
 - **Section headers/labels name the specific things being compared**, not a
   generic count or umbrella ("Two styles of X" teaches nothing — name the
   styles). Keep internal-component words (e.g. "scheduler") out of

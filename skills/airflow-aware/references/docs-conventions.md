@@ -56,3 +56,41 @@ construction (e.g. hardcoded subclasses of a single vendor's hook), keep it
 exhaustive and don't add a disclaimer — a disclaimer there would misrepresent
 it as open when it isn't.
 
+---
+
+## Name a default in its own module — don't tell users to import a symbol that moves
+
+Docs must not tell a user to import a private or unstable symbol that belongs
+to someone else's internals. The strongest reverse signal that a symbol will
+move again: **if the repo already has a compatibility/fallback import chain
+written for it**, that chain is evidence of past churn — don't point docs at
+it.
+
+Case study: apache/airflow PR #70830, `common.ai` provider. `LLMRetryPolicy`'s
+default redactor was originally an inline lambda in the signature, and the
+docs told Dag authors to write `from airflow.sdk.log import redact` to layer
+their own on top. A reviewer pointed out `redact` isn't in Task SDK's public
+interface (`task-sdk/docs/api.rst` only autodocs `mask_secret`), and it has
+moved four times — `providers/common/compat/.../sdk.py` carries exactly four
+fallback imports for it (`airflow.sdk.log` →
+`airflow.sdk._shared.secrets_masker` →
+`airflow.sdk.execution_time.secrets_masker` →
+`airflow.utils.log.secrets_masker`). Fix: extracted to a module-level
+`default_redactor`, added to `__all__`, and the docs now point at
+`from airflow.providers.common.ai.policies.retry import default_redactor`
+instead.
+
+Why: an import path in docs is a compatibility promise to the user. Pointing
+at a private symbol you don't control turns someone else's refactor into
+silent user-facing breakage — their custom redactor `ImportError`s or quietly
+stops working after an upgrade. A named default exported from your own module
+is a stable surface regardless of how the internals move.
+
+How to apply: before telling users to import a symbol, confirm it's in that
+package's public API docs. If the repo already has a compat/fallback import
+chain for a symbol, treat that as proof it will move again and keep it out of
+docs. If the default value in question is that kind of symbol, wrap it in a
+named function in your own module, export it via `__all__`, and point docs at
+that layer instead. Check docstring `:func:` cross-references for the same
+symbol while you're at it — don't fix only the `.rst`.
+
