@@ -282,3 +282,26 @@ How to apply:
   settings (e.g. a configurable reading-speed value): validate for legality
   (positive, finite) and raise a clear error rather than silently producing
   a degenerate result.
+
+---
+
+## Inline a helper function used at exactly one call site
+
+A top-level (or module-level) function referenced from exactly one call site
+is a pure indirection with no reuse or testability benefit — inline it (a
+lambda as a default value, or the expression expanded at the call site)
+instead of keeping a separately-named function around.
+
+Case study: apache/airflow `providers/common/ai/.../policies/retry.py`'s
+`_mask_secrets(value)` was a module-level function referenced only once, as
+the default for `__init__`'s `redactor` parameter. Inlined to
+`redactor: Callable[[str], str] | None = lambda message: cast("str", redact(message))`
+directly at the parameter default.
+
+How to apply: when a top-level function has exactly one caller, ask whether it
+can be inlined. If the original function carries an explanatory comment
+(non-obvious reasoning, not a restatement of the next line), that comment
+must move with it, not disappear along with the function definition — check
+this specifically during review; a comment silently dropped during an inline
+is a defect, not an incidental side effect of tidying up.
+
