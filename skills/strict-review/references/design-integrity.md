@@ -280,3 +280,37 @@ together with an explicit `redactor` raises `ValueError` at construction.
 4. Treat this as must-fix, not nit, whenever the parameter gates masking,
    encryption, or signature verification.
 
+---
+
+## Part G — Error messages must name the flag the user actually typed
+
+### Rule
+
+When one validation path can be reached by multiple distinct user-facing
+inputs (e.g. several CLI flags that all normalize into the same internal
+field), the error message must name the input the user actually typed — not
+the internal field name those inputs get normalized into. Hardcoding the
+normalized field's name into the message is a defect once more than one
+surface input can trigger the same check.
+
+### How to apply during review
+
+1. Watch for the shape "multiple flags normalize into one internal field,
+   then a shared validation function hardcodes that field's name into its
+   error message."
+2. Ask: "does this error message stay honest about the user's actual input
+   across every path that can trigger it?"
+3. The fix is to thread through which surface input triggered the check (e.g.
+   a boolean recorded at the point where the expansion happens) and branch the
+   message accordingly — not to pick one alias's name and apply it everywhere.
+
+### Concrete reference
+
+apache/airflow PR #69454, `airflow-core/src/airflow/cli/commands/partition_command.py`'s
+`clear()`: `--date a~b` expands into `args.start_date`/`args.end_date`
+internally, and the inverted-window guard unconditionally reported
+"`--start-date` must be on or before `--end-date`." — naming a flag the user
+calling `--date` never typed. Fix: record a `from_date_flag` boolean at the
+point of expansion, and branch the guard's message on it (the `--date` path
+quotes the original input fragment; the direct `--start-date`/`--end-date`
+path keeps the original message).
