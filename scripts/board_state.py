@@ -300,6 +300,14 @@ def tier_for_status(status: str) -> Tier | None:
         return None
 
 
+def next_action_for_status(status: str) -> str | None:
+    """給 UI 用：已知狀態詞回其 `next_action`；未知狀態詞或無預設下一步一律回 `None`。"""
+    try:
+        return _STATUS_META[BoardStatus(status)].next_action
+    except ValueError:
+        return None
+
+
 def _parse_ts(ts: str) -> datetime:
     parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     if parsed.tzinfo is None:

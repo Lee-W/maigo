@@ -136,9 +136,9 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- `READY` → 🐛 行進 🎯，下一步命令是 `/maigo:take-issue <n>`
-- `NEEDS_INFO` → 🐛 行進 ⏳，理由寫缺什麼資訊
-- `DUP` / `CLOSE` → 🐛 行進 ✅，附 duplicate / close 理由
+- `READY` → 🐛 行進 🎯（判斷句留空，狀態詞已經講清楚下一步是接工）
+- `NEEDS_INFO` → 🐛 行進 ⏳（判斷句留空；缺什麼資訊寫進狀態詞後面的旁註，不是判斷句）
+- `DUP` / `CLOSE` → 🐛 行進 ✅，duplicate / close 理由寫進狀態詞後面的旁註
 
 board 是本地檔；這不違反本命令「不主動寫 GitHub」原則。回寫時必須保留原 checkbox 與 `🧠` 標記。
 

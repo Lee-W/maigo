@@ -15,8 +15,8 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
-      - name: Install dev dependencies
-        run: uv sync --group dev
+      - name: Install dev and docs dependencies
+        run: uv sync --group dev --group docs
 
       - name: Lint
         run: uv run pre-commit run --all-files
@@ -26,9 +26,6 @@ jobs:
 
       - name: Test
         run: uv run pytest
-
-      - name: Install docs deps
-        run: uv sync --group docs
 
       - name: Build docs (strict)
         run: uv run mkdocs build --strict

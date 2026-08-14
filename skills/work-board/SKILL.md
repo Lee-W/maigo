@@ -31,37 +31,50 @@ description: This skill should be used when reading, writing, or migrating `.mai
 > 最後刷新：2026-07-09 14:30 ｜ 🎯 3 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 2
 
 ## 🎯 你的球（3）
-- [ ] 🐛 #123 (alice) **READY** — triage 完可接 → `/maigo:take-issue 123` — "fix xxx"
-- [ ] 🔀 #456 (你) **CHANGES_REQUESTED** Δ +120/-45 — reviewer 要改 → `/maigo:address-comments` — "feat yyy"
-- [x] 👀 #789 (bob) **↩︎ 回你的球** Δ +88/-12 — 你回過後又推新 commit → `/maigo:review 789` — "…"
+- [ ] 🐛 #123 (alice) **READY** — "fix xxx"
+- [ ] 🔀 #456 **CHANGES_REQUESTED** Δ +120/-45 — "feat yyy" — 照改還是回 reviewer
+- [x] 👀 #789 (bob) **↩︎ 回你的球** Δ +88/-12 — "…" — 新 commit 改了多少，值得整個重審嗎 📄 `review-789.md`
 
 ## ⏳ 等別人（2）
-- [ ] 🔀 #460 (你) **等 review** Δ +42/-7 — 最後活動是你 07-08 — "…"
-- [ ] 🐛 #130 (carol) **NEEDS_INFO** — 等回報者補資訊 — "…"
+- [ ] 🔀 #460 **等 review** Δ +42/-7 — "…"
+- [ ] 🐛 #130 (carol) **NEEDS_INFO** — "…"
 
 ## 📥 無法分類（0）
 <!-- 只放 gh 抓不到的（權限 / 打錯號碼 / 網路失敗），抓得到的一律直接分桶 -->
 
 ## ✅ Merged / closed（最近 7 天）
-- [x] 👀 #700 (dave) **APPROVE** Δ +31/-9 🧠 — merged 07-07 — "…"
+- [x] 👀 #700 (dave) **APPROVE**（merged 07-07） Δ +31/-9 🧠 — "…"
 
 ## 🗄️ 已放棄（1）
-- [ ] 🐛 #99 (eve) **已放棄** — `--drop` 軟刪，7 天後可清 — "…"
+- [ ] 🐛 #99 (eve) **已放棄**（`--drop` 軟刪，7 天後可清） — "…"
 ```
 
 ### 行文法
 
+**設計原則：一眼看出要採取的行動、要下的判斷；其餘細節收起來。** 理由欄不是事實紀錄，是判斷句——
+沒有判斷要下就不寫。
+
 ```text
-- [ ] <型別emoji> #<n 或 owner/repo#n> (<作者>) **<狀態詞>** Δ +<additions>/-<deletions> — <一句話理由> → `<下一步命令>` 📄 `<產物路徑>` — "<title>"
+- [ ] <型別emoji> #<n 或 owner/repo#n> (<作者>) **<狀態詞>** Δ +<additions>/-<deletions> <badges> — "<title>" — <判斷句> 📄 `<產物路徑>`
 ```
 
 - **型別 emoji**：🐛 issue ｜ 🔀 你的 PR ｜ 👀 在審的 PR
-- **作者**：issue / PR 的 author；自己的 PR 寫 `(你)`，served 表格會拆成獨立欄位
+- **作者**：issue / PR 的 author；**🔀 你的 PR 整個省略 `(作者)` 欄位**（型別 emoji 已定義
+  「這是你的 PR」，`(你)` 是贅字）；served 表格會把作者收進每列的展開區
 - **`Δ +A/-D`**（PR 必填、issue 省略）：GitHub `additions` / `deletions`；閱讀層另以
   `A + D` 作為「改動量」排序 key
-- **`→ 下一步命令`**：只有 🎯 區的行有——看到就能複製執行，這是「最好讀寫」的核心
+- **badges**（`🧠`/`💤`，optional）：緊接在 `Δ +A/-D` 之後
+- **`"<title>"`**：接在狀態詞／`Δ`／badges 之後——先看狀態與改動量，再看標題
+- **`<判斷句>`（optional，理由欄的新形式）**：只寫「你現在要決定什麼」，**不寫「發生了什麼」**。
+  - 狀態詞本身已經講清楚下一步、或根本沒有判斷要下（例：`可合併`、`等 review`、
+    `IN_PROGRESS`）→ **整段省略**，連前導的 `—` 分隔號一起省略
+  - 真有岔路要選（改還是不改、修還是換路、能不能重現）→ 一句話點出岔路，愈短愈好
+  - 下一步命令**不寫進真相層**——`--serve` 閱讀層由
+    [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+    的 `next_action_for_status()` 依狀態詞推導成可複製命令（見 §6），真相層與閱讀層因此不會
+    再像舊版一樣各自漂移
 - **`📄 產物路徑`**（optional）：指向這項的本地產物（review-<n>.md / triage 筆記等），相對
-  `.maigo/` 的路徑。沒產物就省略。真相層不塞 markdown link；served 表格
+  `.maigo/` 的路徑，放在整行最後。沒產物就省略。真相層不塞 markdown link；served 表格
   會把它轉成可點的本地 report 連結（見 §6）
 - **checkbox**：`[x]` ＝「這項我**親自**處理過了」（學習閘門訊號，見 §5）；與所在分區正交
 - **🧠 標記**：學習盤點已完成，不重複學
@@ -69,7 +82,18 @@ description: This skill should be used when reading, writing, or migrating `.mai
   `🧠` 一樣是正交於狀態詞的 badge，不影響 bucket / tier
 - **跨 repo**：board 綁 cwd repo（header 記 `gh repo view --json nameWithOwner` 結果）；
   丟進來的 URL 若屬其他 repo，行內用 `owner/repo#n` 全稱
-- 旁註沿用 review board 慣例：DRAFT / 指定 anchor / 他人 review decision 放狀態詞後面
+- **旁註**（沿用 review board 慣例）：branch 名、closed 理由、linked PR、DRAFT、他人 review
+  decision 這類「per-item 事實」寫在狀態詞後面的括弧裡（例：`**IN_PROGRESS**（分支 fix/xxx）`）——
+  旁註記事實，判斷句記決定，兩者不是同一件事
+- **空白容錯**：旁註 `（…）` 與緊接著的 `Δ`／`—` 之間有沒有留空格，parser 都吃得下
+  （nvim 手改最容易漏這格空白）
+- **`— "<title>"` 的 `—` 分隔符是強制的，parser 不會用啟發式猜**：title 前面那個 `—`
+  一定要打，且 title 的收尾引號後面必須緊接著行尾／判斷句的 `—`／`📄` 產物欄三者之一——
+  漏打分隔符（或整段引號打壞）都不會被硬猜出一個看似合理的切法。判斷句本身含引號、
+  `——`、`Δ+N/-M` 這類自由文字完全沒問題（只要 title 自己的分隔符有打對），但只要
+  parser 判定不出合法的 `"<title>"` 欄位，一律回報格式壞掉，`--serve` 閱讀層不會靜默
+  留空——比照未知狀態詞大聲顯示「⚠ 無法解析此列」，並強制展開該列所在的 section
+  （見 §6）
 
 ### 狀態詞 vocabulary（依型別，含 tier）
 
@@ -105,10 +129,11 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 
 **badge（正交於狀態詞，不佔 bucket）**：`🧠` 已完成學習盤點；`💤` stale——`updatedAt`
 逾 14 天（`scripts/board_state.py --stale-days` 可調），提示這顆球可能被遺忘，不改變 bucket / tier。
-兩者都寫在 `Δ +A/-D` 之後、理由之前，例：`Δ +12/-3 🧠💤 — ...`。
+兩者都寫在 `Δ +A/-D` 之後、title 之前，例：`Δ +12/-3 🧠💤 — "..."`。
 
 **不在 enum 內的狀態詞**（手改壞、或舊工具寫入的殘留字）在 `--serve` 閱讀層會顯示紅框
-「⚠ 未知狀態」，不會靜默落灰——見 §6。
+「⚠ 未知狀態」，且該列所在的 section 會被強制展開（不管 marker 是誰），不會靜默落灰
+——見 §6。
 
 **向下相容**：新 vocab 是舊 vocab 的超集，沒有任何舊狀態詞被移除或改名。第一次
 `/maigo:board` 刷新時，`board_state.py` 的 `classify()` 會用 `prior_status` 重算每一行，
@@ -208,10 +233,10 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 | 命令 | 回寫時機 | 行為 |
 |---|---|---|
 | `/maigo:review` | 每顆 PR 出完 report | 本地 verdict → 🎯 留著；已送 GitHub → ⏳ |
-| `/maigo:triage-issue` | 每個 verdict 出爐 | `READY`→🎯（next: take）；`NEEDS_INFO`→⏳；`DUP`/`CLOSE`→✅ 附理由。board 是本地檔，不違反 triage「不主動寫 GitHub」原則 |
+| `/maigo:triage-issue` | 每個 verdict 出爐 | `READY`→🎯（next: take）；`NEEDS_INFO`→⏳；`DUP`/`CLOSE`→✅，duplicate / close 理由放狀態旁註。board 是本地檔，不違反 triage「不主動寫 GitHub」原則 |
 | `/maigo:take-issue` | 開工時＋收尾 | 開工：issue 行標 `IN_PROGRESS` ＋ branch 名；收尾若開了 PR：新增 🔀 行、issue 行旁註 linked PR |
 | `/maigo:describe-pr` | PR 開出後（若使用者說已開） | 新增/更新對應 🔀 行 → ⏳ `等 review` |
-| `/maigo:address-comments` | 步驟 8（全部 work item 走完） | commit 未 push（**預設**——該命令不 push、不替使用者回覆）→ 🎯 留著，下一步 `push ＋ 貼回覆草稿`；使用者已自行 push 且回覆已送出 → ⏳ `等 review` |
+| `/maigo:address-comments` | 步驟 8（全部 work item 走完） | commit 未 push（**預設**——該命令不 push、不替使用者回覆）→ 🎯 留著，判斷句寫「push 了嗎——還沒就先 push」；使用者已自行 push 且回覆已送出 → ⏳ `等 review`（判斷句留空） |
 
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 
@@ -263,35 +288,53 @@ maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使�
 2. **docs_dir 直指 `.maigo/`**：`board.md` 跟其他 `.md`（📄 連結的 review report 等產物）
    由同一個 server 直接渲染——不再有另外的 render 步驟，也不再另外產生一份閱讀層檔案。
 3. **表格 hook**：[`scripts/board_serve_hook.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_serve_hook.py)
-   只在渲染 `board.md` 時把每個球權分區的單行資料轉成七欄表格：「我處理過、項目、
-   作者、改動、狀態、現況、下一步」。不做 Kanban 橫向分欄；依然保留球權 section 的語意。
-   狀態欄底色查 `board_state.tier_for_status()`，回 5 個 tier class
-   （`status-blocked/act/wip/wait/done`）而非固定四色；不在 enum 內的狀態詞回
-   `status-unknown`（紅框 + 「⚠ 未知狀態」字樣），不靜默落灰。
-4. **可點的閱讀層**：`#n` 會連到 GitHub issue / PR，`📄 \`路徑\`` 會連到同站渲染的
+   只在渲染 `board.md` 時把每個球權分區的單行資料轉成 **3 欄表格**，貫徹「一眼看出要
+   做什麼」：
+   - **✓**：checkbox ＋ `🧠` 學習狀態 ＋ 每列的操作選單（複製 `--check` / `--uncheck` /
+     `--drop`，原本獨立的「下一步」欄併進這裡）
+   - **球**：`<型別 emoji> #<n>` ＋ title（主字級）＋ 判斷句（次字級，沒有就不占位）
+   - **動作**：由
+     [`board_state.next_action_for_status()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+     依狀態詞 ＋ item id 組出的可複製命令按鈕；狀態沒有對應動作（例：`可合併`、`WIP`）
+     就留白，不印 `—` 佔位
+
+   tier 不再用整欄狀態 pill，改成**列左側色條**（5 個 tier class
+   `status-blocked/act/wip/wait/done`）；不在 enum 內的狀態詞色條變紅框並顯示
+   「⚠ 未知狀態」，`"<title>"` 解析失敗時同樣顯示紅框「⚠ 無法解析此列」，兩者都不
+   靜默落灰。作者、`Δ +A/-D`、狀態詞原文、📄 產物、badges 全部移入每列的 `⌄`
+   展開區，預設收起，不佔一眼掃過的視野。
+4. **section 標題保留為真正的 heading**：`## ` 這行照原樣輸出，MkDocs 照舊發出
+   `<h2>`——Material 右側「目錄」的 section 條目因此不受影響；**只有表格本體**
+   包進 `<details>` 收合，標題本身不收合、一直看得到（含它已經帶的計數）。
+5. **section 預設收合**：只有 `🎯 你的球` 預設展開；`⏳ 等別人` / `✅ Merged-closed` /
+   `🗄️ 已放棄` 的表格用 `<details>` 預設收起，點開才看內容——跟真相層「你現在該動
+   的排最前面」同一種優先權排序，只是多了「其餘先收起來」。**例外**：任何 section
+   只要含有「⚠ 未知狀態」或「⚠ 無法解析此列」的列，不管 marker 是誰，一律強制展開
+   ——大聲失敗若被非 🎯 分區的收合藏住，等於還是靜默落灰。
+6. **可點的閱讀層**：`#n` 會連到 GitHub issue / PR，`📄 \`路徑\`` 會連到同站渲染的
    本地 report。導覽只列 Work Board，不把 `.maigo/` 內所有 report 擠成頂部清單。
-5. **checkbox**：表格保留「我處理過」checkbox 與 `🧠` 學習狀態，但網頁仍是唯讀；
+7. **checkbox**：表格保留「我處理過」checkbox 與 `🧠` 學習狀態，但網頁仍是唯讀；
    勾選回寫一樣只改真相層 `board.md` 本身。`pymdownx.tasklist` 保留作為無法解析行的 fallback。
-6. **篩選與排序**：原生 JavaScript 在閱讀層提供全文搜尋、類型 / 狀態篩選，以及
-   作者、標題、改動量排序。排序只改當下 DOM，且只在各球權 section 內進行；
-   不回寫 `board.md`，不破壞「球到你手上的時間」責任排序。
-7. **列操作選單**：每列可複製 `maigo:board --check` / `--uncheck` / `--drop`。
+8. **篩選與排序**：原生 JavaScript 在閱讀層提供全文搜尋、類型 / 狀態篩選，以及
+   標題、改動量排序（展開區欄位一併納入排序 key）。排序只改當下 DOM，且只在各球權
+   section 內進行；不回寫 `board.md`，不破壞「球到你手上的時間」責任排序。
+9. **列操作選單**：每列可複製 `maigo:board --check` / `--uncheck` / `--drop`，收在 ✓ 欄。
    這只是 clipboard helper；served 頁面不開寫檔 API，不直接變更真相層。
-8. **首頁**：`board.md` 不是 `index.md`——script 不額外造一份 index scaffold 去污染
+10. **首頁**：`board.md` 不是 `index.md`——script 不額外造一份 index scaffold 去污染
    `.maigo/`，直接印出 board 頁網址（`http://<addr>/board/`）。
-9. **啟動優先序**：cwd 專案 venv 已裝 MkDocs Material 與 pymdown-extensions →
+11. **啟動優先序**：cwd 專案 venv 已裝 MkDocs Material 與 pymdown-extensions →
    `uv run mkdocs serve -f <config>`；沒有 →
    `uvx --from mkdocs-material --with pymdown-extensions mkdocs serve -f <config>`
    （zero repo 相依，maigo 在其他 repo 的 `.maigo/` 一樣可用）。
-10. **live reload**：MkDocs 內建 watch，agent 寫 board.md 或使用者 nvim 存檔，served
+12. **live reload**：MkDocs 內建 watch，agent 寫 board.md 或使用者 nvim 存檔，served
    頁面幾秒內更新，不需要手動重跑任何 render 指令。
-11. **退場門**：serve 引擎只是手段——`config` 極小、真相層是純 markdown，隨時可換掉
+13. **退場門**：serve 引擎只是手段——`config` 極小、真相層是純 markdown，隨時可換掉
    整個引擎。Zensical 曾是 v2 原定候選，但實作輪驗證出對 hidden 開頭目錄
    （`.maigo/`）靜默零收錄、symlink 繞法會讓 watcher 追不到真相層變更兩個阻斷性
    問題，v2.1 起降為未來選項（待上游修復再評估回歸；證據見
    `.maigo/board-design.md` §12 修訂段）。v1 的靜態 HTML ＋ pandoc materialize_docs
    渲染腳本已整檔退役，不再維護。
-12. **只能前景執行**：`--serve` 要一直開著終端機、Ctrl-C 結束，不要背景 detach——
+14. **只能前景執行**：`--serve` 要一直開著終端機、Ctrl-C 結束，不要背景 detach——
    父行程被 SIGTERM 終止時子行程會孤兒化佔 port。
 
 ## 7. 跨 session 接續：`ListAgents` 查不到對應 session 時

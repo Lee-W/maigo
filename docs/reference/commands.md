@@ -202,9 +202,9 @@ orchestrator 判斷兩條路徑：
 
 把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依球權分成
 🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed。`--serve` 用 MkDocs Material 起本地 live reload
-網頁：導覽只留工作板，各球權分區以七欄表格呈現，包含獨立作者欄與 PR
-改動行數；支援搜尋、類型 / 狀態篩選與 section 內排序，不用 Kanban。改 `board.md`
-存檔後瀏覽器直接更新。
+網頁：導覽只留工作板，各球權分區以「✓／球／動作」三欄表格呈現；作者、PR 改動行數、
+狀態詞與產物收進每列的展開區，非 🎯 分區預設收合。頁面支援搜尋、類型 / 狀態篩選，
+以及依標題或改動量做 section 內排序，不用 Kanban。改 `board.md` 存檔後瀏覽器直接更新。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
