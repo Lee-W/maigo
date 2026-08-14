@@ -84,15 +84,19 @@ echo '<[{type, gh_meta, prior_status}, ...]>' | python3 scripts/board_state.py -
 - 首跑在 `.maigo/_serve/` 生成 MkDocs Material scaffold（config ＋ CSS；gitignored
   工作區）；未修改的舊版會自動升級，使用者自訂版會保留並提示合併
 - 導覽只顯示 Work Board；不把 `.maigo/` 所有 report 排在頁面上方
-- 每個球權 section 渲染成「我處理過／項目／作者／改動／狀態／現況／下一步」七欄表格，
-  不做 Kanban 橫向分欄；GitHub item 與 📄 report 皆可直接點開
+- 每個球權 section 渲染成「✓／球／動作」3 欄表格：✓ 欄放 checkbox ＋ `🧠` 學習狀態 ＋
+  可複製 `--check` / `--uncheck` / `--drop` 的操作選單；球欄放型別 emoji ＋ #n ＋ title
+  （主字級）＋ 判斷句（次字級，沒有就不占位）；動作欄放依狀態詞推導出的可複製命令，
+  狀態沒有對應動作就留白。tier 改用列左側色條呈現；作者、`Δ +A/-D`、狀態詞原文、
+  📄 產物、badges 移入每列展開區。不做 Kanban 橫向分欄；GitHub item 與 📄 report
+  皆可直接點開
+- 只有 🎯 你的球 section 預設展開；⏳ / ✅ / 🗄️ 用 `<details>` 預設收起，只顯示標題與計數
 - PR 行從 GitHub `additions` / `deletions` 寫入 `Δ +A/-D`；頁面可搜尋、依類型 / 狀態篩選，
-  並在各球權 section 內依作者、標題或改動量排序，不回寫真相層
+  並在各球權 section 內依標題或改動量排序，不回寫真相層
 - 啟動優先序：repo venv 有 MkDocs Material 與 pymdown-extensions →
   `uv run mkdocs serve`；沒有 → `uvx` 臨時取得套件
-- checkbox 與 `🧠` 學習狀態在表格內保留（唯讀，勾選還是只能改 `board.md`）
-- 每列的「操作」選單可複製 `--check` / `--uncheck` / `--drop` 命令；網頁本身
-  不開寫檔 API、不直接修改 `board.md`
+- checkbox 與 `🧠` 學習狀態在表格內保留（唯讀，勾選還是只能改 `board.md`）；✓ 欄的操作
+  選單只是 clipboard helper，網頁本身不開寫檔 API、不直接修改 `board.md`
 - 改真相層 `board.md` 存檔，served 頁面幾秒內自動更新（mkdocs 內建 live reload）
 - 細節、退場門見 [`skills/work-board` §6](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
 

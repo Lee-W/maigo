@@ -76,7 +76,10 @@ class TestScaffold:
 
         assert ".work-table" in css
         assert ".work-status" in css
-        assert ".work-command" in css
+        assert ".work-status.status-act" in css
+        assert "\n.status-act {" not in css
+        assert ".action-command" in css
+        assert ".row-detail" in css
         assert ".work-controls" in css
         assert ".diff-add" in css
 
@@ -101,8 +104,8 @@ class TestScaffold:
 
         config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
 
-        assert "maigo-board-scaffold: 7" in config_path.read_text(encoding="utf-8")
-        assert "maigo-board-scaffold: 7" in (serve_dir / "board-style.css").read_text(
+        assert "maigo-board-scaffold: 8" in config_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 8" in (serve_dir / "board-style.css").read_text(
             encoding="utf-8"
         )
 
@@ -123,7 +126,7 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "site-out")
 
         upgraded = css_path.read_text(encoding="utf-8")
-        assert "maigo-board-scaffold: 7" in upgraded
+        assert "maigo-board-scaffold: 8" in upgraded
         assert "status-blocked" in upgraded
 
     def test_preserves_genuinely_modified_v5_css(self, tmp_path: Path, capsys):
@@ -160,7 +163,7 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "site-out")
 
         upgraded = css_path.read_text(encoding="utf-8")
-        assert "maigo-board-scaffold: 7" in upgraded
+        assert "maigo-board-scaffold: 8" in upgraded
         assert "font-size: 0.88rem" in upgraded
 
     def test_preserves_genuinely_modified_v6_css(self, tmp_path: Path, capsys):
@@ -179,6 +182,43 @@ class TestScaffold:
             "/* maigo-board-scaffold: 6\n   使用者自訂過的版本 */\n.custom {}\n"
         )
         assert "v6" in capsys.readouterr().err
+
+    def test_upgrades_unmodified_v7_css_to_current(self, tmp_path: Path):
+        """Regression: `V7_CSS_SHA256` must match the real, byte-for-byte v7
+        `CSS_TEMPLATE` (pinned as a fixture) — same failure mode as the v5/v6
+        constant bugs this mirrors: a wrong hash makes every genuine
+        pre-existing v7 install look "user-customized" forever."""
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        v7_css = (Path(__file__).parent / "fixtures" / "board_serve_v7.css").read_text(
+            encoding="utf-8"
+        )
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(v7_css, encoding="utf-8")
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        upgraded = css_path.read_text(encoding="utf-8")
+        assert "maigo-board-scaffold: 8" in upgraded
+        assert "board-section" in upgraded
+
+    def test_preserves_genuinely_modified_v7_css(self, tmp_path: Path, capsys):
+        maigo_dir = tmp_path / ".maigo"
+        serve_dir = maigo_dir / "_serve"
+        serve_dir.mkdir(parents=True)
+        css_path = serve_dir / "board-style.css"
+        css_path.write_text(
+            "/* maigo-board-scaffold: 7\n   使用者自訂過的版本 */\n.custom {}\n",
+            encoding="utf-8",
+        )
+
+        bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        assert css_path.read_text(encoding="utf-8") == (
+            "/* maigo-board-scaffold: 7\n   使用者自訂過的版本 */\n.custom {}\n"
+        )
+        assert "v7" in capsys.readouterr().err
 
     def test_upgrades_v3_config_without_discarding_custom_settings(
         self, tmp_path: Path
@@ -200,7 +240,7 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "new-site")
         text = config_path.read_text(encoding="utf-8")
 
-        assert "maigo-board-scaffold: 7" in text
+        assert "maigo-board-scaffold: 8" in text
         assert "site_name: Custom Board" in text
         assert f"site_dir: {tmp_path / 'new-site'}" in text
         assert "board-interactions.js" in text
@@ -216,6 +256,8 @@ class TestScaffold:
 
         assert "navigator.clipboard.writeText" in script
         assert "data-copy-command" in script
+        assert 'mode === "title"' in script
+        assert 'mode === "author"' not in script
         assert 'table.closest(".work-table-wrap").hidden' in script
         assert "fetch(" not in script
 
@@ -266,6 +308,47 @@ class TestScaffold:
         bs.scaffold(maigo_dir, tmp_path / "site-out")
 
         assert css_path.read_text(encoding="utf-8") == "/* 使用者自訂樣式 */\n"
+
+
+class TestServedPageTableOfContents:
+    """Regression guard for the TOC regression: section headings collapsing
+    into `<summary>` used to make Material's right-hand TOC nav come up
+    completely empty (no real `<h2>` for it to index). Only the table body
+    may collapse — the `## ` heading must stay a real markdown heading."""
+
+    def test_built_board_page_toc_nav_lists_every_section_heading(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "board.md").write_text(
+            "# Work Board — Lee-W/maigo\n"
+            "\n"
+            "## 🎯 你的球（1）\n"
+            '- [ ] 🐛 #123 (alice) **READY** — "fix parser"\n'
+            "\n"
+            "## ⏳ 等別人（1）\n"
+            '- [ ] 🔀 #460 (你) **等 review** — "add board tables"\n',
+            encoding="utf-8",
+        )
+
+        config_path = bs.scaffold(maigo_dir, tmp_path / "site-out")
+
+        from mkdocs.commands.build import build
+        from mkdocs.config import load_config
+
+        cfg = load_config(str(config_path), strict=True)
+        build(cfg)
+
+        html = (tmp_path / "site-out" / "board" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        nav_start = html.index('<nav class="md-nav md-nav--secondary"')
+        nav_end = html.index("</nav>", nav_start)
+        nav_html = html[nav_start:nav_end]
+
+        assert "🎯 你的球（1）" in nav_html
+        assert "⏳ 等別人（1）" in nav_html
+        # The table itself still collapses — only the heading must stay real.
+        assert 'class="board-section-body"' in html
 
 
 class TestRepoHasMkdocs:

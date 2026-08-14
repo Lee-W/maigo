@@ -45,11 +45,12 @@ SERVE_DIRNAME = "_serve"
 CONFIG_NAME = "mkdocs.yml"
 CSS_NAME = "board-style.css"
 JS_NAME = "board-interactions.js"
-SCAFFOLD_VERSION = 7
+SCAFFOLD_VERSION = 8
 V3_CSS_SHA256 = "00ca2aabe9c85d5d73a5b6b16cf2f31a4acff990bcaefa7bc57a8fca5c9749b8"
 V4_CSS_SHA256 = "6f578df0d1a502058fc711ed41d31e880112a87cdfb8b9c83e5024a0f1e9937e"
 V5_CSS_SHA256 = "30be21255dc29eb1c74bd4915f07a1d1d49108d9c59618759792bf3c1542b853"
 V6_CSS_SHA256 = "ea2a345279372172ebf68d4049270a74ce20d0dbccd3ab4fb142f115e0602f85"
+V7_CSS_SHA256 = "1696890d9461537ffc7a80789f7641f28ab45dfd193eb3c41b1f6a284769394a"
 
 CONFIG_TEMPLATE = """\
 # maigo-board-scaffold: {version}
@@ -90,7 +91,7 @@ markdown_extensions:
 """
 
 CSS_TEMPLATE = """\
-/* maigo-board-scaffold: 7
+/* maigo-board-scaffold: 8
    maigo work-board serve 樣式——首跑自動生成，改壞了刪掉這個檔案，
    下次跑 board_serve.py 會重新生成預設版本；正常改動請直接編輯這個檔案。 */
 :root {
@@ -108,6 +109,28 @@ CSS_TEMPLATE = """\
   border-radius: 0.45rem;
   background: color-mix(in srgb, var(--md-accent-fg-color) 7%, transparent);
 }
+.board-section-body {
+  margin: 0 0 1.5rem;
+}
+.board-section-body > summary {
+  padding: 0.3rem 0;
+  cursor: pointer;
+  list-style: none;
+  color: var(--board-muted);
+  font-size: 0.82rem;
+}
+.board-section-body > summary::-webkit-details-marker {
+  display: none;
+}
+.board-section-body > summary::before {
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 0.15s ease;
+  content: "▸";
+}
+.board-section-body[open] > summary::before {
+  transform: rotate(90deg);
+}
 .work-table-wrap {
   width: 100%;
   margin: 0.5rem 0 2rem;
@@ -118,7 +141,7 @@ CSS_TEMPLATE = """\
 .md-typeset .work-table {
   display: table;
   width: 100%;
-  min-width: 58rem;
+  min-width: 46rem;
   margin: 0;
   border: 0;
   font-size: 0.88rem;
@@ -144,28 +167,24 @@ CSS_TEMPLATE = """\
 .md-typeset .work-table tbody tr:hover {
   background: color-mix(in srgb, var(--md-accent-fg-color) 5%, transparent);
 }
+.work-table tbody tr > td:first-child {
+  border-left: 0.3rem solid transparent;
+}
+.work-table tbody tr.status-blocked > td:first-child { border-left-color: #c62828; }
+.work-table tbody tr.status-act > td:first-child { border-left-color: #d65f00; }
+.work-table tbody tr.status-wip > td:first-child { border-left-color: #1565c0; }
+.work-table tbody tr.status-wait > td:first-child { border-left-color: var(--board-border); }
+.work-table tbody tr.status-done > td:first-child { border-left-color: #2e7d32; }
+.work-table tbody tr.status-unknown > td:first-child { border-left-color: #c62828; }
 .handled-cell {
-  width: 4.5rem;
+  width: 5.5rem;
   text-align: center !important;
 }
-.item-cell {
-  width: 23%;
+.ball-cell {
+  width: 65%;
 }
-.author-cell {
-  width: 8rem;
-}
-.diff-cell {
-  width: 6.5rem;
-  white-space: nowrap;
-}
-.status-cell {
-  width: 9rem;
-}
-.reason-cell {
-  width: 26%;
-}
-.next-cell {
-  width: 21%;
+.action-cell {
+  width: 12rem;
 }
 .learn-checkbox {
   width: 1rem;
@@ -182,11 +201,11 @@ CSS_TEMPLATE = """\
 .work-title {
   line-height: 1.4;
 }
-.work-meta,
-.muted {
-  margin-top: 0.2rem;
+.work-reason {
+  margin-top: 0.15rem;
   color: var(--board-muted);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 .work-status {
   display: inline-block;
@@ -197,27 +216,27 @@ CSS_TEMPLATE = """\
   line-height: 1.4;
   white-space: nowrap;
 }
-.status-blocked {
+.work-status.status-blocked {
   background: color-mix(in srgb, #e53935 16%, transparent);
   color: #c62828;
 }
-.status-act {
+.work-status.status-act {
   background: color-mix(in srgb, #ef6c00 16%, transparent);
   color: #d65f00;
 }
-.status-wip {
+.work-status.status-wip {
   background: color-mix(in srgb, #1565c0 16%, transparent);
   color: #1565c0;
 }
-.status-wait {
+.work-status.status-wait {
   background: color-mix(in srgb, var(--md-default-fg-color) 9%, transparent);
   color: var(--md-default-fg-color);
 }
-.status-done {
+.work-status.status-done {
   background: color-mix(in srgb, #2e7d32 16%, transparent);
   color: #2e7d32;
 }
-.status-unknown {
+.work-status.status-unknown {
   background: color-mix(in srgb, #e53935 8%, transparent);
   color: #c62828;
   border: 1px solid #c62828;
@@ -226,38 +245,33 @@ CSS_TEMPLATE = """\
   margin-left: 0.15rem;
   font-size: 0.8rem;
 }
-[data-md-color-scheme="slate"] .status-blocked { color: #ff8a80; }
-[data-md-color-scheme="slate"] .status-act { color: #ffb36b; }
-[data-md-color-scheme="slate"] .status-wip { color: #82b1ff; }
-[data-md-color-scheme="slate"] .status-wait { color: var(--md-default-fg-color); }
-[data-md-color-scheme="slate"] .status-done { color: #80d88a; }
-[data-md-color-scheme="slate"] .status-unknown { color: #ff8a80; border-color: #ff8a80; }
-.work-command {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  margin-bottom: 0.4rem;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
+[data-md-color-scheme="slate"] .work-status.status-blocked { color: #ff8a80; }
+[data-md-color-scheme="slate"] .work-status.status-act { color: #ffb36b; }
+[data-md-color-scheme="slate"] .work-status.status-wip { color: #82b1ff; }
+[data-md-color-scheme="slate"] .work-status.status-wait { color: var(--md-default-fg-color); }
+[data-md-color-scheme="slate"] .work-status.status-done { color: #80d88a; }
+[data-md-color-scheme="slate"] .work-status.status-unknown { color: #ff8a80; border-color: #ff8a80; }
 .artifact-link {
   display: inline-block;
   margin-bottom: 0.45rem;
   font-size: 0.82rem;
 }
-.row-actions {
+.row-actions,
+.row-detail {
   position: relative;
   width: fit-content;
   margin-top: 0.35rem;
   font-size: 0.8rem;
 }
-.row-actions summary {
+.row-actions summary,
+.row-detail summary {
   color: var(--md-accent-fg-color);
   cursor: pointer;
   list-style: none;
   user-select: none;
 }
-.row-actions summary::-webkit-details-marker {
+.row-actions summary::-webkit-details-marker,
+.row-detail summary::-webkit-details-marker {
   display: none;
 }
 .row-actions-menu {
@@ -269,6 +283,15 @@ CSS_TEMPLATE = """\
   border-radius: 0.35rem;
   background: var(--md-default-bg-color);
   box-shadow: 0 0.25rem 0.8rem rgba(0, 0, 0, 0.14);
+}
+.row-detail-body {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+.row-detail-item {
+  color: var(--board-muted);
+  font-size: 0.82rem;
 }
 .copy-command {
   padding: 0.4rem 0.55rem;
@@ -291,6 +314,21 @@ CSS_TEMPLATE = """\
 }
 [data-md-color-scheme="slate"] .drop-command {
   color: #ff8a80;
+}
+.action-command {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--board-border);
+  border-radius: 0.35rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
+}
+.action-command:hover {
+  border-color: var(--md-accent-fg-color);
+  background: color-mix(in srgb, var(--md-accent-fg-color) 8%, transparent);
 }
 .learned {
   margin-left: 0.15rem;
@@ -353,7 +391,7 @@ CSS_TEMPLATE = """\
 }
 @media (max-width: 76.234375em) {
   .md-typeset .work-table {
-    min-width: 68rem;
+    min-width: 40rem;
   }
   .work-controls {
     align-items: stretch;
@@ -417,6 +455,10 @@ def _upgrade_generated_config(text: str, site_dir: Path) -> str:
         text = text.replace(
             "# maigo-board-scaffold: 6", f"# maigo-board-scaffold: {SCAFFOLD_VERSION}"
         )
+    elif "# maigo-board-scaffold: 7" in text:
+        text = text.replace(
+            "# maigo-board-scaffold: 7", f"# maigo-board-scaffold: {SCAFFOLD_VERSION}"
+        )
     return text
 
 
@@ -478,6 +520,11 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
         and "maigo-board-scaffold: 6" in css_text
         and hashlib.sha256(css_text.encode()).hexdigest() == V6_CSS_SHA256
     )
+    upgrade_v7_css = (
+        css_exists
+        and "maigo-board-scaffold: 7" in css_text
+        and hashlib.sha256(css_text.encode()).hexdigest() == V7_CSS_SHA256
+    )
     if (
         not css_exists
         or upgrade_css
@@ -485,6 +532,7 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
         or upgrade_v4_css
         or upgrade_v5_css
         or upgrade_v6_css
+        or upgrade_v7_css
     ):
         css_path.write_text(CSS_TEMPLATE, encoding="utf-8")
 
@@ -510,6 +558,7 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
         and not upgrade_v4_css
         and not upgrade_v5_css
         and not upgrade_v6_css
+        and not upgrade_v7_css
     ):
         css_text = css_path.read_text(encoding="utf-8")
         if "maigo-board-scaffold:" not in css_text:
@@ -535,6 +584,11 @@ def scaffold(maigo_dir: Path, site_dir: Path) -> Path:
         elif "maigo-board-scaffold: 6" in css_text:
             sys.stderr.write(
                 "board_serve: 保留自訂的 v6 `board-style.css`；字體放大調整需手動合併\n"
+            )
+        elif "maigo-board-scaffold: 7" in css_text:
+            sys.stderr.write(
+                "board_serve: 保留自訂的 v7 `board-style.css`；"
+                "3 欄表格與列收合樣式需手動合併\n"
             )
 
     return config_path

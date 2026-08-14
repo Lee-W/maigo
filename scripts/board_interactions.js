@@ -48,8 +48,8 @@
 
     function compareRows(left, right) {
       const mode = sort.value;
-      if (mode === "author" || mode === "title") {
-        return left.dataset[mode].localeCompare(right.dataset[mode], "zh-Hant");
+      if (mode === "title") {
+        return left.dataset.title.localeCompare(right.dataset.title, "zh-Hant");
       }
       if (mode.startsWith("changes")) {
         const leftChanges = Number(left.dataset.changes);

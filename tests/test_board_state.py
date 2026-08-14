@@ -498,6 +498,27 @@ class TestTierTotality:
     def test_unknown_status_returns_none(self):
         assert bs.tier_for_status("這不是一個合法狀態詞") is None
 
+
+class TestNextActionForStatus:
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            pytest.param("READY", "/maigo:take-issue", id="ready-issue"),
+            pytest.param("待 triage", "/maigo:triage-issue", id="pending-triage"),
+            pytest.param(
+                "CHANGES_REQUESTED",
+                "/maigo:address-comments",
+                id="changes-requested",
+            ),
+            pytest.param("待 review", "/maigo:review", id="pending-review"),
+            pytest.param("可合併", None, id="mergeable"),
+            pytest.param("closed", None, id="closed"),
+            pytest.param("這不是一個合法狀態詞", None, id="unknown"),
+        ],
+    )
+    def test_returns_action_for_status(self, status, expected):
+        assert bs.next_action_for_status(status) == expected
+
     def test_allowed_transitions_covers_every_status_and_none(self):
         assert set(bs.ALLOWED_TRANSITIONS) == set(bs.BoardStatus) | {None}
 
