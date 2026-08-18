@@ -51,8 +51,9 @@ push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github
 依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- 開工時：🐛 issue 行標 `IN_PROGRESS`，旁註 branch 名，留在 🎯
-- 收尾若已開 PR 或使用者提供 PR 編號：新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`，issue 行旁註 linked PR
+- 開工時：🐛 issue 行標 `IN_PROGRESS`，旁註 branch 名，留在 🎯 下一件（rank P5——半成品排在
+  「卡住的／球被打回／一步就結束／等你審」之後，因為它沒卡住任何人）
+- 收尾若已開 PR 或使用者提供 PR 編號：新增 / 更新 🔀 你的 PR 行到 ⏳ 等別人 `等 review`，issue 行旁註 linked PR
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
 

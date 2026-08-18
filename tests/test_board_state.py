@@ -27,42 +27,42 @@ class TestClassifyIssue:
     def test_closed_state_wins_regardless_of_prior(self):
         result = _classify(bs.ItemType.ISSUE, {"state": "CLOSED"}, bs.BoardStatus.READY)
         assert result.status is bs.BoardStatus.CLOSED
-        assert result.bucket is bs.Bucket.DONE
-        assert result.tier is bs.Tier.DONE
+        assert result.section is bs.Section.DONE
+        assert result.rank is bs.Rank.P9
 
     @pytest.mark.parametrize("verdict", [bs.BoardStatus.DUP, bs.BoardStatus.CLOSE])
     def test_dup_and_close_verdicts_are_sticky_terminal(self, verdict):
         result = _classify(bs.ItemType.ISSUE, {"state": "OPEN"}, verdict)
         assert result.status is verdict
-        assert result.bucket is bs.Bucket.DONE
-        assert result.tier is bs.Tier.DONE
+        assert result.section is bs.Section.DONE
+        assert result.rank is bs.Rank.P9
 
     def test_no_prior_verdict_falls_to_pending_triage(self):
         result = _classify(bs.ItemType.ISSUE, {"state": "OPEN"}, None)
         assert result.status is bs.BoardStatus.PENDING_TRIAGE
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
-        assert result.next_action == "/maigo:triage-issue"
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P6
+        assert result.next_action == "/maigo:triage-issue <n>"
 
     def test_ready_with_no_assignee_stays_ready(self):
         gh_meta = {"state": "OPEN", "assignees": []}
         result = _classify(bs.ItemType.ISSUE, gh_meta, bs.BoardStatus.READY)
         assert result.status is bs.BoardStatus.READY
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
-        assert result.next_action == "/maigo:take-issue"
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P7
+        assert result.next_action == "/maigo:take-issue <n>"
 
     def test_ready_with_you_assigned_stays_ready(self):
         gh_meta = {"state": "OPEN", "assignees": [{"login": YOU}]}
         result = _classify(bs.ItemType.ISSUE, gh_meta, bs.BoardStatus.READY)
         assert result.status is bs.BoardStatus.READY
 
-    def test_in_progress_is_sticky_and_wip_tier(self):
+    def test_in_progress_is_sticky_and_p5_rank(self):
         gh_meta = {"state": "OPEN"}
         result = _classify(bs.ItemType.ISSUE, gh_meta, bs.BoardStatus.IN_PROGRESS)
         assert result.status is bs.BoardStatus.IN_PROGRESS
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.WIP
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P5
 
     def test_new_activity_after_your_last_comment_is_new_reply(self):
         gh_meta = {
@@ -77,9 +77,9 @@ class TestClassifyIssue:
         }
         result = _classify(bs.ItemType.ISSUE, gh_meta, bs.BoardStatus.NEEDS_INFO)
         assert result.status is bs.BoardStatus.NEW_REPLY
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
-        assert result.next_action == "/maigo:triage-issue"
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P2
+        assert result.next_action == "/maigo:triage-issue <n>"
 
     def test_needs_info_when_your_comment_has_no_reply(self):
         gh_meta = {
@@ -93,8 +93,8 @@ class TestClassifyIssue:
         }
         result = _classify(bs.ItemType.ISSUE, gh_meta, bs.BoardStatus.NEW_REPLY)
         assert result.status is bs.BoardStatus.NEEDS_INFO
-        assert result.bucket is bs.Bucket.WAITING
-        assert result.tier is bs.Tier.WAIT
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +108,8 @@ class TestClassifyOwnPr:
             bs.ItemType.OWN_PR, {"mergedAt": "2026-01-01T00:00:00Z"}, None
         )
         assert result.status is bs.BoardStatus.MERGED
-        assert result.bucket is bs.Bucket.DONE
-        assert result.tier is bs.Tier.DONE
+        assert result.section is bs.Section.DONE
+        assert result.rank is bs.Rank.P9
 
     def test_merged_state_wins(self):
         result = _classify(bs.ItemType.OWN_PR, {"state": "MERGED"}, None)
@@ -123,15 +123,15 @@ class TestClassifyOwnPr:
         gh_meta = {"state": "OPEN", "isDraft": True}
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.WIP
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.WIP
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P5
 
     def test_conflicting_mergeable_is_blocked(self):
         gh_meta = {"state": "OPEN", "isDraft": False, "mergeable": "CONFLICTING"}
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.CONFLICT
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.BLOCKED
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P1
         assert result.next_action == "/maigo:address-comments"
 
     def test_unknown_mergeable_does_not_false_positive_conflict(self):
@@ -143,7 +143,7 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.CI_RED
-        assert result.tier is bs.Tier.BLOCKED
+        assert result.rank is bs.Rank.P1
 
     def test_changes_requested_is_blocked(self):
         gh_meta = {
@@ -155,7 +155,7 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.CHANGES_REQUESTED
-        assert result.tier is bs.Tier.BLOCKED
+        assert result.rank is bs.Rank.P1
         assert result.next_action == "/maigo:address-comments"
 
     def test_new_comment_after_your_last_activity(self):
@@ -172,8 +172,8 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.NEW_COMMENT
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P2
         assert result.next_action == "/maigo:address-comments"
 
     def test_approved_and_ci_green_is_mergeable(self):
@@ -188,8 +188,8 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.MERGEABLE
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P3
 
     def test_ci_pending(self):
         gh_meta = {
@@ -202,8 +202,8 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.CI_PENDING
-        assert result.bucket is bs.Bucket.WAITING
-        assert result.tier is bs.Tier.WAIT
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
 
     def test_default_is_awaiting_review(self):
         gh_meta = {
@@ -216,8 +216,8 @@ class TestClassifyOwnPr:
         }
         result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.AWAITING_REVIEW
-        assert result.bucket is bs.Bucket.WAITING
-        assert result.tier is bs.Tier.WAIT
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +240,8 @@ class TestClassifyReviewPr:
         gh_meta = {"state": "OPEN", "isDraft": True}
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.OTHERS_DRAFT
-        assert result.bucket is bs.Bucket.WAITING
-        assert result.tier is bs.Tier.WAIT
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
 
     def test_never_reviewed_is_pending_review(self):
         gh_meta = {
@@ -254,9 +254,9 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.PENDING_REVIEW
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
-        assert result.next_action == "/maigo:review"
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P4
+        assert result.next_action == "/maigo:review <n>"
 
     def test_author_activity_after_your_review_is_ball_back(self):
         gh_meta = {
@@ -273,9 +273,9 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.BLOCKED)
         assert result.status is bs.BoardStatus.BALL_BACK
-        assert result.bucket is bs.Bucket.TARGET
-        assert result.tier is bs.Tier.ACT
-        assert result.next_action == "/maigo:review"
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P2
+        assert result.next_action == "/maigo:review <n>"
 
     @pytest.mark.parametrize(
         "verdict",
@@ -299,8 +299,42 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, verdict)
         assert result.status is verdict
-        assert result.bucket is bs.Bucket.WAITING
-        assert result.tier is bs.Tier.WAIT
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
+
+    def test_unposted_verdict_when_review_not_posted(self):
+        """prior 是 active verdict，但 `reviews` 裡沒有你貼出的項目 → 待送出（P3）。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [],
+            "comments": [],
+        }
+        result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE)
+        assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P3
+        assert (
+            result.next_action
+            == "gh pr review <n> --comment --body-file .maigo/review-<n>.md"
+        )
+
+    def test_unposted_verdict_not_triggered_when_review_already_posted(self):
+        """反向 case：`reviews` 裡已有你貼出的項目 → 不判 待送出，維持原 verdict。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [
+                {"author": {"login": YOU}, "submittedAt": "2026-01-02T00:00:00Z"}
+            ],
+            "comments": [],
+        }
+        result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE)
+        assert result.status is bs.BoardStatus.APPROVE
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +375,7 @@ _ISSUE_PRIOR_CANDIDATES = [
     bs.BoardStatus.NEW_REPLY,
     bs.BoardStatus.DUP,
     bs.BoardStatus.CLOSE,
+    bs.BoardStatus.UNREACHABLE,
 ]
 
 _OWN_PR_GH_META_SCENARIOS = [
@@ -408,6 +443,7 @@ _OWN_PR_PRIOR_CANDIDATES = [
     bs.BoardStatus.MERGEABLE,
     bs.BoardStatus.CI_PENDING,
     bs.BoardStatus.AWAITING_REVIEW,
+    bs.BoardStatus.UNREACHABLE,
 ]
 
 _REVIEW_PR_GH_META_SCENARIOS = [
@@ -449,6 +485,8 @@ _REVIEW_PR_PRIOR_CANDIDATES = [
     bs.BoardStatus.NEEDS_CHANGES,
     bs.BoardStatus.APPROVE_WITH_NITS,
     bs.BoardStatus.APPROVE,
+    bs.BoardStatus.UNREACHABLE,
+    bs.BoardStatus.UNPOSTED_VERDICT,
 ]
 
 _TYPE_FIXTURES = [
@@ -486,33 +524,71 @@ class TestAllowedTransitionsProperty:
 
 
 # ---------------------------------------------------------------------------
-# tier / bucket totality
+# rank / section totality
 # ---------------------------------------------------------------------------
 
 
-class TestTierTotality:
-    def test_every_board_status_has_a_tier(self):
+class TestRankTotality:
+    def test_every_board_status_has_a_rank(self):
         for status in bs.BoardStatus:
-            assert bs.tier_for_status(status.value) is not None
+            assert status in bs._STATUS_META
+            assert isinstance(bs._STATUS_META[status].rank, bs.Rank)
 
-    def test_unknown_status_returns_none(self):
-        assert bs.tier_for_status("這不是一個合法狀態詞") is None
+    def test_section_for_rank_is_total(self):
+        for rank in bs.Rank:
+            assert bs._section_for_rank(rank) in set(bs.Section)
 
 
 class TestNextActionForStatus:
     @pytest.mark.parametrize(
         ("status", "expected"),
         [
-            pytest.param("READY", "/maigo:take-issue", id="ready-issue"),
-            pytest.param("待 triage", "/maigo:triage-issue", id="pending-triage"),
+            # P9：結案，全部無 next_action
+            pytest.param("closed", None, id="closed"),
+            pytest.param("merged", None, id="merged"),
+            pytest.param("DUP", None, id="dup"),
+            pytest.param("CLOSE", None, id="close"),
+            pytest.param("已放棄", None, id="archived"),
+            # P0：抓不到
+            pytest.param("抓不到", None, id="unreachable"),
+            # P6：沒判過
+            pytest.param("待 triage", "/maigo:triage-issue <n>", id="pending-triage"),
+            # P7：可以開工
+            pytest.param("READY", "/maigo:take-issue <n>", id="ready"),
+            # P5：手上正在做
+            pytest.param("IN_PROGRESS", None, id="in-progress"),
+            pytest.param("WIP", None, id="wip"),
+            # P2：球被打回
+            pytest.param("有新回覆", "/maigo:triage-issue <n>", id="new-reply"),
+            pytest.param("有新 comment", "/maigo:address-comments", id="new-comment"),
+            pytest.param("↩︎ 回你的球", "/maigo:review <n>", id="ball-back"),
+            # P8：等別人
+            pytest.param("NEEDS_INFO", None, id="needs-info"),
+            pytest.param("CI 等待", None, id="ci-pending"),
+            pytest.param("等 review", None, id="awaiting-review"),
+            pytest.param("他人草稿", None, id="others-draft"),
+            pytest.param("BLOCKED", None, id="blocked"),
+            pytest.param("NEEDS_CHANGES", None, id="needs-changes"),
+            pytest.param("APPROVE_WITH_NITS", None, id="approve-with-nits"),
+            pytest.param("APPROVE", None, id="approve"),
+            # P1：卡住的
+            pytest.param("有衝突", "/maigo:address-comments", id="conflict"),
+            pytest.param("CI 紅", "gh pr checks <n>", id="ci-red"),
             pytest.param(
                 "CHANGES_REQUESTED",
                 "/maigo:address-comments",
                 id="changes-requested",
             ),
-            pytest.param("待 review", "/maigo:review", id="pending-review"),
-            pytest.param("可合併", None, id="mergeable"),
-            pytest.param("closed", None, id="closed"),
+            # P3：一步就結束
+            pytest.param("可合併", "gh pr merge <n>", id="mergeable"),
+            pytest.param(
+                "待送出",
+                "gh pr review <n> --comment --body-file .maigo/review-<n>.md",
+                id="unposted-verdict",
+            ),
+            # P4：等你審
+            pytest.param("待 review", "/maigo:review <n>", id="pending-review"),
+            # 未知狀態詞
             pytest.param("這不是一個合法狀態詞", None, id="unknown"),
         ],
     )
@@ -576,10 +652,10 @@ class TestMain:
         out = json.loads(capsys.readouterr().out)
         assert out == [
             {
-                "bucket": "🎯",
+                "section": "🎯",
+                "rank": 6,
                 "status": "待 triage",
-                "tier": "act",
-                "next_action": "/maigo:triage-issue",
+                "next_action": "/maigo:triage-issue <n>",
                 "badges": [],
             }
         ]

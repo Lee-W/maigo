@@ -17,7 +17,7 @@ that fear produces the opposite problem: a stale header nobody trusts.
 
 Update the section bucket counts you touched at the same time. If the
 header's total count already disagreed with a section title's own count
-before this upsert (e.g. `🎯 38` vs `## 🎯 你的球（36）`), that's pre-existing
+before this upsert (e.g. `🎯 38` vs `## 🎯 下一件（36）`), that's pre-existing
 drift outside the scope of a single-item upsert — don't "fix" it as a side
 effect; only touch the bucket you actually changed.
 

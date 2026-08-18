@@ -101,15 +101,17 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
 
 上面的 queue 是 **per-run、跑完即棄**。跨 session 追蹤已併入單一
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)：
-`.maigo/board.md` 同時收 issue、你的 PR、在審的 PR，依 🎯 你的球 / ⏳ 等別人 /
-✅ Merged-closed 分區。
+`.maigo/board.md` 同時收 issue、你的 PR、在審的 PR，依單一優先序排名分進 🎯 下一件 /
+⏳ 等別人 / ✅ 最近結案三個 section。
 
 review 特有 verdict 詞彙仍沿用本 skill：`BLOCKED` / `NEEDS_CHANGES` /
-`APPROVE_WITH_NITS` / `APPROVE`，首次未審標 `待 review`。在 Work Board 裡（判定邏輯正典見
+`APPROVE_WITH_NITS` / `APPROVE`，首次未審標 `待 review`；本地 verdict 尚未送 GitHub 標
+`待送出`。在 Work Board 裡（判定邏輯正典見
 [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)）：
-`待 review`（從未 review）與 `↩︎ 回你的球`（你 review 後 author 有新活動）對應 🎯；
-verdict 已下且無新 author 活動（`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` /
-`APPROVE` 原樣保留）與 `他人草稿` 對應 ⏳；merged / closed 對應 ✅。
+`待 review`（從未 review）、`待送出`（verdict 未送出）與 `↩︎ 回你的球`（你 review 後
+author 有新活動）對應 🎯 下一件；verdict 已下且無新 author 活動（`BLOCKED` /
+`NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE` 原樣保留）與 `他人草稿` 對應 ⏳ 等別人；
+merged / closed 對應 ✅ 最近結案。
 
 舊 `.maigo/review-board.md` 的遷移規則、行文法、upsert 合約與 `--learn` checkbox
 學習閘門全部見 `work-board` skill。刷新 / 查看 board 一律用 `/maigo:board`；

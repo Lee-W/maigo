@@ -42,7 +42,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 若只是要把一批 PR 放進跨 session board，改用 `/maigo:board <pr-1> <pr-2> ...`。
 長期跨 session 追一批 PR 時用
 [`/maigo:board`](https://github.com/Lee-W/maigo/blob/main/commands/board.md) 的 Work Board
-（`.maigo/board.md`，`/maigo:board --serve` 起本地 live reload 頁面）——queue 是 per-run，board 記得跨 session 的狀態轉移
+（`.maigo/board.md`）——queue 是 per-run，board 記得跨 session 的狀態轉移
 （含「你回過但作者又推新東西」）。
 
 ## 雙語輸出
@@ -152,10 +152,13 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- 本地 verdict 尚未送 GitHub → 👀 行留在 🎯，狀態詞寫 `BLOCKED` / `NEEDS_CHANGES` /
-  `APPROVE_WITH_NITS` / `APPROVE`
-- 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳
-- merged / closed → 👀 行進 ✅
+- 本地 verdict 尚未送 GitHub（`reviews` 裡沒有你送出的 review）→ 👀 行留在 🎯 下一件，
+  狀態詞寫 `待送出`——不再寫成 `BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` /
+  `APPROVE` 之一硬留 🎯；這修掉一個既知的漂移：舊寫法在下次刷新會被 `classify()`
+  判成 ⏳，本地 verdict 就此靜靜沉底
+- 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
+  （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
+- merged / closed → 👀 行進 ✅ 最近結案
 
 回寫時必須保留原 checkbox 與 `🧠` 標記。刷新 / 查看 board 用 `/maigo:board`；
 `/maigo:review` 不提供 board-only alias。

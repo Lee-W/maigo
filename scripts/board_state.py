@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Single source of truth for Work Board state (`.maigo/board.md`) classification.
 
-Defines the detail-state enum (with bucket / tier / default next_action),
+Defines the detail-state enum (with rank / section / default next_action),
 the pure `classify()` transition function, and `ALLOWED_TRANSITIONS` — the
 declarative transition graph a property test checks `classify()` against.
 
@@ -15,7 +15,8 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 stdin：JSON 陣列 `[{type, gh_meta, prior_status}]`
 （`type` 是 🐛/🔀/👀；`prior_status` 是上次寫進 board.md 的狀態詞或 `null`；
 未知/過期的狀態詞視為 `null`，向下相容自動正規化）。
-stdout：JSON 陣列 `[{bucket, status, tier, next_action, badges}]`。
+stdout：JSON 陣列 `[{section, rank, status, next_action, badges}]`（`rank` 是整數，
+數字越小優先序越高，呼叫端直接用它排序）。
 
 `--you <login>` 提供目前使用者的 GitHub login，用來比較「你 vs 別人最後活動」；
 省略時視為空字串（時間戳比較一律不觸發，退回各狀態機的預設分支）。
@@ -33,29 +34,32 @@ import json
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum
+from enum import Enum, IntEnum
 
 STALE_DAYS_DEFAULT = 14
 
 
-class Tier(str, Enum):
-    """顏色分級——決定 UI tier class，5 級由緊急到不急。"""
+class Rank(IntEnum):
+    """優先序階梯，10 級，數字越小越優先。永遠由 detail state 推導，不獨立儲存。"""
 
-    BLOCKED = "blocked"
-    ACT = "act"
-    WIP = "wip"
-    WAIT = "wait"
-    DONE = "done"
+    P0 = 0
+    P1 = 1
+    P2 = 2
+    P3 = 3
+    P4 = 4
+    P5 = 5
+    P6 = 6
+    P7 = 7
+    P8 = 8
+    P9 = 9
 
 
-class Bucket(str, Enum):
-    """球權分區。永遠由 detail state 推導，不獨立儲存。"""
+class Section(str, Enum):
+    """board.md 的三個區塊。永遠由 rank 推導，不獨立儲存。"""
 
-    TARGET = "🎯"
+    NEXT = "🎯"
     WAITING = "⏳"
     DONE = "✅"
-    UNSORTED = "📥"
-    ARCHIVED = "🗄️"
 
 
 class ItemType(str, Enum):
@@ -75,6 +79,9 @@ class BoardStatus(str, Enum):
     DUP = "DUP"
     CLOSE = "CLOSE"
     ARCHIVED = "已放棄"
+
+    # P0：orchestrator 指派，classify() 永遠不產出
+    UNREACHABLE = "抓不到"
 
     # 🐛 issue
     PENDING_TRIAGE = "待 triage"
@@ -101,52 +108,68 @@ class BoardStatus(str, Enum):
     NEEDS_CHANGES = "NEEDS_CHANGES"
     APPROVE_WITH_NITS = "APPROVE_WITH_NITS"
     APPROVE = "APPROVE"
+    UNPOSTED_VERDICT = "待送出"
 
 
 @dataclass(frozen=True)
 class StatusMeta:
-    bucket: Bucket
-    tier: Tier
+    rank: Rank
     next_action: str | None
 
 
 _STATUS_META: dict[BoardStatus, StatusMeta] = {
-    BoardStatus.CLOSED: StatusMeta(Bucket.DONE, Tier.DONE, None),
-    BoardStatus.MERGED: StatusMeta(Bucket.DONE, Tier.DONE, None),
-    BoardStatus.DUP: StatusMeta(Bucket.DONE, Tier.DONE, None),
-    BoardStatus.CLOSE: StatusMeta(Bucket.DONE, Tier.DONE, None),
-    BoardStatus.ARCHIVED: StatusMeta(Bucket.ARCHIVED, Tier.DONE, None),
-    BoardStatus.PENDING_TRIAGE: StatusMeta(
-        Bucket.TARGET, Tier.ACT, "/maigo:triage-issue"
+    # P0：抓不到
+    BoardStatus.UNREACHABLE: StatusMeta(Rank.P0, None),
+    # P1：卡住的
+    BoardStatus.CONFLICT: StatusMeta(Rank.P1, "/maigo:address-comments"),
+    BoardStatus.CI_RED: StatusMeta(Rank.P1, "gh pr checks <n>"),
+    BoardStatus.CHANGES_REQUESTED: StatusMeta(Rank.P1, "/maigo:address-comments"),
+    # P2：球被打回
+    BoardStatus.BALL_BACK: StatusMeta(Rank.P2, "/maigo:review <n>"),
+    BoardStatus.NEW_REPLY: StatusMeta(Rank.P2, "/maigo:triage-issue <n>"),
+    BoardStatus.NEW_COMMENT: StatusMeta(Rank.P2, "/maigo:address-comments"),
+    # P3：一步就結束
+    BoardStatus.MERGEABLE: StatusMeta(Rank.P3, "gh pr merge <n>"),
+    BoardStatus.UNPOSTED_VERDICT: StatusMeta(
+        Rank.P3, "gh pr review <n> --comment --body-file .maigo/review-<n>.md"
     ),
-    BoardStatus.READY: StatusMeta(Bucket.TARGET, Tier.ACT, "/maigo:take-issue"),
-    BoardStatus.IN_PROGRESS: StatusMeta(Bucket.TARGET, Tier.WIP, None),
-    BoardStatus.NEW_REPLY: StatusMeta(Bucket.TARGET, Tier.ACT, "/maigo:triage-issue"),
-    BoardStatus.NEEDS_INFO: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.WIP: StatusMeta(Bucket.TARGET, Tier.WIP, None),
-    BoardStatus.CONFLICT: StatusMeta(
-        Bucket.TARGET, Tier.BLOCKED, "/maigo:address-comments"
-    ),
-    BoardStatus.CI_RED: StatusMeta(Bucket.TARGET, Tier.BLOCKED, None),
-    BoardStatus.CHANGES_REQUESTED: StatusMeta(
-        Bucket.TARGET, Tier.BLOCKED, "/maigo:address-comments"
-    ),
-    BoardStatus.NEW_COMMENT: StatusMeta(
-        Bucket.TARGET, Tier.ACT, "/maigo:address-comments"
-    ),
-    BoardStatus.MERGEABLE: StatusMeta(Bucket.TARGET, Tier.ACT, None),
-    BoardStatus.CI_PENDING: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.AWAITING_REVIEW: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.OTHERS_DRAFT: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.PENDING_REVIEW: StatusMeta(Bucket.TARGET, Tier.ACT, "/maigo:review"),
-    BoardStatus.BALL_BACK: StatusMeta(Bucket.TARGET, Tier.ACT, "/maigo:review"),
-    BoardStatus.BLOCKED: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.NEEDS_CHANGES: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.APPROVE_WITH_NITS: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
-    BoardStatus.APPROVE: StatusMeta(Bucket.WAITING, Tier.WAIT, None),
+    # P4：等你審
+    BoardStatus.PENDING_REVIEW: StatusMeta(Rank.P4, "/maigo:review <n>"),
+    # P5：手上正在做
+    BoardStatus.IN_PROGRESS: StatusMeta(Rank.P5, None),
+    BoardStatus.WIP: StatusMeta(Rank.P5, None),
+    # P6：沒判過
+    BoardStatus.PENDING_TRIAGE: StatusMeta(Rank.P6, "/maigo:triage-issue <n>"),
+    # P7：可以開工
+    BoardStatus.READY: StatusMeta(Rank.P7, "/maigo:take-issue <n>"),
+    # P8：等別人
+    BoardStatus.AWAITING_REVIEW: StatusMeta(Rank.P8, None),
+    BoardStatus.CI_PENDING: StatusMeta(Rank.P8, None),
+    BoardStatus.NEEDS_INFO: StatusMeta(Rank.P8, None),
+    BoardStatus.OTHERS_DRAFT: StatusMeta(Rank.P8, None),
+    BoardStatus.BLOCKED: StatusMeta(Rank.P8, None),
+    BoardStatus.NEEDS_CHANGES: StatusMeta(Rank.P8, None),
+    BoardStatus.APPROVE_WITH_NITS: StatusMeta(Rank.P8, None),
+    BoardStatus.APPROVE: StatusMeta(Rank.P8, None),
+    # P9：結案
+    BoardStatus.CLOSED: StatusMeta(Rank.P9, None),
+    BoardStatus.MERGED: StatusMeta(Rank.P9, None),
+    BoardStatus.DUP: StatusMeta(Rank.P9, None),
+    BoardStatus.CLOSE: StatusMeta(Rank.P9, None),
+    BoardStatus.ARCHIVED: StatusMeta(Rank.P9, None),
 }
 
-assert set(_STATUS_META) == set(BoardStatus), "每個 BoardStatus 都必須有 tier/bucket"
+assert set(_STATUS_META) == set(BoardStatus), "每個 BoardStatus 都必須有 rank"
+
+
+def _section_for_rank(rank: Rank) -> Section:
+    """rank → section：P0–P7 進 🎯、P8 進 ⏳、P9 進 ✅。"""
+    if rank <= Rank.P7:
+        return Section.NEXT
+    if rank == Rank.P8:
+        return Section.WAITING
+    return Section.DONE
+
 
 _REVIEW_ACTIVE_VERDICTS = frozenset(
     {
@@ -155,6 +178,7 @@ _REVIEW_ACTIVE_VERDICTS = frozenset(
         BoardStatus.APPROVE_WITH_NITS,
         BoardStatus.APPROVE,
         BoardStatus.BALL_BACK,
+        BoardStatus.UNPOSTED_VERDICT,
     }
 )
 
@@ -235,6 +259,7 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
             BoardStatus.CLOSED,
             BoardStatus.BALL_BACK,
             BoardStatus.OTHERS_DRAFT,
+            BoardStatus.UNPOSTED_VERDICT,
         }
     ),
     BoardStatus.BLOCKED: frozenset(
@@ -244,6 +269,7 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
             BoardStatus.BLOCKED,
             BoardStatus.BALL_BACK,
             BoardStatus.OTHERS_DRAFT,
+            BoardStatus.UNPOSTED_VERDICT,
         }
     ),
     BoardStatus.NEEDS_CHANGES: frozenset(
@@ -253,6 +279,7 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
             BoardStatus.NEEDS_CHANGES,
             BoardStatus.BALL_BACK,
             BoardStatus.OTHERS_DRAFT,
+            BoardStatus.UNPOSTED_VERDICT,
         }
     ),
     BoardStatus.APPROVE_WITH_NITS: frozenset(
@@ -262,6 +289,7 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
             BoardStatus.APPROVE_WITH_NITS,
             BoardStatus.BALL_BACK,
             BoardStatus.OTHERS_DRAFT,
+            BoardStatus.UNPOSTED_VERDICT,
         }
     ),
     BoardStatus.APPROVE: frozenset(
@@ -271,12 +299,25 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
             BoardStatus.APPROVE,
             BoardStatus.BALL_BACK,
             BoardStatus.OTHERS_DRAFT,
+            BoardStatus.UNPOSTED_VERDICT,
+        }
+    ),
+    # P3：本地 verdict 尚未貼上 GitHub——貼上後跟其他 active verdict 一樣可能被 ball back
+    BoardStatus.UNPOSTED_VERDICT: frozenset(
+        {
+            BoardStatus.MERGED,
+            BoardStatus.CLOSED,
+            BoardStatus.UNPOSTED_VERDICT,
+            BoardStatus.BALL_BACK,
+            BoardStatus.OTHERS_DRAFT,
         }
     ),
     # 終端狀態：無出邊（只能被 purge），自迴圈代表「刷新時原樣保留」
     BoardStatus.CLOSED: frozenset({BoardStatus.CLOSED}),
     BoardStatus.MERGED: frozenset({BoardStatus.MERGED}),
     BoardStatus.ARCHIVED: frozenset({BoardStatus.ARCHIVED}),
+    # P0：orchestrator 指派；下次抓得到就正常重判，出邊涵蓋所有狀態
+    BoardStatus.UNREACHABLE: frozenset(BoardStatus),
 }
 
 assert set(ALLOWED_TRANSITIONS) == set(BoardStatus) | {None}, (
@@ -286,18 +327,10 @@ assert set(ALLOWED_TRANSITIONS) == set(BoardStatus) | {None}, (
 
 @dataclass(frozen=True)
 class ClassifyResult:
-    bucket: Bucket
+    section: Section
+    rank: Rank
     status: BoardStatus
-    tier: Tier
     next_action: str | None
-
-
-def tier_for_status(status: str) -> Tier | None:
-    """給 UI 用：已知狀態詞回其 tier，未知狀態詞回 `None`（呼叫端據此大聲失敗）。"""
-    try:
-        return _STATUS_META[BoardStatus(status)].tier
-    except ValueError:
-        return None
 
 
 def next_action_for_status(status: str) -> str | None:
@@ -446,6 +479,10 @@ def _classify_review_pr(
         return BoardStatus.OTHERS_DRAFT
     if prior_status not in _REVIEW_ACTIVE_VERDICTS:
         return BoardStatus.PENDING_REVIEW
+    reviews = gh_meta.get("reviews") or []
+    posted_by_you = any((r.get("author") or {}).get("login") == you for r in reviews)
+    if not posted_by_you:
+        return BoardStatus.UNPOSTED_VERDICT
     events = _activity_events(gh_meta)
     your_last = _last_timestamp_by(events, you)
     author_login = (gh_meta.get("author") or {}).get("login")
@@ -460,7 +497,7 @@ def classify(
     prior_status: BoardStatus | None,
     you: str = "",
 ) -> ClassifyResult:
-    """純函式：`(item_type, gh_meta, prior_status, you) -> bucket/status/tier/next_action`。
+    """純函式：`(item_type, gh_meta, prior_status, you) -> section/status/rank/next_action`。
 
     不做任何 I/O；「你 vs 別人最後活動」全部從 `gh_meta` 的 comments/reviews
     author+時間戳算出，不呼叫 `datetime.now()`（那是 `compute_badges()` 的事）。
@@ -475,7 +512,10 @@ def classify(
         raise ValueError(f"unknown item_type: {item_type!r}")
     meta = _STATUS_META[status]
     return ClassifyResult(
-        bucket=meta.bucket, status=status, tier=meta.tier, next_action=meta.next_action
+        section=_section_for_rank(meta.rank),
+        rank=meta.rank,
+        status=status,
+        next_action=meta.next_action,
     )
 
 
@@ -537,9 +577,9 @@ def main(argv: list[str] | None = None) -> int:
         badges = compute_badges(gh_meta, now, args.stale_days)
         results.append(
             {
-                "bucket": result.bucket.value,
+                "section": result.section.value,
+                "rank": int(result.rank),
                 "status": result.status.value,
-                "tier": result.tier.value,
                 "next_action": result.next_action,
                 "badges": badges,
             }

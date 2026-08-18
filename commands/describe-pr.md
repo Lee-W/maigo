@@ -81,7 +81,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- 新增 / 更新 🔀 你的 PR 行到 ⏳ `等 review`
+- 新增 / 更新 🔀 你的 PR 行到 ⏳ 等別人 `等 review`
 - title 用實際 PR title；判斷句留空（等待中，沒有待決事項）
 
 回寫時必須保留原 checkbox 與 `🧠` 標記。沒有 PR 編號時不猜、不寫 board。

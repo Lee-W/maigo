@@ -200,29 +200,24 @@ orchestrator 判斷兩條路徑：
 
 ## `/maigo:board` — 跨 session Work Board
 
-把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依球權分成
-🎯 你的球 / ⏳ 等別人 / ✅ Merged-closed。`--serve` 用 MkDocs Material 起本地 live reload
-網頁：導覽只留工作板，各球權分區以「✓／球／動作」三欄表格呈現；作者、PR 改動行數、
-狀態詞與產物收進每列的展開區，非 🎯 分區預設收合。頁面支援搜尋、類型 / 狀態篩選，
-以及依標題或改動量做 section 內排序，不用 Kanban。改 `board.md` 存檔後瀏覽器直接更新。
+把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依單一優先序階梯排進
+🎯 下一件 / ⏳ 等別人 / ✅ 最近結案三個 section——真相層就是最終產物，`:e` 開檔即讀即改，
+maigo 不提供任何呈現層。🎯 區是編號清單，第一行就是下一件事；⏳ / ✅ 區是查閱用的
+checkbox 清單。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
 /maigo:board                # 刷新全板、只印 🎯 + 計數
 /maigo:board --all          # 印整板
-/maigo:board --serve        # 起本地 live reload 網頁（mkdocs，見 work-board skill）
 /maigo:board --learn        # 盤點已勾但未 🧠 的項目
 /maigo:board --check <n...> # 標記為使用者親自處理過
 /maigo:board --uncheck <n...> # 取消處理標記
-/maigo:board --drop <n...>  # 不追了，移除行
+/maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄）
 ```
 
 board 只決定「下一步誰該動」；實際 review、triage、take issue、address comments
 仍交給各自命令。行文法、球權判定、回寫合約與舊 `.maigo/review-board.md` 遷移規則見
 [work-board skill](../skills/work-board.md)。
-
-`--serve` 的列操作選單只複製 `--check` / `--uncheck` / `--drop` 命令；網頁不會
-直接寫回 `board.md`。
 
 ## `/maigo:crystallize` — 把成熟的記憶條目畢業成 skill
 
