@@ -1,7 +1,7 @@
 # Harness Discipline — Evidence Discipline
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
-七個具體案例，共同主題是**證據必須獨立於嫌疑來源**：不能拿被懷疑的來源自己的輸出、
+八個具體案例，共同主題是**證據必須獨立於嫌疑來源**：不能拿被懷疑的來源自己的輸出、
 或自己的推測，來證明那個來源／推測是對的。Read this file when 你要斷言資料狀態、
 判斷一個工具/log 是否可信、或要定罪某次改動造成的錯誤之前。
 
@@ -186,3 +186,75 @@ payload log 證明上游根本沒 fire 該事件，那才是帶外證據。）
   對照它的執行區間再下結論；同時把這視為「該 agent 的其餘自述也需獨立驗證」的
   訊號——產出者不驗自己，改派 fresh-context 驗證者複核。
 - 與第 1 節同源：那條約束自己別把推測寫成事實，這條約束別採信別人的推測。
+
+---
+
+## 8. 單點觀測不足以支撐全稱結論——換一個會改變結果的觀測點來隔離
+
+單一觀察點（一次建構成功、一次抽樣比對、一次 mutation 全綠）常被寫成全稱主張
+（「一定可以」、「完全沒有交集」、「這樣就測到了」），但單點觀測只排除了「這一側」，
+沒有排除「另一側」。判準：**換一個確實會改變結果的觀測點，看結論是否還成立**——
+若換了之後結論翻轉，代表原本的單點觀測本來就沒有區辨力。
+
+**Mutation canary 全綠有三種相反成因**，修法互相衝突，所以「全綠」本身不是結論，是
+待分類的訊號：(1) 情境無區辨力——另一條路徑也會產生同樣的觀測值；(2) 斷言是套套邏輯
+——沒有真的觀測到被測行為；(3) 該 mutation 觸及的分支根本不在任何測試範圍內。第 3
+種最容易被誤判成「驗證通過」（因為指令 exit 0），也容易被反向誤判成「新斷言無效」。
+隔離方法：換一個**確實會改變被測分支輸出**的 mutation 再跑一次；若那個轉紅，原
+mutation 無感就屬第 3 種——原斷言有效，只是打在別的分支上。
+
+實例（apache/airflow backfill partition preview）：`LimitedItemsList` 加
+`orientation` prop 時，指定的 mutation 是把新加的 `data-testid` 從
+`isVertical ? "…" : undefined` 改回無條件字串。跑下去五個測試檔全綠——因為該 gate
+只影響 horizontal 分支，而 4 個 horizontal call site 從來沒有任何測試斷言過「truncate
+到剩餘恰 1 筆」的 DOM。改用**反轉邏輯**的 mutation（`isVertical ? undefined : "…"`）
+立刻轉紅，證明新斷言有效；「字面 mutation 無感」本身成為「該路徑無覆蓋」的證據，被當
+發現回報，而不是被吞掉——若那個覆蓋洞落在 PR 之前就存在、本次未改變的行為上，正解是
+回報並判定不在本 PR scope，不是補測試去填洞。
+
+**第 1 種（情境無區辨力）的修法**：設計「只有被測分支能達成」的場景——通常是讓
+**另一條路徑先跑完、且拿不到值**，逼結果只能由被測分支補上。這句是可獨立套用的
+原則，不限於 React／`reset()`：後端的快取 fallback、API 預設值等任何「多條路徑會
+收斂到同一觀測值」的情境，通常也適用同一個設計動作。下面的實例示範這個原則的具體落地。
+
+實例（apache/airflow PR #71393）：`TriggerDAGForm.tsx` 有兩處寫
+`partitionKey: suggestedPartitionKey ?? undefined`——一處在 `useForm` 的
+`defaultValues`，一處在 `prefillConfig && open` 的 `reset()` effect。為後者寫的測試，
+canary 把 effect 那處改回 `partitionKey: undefined`，8 個測試仍全綠——因為
+react-hook-form 的 `reset()` 遇到 `undefined` 會 fall back 到 mount 時的
+`defaultValues`，而 `defaultValues` 已經是同一個值，兩條路徑的觀測結果完全相同。修法
+是把值改成「mount 之後才到達」：先 render 無建議值（`defaultValues` 因此捕捉到
+`undefined`），再 rerender 帶建議值，只有 effect 能補上；canary 立刻轉紅，且這個場景
+同時也是真實情境（API 查詢在首次 render 後才 resolve），不是為了測試硬造的。
+
+**單點觀測寫成全稱／否定式全稱宣稱，一樣是同型錯誤**，只是發生在交辦與審查而非測試：
+
+- 實作者測到 `OpenAIEmbedding(model="nomic-embed-text")` 建構失敗，寫成「embedding
+  不可用、LLM 可用」；實際 `OpenAI(model="llama3").chat()` 一樣會炸，只是延後到首次
+  呼叫才觸發——建構期驗證與呼叫期驗證是不同的觀測點，兩次抽樣剛好落在同一側，不構成
+  全稱結論。
+- 實作者測到「建構成功」，寫成「accepts any model name string」——同樣是把單點觀測
+  當全稱。
+- **審查者本人也會犯**：一份文件審查中，審查者做了兩個單點 membership 檢查
+  （`gpt-4o` 不在 embedding 清單、`text-embedding-3-small` 不在 LLM 清單），據此宣告
+  「兩份清單完全沒有交集」；實際交集有 `ada`/`babbage`/`curie`/`davinci` 四個舊名稱，
+  它自承「沒有真的算過完整交集」。實作者事後實跑才推翻這個宣稱。
+
+**具體做法**：
+
+- 要回答「這樣就可用／全部情況都是這樣／兩者完全沒有交集」，先問「我手上的觀測點是不是
+  剛好只覆蓋了一側？換一個會改變結果的觀測點會怎樣？」——真的換一個試，不要用同側再測
+  一次來壯膽。
+- 驗「某設定可不可用」要測到**實際使用那一步**（`.chat()`、真的送出、真的跑一次
+  mutation 後的斷言結果），不是只測建構/初始化成功。
+- 要回答「值域有哪些／某值存不存在／兩集合有無交集」，就真的算一次完整集合，不要用
+  兩三個抽樣點推論。
+- 否定式全稱（never / no way to / 完全沒有）最難證，通常要把主句收斂到與證據同範圍——
+  證據只到 membership 抽樣，就只能寫「這幾個抽樣值沒有交集」，不能寫「完全沒有交集」。
+- **審查者的結論同樣要被獨立重跑**——不要因為是審查者說的就照抄；本篇兩個實例都是靠
+  「有沒有換一個會翻盤的觀測點」被抓到的。
+
+Related: mutation-test 作為修法驗證證據的另一半流程（暫時拆掉修法本體 → 測試須轉紅 →
+復原）在 [`skills/strict-review/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)
+的「Mutation test 作為修法驗證證據」段——那條講「怎麼證明修法有守住」，這條講「canary
+全綠時怎麼判斷成因」，兩者互補但不重複。

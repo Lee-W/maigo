@@ -64,6 +64,55 @@ Be precise relaying maintainer thread state: "author replied, awaiting
 reviewer re-confirmation" is not the same as "no response" — GitHub's
 `isResolved: false` often just means nobody has clicked Resolve yet.
 
+### Establish the delta with a two-step check — not `gh pr diff`, not a raw commit range
+
+"What changed since the stored report" is **not** any of:
+
+- `gh pr diff <n>` / `gh pr diff --name-only` — that's the **whole PR vs
+  `main`**, not the delta since the report's `<oldSha>`.
+- A pasted GitHub `.../changes/<oldSha>..<newSha>` range — see below, it
+  often carries rebase/merge noise.
+- `git log <old>..<new>` — only meaningful when `<old>` is actually an
+  ancestor of `<new>`.
+
+Two-step check, run before handing a delta re-review to a subagent (put the
+resolved SHAs in the delegation prompt, not the stale ones from the stored
+report):
+
+```bash
+git merge-base --is-ancestor <old_head> <new_head>        # 1. not an ancestor → old..new is unreliable
+git log --format='%h %ad %s' --date=short <old>..<new>    # 2. read the dates
+```
+
+1. **Ancestor check.** After a force-push/rebase, the old head is no longer
+   an ancestor of the new one — `old..new` then lists rebase-rehashed *old*
+   content as if it were new commits.
+2. **Date check.** Any commit dated before the stored report's review date
+   cannot be a response to that review — the cheapest check, and the one most
+   often skipped.
+
+For the real content delta, use `git diff --stat <old> <new>`; an implausibly
+large file count (hundreds+) means the range still contains a `main` merge —
+fall back to reading the actual `git log` commits.
+
+**Case studies** (apache/airflow, three same-session recurrences of this
+mistake):
+
+- **PR #70671** — `gh pr diff` read as the delta led to asserting the author
+  had responded to three must-fix items and possibly changed design
+  direction. `git diff --stat <old> <new>` showed only one new Markdown file
+  (+124 lines); the seven previously-reviewed source files were
+  byte-identical to the head already reviewed.
+- **PR #58543** — `git log old..new` listed 4 "new" commits.
+  `merge-base --is-ancestor` returned NO (the branch had been rebased); one
+  of the 4 had a commit message identical to the old head's tip (same
+  content, rehashed), and 3 of the 4 were dated before the review — only 1
+  was genuinely new.
+- **PR #68778** — a subagent given a stale worktree SHA in its delegation
+  prompt noticed on its own that the head had moved and re-fetched before
+  reviewing — a fallback that caught the mistake, not a substitute for
+  running the two-step check upfront.
+
 ### A `<oldSha>..<newSha>` compare range spanning a rebase is noise
 
 A pasted GitHub `.../changes/<oldSha>..<newSha>` range that spans a
