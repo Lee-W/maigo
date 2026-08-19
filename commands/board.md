@@ -56,18 +56,27 @@ checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不
 ### 3. 刷新分區
 
 除 `--learn` 外，每次都刷新 board 上所有抓得到的項目：把每項的 `type` / `gh_meta` /
-`prior_status`（讀自現有 board 行）組成 JSON 陣列，餵給
+`prior_status`（讀自現有 board 行）/ `url` 組成 JSON 陣列，餵給
 [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
-的 `classify()` 分類，取回 `section` / `rank` / `status` / `next_action`，依 rank 升序 ＋
-同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單（`⏳`/`✅` 依 `updatedAt` 降序、無編號）：
+的 `classify()` 分類，取回 `section` / `rank` / `status` / `next_action` / `detail_path`，依
+rank 升序 ＋ 同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單（`⏳`/`✅` 依 `updatedAt` 降序、
+無編號）：
 
 ```bash
-echo '<[{type, gh_meta, prior_status}, ...]>' | python3 scripts/board_state.py --you <login>
+echo '<[{type, gh_meta, prior_status, url}, ...]>' \
+  | python3 scripts/board_state.py --you <login> --repo <owner/name>
 ```
 
 三張完整球權判定表、排序與 ✅ 保留天數見
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
 `classify()` 是判定邏輯的唯一正典，本命令不再自行複述規則。
+
+**同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
+`.maigo/i/<slug>.md`——refresh 只重寫事實區（標題行 ＋ 連結/規模/下一步三條 metadata），
+`## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格、欄位省略規則見
+[`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
+刷新完成後比對 `.maigo/i/*.md` 與 board 索引行，多出來的孤兒檔案列出來給使用者確認後刪，
+不自動刪。
 
 ### 4. 輸出
 
@@ -104,7 +113,8 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 
 `--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後，狀態詞改為
 `已放棄`，整行移進 `✅ 最近結案`——跟其他結案行共用同一條 7 天老化規則，不再有獨立的
-留痕區。保留原 checkbox 與 `🧠` 狀態。
+留痕區。保留原 checkbox 與 `🧠` 狀態；對應細節檔不動，等 7 天老化清除時跟索引行一起刪
+（見 [`skills/work-board` §3 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 
 ## 與其他命令的差異
 
@@ -121,5 +131,9 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 - **board 是唯一真相層**：`.maigo/board.md` 保留 checkbox 與 `🧠`；maigo 不提供任何呈現層，
   nvim 直接開檔即讀即改。
 - **回寫照 upsert 合約**：行存在就替換整行並保留 checkbox / `🧠`；行不存在才 append 到對應 section。
+  **整行替換時對應細節檔（`.maigo/i/<slug>.md`）必須跟著同步更新，不可只改索引行漏改細節檔**
+  ——兩者是同一次寫回的兩個產物。同步更新＝只重寫事實區，`## 判斷` 與 `## 筆記`
+  依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
+  的硬規則原樣保留，沒有例外。
 - **`--learn` 必須確認**：候選知識要經 `memory-propose-confirm`，不可靜默寫入 memory。
 - **不寫 GitHub**：board 只讀 GitHub metadata，不回覆、不 label、不 close、不 push。

@@ -159,6 +159,9 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
   （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
 - merged / closed → 👀 行進 ✅ 最近結案
+- 這份 `review-<n>.md` 產物路徑寫進對應細節檔（`.maigo/i/<slug>.md`，見
+  [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
+  的 `## 筆記` 區，一行裸相對路徑連結——不再寫進索引行
 
 回寫時必須保留原 checkbox 與 `🧠` 標記。刷新 / 查看 board 用 `/maigo:board`；
 `/maigo:review` 不提供 board-only alias。

@@ -2,35 +2,44 @@
 """Single source of truth for Work Board state (`.maigo/board.md`) classification.
 
 Defines the detail-state enum (with rank / section / default next_action),
-the pure `classify()` transition function, and `ALLOWED_TRANSITIONS` — the
-declarative transition graph a property test checks `classify()` against.
+the pure `classify()` transition function, `ALLOWED_TRANSITIONS` — the
+declarative transition graph a property test checks `classify()` against —
+以及 `detail_path()`：把 issue/PR URL 算成 `.maigo/i/<slug>.md` 細節檔路徑的正典。
+`next_action` / badges 這些欄位不再直接進 board 索引行，是細節檔（`.maigo/i/<slug>.md`）
+的資料來源；索引行格式見 `skills/work-board/SKILL.md`。
 
 跑（薄 CLI）：
 
 ```
-echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
-    | python3 scripts/board_state.py --you octocat
+echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null, "url": null}]' \
+    | python3 scripts/board_state.py --you octocat --repo owner/repo
 ```
 
-stdin：JSON 陣列 `[{type, gh_meta, prior_status}]`
+stdin：JSON 陣列 `[{type, gh_meta, prior_status, url}]`
 （`type` 是 🐛/🔀/👀；`prior_status` 是上次寫進 board.md 的狀態詞或 `null`；
-未知/過期的狀態詞視為 `null`，向下相容自動正規化）。
-stdout：JSON 陣列 `[{section, rank, status, next_action, badges}]`（`rank` 是整數，
-數字越小優先序越高，呼叫端直接用它排序）。
+未知/過期的狀態詞視為 `null`，向下相容自動正規化；`url` 是 optional 的 GitHub
+issue/PR URL，用來算 `detail_path`）。
+stdout：JSON 陣列 `[{section, rank, status, next_action, badges, detail_path}]`
+（`rank` 是整數，數字越小優先序越高，呼叫端直接用它排序；`detail_path` 無 `url`
+或無法解析時為 `null`）。
 
 `--you <login>` 提供目前使用者的 GitHub login，用來比較「你 vs 別人最後活動」；
 省略時視為空字串（時間戳比較一律不觸發，退回各狀態機的預設分支）。
 `--stale-days`（預設 14）控制 `💤` badge 的門檻。
+`--repo <owner/name>` 提供 board 綁定的 cwd repo，用來判斷 `detail_path` 是否算
+「同 repo」；省略時視為空字串（一律當跨 repo 處理）。
 
 stdlib-only；`classify()` 與 `compute_badges()` 皆為純函式——`classify()`
 完全不碰時間；`compute_badges()` 需要 wall-clock 比較，因此把 `now` 當成
-明確參數傳入，不在函式內部呼叫 `datetime.now()`。
+明確參數傳入，不在函式內部呼叫 `datetime.now()`。`detail_path()` 同樣是純函式，
+只做字串解析，不打任何網路請求。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -341,6 +350,35 @@ def next_action_for_status(status: str) -> str | None:
         return None
 
 
+_GITHUB_ISSUE_OR_PR_URL_RE = re.compile(
+    r"^https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/(?:pull|issues)/(?P<number>\d+)/?$"
+)
+
+
+def detail_path(url: str, home_repo: str = "") -> str | None:
+    """把 issue/PR URL 算成 board 索引行用的細節檔相對路徑（相對 `.maigo/`）。
+
+    `home_repo`（board 綁定的 cwd repo，`owner/name`）與 URL 所屬 repo 相同時回
+    `i/<n>.md`；跨 repo（含 `home_repo` 為空字串——省略時一律當跨 repo）回
+    `i/<repo>-<n>.md`。只認 `https://github.com/<owner>/<repo>/(pull|issues)/<n>`
+    形式，其餘（非 GitHub 網域、非 issue/PR 路徑、格式壞掉）一律回 `None`。
+
+    已知限制（刻意取捨，不要自作主張加 owner 前綴）：`<repo>` 只取 repo 名、
+    不含 owner，不同 owner 的同名 repo 在跨 repo 情境會撞號——路徑短優先。
+    """
+    if not url:
+        return None
+    match = _GITHUB_ISSUE_OR_PR_URL_RE.match(url.strip())
+    if not match:
+        return None
+    owner = match.group("owner")
+    repo = match.group("repo")
+    number = match.group("number")
+    if home_repo and f"{owner}/{repo}" == home_repo:
+        return f"i/{number}.md"
+    return f"i/{repo}-{number}.md"
+
+
 def _parse_ts(ts: str) -> datetime:
     parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
@@ -551,6 +589,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--stale-days", type=int, default=STALE_DAYS_DEFAULT, help="💤 badge 門檻天數"
     )
+    parser.add_argument(
+        "--repo",
+        default="",
+        help="board 綁定的 cwd repo（owner/name），判定 detail_path 同 repo/跨 repo",
+    )
     args = parser.parse_args(argv)
 
     raw = sys.stdin.read()
@@ -582,6 +625,7 @@ def main(argv: list[str] | None = None) -> int:
                 "status": result.status.value,
                 "next_action": result.next_action,
                 "badges": badges,
+                "detail_path": detail_path(item.get("url") or "", args.repo),
             }
         )
 

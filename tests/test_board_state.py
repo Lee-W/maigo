@@ -608,6 +608,50 @@ class TestNextActionForStatus:
 
 
 # ---------------------------------------------------------------------------
+# detail_path()
+# ---------------------------------------------------------------------------
+
+
+class TestDetailPath:
+    def test_same_repo_pr_url_uses_bare_number(self):
+        result = bs.detail_path(
+            "https://github.com/Lee-W/maigo/pull/9201", home_repo="Lee-W/maigo"
+        )
+        assert result == "i/9201.md"
+
+    def test_cross_repo_pr_url_prefixes_repo_name(self):
+        result = bs.detail_path(
+            "https://github.com/other-owner/other-repo/pull/42",
+            home_repo="Lee-W/maigo",
+        )
+        assert result == "i/other-repo-42.md"
+
+    def test_issues_url_is_recognized(self):
+        result = bs.detail_path(
+            "https://github.com/Lee-W/maigo/issues/9101", home_repo="Lee-W/maigo"
+        )
+        assert result == "i/9101.md"
+
+    def test_no_home_repo_treats_everything_as_cross_repo(self):
+        result = bs.detail_path("https://github.com/Lee-W/maigo/pull/9201")
+        assert result == "i/maigo-9201.md"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "not a url",
+            "https://example.com/Lee-W/maigo/pull/9201",
+            "https://github.com/Lee-W/maigo",
+            "https://github.com/Lee-W/maigo/commits/9201",
+            "https://github.com/Lee-W/maigo/pull/not-a-number",
+        ],
+    )
+    def test_unparseable_url_returns_none(self, url):
+        assert bs.detail_path(url, home_repo="Lee-W/maigo") is None
+
+
+# ---------------------------------------------------------------------------
 # compute_badges()
 # ---------------------------------------------------------------------------
 
@@ -657,6 +701,7 @@ class TestMain:
                 "status": "待 triage",
                 "next_action": "/maigo:triage-issue <n>",
                 "badges": [],
+                "detail_path": None,
             }
         ]
 

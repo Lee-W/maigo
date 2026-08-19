@@ -32,19 +32,40 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ## 🎯 下一件（3）
 
-1. [ ] 🔀 CHANGES_REQUESTED — "Redesign Work Board reading view" — 補測試還是反駁 reviewer — `/maigo:address-comments` — Δ+286/-74 https://github.com/Lee-W/maigo/pull/9201
-2. [x] 👀 ↩︎ 回你的球 — "Avoid duplicate GitHub requests" — 新 commit 值得整個重審嗎 — `/maigo:review 9301` — (carol) Δ+91/-38 📄 review-9301.md https://github.com/Lee-W/maigo/pull/9301
-3. [ ] 🐛 待 triage — "CLI 在空設定檔時會 crash" — 能重現嗎——不能就 NEEDS_INFO — `/maigo:triage-issue 9101` — (alice) 💤 https://github.com/Lee-W/maigo/issues/9101
+1. [ ] 🔀 CHANGES_REQUESTED i/9201.md — Redesign Work Board reading view
+2. [x] 👀 ↩︎ 回你的球 i/9301.md — Avoid duplicate GitHub requests
+3. [ ] 🐛 待 triage 💤 i/9101.md — CLI 在空設定檔時會 crash
 
 ## ⏳ 等別人（2）
 
-- [ ] 🔀 等 review — "Document plugin installation flow" — Δ+63/-11 https://github.com/Lee-W/maigo/pull/9202
-- [ ] 🐛 NEEDS_INFO（已請補作業系統與完整 log） — "Hook occasionally exits without output" — (erin) https://github.com/Lee-W/maigo/issues/9103
+- [ ] 🔀 等 review i/9202.md — Document plugin installation flow
+- [ ] 🐛 NEEDS_INFO（已請補作業系統與完整 log） i/9103.md — Hook occasionally exits without output
 
 ## ✅ 最近結案（1）
 
-- [x] 👀 APPROVE（merged 07-12） — "Add structured review verdicts" — (grace) Δ+143/-52 🧠 📄 review-9303.md https://github.com/Lee-W/maigo/pull/9303
+- [x] 👀 APPROVE（merged 07-12） 🧠 i/9303.md — Add structured review verdicts
 ```
+
+`i/9201.md` 對應的細節檔（相對 `.maigo/`）：
+
+```markdown
+# 🔀 CHANGES_REQUESTED — Redesign Work Board reading view
+
+- 連結：https://github.com/Lee-W/maigo/pull/9201
+- 規模：Δ+286/-74
+- 下一步：`/maigo:address-comments`
+
+## 判斷
+
+補測試還是反駁 reviewer
+
+## 筆記
+
+<!-- 手寫區 -->
+```
+
+細節檔格式規格見 §1a；欄位省略規則（`作者`／`規模`／`下一步` 何時整行不寫）與 upsert
+生命週期（建立/更新/回收/孤兒偵測）也在該節。
 
 - **🎯 下一件**：Rank P0–P7，**編號清單**（`1. [ ]`），第 1 行就是下一件事。
 - **⏳ 等別人**：Rank P8，checkbox 清單、無編號——球不在你手上，這區是查閱，不是待辦。
@@ -55,61 +76,101 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ### 行文法
 
-**設計原則：純標準 markdown，不依賴任何 plugin 或設定；一眼看出要採取的行動、要下的判斷；
-其餘細節收進尾註。** `.maigo/` 已被 `.gitignore:2` 排除，board.md **不進 repo、不被任何
-renderer 渲染**——唯一要滿足的是「treesitter 高亮/fold 不出錯 ＋ 人讀得順 ＋ parser 切得開」，
-不必為 GFM 相容性讓步。判斷句不是事實紀錄，沒有判斷要下就不寫。
+**設計原則：行動資訊全部壓在前段（最寬 60 顯示欄內），title 放最後、允許被視窗切掉、
+不截斷。** 視窗窄時被切掉的永遠只有 title 尾巴，決策段（編號/checkbox/型別/狀態/
+細節檔路徑）一定看得到；視窗寬時 title 自動看全，不必為截斷取捨。`.maigo/` 已被
+`.gitignore:2` 排除，board.md **不進 repo、不被任何 renderer 渲染**——唯一要滿足的是
+「treesitter 高亮/fold 不出錯 ＋ 人讀得順 ＋ parser 切得開」，不必為 GFM 相容性讓步。
+URL、規模（Δ+A/-D）、作者、下一步、判斷句這些細節全部搬進 `.maigo/i/<slug>.md`
+細節檔（§1a），索引行只留決策當下要看的欄位。
 
 ```text
-🎯 區：<n>. [ ] <型別emoji> <狀態詞>（旁註） — "<title>"[ — <判斷句>][ — `<下一步>`] — <尾註>
-⏳/✅ 區：- [ ] <型別emoji> <狀態詞>（旁註） — "<title>" — <尾註>
-尾註：[(<作者>) ][Δ+A/-D ][badges ][📄 <產物路徑> ]<URL>
+🎯 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）][ <badges>] <細節檔路徑> — <title>
+⏳/✅ 區：- [ ] <型別emoji> <狀態詞>[（旁註）][ <badges>] <細節檔路徑> — <title>
 ```
 
 - **一行一項、絕不換行**：`/` 搜尋與 `dd` 刪除都以行為單位；換行會讓兩者都失準。
 - **型別 emoji**：🐛 issue ｜ 🔀 你的 PR ｜ 👀 在審的 PR
 - **編號 ＋ checkbox 混排（僅 🎯 區）**：`1. [ ]`。使用者選定編號清單，checkbox 是學習閘門
   的唯一訊號（§5），兩者都要留；⏳/✅ 區是查閱不是待辦，維持無編號的 `- [ ]`。
-- **`"<title>"`**：接在狀態詞／旁註之後——先看狀態，再看標題。
-- **`<判斷句>`（optional）**：只寫「你現在要決定什麼」，**不寫「發生了什麼」**。
-  - 狀態詞本身已經講清楚下一步、或根本沒有判斷要下（例：`可合併`、`等 review`、
-    `IN_PROGRESS`）→ **整段省略**，連前導的 `—` 分隔號一起省略
-  - 真有岔路要選（改還是不改、修還是換路、能不能重現）→ 一句話點出岔路，愈短愈好
-- **`` `<下一步>` `` 欄（optional，僅 🎯 區有意義）**：`next_action` 現在**寫進真相層**——
-  [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
-  的 `next_action_for_status()` 依狀態詞算出可複製命令或 `gh` 指令（不限 `/maigo:*`，
-  見 `_STATUS_META`），寫回時的呼叫端把 `<n>` 代入實際編號。整欄連分隔符一起省略的情況：
-  狀態沒有對應下一步（`WIP` / `IN_PROGRESS` / P8 / P9 / P0）。這是純文字——nvim 裡 `yi\``
-  複製去跑，maigo 不會替使用者執行。
-- **尾註（決策資訊全部塞進前 ~60 字元，尾註是查閱用）**：
-  - **作者** `(<作者>)`：issue / PR 的 author；**🔀 你的 PR 整個省略**（型別 emoji 已定義
-    「這是你的 PR」，`(你)` 是贅字）。決定「現在要不要動手」不看作者，看標題，所以移到尾註
-    （若用起來覺得不順，改回 `<狀態詞> (<作者>) — "<title>"` 是單點改動）。
-  - **`Δ+A/-D`**（PR 必填、issue 省略）：GitHub `additions` / `deletions`。
-  - **badges**（`🧠`/`💤`，optional）：緊接在 `Δ+A/-D` 之後。
-  - **`📄 <產物路徑>`**（optional）：指向這項的本地產物（review-<n>.md / triage 筆記等），
-    相對 `.maigo/` 的裸相對路徑（**不加反引號**——反引號會擋住 nvim `gf`）。沒產物就省略。
-  - **`<URL>`（必填，放最後）**：真 GitHub URL，不是裸 `#9201`——`#9201` 這種形式 `gx`
-    打不開，真 URL 是 Neovim 核心 `gx` 就吃得下的形式（不需 plugin）。放尾註是因為它是
-    這行最長也最不需要用眼睛讀的東西，`$` 之後 `gx` 一鍵；搜尋不受影響（URL 內含編號，
-    `/9201` 照樣命中）。
+- **旁註**（沿用 review board 慣例，optional）：branch 名、closed 理由、linked PR、DRAFT、
+  他人 review decision 這類「per-item 事實」寫在狀態詞後面的括弧裡
+  （例：`IN_PROGRESS（分支 fix/xxx）`）——旁註記事實，判斷句記決定，兩者不是同一件事；
+  判斷句本身已搬進細節檔（§1a）。
+- **badges**（`🧠`/`💤`，optional）：緊接在旁註之後、細節檔路徑之前，用一個空格分隔；
+  §2 vocabulary 表下方有各自的觸發規則。
+- **細節檔路徑（必填、裸相對路徑、不加反引號）**：相對 `.maigo/`，由
+  [`detail_path()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+  算出——同 repo 是 `i/<n>.md`，跨 repo 是 `i/<repo>-<n>.md`。**不加反引號**：反引號會擋住
+  nvim `gf`；游標停在路徑上 `gf` 直接開對應細節檔（格式見 §1a、操作見 §6）。
+- **`— <title>` 的 `—` 分隔符是強制的，parser 不會用啟發式猜**：title 前面那個 `—`
+  一定要打；title **不再加引號**（title 已是行尾最後一欄，引號在舊文法是為了跟後續欄位
+  切開，現在只是純雜訊）。漏打分隔符一律回報格式壞掉，寫回命令**大聲失敗**，不靜默留空
+  ——比照未知狀態詞。
 - **checkbox**：`[x]` ＝「這項我**親自**處理過了」（學習閘門訊號，見 §5）；與所在 section 正交。
 - **🧠 標記**：學習盤點已完成，不重複學。
 - **💤 標記**：`updatedAt` 逾期未更新（stale badge，見 §2 vocabulary 表下方說明），跟
   `🧠` 一樣是正交於狀態詞的 badge，不影響 rank / section。
 - **跨 repo**：board 綁 cwd repo（header 記 `gh repo view --json nameWithOwner` 結果）；
-  丟進來的 URL 若屬其他 repo，尾註 URL 就是該 repo 的完整 GitHub URL。
-- **旁註**（沿用 review board 慣例）：branch 名、closed 理由、linked PR、DRAFT、他人 review
-  decision 這類「per-item 事實」寫在狀態詞後面的括弧裡（例：`IN_PROGRESS（分支 fix/xxx）`）——
-  旁註記事實，判斷句記決定，兩者不是同一件事。
-- **空白容錯**：旁註 `（…）` 與緊接著的 `—` 之間有沒有留空格，parser 都吃得下
+  丟進來的 URL 若屬其他 repo，細節檔路徑改用 `i/<repo>-<n>.md` 形式（見上），真 URL
+  完整記在該項的細節檔 `連結` 欄裡，不在索引行出現。
+- **空白容錯**：旁註 `（…）` 與緊接著的 badges／細節檔路徑之間有沒有留空格，parser 都吃得下
   （nvim 手改最容易漏這格空白）。
-- **`— "<title>"` 的 `—` 分隔符是強制的，parser 不會用啟發式猜**：title 前面那個 `—`
-  一定要打，且 title 的收尾引號後面必須緊接著行尾／判斷句的 `—`／`` `下一步` `` 三者之一——
-  漏打分隔符（或整段引號打壞）都不會被硬猜出一個看似合理的切法。判斷句本身含引號、
-  `——`、`Δ+N/-M` 這類自由文字完全沒問題（只要 title 自己的分隔符有打對），但只要
-  parser 判定不出合法的 `"<title>"` 欄位，一律回報格式壞掉，寫回命令**大聲失敗**，
-  不靜默留空——比照未知狀態詞。
+
+### 1a. 細節檔格式 `.maigo/i/<slug>.md`
+
+索引行搬走的欄位（URL、規模 Δ+A/-D、作者、下一步、判斷句、舊 `📄 <產物路徑>`）全部
+收進這份細節檔：
+
+```markdown
+# <型別emoji> <狀態詞> — <title>
+
+- 連結：<URL>
+- 規模：Δ+A/-D ｜ 作者：<author>
+- 下一步：`<next_action>`
+
+## 判斷
+
+<判斷句——你現在要決定什麼，不寫發生了什麼>
+
+## 筆記
+
+<!-- 手寫區 -->
+```
+
+**硬規則：refresh 或任何寫回只重寫 `## 判斷` 之前的事實區（標題行 ＋ 三條 metadata），
+`## 判斷` 與 `## 筆記` 兩段一律原樣保留，絕不覆蓋。** 細節檔不存在時才整份新建
+（判斷句寫進 `## 判斷`、`## 筆記` 留空）。這條硬規則適用於**所有**寫回路徑——`/maigo:board`
+的 refresh 以及五個 delegate 命令（review / triage-issue / take-issue / describe-pr /
+address-comments）各自的 upsert，沒有例外可以整份覆蓋掉細節檔清掉使用者手寫的 `## 筆記`。
+
+**撞號限制與後果**：`detail_path()` 的 `<repo>` 只取 repo 名、不含 owner（見
+[`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+docstring），所以不同 owner 的同名 repo（例如 `astronomer/astro` 與另一個 owner 的
+`astro`）在跨 repo 情境會共用同一個 `i/<repo>-<n>.md`——兩項的事實區與 `## 判斷` /
+`## 筆記` 會互相覆蓋。這是刻意的取捨（路徑短優先），目前**不自動處理**；真的撞號時
+手動把其中一份細節檔改名（並同步索引行的細節檔路徑）即可繞開。
+
+欄位省略規則：
+
+- **作者**：🔀 你的 PR 省略整個「｜ 作者：…」（型別 emoji 已定義「這是你的 PR」，
+  `作者：你` 是贅字）。
+- **規模**：issue 省略整行（沒有 additions/deletions 可言）。
+- **下一步**：`next_action` 為 `null` 時省略整行——狀態沒有對應下一步，見
+  [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+  的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
+- **舊 `📄 <產物路徑>`**（review-<n>.md / triage 筆記等本地產物）：改寫進 `## 筆記`
+  區裡的一行裸相對路徑連結（例：`review-9301.md`），不佔事實區欄位。
+- **資料缺失時的降級**（與上面三條「刻意省略」不同）：某欄位該有值但當下拿不到
+  （例：遷移進來的 👀 項目沒有 `Δ+A/-D`，因為舊格式本來就沒記），就**只寫拿得到的部分**
+  ——`- 規模：` 整行只剩作者時退化成 `- 作者：<author>`，不要填 `?` 或 `N/A` 佔位。
+  下次寫回拿到真值就補回完整形狀，省略規則不會擋住它被填回去。
+
+`## 判斷`：只寫「你現在要決定什麼」，**不寫「發生了什麼」**。
+
+- 狀態詞本身已經講清楚下一步、或根本沒有判斷要下（例：`可合併`、`等 review`、
+  `IN_PROGRESS`）→ 該段留空
+- 真有岔路要選（改還是不改、修還是換路、能不能重現）→ 一句話點出岔路，愈短愈好
 
 ### 狀態詞 vocabulary（依型別，含 rank）
 
@@ -147,10 +208,10 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 
 **badge（正交於狀態詞，不佔 rank）**：`🧠` 已完成學習盤點；`💤` stale——`updatedAt`
 逾 14 天（`scripts/board_state.py --stale-days` 可調），提示這顆球可能被遺忘，不改變 rank / section。
-兩者都寫在尾註 `Δ+A/-D` 之後，例：`Δ+12/-3 🧠💤 https://github.com/...`。
+兩者都寫在旁註之後、細節檔路徑之前，例：`🎯 1. [ ] 🔀 WIP 🧠💤 i/12.md — <title>`。
 
 **不在 enum 內的狀態詞**（手改壞、或舊工具寫入的殘留字）——寫回命令刷新該行時大聲失敗，
-不靜默正規化成任何看似合理的狀態，比照 `"<title>"` 解析失敗的處理方式。
+不靜默正規化成任何看似合理的狀態，比照 `— <title>` 分隔符解析失敗的處理方式。
 
 **向下相容**：新 vocab 是舊 vocab 的超集，沒有任何舊狀態詞被移除或改名（僅新增
 `抓不到`／`待送出` 兩個）。第一次 `/maigo:board` 刷新時，`board_state.py` 的 `classify()`
@@ -251,6 +312,17 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 
 **upsert 規則**：以 `#<n>`（含 repo 全稱時用全稱）為 key；行存在→整行替換
 （**保留原 checkbox 與 🧠 狀態**），不存在→append 到對應 section；board 檔不存在就先建骨架。
+**整行替換時，對應細節檔（`.maigo/i/<slug>.md`）必須跟著整份重寫，不可只改索引行漏改
+細節檔**——索引行與細節檔是同一次寫回的兩個產物，不允許其中一個落後。
+
+### 細節檔生命週期
+
+- **建立**：項目首次進 board → 建細節檔（§1a）。
+- **更新**：refresh 或任何寫回 → 重寫事實區，`## 判斷` / `## 筆記` 原樣保留（§1a 硬規則）。
+- **回收**：項目離開 board（✅ 區 7 天老化清除、`--drop` 後也走同一條老化規則）→
+  連細節檔一起刪，不留孤兒檔。
+- **孤兒偵測**：`/maigo:board` 刷新時比對 `.maigo/i/*.md` 與 board 索引行，多出來的檔案
+  列出來給使用者確認後刪，不自動刪。
 
 | 命令 | 回寫時機 | 行為 |
 |---|---|---|
@@ -258,7 +330,7 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 | `/maigo:triage-issue` | 每個 verdict 出爐 | `READY`→🎯（next: take）；`NEEDS_INFO`→⏳；`DUP`/`CLOSE`→✅，duplicate / close 理由放狀態旁註。board 是本地檔，不違反 triage「不主動寫 GitHub」原則 |
 | `/maigo:take-issue` | 開工時＋收尾 | 開工：issue 行標 `IN_PROGRESS` ＋ branch 名；收尾若開了 PR：新增 🔀 行、issue 行旁註 linked PR |
 | `/maigo:describe-pr` | PR 開出後（若使用者說已開） | 新增/更新對應 🔀 行 → ⏳ `等 review` |
-| `/maigo:address-comments` | 步驟 8（全部 work item 走完） | commit 未 push（**預設**——該命令不 push、不替使用者回覆）→ 🎯 留著，判斷句寫「push 了嗎——還沒就先 push」；使用者已自行 push 且回覆已送出 → ⏳ `等 review`（判斷句留空） |
+| `/maigo:address-comments` | 步驟 8（全部 work item 走完） | commit 未 push（**預設**——該命令不 push、不替使用者回覆）→ 🎯 留著，細節檔 `## 判斷` 區寫「push 了嗎——還沒就先 push」；使用者已自行 push 且回覆已送出 → ⏳ `等 review`（`## 判斷` 區留空） |
 
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 
@@ -273,7 +345,11 @@ maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使�
 
 1. 讀舊檔，按分區映射搬行：`Active` + `↩︎ 回你的球` → 🎯；`Off-board` → ⏳；
    `Merged/closed` → ✅；`🔍 本批佇列` → 依 §2 重判
-2. 舊行格式 `- #<PR> (<author>) …` 補上 `- [ ] 👀` 前綴，狀態詞照搬
+2. 解析舊行的 author / URL / 規模（`- #<PR> (<author>) …` 這個舊尾註形狀）→ 用
+   [`detail_path()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
+   算出細節檔路徑並依 §1a 格式建檔（事實區填入解析出的 author/URL/規模，`## 判斷` /
+   `## 筆記` 留空）→ 索引行改寫成新文法，只留
+   `- [ ] 👀 <狀態詞> <細節檔路徑> — <title>`，不保留內嵌的 `(<author>)` 或 URL
 3. 舊檔改名 `review-board.md.migrated`（留底不刪），之後一切只寫 `board.md`
 4. [`review-batch-queue.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)
    的「持久 review board」段落改為指向本 skill，只保留 review 特有的 verdict 語彙說明
@@ -306,11 +382,13 @@ maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使�
 1. **三個 fold**：三個 `## ` section 標題就是 treesitter markdown fold 的邊界，`zM`
    收合後只剩三行標題 ＋ 計數，`za`/`zo` 逐一展開想看的區。
 2. **`/狀態詞` 搜尋**：狀態詞是純文字（`待 triage`、`CHANGES_REQUESTED`……），
-   `/待送出` 之類直接命中；行內真 URL 含編號，`/9201` 一樣命中對應行。
-3. **行尾 `gx` 開 GitHub**：尾註最後一段是真 URL，游標移到行上 `gx`（Neovim 核心內建，
-   不需 plugin）直接開瀏覽器到該 issue/PR。
-4. **`📄` 產物用 `gf`**：裸相對路徑（不加反引號）就是 nvim `gf` 吃得下的形式，
-   游標停在路徑上 `gf` 直接開那份 review/triage 筆記。
+   `/待送出` 之類直接命中；細節檔路徑內含編號（`i/9201.md`），`/9201` 一樣命中對應行。
+3. **細節檔路徑用 `gf` 跳過去**：裸相對路徑（不加反引號）就是 nvim `gf` 吃得下的形式，
+   游標停在 `i/<slug>.md` 上 `gf`（Neovim 核心內建，不需 plugin）直接開那份細節檔
+   （格式見 §1a）；看完 `<C-o>` 跳回 board.md 原本的位置。
+4. **細節檔內 `gx` 開 GitHub**：真 URL 搬進了細節檔的「連結」那一行，游標移到該行 `gx`
+   直接開瀏覽器到該 issue/PR；「筆記」段落裡的裸相對路徑（例：`review-9301.md`）同樣
+   `gf` 可跳。
 5. **勾 `[x]` 觸發 `--learn`**：把 `- [ ]` 或 `1. [ ]` 改成 `[x]` 存檔即完成（見 §5），
    不需要額外命令；下次 `/maigo:board` 刷新會列出已勾未 `🧠` 的項目。
 6. **一行一項**：`/` 搜尋與 `dd` 刪除都以行為單位，board.md 的每一行對應一個 item，

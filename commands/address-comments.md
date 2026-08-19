@@ -215,11 +215,11 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 更新 `.maigo/board.md`：
 
 - 當前 branch 對應的 🔀 你的 PR 行**預設留在 🎯 下一件**，rank 由 `有新 comment` 決定——
-  步驟 5 的 commit 尚未 push、步驟 6 的回覆草稿尚未送出，球還在使用者手上；判斷句寫
-  「push 了嗎——還沒就先 push」。只有使用者在這輪之中自行 push 且送出回覆，才移進
-  ⏳ 等別人 `等 review`（判斷句留空）
-- 若仍有 blocked work item，狀態同樣留 🎯 下一件，狀態字改 `有新 comment`；判斷句視卡點寫（例：
-  「哪個 work item 卡住——需要你決定」），不寫死固定句子
+  步驟 5 的 commit 尚未 push、步驟 6 的回覆草稿尚未送出，球還在使用者手上；對應細節檔
+  （`.maigo/i/<slug>.md`）的 `## 判斷` 區寫「push 了嗎——還沒就先 push」。只有使用者在
+  這輪之中自行 push 且送出回覆，才移進 ⏳ 等別人 `等 review`（`## 判斷` 區留空）
+- 若仍有 blocked work item，狀態同樣留 🎯 下一件，狀態字改 `有新 comment`；細節檔
+  `## 判斷` 區視卡點寫（例：「哪個 work item 卡住——需要你決定」），不寫死固定句子
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
 
