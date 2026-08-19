@@ -80,5 +80,10 @@ live in [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/nar
 - **工具邊界**：venv 工具（`pytest` / `mkdocs` / `pre-commit`）與要求專案 Python 的
   `scripts/validate_plugin.py` 一律用 `uv run` 執行；`hooks/` 底下的 runtime script
   與其他 standalone stdlib-only script 用 `python3` 直接執行。
+- **改完 `commands/` 或 `skills/` 要開新 session 才驗得到**：命令與 skill 定義在
+  session 開場就被快照，同一個 session 內跑 `/maigo:*` 載到的仍是**改動前**的版本。
+  在原 session 裡「試跑看看」等於在驗舊快照——會誤判成「改動沒生效」，更糟的是
+  誤以為驗過了。要實際驗證命令流程的改動，開新 session；同 session 內只能驗
+  底層 script（`scripts/*.py` 是執行時才讀，不受快照影響）。
 - **Version bump 由 CI 執行**：`cz bump` 是 CI 的職責，不屬於任何 plan / 任務步驟 /
   open question——規劃或交辦時不得把手動 bump 列為待辦項目。
