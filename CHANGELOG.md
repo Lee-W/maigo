@@ -5,6 +5,18 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.54.0 (2026-08-19)
+
+### BREAKING CHANGE
+
+- existing `.maigo/board.md` files use the old line grammar
+and must be migrated per §4 of skills/work-board/SKILL.md, which also
+generates the per-item detail files.
+
+### Feat
+
+- **board**: shorten board lines by moving details to per-item files
+
 ## v0.53.0 (2026-08-19)
 
 ### Feat
