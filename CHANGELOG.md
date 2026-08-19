@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.53.0 (2026-08-19)
+
+### Feat
+
+- **board**: rank work by priority instead of bucketing by possession
+
 ## v0.52.0 (2026-08-14)
 
 ### Feat
