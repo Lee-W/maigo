@@ -153,8 +153,9 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 
 When new commits or a new maintainer review arrive on a PR **already
 reviewed before**, do a delta re-review against the stored report rather
-than reviewing from scratch — mechanics and the rebase-range pitfall are in
-`references/review-modes.md`.
+than reviewing from scratch — the two-step ancestor+date check, the
+rebase-range pitfall, and `isResolved` reliability (see below) are in
+`references/review-modes.md` and `references/review-judgment.md`.
 
 **Mutation test 作為修法驗證證據**：光看「新增的斷言轉綠」不夠——測試可能本來就不會失敗，
 或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
@@ -225,8 +226,9 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag (references)
 
-Twenty principles for calibrating whether a finding is a real must-fix and how
-much change a comment warrants; details in `references/review-judgment.md`:
+Twenty-three principles for calibrating whether a finding is a real must-fix
+and how much change a comment warrants; details in
+`references/review-judgment.md`:
 
 - **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
 - **Don't escalate coverage gap to correctness bug** — verify reachability + not-by-design (and blast radius — a removed guard isn't automatically must-fix) before calling it a bug.
@@ -249,6 +251,7 @@ much change a comment warrants; details in `references/review-judgment.md`:
 - **Verify a mechanism claim empirically** — write a small isolated repro before publishing a "why this works/breaks" explanation.
 - **Trace the introducing commit before reverting a shared signature** — a type error at a changed signature's use site is usually an incomplete rollout, not a wrong change.
 - **Trace the reconciliation/self-heal loop fully before characterizing a bug's severity** — a mismatch that self-corrects within one cleanup cycle is not the same severity as one that repeats forever; find the actual consumer/cleanup loop before writing the severity language.
+- **Don't trust review-thread `isResolved` in either direction** — a resolved thread can be an empty self-resolve, an open thread can already be fixed; read the thread then verify against code before drawing either conclusion.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

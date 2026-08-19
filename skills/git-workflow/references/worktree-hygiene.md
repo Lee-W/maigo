@@ -208,6 +208,52 @@ upstream/main..HEAD` or equivalent) — don't assume a stable commit hash
 across the session, and don't assume a reflog-visible rewrite is
 self-inflicted just because no stash was involved.
 
+## Start a task in its own worktree from the outset, and detect peer sessions with `ListAgents` before writing
+
+Two conventions that trace back to the same root cause — a shared main
+checkout can have another interactive session on it with zero mutual
+awareness — at opposite ends of a task's lifecycle: before starting, and
+before every write.
+
+**Open the worktree before the first tool call, not partway through.** Start
+a new task with `git worktree add <workspaces-root>/<repo>-<topic> -b <topic>
+upstream/main` immediately, rather than beginning work on the shared main
+checkout and moving into a worktree only once a collision surfaces. If a task
+is already partway done on the shared checkout when this is noticed, **stay
+there and finish it, then commit** — don't switch mid-task. The switch costs
+more than the risk it avoids: untracked files don't follow a branch switch,
+an already-running agent has to be interrupted, and partial work gets
+discarded and redone. Apply the worktree-from-the-outset rule starting with
+the *next* task, not the current one.
+
+**Before touching the git index (`git add`) or committing on a shared
+checkout, run `ListAgents`** to rule out an active peer session on the same
+checkout/branch. Two interactive sessions can be open on the same main
+checkout, on the same branch, with no way to discover each other except by
+proactively checking — `git status` only shows current file-level effects,
+not a peer session's intentions.
+
+**Treat every git command's output as a snapshot of right now, not a fact
+carried forward across turns or tool calls.** Concretely:
+
+- Commit SHAs quoted earlier in the conversation can go stale mid-conversation
+  if the branch gets rebased onto a newer upstream outside this session's
+  knowledge — re-run `git log` rather than reusing an earlier-turn SHA.
+- Before reverting or "fixing" something that looks inconsistent (a comment
+  that doesn't match what's expected, a change not remembered making), check
+  whether it was an **intentional manual edit** by a peer session first —
+  don't silently overwrite it while fixing something unrelated.
+- Before treating uncommitted-looking content as lost, check `git branch
+  --list` and `git stash list` — it may already be safely committed on a
+  peer session's own separate branch, not lost at all.
+
+**Concrete incident** (same session, two collisions back to back): a peer
+session read this session's uncommitted diff, mistook it for its own work to
+continue, verified it, and pushed the branch to `origin`; both sessions then
+repeatedly ran `git add`/`git reset` trying to get `prek` to see the same
+untracked files, churning the index back and forth between them. Neither side
+had run `ListAgents` before touching the index.
+
 ## Reverify branch and status before any write action
 
 A shared workspace (multiple parallel sessions/terminals against the same

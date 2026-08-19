@@ -202,7 +202,7 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 ## Worktree hygiene (references)
 
-Eleven conventions for worktree lifecycle and git-attribution — sibling-layout
+Fourteen conventions for worktree lifecycle and git-attribution — sibling-layout
 naming, when to open a separate worktree for a pre-existing issue, deferring
 colliding work, batch cleanup safety, squash-merge-aware "already merged"
 checks, and not over-attributing surprising git state (commits/rebases/wrong
@@ -212,6 +212,12 @@ parallel or an unverified delegate report. Details and recipes in
 
 - **Sibling layout** — worktrees live as siblings of the main checkout
   (`<repo>-<topic>`, branch `<topic>`), not nested under a tool's default path.
+- **Start a task in its own worktree from the outset, not midway** — a
+  mid-task switch costs more than staying (untracked files don't follow a
+  branch switch, running agents get interrupted); correct on the *next* task.
+- **`ListAgents` before touching the git index** on a shared checkout — a
+  peer session can be on the same checkout/branch with zero mutual awareness,
+  and `git status` alone won't reveal it.
 - **Pre-existing fix → new worktree off upstream/main**, not folded into the
   current feature branch (proportionality counter-case for trivial diffs).
 - **Colliding work gets deferred** — when approved work overlaps an

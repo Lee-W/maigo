@@ -499,6 +499,64 @@ policy produces the wrong call for one of them).
 
 ---
 
+## 23. Don't trust review-thread `isResolved` in either direction — read the thread, then verify against code
+
+`isResolved` on a GitHub review thread is a weak signal **both ways**. It
+cannot be treated as evidence that a comment was addressed, and it cannot be
+treated as evidence that it wasn't:
+
+- An author can resolve their own thread with no code change and no comment
+  — resolved-count going up doesn't mean anything got fixed.
+- Code can be fixed without anyone clicking "resolve" — an open thread can
+  already be moot.
+
+The only reliable method: pull the thread's actual content (GraphQL, since
+REST lacks `isResolved`), read what the commenter asked for, then check the
+current code to see whether it was actually done. The resolved/unresolved
+count only decides which threads to look at first — it is never the
+conclusion.
+
+**Case studies** (apache/airflow):
+
+*Resolved but with nothing behind it*
+
+- **PR #69757** — `resolved=38 / unresolved=2` looked healthy, but a reviewer
+  pointed out directly in the thread that the resolution was a no-op:
+  nothing had changed, and no justification had been given for leaving the
+  code as-is. At least one of those 38 "resolved" threads was an empty
+  self-resolve. An earlier pass had read "40/40 resolved" as a positive
+  signal and been misled by it.
+- **PR #58543** — all 14 threads were self-resolved by the PR's own author;
+  the two people who had raised the objections (one against the state model,
+  one against an `isinstance` special-case) never came back to confirm. One
+  of them had been reviewing an accidentally-reverted stale version at the
+  time.
+
+*Unresolved but already fixed*
+
+- **PR #68778** — `scheduler_job_runner.py` gained a design-intent comment
+  and a docstring that adopted the commenter's suggested wording verbatim,
+  but both threads still showed `isResolved:false`.
+- **PR #71074** — new commits addressed a savepoint-rollback comment and a
+  "re-point instead of deleting log rows" comment; checking the code
+  confirmed both were actually handled, yet the threads stayed open.
+- **PR #70302** — all three commenters had replied "Fixed" and the diff
+  matched what they asked for, but GitHub still showed every thread
+  unresolved.
+
+How to apply:
+
+- When giving feedback to an author, separate **technically addressed** from
+  **not replied to / not resolved on GitHub**. The second is a process gap,
+  not a technical one, but a maintainer scanning open threads still sees it
+  as "an open objection" and it can block a merge decision regardless.
+- Never write "N/N resolved, so no outstanding concerns" in a review report
+  — that sentence was wrong on PR #69757.
+- Symmetrically, don't assume an open thread means unfixed — check the code
+  first.
+
+---
+
 ## See also: parallel batch review safety
 
 Read-only discipline for fanning out multiple PRs to parallel reviewers on a

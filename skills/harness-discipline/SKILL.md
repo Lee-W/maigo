@@ -48,8 +48,9 @@ description: This skill should be used when the maigo orchestrator, running in t
 - 要填任何型號／參數／欄位名／旗標，必須有本次 session 內的實據（tool schema、官方
   文件、實跑輸出）；三者都查不到 → 標「未確認」，絕不憑印象編造。
 - **證據必須獨立於嫌疑來源**：斷言資料狀態要先查 git 歷史、判監控工具要取帶外真相、
-  分析自產 log 要用結構化欄位而非 substring、定罪某次改動要跑對照組——七個具體案例
-  見 [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)。
+  分析自產 log 要用結構化欄位而非 substring、定罪某次改動要跑對照組、單點觀測不能
+  當全稱結論（換一個會改變結果的觀測點來隔離）——八個具體案例見
+  [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)。
 
 ### docs-only 批次的例外
 
