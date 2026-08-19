@@ -40,6 +40,14 @@ description: This skill should be used when the maigo orchestrator, running in t
    摘要裡的轉述——摘要會讓原始驗收條件的細節失真。
 4. 使用者中途的更正，當下就寫回 `.maigo/plan.md`，不是只記在對話裡。
 
+## `.maigo/` 產物歸屬
+
+`.maigo/` 底下 agent 寫的 markdown 產物（plan / review-rubric / triage-rubric /
+pr-comments 這類）一律呼叫 `scripts/artifact_path.py` 取路徑，不要自己組檔名、
+也不要自己記得比對 H1——判斷邏輯在有測試把關的程式碼裡，散文只提醒你呼叫它。
+完整規則見
+[`references/artifact-ownership.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)。
+
 ## 驗證紀律
 
 - 寫的人不驗自己的產出——驗證一律派 fresh-context subagent（沒參與產出過程的）。
