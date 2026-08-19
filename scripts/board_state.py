@@ -355,16 +355,18 @@ _GITHUB_ISSUE_OR_PR_URL_RE = re.compile(
 )
 
 
-def detail_path(url: str, home_repo: str = "") -> str | None:
-    """把 issue/PR URL 算成 board 索引行用的細節檔相對路徑（相對 `.maigo/`）。
+def github_ref(url: str, home_repo: str = "") -> str | None:
+    """把 issue/PR URL 算成識別碼片段（不含路徑前綴／副檔名）。
 
-    `home_repo`（board 綁定的 cwd repo，`owner/name`）與 URL 所屬 repo 相同時回
-    `i/<n>.md`；跨 repo（含 `home_repo` 為空字串——省略時一律當跨 repo）回
-    `i/<repo>-<n>.md`。只認 `https://github.com/<owner>/<repo>/(pull|issues)/<n>`
-    形式，其餘（非 GitHub 網域、非 issue/PR 路徑、格式壞掉）一律回 `None`。
+    `home_repo`（cwd repo，`owner/name`）與 URL 所屬 repo 相同時回 `<n>`；
+    跨 repo（含 `home_repo` 為空字串——省略時一律當跨 repo）回 `<repo>-<n>`。
+    只認 `https://github.com/<owner>/<repo>/(pull|issues)/<n>` 形式，其餘（非
+    GitHub 網域、非 issue/PR 路徑、格式壞掉）一律回 `None`。
 
     已知限制（刻意取捨，不要自作主張加 owner 前綴）：`<repo>` 只取 repo 名、
     不含 owner，不同 owner 的同名 repo 在跨 repo 情境會撞號——路徑短優先。
+
+    供 `scripts/artifact_path.py` 的第 1 級識別碼來源重用，不重複實作。
     """
     if not url:
         return None
@@ -375,8 +377,19 @@ def detail_path(url: str, home_repo: str = "") -> str | None:
     repo = match.group("repo")
     number = match.group("number")
     if home_repo and f"{owner}/{repo}" == home_repo:
-        return f"i/{number}.md"
-    return f"i/{repo}-{number}.md"
+        return number
+    return f"{repo}-{number}"
+
+
+def detail_path(url: str, home_repo: str = "") -> str | None:
+    """把 issue/PR URL 算成 board 索引行用的細節檔相對路徑（相對 `.maigo/`）。
+
+    薄封裝：實際的 URL 解析在 `github_ref()`，這裡只加 `i/` 前綴與 `.md` 副檔名。
+    """
+    ref = github_ref(url, home_repo)
+    if ref is None:
+        return None
+    return f"i/{ref}.md"
 
 
 def _parse_ts(ts: str) -> datetime:
