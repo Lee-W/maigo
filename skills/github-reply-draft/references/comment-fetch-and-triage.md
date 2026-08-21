@@ -57,7 +57,7 @@ or writing the triage file.
 
 ---
 
-## Triage 檔模板（`.maigo/pr-comments.md`）
+## Triage 檔模板（`.maigo/pr-comments-<id>.md`，路徑由 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py) 算出，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）
 
 ```markdown
 # PR comments: <PR title> (#<number>)

@@ -24,6 +24,7 @@ module = [
   "_retry_log",
   "_session_head",
   "_token_usage",
+  "artifact_path",
   "board_state",
 ]
 ignore_missing_imports = true

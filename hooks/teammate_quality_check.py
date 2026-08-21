@@ -13,9 +13,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hook_io import emit  # noqa: E402
-from _retry_log import record_and_count  # noqa: E402
-
+from _hook_io import emit
+from _retry_log import record_and_count
 
 SOYO_RETRY_LIMIT = 2
 _RETRY_LOG_BASE = Path(".maigo")
@@ -106,6 +105,16 @@ def check_raana(out: str) -> None:
 
 PR_DRAFT_RE = re.compile(r"##\s+Suggested PR title", re.IGNORECASE)
 
+# `.maigo/` artifact naming migrated from fixed filenames (`plan.md` /
+# `review-rubric.md` / `triage-rubric.md`) to identifier-suffixed ones
+# (`plan-<id>.md` / ...) — see `.maigo/plan-maigo-artifact-collision.md`.
+# The identifier group is optional so both old and new forms still match;
+# `[A-Za-z0-9]` as the first character after the hyphen rejects malformed
+# forms like `plan-.md` / `plan--x.md`.
+_TOMORI_ARTIFACT_RE = re.compile(
+    r"\.maigo/(?:plan|review-rubric|triage-rubric)(?:-[A-Za-z0-9][\w.-]*)?\.md"
+)
+
 
 def check_tomori(out: str) -> None:
     require_memory_header(out, "燈 (Tomori)")
@@ -121,10 +130,13 @@ def check_tomori(out: str) -> None:
         emit("approve", "燈 (Tomori) PR 草稿結構齊全")
 
     # plan 模式（預設）/ review 模式 / triage 模式：把產出寫進 .maigo/ 的檔案
-    if not re.search(r"\.maigo/(plan|review-rubric|triage-rubric)\.md", out):
+    # （新命名 `plan-<id>.md` 或舊固定檔名 `plan.md` 皆可，見 _TOMORI_ARTIFACT_RE）
+    if not _TOMORI_ARTIFACT_RE.search(out):
         emit(
             "block",
-            "燈 (Tomori) 的輸出沒提到 .maigo/plan.md / .maigo/review-rubric.md / .maigo/triage-rubric.md。把計畫 / rubric 寫進那個檔案再回報。",
+            "燈 (Tomori) 的輸出沒提到 .maigo/plan(-<id>).md / .maigo/review-rubric(-<id>).md / "
+            ".maigo/triage-rubric(-<id>).md。呼叫 scripts/artifact_path.py 取得路徑，"
+            "把計畫 / rubric 寫進那個檔案再回報。",
         )
     if not re.search(
         r"##\s+(Goal|Steps|Rubric|Acceptance|Category|目標|步驟|期待|對照|分類)",

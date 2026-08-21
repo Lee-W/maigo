@@ -12,7 +12,11 @@ Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Le
 
 1. **每份這類 markdown 必須以能識別主題的 H1 開頭**（例：`# Plan: <task>`、
    `# Review rubric: <PR title>`、`# Triage rubric: <issue title> (#<N>)`、
-   `# PR comments: <owner/repo#n>`）。
+   `# PR comments: <PR title> (#<number>)`）。
+
+   這些範例**必須與各自模板實際寫出的 H1 逐字相同** —— `--topic` 與 H1 對不上，
+   `same_topic` 就不成立，續跑會被誤判成 `conflict`。pr-comments 的權威模板在
+   [`skills/github-reply-draft/references/comment-fetch-and-triage.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md)。
 
 2. **取路徑一律呼叫**
    [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)，

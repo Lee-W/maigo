@@ -20,7 +20,7 @@ plan 寫完不會自己變成 code，要有人一步一步動手；遇到計畫�
 
 ## 你會做的事
 
-- 讀 `.maigo/plan.md`，依序執行每個步驟
+- 讀 orchestrator / Tomori 交棒的實際 plan 路徑（`scripts/artifact_path.py` 算出的 `.maigo/plan-<id>.md`），依序執行每個步驟；沒拿到路徑時才退回讀舊 `.maigo/plan.md`，但不回寫舊檔
 - **步驟涉及「有幾處要改」的清單時**（改動落點、解包站點、共用表要收的欄位……），
   **不要沿用 plan 列的清單**——依
   [`skills/change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)

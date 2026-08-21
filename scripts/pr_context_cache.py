@@ -3,9 +3,11 @@
 
 First run fetches PR context (title / body / diff / CI status / linked issues /
 inline review threads with resolution state / review summaries / conversation
-comments) and caches it into a machine-readable section at the top of
-`.maigo/review-rubric.md`. Re-runs with the same source and an unchanged diff
-restore the cache instead of re-fetching.
+comments) and caches it into a machine-readable section at the top of the
+per-source rubric file — `.maigo/review-rubric-<id>.md`, resolved via
+`scripts/artifact_path.py` (single source of truth for `.maigo/` artifact
+naming + ownership) unless `--rubric` overrides it. Re-runs with the same
+source and an unchanged diff restore the cache instead of re-fetching.
 
 Review threads / review summaries / conversation comments are only fetched
 for a `pr` source (branch / range diffs have no GitHub review thread to
@@ -16,9 +18,14 @@ before finalizing a verdict.
 跑：`python3 scripts/pr_context_cache.py <source> [--rubric PATH] [--base BRANCH]`
 
 source 可以是 GitHub PR URL / PR 編號（需要 gh CLI）、本地 branch 名、
-或 commit range（如 `main..feature`）。
+或 commit range（如 `main..feature`）。省略 `--rubric` 時會呼叫
+`artifact_path.resolve_for_write()` 依 source 算出這次要用的路徑。
 
-stdout 第一行印 `cache_hit: true|false`，其後是 cache 區段全文（含全部欄位）。
+stdout 第一行印 `cache_hit: true|false`，第二行 `rubric: <path>`，其後是
+cache 區段全文（含全部欄位）。若 `resolve_for_write()` 判定同識別碼已被
+另一個主題占用（`status: conflict`，罕見）→ 印 `status: conflict` /
+`conflict_owner:` / `suggest:` 三行，**exit 3，不寫 cache**——caller 依
+`skills/pr-context-cache/SKILL.md` 的 Fallback 段退回手動抓。
 gh / git 失敗 → exit 1 + stderr 一行（caller 改走手動 fetch）。
 """
 
@@ -30,8 +37,11 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from artifact_path import resolve_for_write
 
 CACHE_START = "<!-- pr-context-cache:start v1 -->"
 CACHE_END = "<!-- pr-context-cache:end -->"
@@ -221,7 +231,7 @@ def fetch_context(source: str, kind: str, base: str) -> dict[str, str]:
     issues = extract_linked_issues(body, log)
     return {
         "source": source,
-        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "pr_number": number,
         "title": title,
         "body": truncate_lines(body, BODY_LINE_LIMIT, "...[truncated]") or "n/a",
@@ -319,15 +329,73 @@ def write_cache(rubric_path: Path, section: str) -> None:
     rubric_path.write_text(new_text, encoding="utf-8")
 
 
+def _pr_url(source: str, home_repo: str) -> str | None:
+    """Build a full GitHub PR URL for identifier resolution (level 1 of the chain).
+
+    `source` may already be a URL, or a bare/`#`-prefixed PR number that only
+    resolves against the current repo's remote (`home_repo`, from `repo_slug()`).
+    """
+    if source.startswith(("http://", "https://")):
+        return source
+    if home_repo:
+        return f"https://github.com/{home_repo}/pull/{source.lstrip('#')}"
+    return None
+
+
+def _topic_hint(source: str, kind: str) -> str:
+    """Best-effort topic mirroring the `# Review rubric: <PR title>` H1 Tomori
+    will write, so a same-PR re-run resolves to `status: same_topic` instead
+    of a false conflict."""
+    if kind == "pr":
+        title = run(
+            ["gh", "pr", "view", source.lstrip("#"), "--json", "title", "-q", ".title"],
+            check=False,
+        )
+        return f"Review rubric: {title or source}"
+    return f"Review rubric: {source}"
+
+
+def _resolve_rubric_path(source: str, kind: str) -> Path | None:
+    """Resolve the rubric path via `artifact_path.resolve_for_write()`.
+
+    Prints the `status: conflict` lines and returns `None` on conflict —
+    the caller must stop (exit 3), not pick a path or write cache itself.
+    """
+    home_repo = repo_slug()
+    resolution = resolve_for_write(
+        "review-rubric",
+        _topic_hint(source, kind),
+        url=_pr_url(source, home_repo) if kind == "pr" else None,
+        home_repo=home_repo,
+    )
+    if resolution.status == "conflict":
+        print("status: conflict")
+        print(f"conflict_owner: {resolution.existing_topic}")
+        print(f"suggest: {resolution.suggested_path}")
+        return None
+    return Path(resolution.path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", help="GitHub PR URL/number, branch, or commit range")
-    parser.add_argument("--rubric", default=".maigo/review-rubric.md")
+    parser.add_argument(
+        "--rubric",
+        default=None,
+        help="rubric file path; omit to resolve via scripts/artifact_path.py",
+    )
     parser.add_argument("--base", default="main", help="base branch for branch diffs")
     args = parser.parse_args(argv)
 
     kind = classify_source(args.source)
-    rubric_path = Path(args.rubric)
+
+    rubric_path: Path | None
+    if args.rubric is not None:
+        rubric_path = Path(args.rubric)
+    else:
+        rubric_path = _resolve_rubric_path(args.source, kind)
+        if rubric_path is None:
+            return 3
 
     cached = None
     if rubric_path.exists():
@@ -337,6 +405,7 @@ def main(argv: list[str] | None = None) -> int:
         sha_now = current_diff_sha(args.source, kind, args.base)
         if parse_cached_field(cached, "Diff sha") == sha_now:
             print("cache_hit: true")
+            print(f"rubric: {rubric_path}")
             print(cached)
             return 0
 
@@ -344,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
     section = render_cache(fields)
     write_cache(rubric_path, section)
     print("cache_hit: false")
+    print(f"rubric: {rubric_path}")
     print(section)
     return 0
 

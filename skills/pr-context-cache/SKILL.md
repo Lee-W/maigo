@@ -1,6 +1,6 @@
 ---
 name: pr-context-cache
-description: This skill should be used during /maigo:review when fetching or reusing PR context (title / body / diff / CI status / linked issues), caching the first fetch into review-rubric.md so subsequent re-review rounds skip re-fetching.
+description: This skill should be used during /maigo:review when fetching or reusing PR context (title / body / diff / CI status / linked issues), caching the first fetch into the PR's review-rubric artifact so subsequent re-review rounds skip re-fetching.
 ---
 
 <!-- mkdocs-include-start -->
@@ -13,9 +13,12 @@ description: This skill should be used during /maigo:review when fetching or reu
 ## Why this skill exists
 
 `/maigo:review` 的第一步是 Raana 抓 PR context。「re-review」（同一個 PR 改完再跑一次）
-時這些資料幾乎沒變——重抓只是浪費時間。第一次 fetch 後 cache 到
-`.maigo/review-rubric.md` 開頭的機讀區段，re-review 偵測同 source 且 diff sha 未變
-→ 直接還原，跳過全部 `gh` / `git` 重抓。
+時這些資料幾乎沒變——重抓只是浪費時間。第一次 fetch 後 cache 到本次的 review rubric
+檔開頭的機讀區段，re-review 偵測同 source 且 diff sha 未變 → 直接還原，跳過全部
+`gh` / `git` 重抓。**rubric 檔路徑不再固定**：省略 `--rubric` 時 script 會依 source
+呼叫 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
+算出 `.maigo/review-rubric-<id>.md`（歸屬規則見
+[`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
 ## 怎麼跑
 
@@ -23,13 +26,14 @@ description: This skill should be used during /maigo:review when fetching or reu
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source> \
-    [--rubric .maigo/review-rubric.md] [--base main]
+    [--rubric PATH] [--base main]
 ```
 
 - `<source>`：GitHub PR URL / PR 編號（需要 gh CLI）、本地 branch 名、或 commit range
 - 在 maigo repo 自身工作時，直接 `python3 scripts/pr_context_cache.py` 即可
+- 省略 `--rubric` 是預設用法——script 自動算路徑；只有需要覆寫既有檔案時才傳 `--rubric`
 
-stdout 第一行是 `cache_hit: true|false`，其後是 cache 區段全文——
+stdout 第一行是 `cache_hit: true|false`，第二行 `rubric: <path>`，其後是 cache 區段全文——
 含 Source / PR number / Title / Body（截 500 行）/ Linked issues / CI status /
 Diff stat / **Review threads（inline review thread，含 resolve 狀態）/ Review
 summaries（`gh pr view --json reviews`）/ Conversation comments（`gh pr view
@@ -51,13 +55,14 @@ reviewDecision，漏看某 PR 上一位 reviewer 對 `isinstance`-based type-swi
 
 ## Fallback
 
-script 跑不起來（找不到路徑、無 gh CLI、git 失敗 → exit 1 + stderr）→
-Raana 回退手動抓：依 `/maigo:review` step 1 列的 `gh pr view / gh pr diff /
-gh pr checks`（或 `git diff` / `git log`）指令直接 fetch，不寫 cache。
+script 跑不起來（找不到路徑、無 gh CLI、git 失敗 → exit 1 + stderr；或路徑歸屬衝突
+`status: conflict` → exit 3，見 artifact-ownership）→ Raana 回退手動抓：依
+`/maigo:review` step 1 列的 `gh pr view / gh pr diff / gh pr checks`
+（或 `git diff` / `git log`）指令直接 fetch，不寫 cache。
 
 ## What this skill does NOT cover
 
-- 讀 `review-rubric.md` 其餘內容（rubric 本身由 Tomori 撰寫）
+- 讀 review rubric 檔其餘內容（rubric 本身由 Tomori 撰寫）
 - 評估 diff 是否有問題（那是 Soyo 的工作）
 - 決定要 review 哪個 target（caller 傳進來）
 - 非 review 流程的 PR context 抓取（如 `/maigo:describe-pr` 不走這個 skill）

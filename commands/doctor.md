@@ -32,6 +32,12 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 5. **Token usage**（read-only）：讀 `.maigo/token-usage.jsonl`，彙整最近 7 天總量並依角色／model
    分組。只採用 harness 已提供的 foreground subagent metadata；背景 agent、Codex 或舊版 harness
    沒資料時標示 unavailable，不自行估算、不算 error。
+6. **舊固定檔名孤兒檔**（read-only，只列不刪）：`.maigo/` 底下的產物已改成帶識別碼命名
+   （`plan-<id>.md` / `review-rubric-<id>.md` / `triage-rubric-<id>.md` / `pr-comments-<id>.md`），
+   舊固定檔名（`.maigo/plan.md`、`.maigo/review-rubric.md`、`.maigo/triage-rubric.md`、
+   `.maigo/pr-comments.md`）若還存在，代表是升級前留下的孤兒——只列出來，**不自動刪除**，
+   由使用者自己決定要不要清（見
+   [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
 ## 流程
 
@@ -56,7 +62,8 @@ python3 scripts/retry_log_summary.py
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 ```
 
-5. **Orchestrator**：
+5. **Orchestrator**：列出 `.maigo/` 底下的舊固定檔名孤兒檔（`ls .maigo/{plan,review-rubric,triage-rubric,pr-comments}.md 2>/dev/null` 存在就列，不存在就跳過），只回報路徑，不刪除。
+6. **Orchestrator**：
    - 彙整報告。
    - 針對缺失項給予具體的「改進」建議（不使用「優化」）。
 
@@ -86,6 +93,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 
 ## 🪙 Token Usage
 - <一行 metadata 摘要；無資料時說明 unavailable，不推估>
+
+## 📦 舊產物孤兒檔（升級前的固定檔名，只列不刪）
+- <`.maigo/plan.md` 等舊檔名清單，或「無孤兒檔」>
 
 ## 📢 建議
 - ...

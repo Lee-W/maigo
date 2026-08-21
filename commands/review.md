@@ -55,7 +55,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
-**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source>`——第一次 fetch 後 cache 到 `.maigo/review-rubric.md` 開頭的 `<!-- pr-context-cache:start v1 -->` 段，後續 re-review 同 source 且 diff sha 未變 → 直接還原，跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。script 跑不起來 → 依下面指令手動抓（不寫 cache）。
+**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source>`——第一次 fetch 後 cache 到本次 review rubric 檔（stdout 的 `rubric:` 那行給的路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段，後續 re-review 同 source 且 diff sha 未變 → 直接還原，跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。
 
 - **取 diff**：
   - GitHub PR → `gh pr view <num/url> --json title,body,additions,deletions`、`gh pr diff <num/url>`
@@ -64,9 +64,11 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 - **看周邊**：diff 涉及檔案的呼叫關係（被誰用、用了誰）、同檔案 / 同 module 既有的寫法慣例
 - 回報：變更摘要 + 周邊 context + 既有慣例
 
-### 2. 燈 (Tomori) — 寫 review rubric 到 `.maigo/review-rubric.md`。「……讓我先理清楚它想做什麼。」
+### 2. 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
 
-（目錄不存在請先 `mkdir -p .maigo`）
+用 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時呼叫
+`scripts/artifact_path.py review-rubric --topic "Review rubric: <PR title>"` 自己算），
+歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)（目錄不存在請先 `mkdir -p .maigo`）
 
 從 PR description / commit message / linked issue / 變更本身，萃取出 reviewer 的**對照基準**
 （acceptance / edge case / trade-off / 待釐清點）。欄位骨架見

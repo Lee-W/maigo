@@ -6,7 +6,7 @@ flowchart TD
     Fetch --> HasComments{有意見?}
     HasComments -- 沒有 --> NoOp([結束: 無意見可處理])
     HasComments -- 有 --> List[Orchestrator 列出<br/>使用者挑哪些要處理]
-    List --> Plan[Orchestrator 寫 pr-comments.md<br/>分組 work item + 提路由計畫]
+    List --> Plan[Orchestrator 寫 pr-comments-&lt;id&gt;.md<br/>分組 work item + 提路由計畫]
     Plan --> Confirm{使用者確認<br/>分組 + 路由?}
     Confirm -- 要調整 --> Plan
     Confirm -- OK --> Route[逐 work item 跑指定 route]

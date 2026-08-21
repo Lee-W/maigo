@@ -24,7 +24,11 @@ allowed-tools: Bash(gh issue view:*), Read
 gh issue view <n> --json title,body,labels,comments
 ```
 
-若 `.maigo/` 底下有先前 triage 產物（如 `triage-rubric.md`）就一併讀，沒有也不擋。把 issue
+若曾跑過 `/maigo:triage-issue`，`.maigo/` 底下可能有這條 issue 的 triage 產物：呼叫
+`python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" triage-rubric --url <issue url> --topic "Triage rubric: <title> (#<n>)"`
+取得這條 issue 的候選路徑，`path:` 那行指的檔案存在就讀；`status: new`（新路徑還沒被寫過）
+或 `status: conflict`（識別碼被別的主題占用）→ 退回讀舊 `.maigo/triage-rubric.md`（`legacy_exists:`
+那行，只可讀）。兩者都讀不到也不擋，就當沒有先前 triage 產物繼續。把 issue
 body + comments 整理成需求敘述：acceptance criteria 從 body 與 maintainer 在 comments 的
 補充萃取，帶著這份 issue context 進下一步。
 

@@ -42,7 +42,8 @@ Any `[ ]` blocks READY — verdict downgrades to NEEDS_INFO / DUP / CLOSE per th
 
 ## Classification (parallel to checklist, always required)
 
-Tomori's `.maigo/triage-rubric.md` includes a `## Category` line — one of
+Tomori's triage rubric (`.maigo/triage-rubric-<id>.md`, one per issue) includes
+a `## Category` line — one of
 `bug` / `feature` / `question` / `documentation` / `other`. Soyo's output **always
 echoes Tomori's classification** and adds a `disagreement` line if existing
 GitHub labels point at a different category:

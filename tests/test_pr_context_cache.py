@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -185,6 +186,113 @@ class TestMainCacheFlow:
         assert pcc.main(["my-branch", "--rubric", str(rubric)]) == 0
         assert capsys.readouterr().out.startswith("cache_hit: false")
         assert rubric.is_file()
+
+    def test_no_rubric_conflict_exits_3_without_writing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        monkeypatch.setattr(pcc, "_resolve_rubric_path", lambda source, kind: None)
+        monkeypatch.setattr(
+            pcc,
+            "fetch_context",
+            lambda *a: pytest.fail("fetch_context called despite conflict"),
+        )
+        assert pcc.main(["my-branch"]) == 3
+
+
+def _stub_resolution(**overrides) -> SimpleNamespace:
+    fields = {
+        "status": "new",
+        "path": ".maigo/review-rubric-42.md",
+        "existing_topic": None,
+        "incoming_topic": "Review rubric: stub",
+        "suggested_path": None,
+        "legacy_path": None,
+    }
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
+
+
+class TestResolveRubricPath:
+    """`_resolve_rubric_path()` calls `artifact_path.resolve_for_write()` per
+    kind (pr/branch/range) and translates its Resolution into either a Path
+    or the conflict stdout + None. `resolve_for_write()` itself is tested in
+    `tests/test_artifact_path.py` — these tests only check the plumbing."""
+
+    def test_pr_kind_builds_url_and_title_topic(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        captured: dict = {}
+
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
+            captured.update(kind=kind, topic=topic, url=url, home_repo=home_repo)
+            return _stub_resolution(path=".maigo/review-rubric-42.md")
+
+        monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
+        result = pcc._resolve_rubric_path("42", "pr")
+        assert result == Path(".maigo/review-rubric-42.md")
+        assert captured == {
+            "kind": "review-rubric",
+            "topic": "Review rubric: Fix the thing",
+            "url": "https://github.com/o/r/pull/42",
+            "home_repo": "o/r",
+        }
+
+    def test_branch_kind_has_no_url(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        captured: dict = {}
+
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
+            captured.update(kind=kind, topic=topic, url=url)
+            return _stub_resolution(path=".maigo/review-rubric-my-branch.md")
+
+        monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
+        result = pcc._resolve_rubric_path("my-branch", "branch")
+        assert result == Path(".maigo/review-rubric-my-branch.md")
+        assert captured == {
+            "kind": "review-rubric",
+            "topic": "Review rubric: my-branch",
+            "url": None,
+        }
+
+    def test_range_kind_has_no_url(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        captured: dict = {}
+
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
+            captured.update(kind=kind, topic=topic, url=url)
+            return _stub_resolution(path=".maigo/review-rubric-main-feature.md")
+
+        monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
+        result = pcc._resolve_rubric_path("main..feature", "range")
+        assert result == Path(".maigo/review-rubric-main-feature.md")
+        assert captured == {
+            "kind": "review-rubric",
+            "topic": "Review rubric: main..feature",
+            "url": None,
+        }
+
+    def test_conflict_prints_owner_and_suggestion_and_returns_none(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(
+            pcc,
+            "resolve_for_write",
+            lambda *a, **kw: _stub_resolution(
+                status="conflict",
+                path=None,
+                existing_topic="Review rubric: Some other PR",
+                suggested_path=".maigo/review-rubric-42-2.md",
+            ),
+        )
+        result = pcc._resolve_rubric_path("42", "pr")
+        assert result is None
+        out = capsys.readouterr().out
+        assert "status: conflict" in out
+        assert "conflict_owner: Review rubric: Some other PR" in out
+        assert "suggest: .maigo/review-rubric-42-2.md" in out
 
 
 class TestRenderReviewThreads:
