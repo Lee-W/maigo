@@ -7,7 +7,7 @@ file when writing the rubric or assembling the final report.
 
 ---
 
-## Review rubric 骨架（`.maigo/review-rubric.md`）
+## Review rubric 骨架（`.maigo/review-rubric-<id>.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
 
 ```markdown
 # Review rubric: <PR title>
@@ -41,7 +41,7 @@ file when writing the rubric or assembling the final report.
 <變更摘要 + 周邊 context 一段>
 
 ## Rubric（燈）
-<rubric 摘要——詳見 .maigo/review-rubric.md>
+<rubric 摘要——詳見本次 review rubric 檔（pr-context-cache 印出的 rubric: 路徑）>
 
 ## Verdict（爽世）
 APPROVE | REQUEST_CHANGES | BLOCKED

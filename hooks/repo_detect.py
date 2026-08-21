@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hook_io import emit  # noqa: E402
-from _session_head import record as record_session_head  # noqa: E402
+from _hook_io import emit
+from _session_head import record as record_session_head
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -171,9 +171,9 @@ def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
 def ensure_maigo_ignored(cwd: str) -> None:
     """Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
 
-    maigo writes working artefacts (``plan.md``, ``review-rubric.md``,
-    ``pr-comments.md``, retry logs) into ``.maigo/`` at the repo root; those must
-    never be committed. We append the rule to the repo's ``info/exclude`` —
+    maigo writes working artefacts (``plan-<id>.md``, ``review-rubric-<id>.md``,
+    ``pr-comments-<id>.md``, retry logs) into ``.maigo/`` at the repo root; those
+    must never be committed. We append the rule to the repo's ``info/exclude`` —
     resolved via ``git rev-parse --git-path`` so it lands in the shared git dir
     even from a linked worktree — rather than the project's tracked ``.gitignore``,
     which the host repo (e.g. apache/airflow) commits and must not be mutated.

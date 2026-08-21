@@ -138,6 +138,51 @@ class TestCheckTomori:
         assert result["decision"] == "block"
         assert "結構" in result["reason"]
 
+    def test_review_rubric_with_rubric_heading_approves(
+        self, capsys: pytest.CaptureFixture
+    ):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n"
+                ".maigo/review-rubric-71380.md\n## Rubric\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+
+# ---------------------------------------------------------------------------
+# _TOMORI_ARTIFACT_RE — accepts both the old fixed filenames and the new
+# identifier-suffixed ones (`.maigo/plan-maigo-artifact-collision.md` Step 11)
+# ---------------------------------------------------------------------------
+
+
+class TestTomoriArtifactRegex:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            pytest.param(".maigo/plan.md", id="old-plan"),
+            pytest.param(".maigo/review-rubric.md", id="old-review-rubric"),
+            pytest.param(".maigo/triage-rubric.md", id="old-triage-rubric"),
+            pytest.param(".maigo/plan-fix-dag-run-stall.md", id="new-plan"),
+            pytest.param(".maigo/review-rubric-71380.md", id="new-review-rubric"),
+            pytest.param(
+                ".maigo/triage-rubric-airflow-9201.md", id="new-triage-rubric"
+            ),
+        ],
+    )
+    def test_matches_old_and_new_forms(self, text: str):
+        assert tqc._TOMORI_ARTIFACT_RE.search(text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            pytest.param(".maigo/plan-.md", id="empty-identifier"),
+            pytest.param(".maigo/plan--x.md", id="hyphen-leading-identifier"),
+        ],
+    )
+    def test_rejects_malformed_identifier(self, text: str):
+        assert tqc._TOMORI_ARTIFACT_RE.search(text) is None
+
 
 # ---------------------------------------------------------------------------
 # check_soyo

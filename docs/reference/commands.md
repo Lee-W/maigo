@@ -14,7 +14,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
 | 1 | Raana | 探索 codebase 找相關位置、慣例 |
-| 2 | Tomori | 寫 `.maigo/plan.md` |
+| 2 | Tomori | 寫 `.maigo/plan-<id>.md`（路徑由 `scripts/artifact_path.py` 算出） |
 | 3 | (user) | 確認 plan、回 open questions |
 | 4 | Anon | 按 plan 實作 |
 | 5 | Soyo | review（依 `strict-review` skill） |
@@ -107,7 +107,7 @@ Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真�
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
 | 1 | Raana | 抓 diff + 周邊 context（用 `gh pr view`、`gh pr diff` 或 `git diff`） |
-| 2 | Tomori | **寫 `.maigo/review-rubric.md`**（不是實作計畫，是 reviewer 對照基準） |
+| 2 | Tomori | **寫 `.maigo/review-rubric-<id>.md`**（不是實作計畫，是 reviewer 對照基準） |
 | 3 | Soyo | 拿 rubric 對 diff 嚴格 review |
 | 4 | Taki | checkout 變更，跑 test / lint / type check |
 | 4.5 | Orchestrator | 裁決 gate——有 findings 才觸發，逐條表態；只有「不適用+理由」才寫記憶 |
@@ -274,7 +274,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | 1 | Orchestrator | Pre-flight gate——不在 git repo / 沒 `gh` / 當前 branch 無 PR → 擋下、非 0 退出 |
 | 2 | Orchestrator | 抓 inline review threads + review 摘要 + conversation comments |
 | 3 | Orchestrator | 列出意見，使用者挑哪些要處理 |
-| 4 | Orchestrator | 寫 `.maigo/pr-comments.md`，分組 work item + 提路由計畫，AskUserQuestion 確認 |
+| 4 | Orchestrator | 寫 `.maigo/pr-comments-<id>.md`，分組 work item + 提路由計畫，AskUserQuestion 確認 |
 | 5 | (route) | 逐 work item 跑 `/maigo:quick` / `/maigo:go` / `/maigo:team` 的完整流程 |
 | 6 | Orchestrator | finale——處理對照 + 回覆草稿（不送出）+ commit message 草稿 |
 | 7 | Orchestrator | 學習收尾——萃取 convention 形狀 comment → 確認 → 寫 type:project 記憶 |
@@ -296,7 +296,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 |------|-----|--------|
 | 1 | 🐱 樂奈 | 抓每條 issue 的 lightweight metadata，排 triage queue |
 | 2 | 🐱 樂奈 | 每條 issue 抓完整 body + comments + 找潛在 dup |
-| 3 | 🩵 燈 | 寫 `.maigo/triage-rubric.md`（category + why + potential dup） |
+| 3 | 🩵 燈 | 寫 `.maigo/triage-rubric-<id>.md`（每條 issue 各自一份；category + why + potential dup） |
 | 4 | 🟡 爽世 | 套 `strict-triage` skill，下 verdict + 產 `gh` 草稿 |
 | 5 | Orchestrator | 呈現 per-issue 報告，等使用者 next |
 | 6 | Orchestrator | 整批結束後輸出 roll-up summary |

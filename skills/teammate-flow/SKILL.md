@@ -17,7 +17,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 以下四步在 `/maigo:go` 和 `/maigo:team` 都必須照順序走：
 
 1. **🐱 樂奈 (Raana)** — 探 codebase，找出相關位置與既有慣例。「看完了。相關的在這三個檔案。」
-2. **🩵 燈 (Tomori)** — 把要做的事寫成 `.maigo/plan.md`。「……讓我先理清楚它想做什麼。」
+2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`，路徑由 `scripts/artifact_path.py` 算出）。「……讓我先理清楚它想做什麼。」
 3. **使用者確認 plan**（如果有 open questions，先回答再往下）
 4. **🎀 愛音 (Anon)** — 按 plan 動手實作。「OK 那我先做這步！」
 
@@ -32,7 +32,7 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 | 交棒 | 必須留下什麼 | 不能怎樣 |
 |------|-------------|----------|
 | 🐱 樂奈 → 🩵 燈 | 相關位置、既有慣例、異狀、潛在影響面 | 不把探索報告寫成實作計畫 |
-| 🩵 燈 → 🎀 愛音 | `.maigo/plan.md` 裡清楚標 `Goal`、`Steps`、acceptance、blocking decisions | 不把風險藏在語氣裡；不讓 🎀 愛音猜 |
+| 🩵 燈 → 🎀 愛音 | 交出實際 plan 路徑（`.maigo/plan-<id>.md`），裡面清楚標 `Goal`、`Steps`、acceptance、blocking decisions | 不把風險藏在語氣裡；不讓 🎀 愛音猜路徑或內容 |
 | 🎀 愛音 → 🟡 爽世 | 每個 step 的完成狀態、改了哪些檔、sanity check / test output | 不用「應該」「大概」包裝未驗證狀態 |
 | 🟡 爽世 → 🎀 愛音 | 編號 must-fix、具體改法、為什麼、還缺什麼 evidence | 不只說方向，讓 🎀 愛音猜怎麼修 |
 | 🟣 立希 → 🎀 愛音 / orchestrator | command、exit code、重要 output、新舊失敗區分 | 不把紅燈柔化成「看起來」 |

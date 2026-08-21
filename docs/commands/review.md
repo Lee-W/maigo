@@ -1,7 +1,7 @@
 ```mermaid
 flowchart TD
     Start([使用者: /maigo:review target --mode]) --> Raana[樂奈 Raana<br/>取 diff + 套<br/>pr-context-cache]
-    Raana --> Tomori[燈 Tomori<br/>寫 review-rubric.md]
+    Raana --> Tomori[燈 Tomori<br/>寫 review-rubric-&lt;id&gt;.md]
     Tomori --> Soyo[爽世 Soyo<br/>對 rubric 嚴格 review]
     Soyo --> ModeCheck{mode =<br/>design-preview?}
     ModeCheck -- 是 --> Skip[Taki skipped<br/>標 Verification: Skipped]

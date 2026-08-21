@@ -105,14 +105,16 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 ### 4. 寫 triage + 提路由計畫，確認
 
-把被選中的意見寫進 `.maigo/pr-comments.md`（目錄不存在先 `mkdir -p .maigo`），並擬路由計畫。
+呼叫 `scripts/artifact_path.py pr-comments --url <PR url> --topic "PR comments: <PR title> (#<number>)"`
+取得路徑（`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
+目錄不存在先 `mkdir -p .maigo`），把被選中的意見寫進去，並擬路由計畫。
 
-**寫入前先確認既有檔案的歸屬**：若 `.maigo/pr-comments.md` 已存在，先讀一次檔頭的 PR 編號/URL。
-若跟本次 PR 不同 → 是前一個 PR 留下的殘留（同一個 worktree 曾跑過別的 PR 的
-address-comments），直接覆寫成本次 PR 的內容，不必詢問使用者（這份檔案本來就是拋棄式的
-進度追蹤 artefact，不是長期記憶）。若跟本次 PR 相同 → 代表這是續跑（例如上次 session 中途
-中斷），保留既有 work item 的 `Status`（`done` / `in-progress` / `blocked`），只在步驟 3 新選中
-但尚未出現在檔案裡的意見上新增條目，不要把已完成的進度覆寫回 `pending`。
+**歸屬判斷依 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)**（不要自己讀檔頭比對）：
+`status: new` 直接寫；`status: conflict`（同識別碼被另一個 PR 的 triage 佔用，罕見）→ 停下把
+`conflict_owner:` / `suggest:` 呈現給使用者，不要自作主張換名或覆寫。`status: same_topic` 才是
+續跑（例如上次 session 中途中斷）——這時保留既有 work item 的 `Status`（`done` /
+`in-progress` / `blocked`），只在步驟 3 新選中但尚未出現在檔案裡的意見上新增條目，
+**不要把已完成的進度覆寫回 `pending`**（這是本命令特有的加碼規則，對應 `status: same_topic`）。
 triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（哪種訊號建議走
 `/maigo:quick` / `/maigo:go` / `/maigo:team`）見
 `skills/github-reply-draft/references/comment-fetch-and-triage.md`「Triage 檔模板」與「路由判斷」。
@@ -239,7 +241,8 @@ address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 quick / go / team 的 agent 流程。
 - **不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push、不開 / 關 PR；只產草稿。
-- **repo 內唯一寫的 artefact 是 `.maigo/pr-comments.md`**——triage / 進度追蹤用；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
+- **repo 內唯一寫的 artefact 是本次 pr-comments 檔**（`.maigo/pr-comments-<id>.md`，路徑由
+  `scripts/artifact_path.py` 算出）——triage / 進度追蹤用；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
 
 ## 與其他命令的差異
 

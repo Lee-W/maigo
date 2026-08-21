@@ -53,8 +53,9 @@ claude --plugin-dir /path/to/maigo
 ```
 
 預期會看到 Raana → Tomori → Anon → Soyo → Taki 順序輸出；中途 plan 會寫到
-`.maigo/plan.md`，review rubric 寫到
-`.maigo/review-rubric.md`（均在 repo root 下 `.maigo/`，gitignored）。Soyo 若 verdict 是
+`.maigo/plan-<id>.md`，review rubric 寫到
+`.maigo/review-rubric-<id>.md`（均在 repo root 下 `.maigo/`，gitignored；`<id>` 由
+`scripts/artifact_path.py` 依 branch / PR 編號算出）。Soyo 若 verdict 是
 `NEEDS_CHANGES` / `BLOCKED`，會留 must-fix 清單；Taki 結尾必貼 `exit <N>` 與
 `PASS` / `FAIL`。
 

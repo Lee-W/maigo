@@ -34,11 +34,15 @@ description: This skill should be used when the maigo orchestrator, running in t
 
 任務預估超過 **10 輪工具呼叫**，或涉及多個交付物，適用以下流程：
 
-1. 動工前把目標／驗收條件（逐條可勾）／明確不做的事寫進 `.maigo/plan.md`。
+1. 動工前把目標／驗收條件（逐條可勾）／明確不做的事寫進 plan 檔——呼叫
+   `scripts/artifact_path.py plan --topic "Plan: <任務名>"` 取得路徑（歸屬規則見
+   [`references/artifact-ownership.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 2. 每完成一項立刻存檔、立刻更新該項的勾選狀態——存檔的就是全部，沒存的等於沒做。
-3. 察覺 context 被壓縮過（開頭出現 summary）時，先重讀 `.maigo/plan.md` 再繼續，不信任
-   摘要裡的轉述——摘要會讓原始驗收條件的細節失真。
-4. 使用者中途的更正，當下就寫回 `.maigo/plan.md`，不是只記在對話裡。
+3. 察覺 context 被壓縮過（開頭出現 summary）時，**用同一支 script 帶同樣的 `--topic`
+   重新算出路徑再讀**，不要憑記憶回想檔名——四級識別碼鏈就是設計成事後可重新推導；
+   不信任摘要裡的轉述，摘要會讓原始驗收條件的細節失真。
+4. 使用者中途的更正，當下就寫回該 plan 檔，不是只記在對話裡。新路徑讀不到但舊
+   `.maigo/plan.md` 存在時可退回讀舊檔繼續，下一次寫入一律寫到新路徑，不回寫舊檔。
 
 ## `.maigo/` 產物歸屬
 

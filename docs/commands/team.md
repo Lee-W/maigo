@@ -1,7 +1,7 @@
 ```mermaid
 flowchart TD
     Start([使用者: /maigo:team 任務]) --> Raana[樂奈 Raana]
-    Raana --> Tomori[燈 Tomori<br/>寫 plan.md]
+    Raana --> Tomori[燈 Tomori<br/>寫 plan-&lt;id&gt;.md]
     Tomori --> Confirm{使用者確認 plan?}
     Confirm -- 有 open questions --> Tomori
     Confirm -- OK --> Anon[愛音 Anon<br/>實作]
