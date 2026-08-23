@@ -1,10 +1,11 @@
 # Work Board — Upsert Discipline Reference
 
-Loaded on demand by `skills/work-board/SKILL.md` §3 — **three easy-to-miss
+Loaded on demand by `skills/work-board/SKILL.md` §3 — **four easy-to-miss
 upsert habits**: keeping the header's "最後刷新" date honest even on a
 single-item upsert, treating the board upsert as its own independent step
-outside the four-teammate pipeline, and not confusing a board verdict label
-with proof the review actually reached GitHub.
+outside the four-teammate pipeline, not confusing a board verdict label
+with proof the review actually reached GitHub, and never rewriting an existing
+board with a whole-file `Write`.
 
 ---
 
@@ -52,3 +53,31 @@ review（本地分析從未貼上 GitHub）" rather than treating the local verd
 done. Distinguish a maintainer's own official verdict (someone else's
 `CHANGES_REQUESTED`, which genuinely is posted) from your own unposted
 draft — only the latter needs this check.
+
+---
+
+## Never rewrite an existing board with a whole-file `Write`
+
+`.maigo/board.md` is deliberately **one file shared across every session** —
+it has no task identifier in its name, because a per-task board would defeat
+the point of a single cross-session view. That makes it the one artifact where
+two sessions genuinely do write to the same path at the same time.
+
+A whole-file `Write` rebuilt from a snapshot you read some turns ago silently
+discards everything another session wrote in between. Nothing errors; the rows
+are simply gone, and `.maigo/` is gitignored so there is no version to recover.
+
+**How to apply:**
+
+- **`Edit`, never `Write`, on a board that already exists.** `Edit`'s
+  `old_string` acts as an optimistic lock: if another session changed that
+  line, the edit *fails* instead of overwriting. Reserve `Write` for creating
+  the skeleton when the file does not exist yet.
+- **Re-read immediately before writing.** Content you read earlier in the
+  session is not evidence of the current file.
+- **On `Edit` failure: re-read, recompute that row, retry.** Do not fall back
+  to `Write` to force it through — the failure is the mechanism working.
+
+The same applies to `.maigo/i/<slug>.md`: its fact section is rewritten
+wholesale on every refresh, so re-read immediately before rewriting to avoid
+clobbering a concurrent update to the hand-written `## 判斷` / `## 筆記`.

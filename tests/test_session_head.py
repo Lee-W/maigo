@@ -131,6 +131,40 @@ class TestRecord:
         path.write_text(json.dumps({"a": "sha", "b": 3, "c": None}), encoding="utf-8")
         assert _session_head.read_records(path) == {"a": "sha"}
 
+    def test_concurrent_entry_written_before_us_survives(self, tmp_path: Path):
+        # A second session lands its entry partway through our own record()
+        # call. Reading the file once at function entry and rebuilding it from
+        # that stale snapshot drops the other entry; reading again immediately
+        # before the write keeps both. mkdir is the injection point because it
+        # sits between the two candidate read positions.
+        head = init_repo(tmp_path)
+        path = tmp_path / _session_head.LOG_PATH
+        real_mkdir = Path.mkdir
+
+        def mkdir_then_other_session_writes(self: Path, **kwargs: object) -> None:
+            real_mkdir(self, **kwargs)  # type: ignore[arg-type]
+            if self == path.parent and not path.exists():
+                path.write_text(json.dumps({"other-sess": "beef"}), encoding="utf-8")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(Path, "mkdir", mkdir_then_other_session_writes)
+            assert _session_head.record(tmp_path, "sess-1") is True
+
+        assert _session_head.read_records(path) == {
+            "other-sess": "beef",
+            "sess-1": head,
+        }
+
+    def test_write_leaves_no_temp_file_behind(self, tmp_path: Path):
+        init_repo(tmp_path)
+        assert _session_head.record(tmp_path, "sess-1") is True
+        leftovers = [
+            p.name
+            for p in (tmp_path / _session_head.LOG_PATH).parent.iterdir()
+            if p.name != _session_head.LOG_PATH.name
+        ]
+        assert leftovers == []
+
 
 # ---------------------------------------------------------------------------
 # head_moved
