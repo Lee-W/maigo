@@ -18,6 +18,7 @@ into a full test run would be worse than the gap this closes.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -70,19 +71,34 @@ def record(cwd: Path, session_id: object) -> bool:
         return False
 
     path = cwd / LOG_PATH
-    records = read_records(path)
-    records[session_id] = head
-    if len(records) > MAX_ENTRIES:
-        # dicts keep insertion order, so this drops the oldest sessions
-        records = dict(list(records.items())[-MAX_ENTRIES:])
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(records, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
+        # Re-read at the last possible moment. Another session may have added
+        # its entry since this one started, and a whole-file rewrite built on a
+        # stale read would silently drop it.
+        records = read_records(path) | {session_id: head}
+        if len(records) > MAX_ENTRIES:
+            # dicts keep insertion order, so this drops the oldest sessions
+            records = dict(list(records.items())[-MAX_ENTRIES:])
+        _write_atomic(path, json.dumps(records, ensure_ascii=False) + "\n")
     except OSError:
         return False
     return True
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """Write via a temp file in the same directory, then rename over the target.
+
+    `os.replace` is atomic within a filesystem, so a concurrent reader sees
+    either the whole old file or the whole new one — never a half-written one.
+    """
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def head_moved(cwd: Path, session_id: object) -> bool:
