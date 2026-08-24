@@ -232,6 +232,12 @@ backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 | `test-command` | 完全覆寫 test 指令（用 `shlex.split` 解析，支援引號） |
 | `known-test-failures` | 已知失敗名單（一行一個），不擋這些；只擋「新的」失敗 |
 
+這三個檔的查找位置是 **`cwd/.claude/`**，其中 `cwd` 來自 stdin JSON——而該值會跟著 session 的 shell 工作目錄移動，不是固定在 repo 根。在 monorepo 的子目錄工作時（例：`cd airflow-core/src/airflow/ui`），`claude_dir` 變成 `<子目錄>/.claude`；repo 根那三個檔全部靜默失效，`detect_test_command` 也改用子目錄的標記重新偵測。
+
+實例（2026-08-19，apache/airflow）：session 在 `airflow-core/src/airflow/ui` 下操作後，hook 跑的是 `npm test --silent`（該目錄有 `package.json`），而非 repo 根該偵測到的 `uv run pytest -x`（根有 `uv.lock` 且 `uv` 在 PATH）；同時根目錄既有的 `known-test-failures`（已列 4 個已知失敗檔）與 `skip-test-verification` 都沒生效，那 4 檔被重新報成「新失敗」。
+
+判斷方法：hook 訊息裡的指令名就是線索——跑的指令若不是 repo 根該偵測到的那個，`claude_dir` 就不在根目錄。要讓設定生效，把 `.claude/` 放在 hook 實際解析到的那層目錄。
+
 ### Fatal markers
 
 偵測到 `\bImportError:` / `\bModuleNotFoundError:` / `\bSyntaxError:`（必須有冒號，
