@@ -5,6 +5,18 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.55.0 (2026-08-24)
+
+### Feat
+
+- **artifact-path**: wire plan/review-rubric/triage-rubric/pr-comments writers through artifact_path.py
+- **artifact-path**: add .maigo/ artifact naming + ownership guard
+
+### Fix
+
+- **hook**: cwd handling
+- **concurrency**: stop concurrent sessions from clobbering shared .maigo/ state
+
 ## v0.54.0 (2026-08-19)
 
 ### BREAKING CHANGE
