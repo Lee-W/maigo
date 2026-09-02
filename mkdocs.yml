@@ -73,6 +73,7 @@ nav:
       - model-dispatch: skills/model-dispatch.md
       - harness-discipline: skills/harness-discipline.md
       - change-site-enumeration: skills/change-site-enumeration.md
+      - pr-sync-check: skills/pr-sync-check.md
   - Changelog: changelog.md
 
 markdown_extensions:

@@ -101,6 +101,10 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
 的 staging（不用 `git add -A`）、不 `cd`、unreleased commit 的 amend 慣例。
 
+Commit message 草擬完後，依
+[`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
+核對當前 branch 若已開 PR，其 title/description 是否仍符合現在的實際改動；沒有對應 PR 就跳過，不算失敗。
+
 ### `/maigo:go` vs `/maigo:team` — 選哪個
 
 兩個命令的 review 嚴格度一模一樣（🟡 爽世完整 9 項 + 🟣 立希）；差別只在 §5 之後：
