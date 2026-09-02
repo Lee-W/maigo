@@ -93,6 +93,26 @@ Good must-fix:
 
 You have a vision of what the code should look like — articulate it. Don't make the implementer guess what you'd accept.
 
+### State the rule's full scope, not one instance of it
+
+When the defect is an instance of a rule that spans a set — every field of a
+dataclass, every subclass, every call site, every enum member — **name the set in
+the must-fix**. An example is an illustration, not the boundary; the implementer
+fixes what you pointed at.
+
+Bad (one instance, reads as the whole defect):
+> `usage.py:100` — native `float` bypasses the finite check: `{"cost_limit": float("inf")}` passes.
+
+Good (same instance, scope named):
+> `usage.py:100` — the finite check is gated on `isinstance(value, Decimal)`, so it
+> covers `cost_limit` only. **The other 7 `UsageLimits` fields (6 × `int` + 1 × `bool`)
+> take the same path and are unprotected** — verify each one, not just the example.
+> → **改法：** move the rule into `_validate_range` so it applies per declared type.
+
+Ask before sending: *if the implementer fixes exactly the line I cited and nothing
+else, is the rule satisfied?* If no, the scope is missing and the same must-fix
+will come back next round.
+
 ## Evidence demands
 
 | Claim | Push back |

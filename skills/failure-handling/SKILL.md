@@ -49,6 +49,28 @@ description: This skill should be used when handling failures in go-class comman
 
 **不能做**：因 subagent 撞 529 就**跳過**該 stage（跳過 review / 跳過驗證）。過載是基礎設施問題，不是放行理由——要嘛代打、要嘛等，不能省。
 
+### Subagent 中途被切斷（`stalled`／睡眠／連線中斷）
+
+與 529 不同：529 是啟動失敗，這是**跑到一半沒了**，而且回傳往往只有一句 harness 訊息，看不出真因。
+
+**`Agent stalled: no progress for 600s` 不等於基礎設施過載。** 同樣的訊息也會由
+**本機電腦進入睡眠**產生（訊息可能到下一次才變成 `Your computer went to sleep
+mid-response`）。差別很重要：過載該退避重試，睡眠退避無效——所以**不要**因為連續幾次
+`stalled` 就把 prompt 拆得越來越小，那治不到真因，只是把同一份工作重跑好幾遍。
+判準：`ListAgents` 顯示其他 agent 同時段也一起停、或多次中斷落在同一段掛機時間 → 懷疑睡眠。
+
+**唯一可靠的緩解是把「落檔」寫進回報合約**，而不是縮小任務：
+
+> 報告檔路徑：`<scratchpad>/<agent>-<task>.md`
+> **每答完一條就立刻追加寫入，不要累積到最後才寫。** 若你中途被切斷，落檔的部分就是有效交付。
+
+被切斷後的復原順序：
+
+1. **先看落檔**（`ls` scratchpad、讀那個報告檔）——已答完的部分可能已經在裡面
+2. **不要開新 agent 從頭重做**——用 `SendMessage` 續跑同一個 agent，transcript context 還在
+3. 續跑指令要求**先盤點再續作**：讀既有報告檔 ＋ `git status` ＋ 檢視目標檔，逐項判斷做到哪，**只補缺的**
+4. 明確告知「哪幾項已確認完成、不用重做」——orchestrator 自己先盤點過，能省掉一整輪
+
 ### Subagent 中途撞 usage / session limit
 
 與 529 不同：529 是啟動失敗，這是**跑到一半被切斷**——subagent 可能已完成部分工作（working tree 留有半成品），回傳卻只有一句 limit 訊息（含重置時間）。
