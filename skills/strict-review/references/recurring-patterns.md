@@ -25,6 +25,28 @@ How to apply during review:
 
 ---
 
+## PR title/description is a contract — verify it matches the diff
+
+A PR title or description that states a behavioural/scope claim ("adds X", "migrates Y to Z",
+"still WIP, doesn't cover W" ) is a **contract** the reviewer trusts before opening the diff.
+When the title/body says "X is done" or "the PR covers files A/B/C", the actual diff must show
+that.
+
+How to apply during review:
+
+1. For each behavioural/scope claim in the PR title and description, check it against the
+   actual diff — not against the plan or an earlier revision of the PR.
+2. If the claim no longer matches (work described as done isn't, files described as in-scope
+   were pulled out, a "draft" label lingers on a finished PR): flag it. **Must-fix** when the
+   mismatch would mislead a reviewer's judgment of what to check (e.g. description claims full
+   coverage but a code path is untouched); **nit** when the drift is cosmetic (stale wording that
+   doesn't change what the reviewer needs to look at).
+3. Don't accept "the description is just an early draft" as a reason to skip this — an
+   unrefreshed description after several rounds of review-driven changes is exactly the failure
+   mode this pattern targets.
+
+---
+
 ## Underscore-private exception that consumers must `isinstance`-check is de-facto public API
 
 When a module defines private exception classes (`_FooError`, `_BarError`) and a consumer

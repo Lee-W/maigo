@@ -175,6 +175,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
    每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
 
 3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
+4. **PR title/description 核對**：這裡已知 PR 存在（步驟 1 pre-flight gate 已核過），依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對現有 title/description 是否仍符合上面落地的改動，脫鉤就草擬更新交給使用者複製貼上。
 
 ### 7. 學習收尾——從處理過的 comment 萃取慣例
 

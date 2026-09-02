@@ -55,6 +55,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`model-dispatch`](../skills/model-dispatch.md) | orchestrator | orchestrator 在 **Claude Code harness** 下 spawn subagent 時 | 檔位政策（haiku/sonnet/opus 三檔用途）、升降級規則、兩輪重試預算、SendMessage 換檔位限制 |
 | [`harness-discipline`](../skills/harness-discipline.md) | orchestrator | orchestrator 在 **Claude Code harness** 下執行任何 `/maigo:*` 命令時 | 委派門檻（≥4 檔/≥400 行/≥3 檔同修）、回報合約、task-state 防失焦、驗證獨立性（fresh-context 驗證） |
 | [`change-site-enumeration`](../skills/change-site-enumeration.md) | Tomori / Anon / Soyo | Tomori 規劃期、Anon 實作期（不沿用 plan 清單）、Soyo review 期、orchestrator 對使用者宣告 scope 前 | 「有幾處要改」的宣告要由解析權威來源得出，不能由清單轉述 / reviewer 點名位置 / grep 符號名得出；依改動形狀（使用者可見行為 / 平行程式碼收表 / 常數改 arity / 下游對稱性）查表選枚舉方法 |
+| [`pr-sync-check`](../skills/pr-sync-check.md) | — (orchestrator 直跑) | `/maigo:quick` 收尾、`teammate-flow`（`/maigo:go` / `/maigo:team` 收尾）、`/maigo:address-comments` 步驟 6 Finale | 改動收尾時核對當前 branch 已開 PR 的 title/description 是否仍符合實際 diff，脫鉤就套 `github-title-description` 邏輯草擬更新交給使用者複製貼上，絕不代跑 `gh pr edit` |
 
 ## Skill 相依圖
 
@@ -111,6 +112,7 @@ graph LR
         model_dispatch["model-dispatch"]
         harness_discipline["harness-discipline"]
         change_site_enum["change-site-enumeration"]
+        pr_sync_check["pr-sync-check"]
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
@@ -133,6 +135,12 @@ graph LR
     quick --> git_workflow
     address --> git_workflow
     git_workflow --> commit_message
+
+    quick --> pr_sync_check
+    teammate_flow --> pr_sync_check
+    address --> pr_sync_check
+    pr_sync_check --> gtd
+    pr_sync_check --> copyable
 
     go --> strict_review
     team --> strict_review

@@ -182,6 +182,9 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
 
 - **Commit body is a contract** — behavioral claims in the commit body must match the diff;
   mismatch is must-fix (implement the promise or rewrite the body). Details: `references/recurring-patterns.md`.
+- **PR title/description is a contract** — behavioural/scope claims in the PR title or
+  description must match the actual diff; mismatch is must-fix or nit depending on whether it
+  would mislead reviewer judgment. Details: `references/recurring-patterns.md`.
 - **Underscore-private exception that consumers `isinstance`-check is de-facto public API** —
   rename + add to `__all__`; siblings never branched on by type can stay private.
   Details + Airflow case studies: `references/recurring-patterns.md` and
