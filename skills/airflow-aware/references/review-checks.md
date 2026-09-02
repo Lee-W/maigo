@@ -417,6 +417,86 @@ skill's "shared constant changes tuple arity/field count" row — grep the
 constant name (`MODULE_TYPES`, the hardcoded section lists), not the type
 name, and re-grep after the change to confirm no further site remains.
 
+## Migration PR conventions (narrow — read only when the diff touches `airflow-core/src/airflow/migrations/`)
+
+**Scope note**: this only applies when a diff touches
+`airflow-core/src/airflow/migrations/`. Skip it entirely otherwise.
+
+### Rebasing onto a new head requires four synced sites, not two
+
+If the PR adds a new migration and rebasing onto `main` pulls in a
+**different** new migration, a conflict is guaranteed — but `git` only marks
+**two** of the four sites that actually need updating:
+
+1. **Migration filename's numeric prefix** (`0131_3_4_0_xxx.py` →
+   `0132_3_4_0_xxx.py`, via `git mv`) — `main` already claimed `0131_`, and a
+   numeric collision produces no git conflict, so it passes through silently.
+2. **Two lines inside the file**: `down_revision = "<main's new head>"`, and
+   the matching `Revises: <same id>` in the docstring — the docstring line is
+   easy to miss since nothing points at it.
+3. **`airflow-core/src/airflow/utils/db.py`'s `_REVISION_HEADS_MAP`** — the
+   entry for that Airflow version must point at *your* revision (you are the
+   new head). Git does flag a conflict here.
+4. **`airflow-core/docs/migrations-ref.rst`'s table** — your row's
+   `Revises ID` must point at main's new revision while keeping the `(head)`
+   marker, **and** main's newly added row must be re-added — a three-way
+   merge keeps only one side's row, not both. Git does flag a conflict here.
+
+Confirm the chain is actually linked (more reliable than eyeballing):
+
+```bash
+cd airflow-core/src/airflow/migrations/versions
+grep -H -E '^(revision|down_revision) = ' 01[23]*.py
+```
+
+`revision`/`down_revision` should chain head-to-tail with exactly one head.
+Verify site 4 with `prek run --from-ref main --stage pre-commit`'s
+`Update migration ref doc` hook (it regenerates `migrations-ref.rst`; a pass
+confirms the table is right). Verify sites 1–3 with
+`prek run migration-round-trip --hook-stage manual --all-files`.
+
+### A migration touching a parent table needs `disable_sqlite_fkeys` around the whole body
+
+A new migration that uses `op.batch_alter_table()` on a **parent table** (one
+a child table declares `ON DELETE CASCADE` against — `dag` is the most common)
+must wrap the **entire body** of both `upgrade()` and `downgrade()` in
+`disable_sqlite_fkeys(op)`:
+
+```python
+from airflow.migrations.utils import disable_sqlite_fkeys
+
+
+def downgrade():
+    with disable_sqlite_fkeys(op):
+        with op.batch_alter_table("dag", schema=None) as batch_op:
+            batch_op.drop_column("...")
+```
+
+**Why**: SQLite has no real `DROP COLUMN`; alembic's batch mode rebuilds the
+table (create temp → insert-select → drop → rename). During that rebuild the
+FK is still enforced, so `DROP TABLE dag` raises `IntegrityError: FOREIGN KEY
+constraint failed`. Worse, `PRAGMA foreign_keys` only takes effect while the
+connection is in autocommit mode — the batch rebuild's internal `INSERT`
+takes the connection out of autocommit, so a `disable_sqlite_fkeys` call
+placed **after** that point is a silent no-op. The convention is therefore
+stricter than the underlying rule: always wrap the outermost scope, never
+narrow it down. Wrap `upgrade()` too even if it's "just" an `add_column` —
+at write time it's hard to predict whether a given `batch_alter_table` will
+trigger a rebuild.
+
+**How to apply**:
+
+1. Copy the shape from an existing migration in the same repo that already
+   does this correctly rather than inventing a new pattern.
+2. **Local `prek run --stage pre-commit` does not catch this** — the
+   round-trip hook is registered under `stages: [manual]`. Verify locally
+   with `prek run migration-round-trip --hook-stage manual --all-files`
+   (runs through Breeze, takes minutes; first run may build the image).
+3. The corresponding CI job is `Migration round-trip check`, which only
+   triggers when the diff touches
+   `airflow-core/src/airflow/migrations/`.
+4. Authoritative doc: `contributing-docs/26_migration_round_trip_check.rst`.
+
 ---
 
 ## Case studies backing strict-review recurring patterns

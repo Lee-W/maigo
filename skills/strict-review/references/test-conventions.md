@@ -399,3 +399,56 @@ How to apply:
   file that changed) is a signal to suspect the test suite hit a real code
   path — check for a missing mock before assuming the environment is at
   fault.
+
+---
+
+## Mocking the resolver removes the guard entirely
+
+Tests that mock the resolver/factory (`infer_model`, `infer_provider_class`,
+plugin loaders, URI dispatchers) only prove kwargs were assembled and
+forwarded — not that the string values themselves are valid. Under a mock, a
+string is an opaque token; swapping in any value produces the same assertion
+result. A docstring/placeholder that advertises a value the installed
+library no longer accepts can go unnoticed indefinitely, because no test in
+that mocked suite will ever turn red.
+
+One layer deeper, the same failure shows up in the data source a drift
+tripwire reads: it must be the source runtime actually consults, not
+whichever is easiest to parse. A source that's never read at runtime
+produces a tripwire that stays green forever while the value users actually
+see is wrong. Airflow provider example: the connection UI's runtime source
+is `provider.yaml`'s `conn-fields`; when that's present, the hook's
+`get_ui_field_behaviour()` is never called (`providers_manager.py`'s
+`ui_metadata_loaded` gate — that path is deprecated since 3.2.0), so a
+tripwire built on `get_ui_field_behaviour()["placeholders"]` guards a string
+nobody's form ever shows.
+
+Discriminating power must be verified **per source**, not once combined:
+flip each source back to a bad value independently and name which assertion
+turns red for each. If only one source's mutation moves an assertion, the
+other source isn't wired in — that's a test defect, not a coincidence.
+
+Asserting what a mocked hook's downstream call (e.g. `run_sync`) received
+only proves "the argument was forwarded" — not that the code consuming it
+actually honors the value. An upstream reviewer has pushed back on exactly
+this pattern before, on the grounds that passing the assertion establishes
+nothing about what happens once that value reaches the code that actually
+consumes it. Give behavioral evidence instead — swap in a real object (e.g.
+wire a real agent/model into the same patched constructor) so the assertion
+exercises real downstream logic, not a mock's echo.
+
+Why: all three are the same shape — the mock or the wrong data source
+removes the one thing the test was supposed to guard, while the test suite
+keeps reporting green.
+
+How to apply during review:
+
+- A resolver/factory mock in the test under review → ask "what proves the
+  *string values* are valid, not just forwarded?" No answer → push back for
+  an unmocked drift tripwire.
+- Any drift tripwire → ask "which source does runtime actually read?" before
+  trusting it; a deprecated or shadowed source guards nothing.
+- Demand a mutation check **per data source**, not one combined pass.
+- A test that only asserts `mock.call_args` on a mocked hook/dependency is
+  not behavioral evidence; ask for a real-object substitution or an
+  integration path.

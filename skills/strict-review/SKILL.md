@@ -121,6 +121,7 @@ will come back next round.
 | "符合既有慣例" | "參照哪個檔案？貼 `path:line`。" |
 | "這樣比較好" | "比較好的根據？跟原本差在哪？" |
 | "已經測過了" | "貼 command + exit code。" |
+| 聲稱第三方套件行為（precedence／behavior） | "讀 `.venv/lib/pythonX.Y/site-packages/<pkg>` 的已安裝原始碼，貼關鍵函式的實際分支——不採信 docstring 或 `__init__.py` re-export。" |
 
 ## Output format
 

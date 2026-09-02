@@ -117,6 +117,23 @@ Orchestrator 主對話以台灣漢語行文時，避免中國慣用口語詞，�
 **指稱中國**：一律寫「中國」，不寫「大陸」「中國大陸」。適用所有語境（文件、skill、對話、
 commit、review 輸出）。review 他人文字時看到以「大陸」指稱中國也要標出。
 
+## 英文用字禁用清單
+
+寫給使用者看、或代使用者對外輸出的任何 prose，適用以下替換。範圍不分載體：投影片與講稿、docs、
+PR description / issue 留言、commit message、聊天回覆。
+
+| 禁用詞 | 改寫 | 備註 |
+|--------|------|------|
+| `reach for`（建議動作） | `use` | 表格欄位標題、選單型清單的動作欄也算；`the temptation to reach for it` 這種一般英文慣用不在此列 |
+| `temporal`（prose） | `time-based` | `Temporal` 是這個領域的產品名，對外文字用這個詞會讀成在指涉那個產品；命名一組跟時間有關的 mapper / window / timetable 時用「time-based」當集合名詞 |
+
+**豁免**：原始碼路徑與符號名照抄不改——上游確實有
+`task-sdk/src/airflow/sdk/definitions/partition_mappers/temporal.py` 這個模組，那是識別字不是選詞。
+界線是「檔名可以寫，話不要說」；掃描時 `grep -in temporal` 會連 `temporal.py` 一起命中，那是正當內容。
+
+改標題時記得一起掃**講者備註**——備註是要念出來的，漏掉等於還是說了。
+使用者會用 `:claude-wave:` 這個標記帶出這類禁用字，看到就當同一類偏好處理。
+
 ## 收到「角色感」需求時的釐清流程
 
 收到「更有角色感 / 風格更貼近 / 更像原作 / 貼近角色」這類抽象需求時，

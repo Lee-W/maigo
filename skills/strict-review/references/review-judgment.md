@@ -557,6 +557,44 @@ How to apply:
 
 ---
 
+## §24. Relocate a cited line by content before applying it
+
+A `file:line` cited by a reviewer (external or Soyo) is a **lead, not a
+coordinate**. Before applying any must-fix, confirm by **content** — print
+the actual lines or grep the cited string — that the target really is what
+the citation describes.
+
+Two failure modes compound each other:
+
+- **Multiple structurally identical blocks in the same file**: sibling
+  entries with byte-identical field names (multiple entries in one config,
+  multiple rows of the same table, the same key across several providers).
+  The reviewer read content but recorded a line number; the two don't carry
+  which block they came from.
+- **Your own edits since the review shifted the line numbers**: the reviewer
+  reviewed after your last edit, but the cited line may have been counted
+  against a prior layout, or counted against a neighboring block by mistake.
+
+The danger is that applying the citation literally produces **no error
+signal** — the line hit is syntactically valid and semantically plausible,
+tests stay green, and the diff looks completely normal.
+
+How to apply:
+
+- When turning a must-fix into an instruction (for yourself or a delegate),
+  locate the target by content first, then write the instruction with a
+  **content criterion, not a line number** ("change `<old string>` to
+  `<new string>`, in the X entry") and explicitly list neighboring
+  structurally-identical blocks as no-touch zones.
+- If the cited location falls inside a range the task has explicitly
+  declared off-limits, treat that as a **citation error first** — don't
+  touch the content before resolving the mismatch.
+- If the line number turns out wrong, correct it back to the reviewer before
+  re-submitting for re-review; otherwise the re-review will reuse the same
+  wrong coordinates.
+
+---
+
 ## See also: parallel batch review safety
 
 Read-only discipline for fanning out multiple PRs to parallel reviewers on a

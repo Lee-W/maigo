@@ -106,6 +106,15 @@ Scratch scripts go in `dev/` — not in repo root or `scripts/`.
 
 Note: `prek` is the runner currently specified by upstream. It is compatible with the same hooks as `pre-commit`.
 
+**Before trusting a `prek`/`pytest` "Passed"/"exit 0" as evidence**, read
+[`references/verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md) —
+it covers prek's false-green shapes (stashing, zsh word-splitting, missed
+files, `git rebase --continue` skipping hooks entirely), real coverage gaps
+(mypy doesn't cover `providers/`, the UI hook never rebuilds `dist/`,
+`ruff-format` ignores its file list), local-machine false reds (Node 26
+vitest, fresh-worktree `node_modules`, stale local `airflow.db`), and how to
+prove attribution before accepting a red result as your own regression.
+
 #### Before building a new prek hook: surface the genericity/fragility trade-off first
 
 Before adding a new prek hook, answer two questions **up front** and surface
