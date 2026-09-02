@@ -314,3 +314,130 @@ calling `--date` never typed. Fix: record a `from_date_flag` boolean at the
 point of expansion, and branch the guard's message on it (the `--date` path
 quotes the original input fragment; the direct `--start-date`/`--end-date`
 path keeps the original message).
+
+## Part H — Relaxing required fields breaks Union discrimination
+
+### Rule
+
+Using "make a required field Optional / give it a default" as a
+version-compatibility tolerance measure breaks discrimination for any
+`BaseModel` appearing as a Union member. Pydantic's smart union picks a
+member by whether the payload *fits* it; a model with every field optional
+fits everything, so it silently swallows a wrong-shaped payload and returns
+an empty node instead of raising.
+
+### How to apply during review
+
+1. Before accepting "relax required → Optional" as a version-skew fix, check
+   whether the model appears as a member of any Union with **≥2 non-`None`
+   members**. Only single-member Optionals (`X | None`) are safe to relax.
+2. Ask for the actual distribution first — quantify how many fields/models
+   are Union members before deciding scope; a small count can justify a
+   blanket exemption rather than a targeted one.
+3. Reject "recursion" or "cycle guard" as the root cause without a minimal
+   repro that actually removes recursion and still reproduces the bug — the
+   real cause is usually the relaxed Union member itself, not the traversal
+   that reaches it.
+4. The fix trades "loud failure on a missing field" for "no silently wrong
+   data" — that's the right trade, but it must be written down as an
+   explicit consequence, not silently accepted.
+
+### Concrete reference
+
+apache/airflow airflowctl's backward-compat layer for an older API server:
+recursively relaxing generated datamodels' required fields to
+`X | None = None`. Minimal repro
+`PartialAssetExpressionAsset.model_validate({"any": [{"asset": {"name": "n"}}]})`
+returns `asset=None` with no error raised — no recursion involved.
+`DAGDetailsResponse.asset_expression` is a 5-member Union; one missing
+nested field collapses the whole `any` subtree into an empty `Asset` node.
+Fix: skip rewriting any annotation that is a Union with ≥2 non-`None`
+members (170 models total, only 9 fields qualified). The more durable fix
+is adding a `Discriminator` to the Union so pydantic doesn't have to guess.
+
+## Part I — A shared prefix on a searchable field has blast radius
+
+### Rule
+
+Adding a field into search matching requires checking whether its values
+share a common prefix/suffix across all items. Indexing the full string
+lets any substring of that shared prefix match everything — even a query
+that used to be discriminating. The fix is to index the string with the
+shared portion stripped, and compensate on the **query side** by stripping
+the same prefix from user input.
+
+### How to apply during review
+
+1. When a PR adds a field to a search index/comparison, ask: "do all (or
+   most) values of this field share a prefix or suffix?" If yes, demand a
+   full-corpus before/after comparison, not a diff-fragment spot check.
+2. The comparison must count **lost** (previously findable, now not),
+   **gained**, and the change in **zero-result query count** across every
+   real value in the corpus — and **lost must be 0**.
+3. Check every entry point that builds the index, not just the one the
+   reviewer pointed at (e.g. a DOM-side filter and a separate build-time
+   search-index generator are two different sites that both need the fix).
+4. If the final implementation doesn't follow the reviewer's literal
+   suggestion, the reply must give a concrete counterexample (which input,
+   what it became, why the literal suggestion misfires) — not silently do
+   something else.
+
+### Concrete reference
+
+apache/airflow registry (PR #70498): search didn't mirror the id half of
+the build-time searchable-values collection, so ids like
+`clickhousedb`/`cncf-kubernetes` weren't findable from themselves, and the
+full distribution name printed under the card title wasn't findable at
+all. The naive fix (index the printed distribution name) failed under
+test: `apache` went from matching 18 cards to matching all 105, `airflow`
+from 2 to 105. Fix: index `provider.id` as-is, add `normalizeSearch()` to
+strip the `apache-airflow-providers-` prefix from the query. Both the DOM
+filter and the build-time Pagefind index generator needed the fix — the
+reviewer had only pointed at one.
+
+## Part J — An additive prop's "default path unchanged" claim must cover DOM attributes
+
+### Rule
+
+When a shared component gains a new prop with a default value, and the PR
+claims "the default path has zero behavior change," the verbatim comparison
+must extend to DOM attributes, not just logic branches and layout. A newly
+added `data-testid`, `aria-*`, or `role` that isn't gated on the new prop
+means the default path *was* touched — even if no test currently asserts
+on it and nothing looks different on screen.
+
+### How to apply during review
+
+1. When a diff claims "added a prop, default value keeps current behavior,
+   other call sites unaffected," ask specifically: "does this diff add any
+   attribute on the shared path, gated or not?"
+2. An unconditional new `data-testid`/`aria-*` addition inside a shared
+   branch is a defect regardless of whether any test currently observes it.
+3. The fix is conditional rendering — e.g.
+   `data-testid={isNewMode ? "…" : undefined}` — so the unset case renders
+   with zero added attributes, restoring the pre-change DOM verbatim.
+4. Decide and pin down the semantics of any new testid with a test (does
+   the boundary item count as "in" or "out") rather than letting two
+   different meanings share one testid.
+
+### Concrete reference
+
+apache/airflow backfill partition preview: `LimitedItemsList` gained an
+`orientation` prop (default `"horizontal"`); the "+N more" expand logic
+was extracted into a shared `expandAffordance`. The remaining-items === 1
+branch got an unconditional `data-testid="limited-items-item"`. A
+whitespace-normalized diff had verified the separator logic and layout
+were verbatim identical — the attribute-level gap wasn't caught by that
+comparison. Consequence: four untouched call sites gained an extra DOM
+attribute when down to exactly one remaining item, and in vertical mode,
+at exactly `maxItems + 1` items, the capped item and the overflow item
+shared the same testid.
+
+---
+
+**Common shape across Parts H–J**: all three PRs claimed "the default path
+is unchanged" while actually leaving a breach in a shared path — a Union
+member that fits anything, an index entry that matches everything, a DOM
+attribute that renders unconditionally. Reviewing a "default path
+unchanged" claim means actively looking for where the shared path picked
+up new reach, not just confirming the branch you expect wasn't hit.

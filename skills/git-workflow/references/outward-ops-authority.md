@@ -82,3 +82,35 @@ than *pushing* an existing branch.
 hash and that nothing was pushed; mention `--force-with-lease` is needed
 when the user is ready, but don't run it or frame it as the recommended next
 step.
+
+## A bot's status claim is a snapshot from when it posted, not now
+
+Automated comments state the world as of the moment they last ran. Your own
+subsequent rebase, or further upstream movement, doesn't get reflected back
+into that comment — it still reads as current.
+
+**Why:** a lockfile-nudge bot comment said a PR "currently conflicts" with
+`main` and prescribed a fix-it recipe (fetch, rebase, re-lock, force-push).
+By the time it was checked, the branch was already rebased onto the latest
+`main` with zero conflicts — the notice was stale. Following it as written
+would have produced a wasted re-lock plus an unnecessary force-push (which
+resets every CI run's and every reviewer's anchor).
+
+**How to apply:**
+
+- Verify the claim with a read-only command before acting on the
+  recommendation — don't rebase/re-lock/force-push on the bot's say-so alone.
+  For a conflict claim specifically:
+
+  ```bash
+  git fetch upstream main
+  git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main | grep -c '^<<<<<<<'
+  ```
+
+  `0` means no conflicts. Cross-check with
+  `git merge-base --is-ancestor upstream/main HEAD` — true means the branch
+  is already caught up.
+- Generalize beyond conflict bots: any "bot says X, recommends Y" comment
+  gets a read-only re-verification of X before you decide whether to do Y —
+  especially when Y is force-push, re-lock, or regenerate, all of which
+  widen the diff and reset review state.

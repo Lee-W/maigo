@@ -208,6 +208,29 @@ upstream/main..HEAD` or equivalent) — don't assume a stable commit hash
 across the session, and don't assume a reflog-visible rewrite is
 self-inflicted just because no stash was involved.
 
+## Shared `.git` also shares tracking refs: pin the diff base with `merge-base`
+
+Sibling worktrees don't just share `refs/stash` — they share every remote's
+tracking ref too. A `git fetch` in *any* worktree moves that remote's
+tracking ref (e.g. `upstream/main`) for **all** worktrees immediately; it is
+not a per-worktree snapshot.
+
+Seen: a branch was created from `upstream/main` in worktree B while worktree
+A had already fetched `upstream` earlier. After finishing the change, `git
+diff upstream/main --stat` pulled in a pile of unrelated files — a *different*
+worktree had fetched `upstream` again in the meantime and pushed the local
+`upstream/main` ref forward. At first glance this looks like the branch was
+cut from the wrong base; it wasn't — the branch was fine, the tracking ref
+used for the diff had simply moved out from under it.
+
+**How to apply**: to answer "what did this branch change relative to where it
+started", don't diff directly against `<remote>/<branch>`. Pin the actual
+divergence point first — `git merge-base HEAD <remote>/<branch>` — and diff
+against that commit instead (or confirm the expected commit count with `git
+rev-list --count HEAD ^<merge-base>`). If a diff against a remote branch
+suddenly contains files you don't recognize, suspect a sibling worktree moved
+the tracking ref before suspecting your own branch base.
+
 ## Start a task in its own worktree from the outset, and detect peer sessions with `ListAgents` before writing
 
 Two conventions that trace back to the same root cause — a shared main

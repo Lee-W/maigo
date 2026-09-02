@@ -32,6 +32,24 @@ description: This skill should be used when handling failures in go-class comman
 2. 愛音修完後立希 (Taki) 重跑——**不接受愛音口頭說「修好了」**
 3. 修到全綠才算過
 
+### 環境造成的假紅
+
+測試紅燈被診斷為**環境造成的假紅**（Node/OS/工具版本行為差異，不是程式碼缺陷）時，
+判準：乾淨環境會綠、紅的成因指向 Node/OS/工具版本而非被測程式碼本身。
+
+優先順序：
+
+1. **改環境設定讓它真的綠**（例如 `.claude/settings.local.json` 的 `env`、正確的 flag、
+   對版本的工具）
+2. 治本的 repo 改動（測試 setup 層的隔離），範圍合理時另開 PR
+3. **最後才是遮蔽**（本 repo 的 known-test-failures 機制）
+
+**Why**：遮蔽名單是全檔粒度，遮掉噪音的同時把該檔案未來的**真回歸**一起遮掉；環境修法
+沒有這個代價，還會讓別的 session 也直接受益。
+
+**不要把「加進 known-test-failures」當預設收尾動作**——寫之前先問使用者，並在選項裡說明
+代價；修完環境要回報「修掉幾個 / 還剩幾個」，剩下的說清楚為什麼修不掉。
+
 ### Subagent 過載 / 不可用（如 529 Overloaded）
 
 某個 agent 的 Task 因基礎設施問題（伺服器 529 Overloaded、逾時、暫時不可用）反覆啟動失敗，與該 agent 的工作品質無關時：
