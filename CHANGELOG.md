@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.56.0 (2026-09-03)
+
+### Feat
+
+- **pr-sync-check**: add PR title/description sync check to quick/team/address-comments flows
+
 ## v0.55.0 (2026-08-24)
 
 ### Feat
