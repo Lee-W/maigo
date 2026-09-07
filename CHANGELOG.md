@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.57.0 (2026-09-07)
+
+### Feat
+
+- **hooks**: block acceptance criteria that prove a property by grep count
+
 ## v0.56.0 (2026-09-03)
 
 ### Feat
