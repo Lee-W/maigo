@@ -108,7 +108,13 @@ def check_hooks_schema() -> CheckResult:
         r.fail("缺少 object 型別的 `hooks` 頂層欄位")
         return r
 
-    allowed_events = {"SessionStart", "PostToolUse", "TeammateIdle", "Stop"}
+    allowed_events = {
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "TeammateIdle",
+        "Stop",
+    }
     for event, configs in hooks.items():
         if event not in allowed_events:
             r.fail(f"未知 hook event `{event}`")

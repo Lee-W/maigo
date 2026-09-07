@@ -20,6 +20,7 @@ python_version = "3.13"
 [[tool.mypy.overrides]]
 module = [
   "_frontmatter",
+  "_grep_criteria",
   "_hook_io",
   "_retry_log",
   "_session_head",

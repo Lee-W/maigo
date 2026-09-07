@@ -151,6 +151,55 @@ class TestCheckTomori:
 
 
 # ---------------------------------------------------------------------------
+# check_tomori — plan 驗收條件的字面 grep 判準（教訓家族「字面 grep 當判準」）
+# ---------------------------------------------------------------------------
+
+
+class TestTomoriPlanCriteria:
+    OUT = "## Loaded memory entries\n（無相關 entry）\n.maigo/plan-x.md\n## Steps\n"
+
+    @staticmethod
+    def _write_plan(tmp_path, body: str) -> None:
+        plan_dir = tmp_path / ".maigo"
+        plan_dir.mkdir(exist_ok=True)
+        (plan_dir / "plan-x.md").write_text(body, encoding="utf-8")
+
+    def test_literal_grep_criterion_in_plan_blocks(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        self._write_plan(
+            tmp_path, "## Acceptance\n- [ ] `grep -c old_field .` 必須回 0\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(self.OUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "字面 grep 當判準" in result["reason"]
+
+    def test_scoped_grep_criterion_in_plan_approves(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        self._write_plan(
+            tmp_path, "## Acceptance\n- [ ] `git diff | grep -c old_field` 為 0\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(self.OUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+    def test_missing_plan_file_fails_open(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(self.OUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "approve"
+
+
+# ---------------------------------------------------------------------------
 # _TOMORI_ARTIFACT_RE — accepts both the old fixed filenames and the new
 # identifier-suffixed ones (`.maigo/plan-maigo-artifact-collision.md` Step 11)
 # ---------------------------------------------------------------------------

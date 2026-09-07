@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _grep_criteria import block_reason, find_literal_grep_criteria
 from _hook_io import emit
 from _retry_log import record_and_count
 
@@ -116,6 +117,23 @@ _TOMORI_ARTIFACT_RE = re.compile(
 )
 
 
+def _plan_criteria_hits(out: str) -> list[str]:
+    """Scan the plan artifact 燈 (Tomori) just wrote for literal-grep criteria.
+
+    Fail-open: 讀不到檔案（還沒寫入、路徑在別的 repo、權限問題）就回空 list，
+    hook 不會因為讀檔失敗擋下計畫。
+    """
+    match = _TOMORI_ARTIFACT_RE.search(out)
+    if not match:
+        return []
+    path = Path(os.getcwd()).resolve() / match.group(0)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return find_literal_grep_criteria(text)
+
+
 def check_tomori(out: str) -> None:
     require_memory_header(out, "燈 (Tomori)")
 
@@ -146,6 +164,9 @@ def check_tomori(out: str) -> None:
             "block",
             "燈 (Tomori) 的輸出缺少結構（## Goal / ## Steps / ## Rubric / ## Acceptance / ## Category / 目標 / 步驟 / 分類）。",
         )
+    hits = _plan_criteria_hits(out)
+    if hits:
+        emit("block", block_reason("燈 (Tomori) 計畫的驗收條件", hits))
     emit("approve", "燈 (Tomori) 輸出結構齊全")
 
 

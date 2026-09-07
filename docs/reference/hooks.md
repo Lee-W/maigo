@@ -1,6 +1,6 @@
 # Hooks Reference
 
-Maigo 的 Claude Code plugin 註冊四個 hook，定義在 `hooks/hooks.json`。
+Maigo 的 Claude Code plugin 註冊五個 hook，定義在 `hooks/hooks.json`。
 只要 Claude Code plugin 載入就自動生效，使用者不用設定。
 
 Codex manifest 會用空的 inline hooks 覆蓋這組 Claude Code lifecycle hooks；
@@ -123,6 +123,41 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
 完成後跑 `uv run python scripts/validate_plugin.py` 確認 skill cross-ref 通過
 （validator 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。
 
+## PreToolUse — `hooks/delegation_criteria_check.py`
+
+只匹配 `Agent` 工具。交辦 subagent 之前掃 `tool_input.prompt`，
+擋下把「字面 grep 的命中數」當成抽象性質證明的驗收條件。
+
+擋的判準（同一行同時成立才算）：
+
+| 條件 | 說明 |
+|------|------|
+| 是條列項或含「驗收」 | `- ` / `* ` / `1. ` / `- [ ]` 開頭，或該行出現「驗收」 |
+| 出現 `grep` / `rg` / `ripgrep` | 掃描工具 |
+| 出現歸零／計數斷言 | 為零 / 為 0 / 回 0 / = 0 / 應為 0 / 零命中 / 只准剩 / `no matches` |
+| **沒有**限縮到本次改動 | 含 `git diff` / 新增行 / 本次新增 / 本次修改 的行不擋——那是教訓給的正解 |
+| **不是**在引用規則本身 | 含 不要 / 不得用 / 別用 / 禁止 / 避免 / 反例 的行不擋 |
+
+出處是登記在案的教訓家族「字面 grep 當判準」（2026-07-25／07-31／08-11，累計 3 次）：
+pattern 會命中正當內容（註解、對照表、fixture、詞彙表）或無關的共現字串，
+判準回非預期值時錯的往往是判準而不是產物，而照字面「修好它」比原狀更糟。
+
+同一組偵測邏輯（`hooks/_grep_criteria.py`）也被 TeammateIdle 的
+燈 (Tomori) 檢查重用，掃她剛寫進 `.maigo/plan-<id>.md` 的驗收條件。
+
+### 放行為什麼不輸出 decision
+
+PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代替使用者做那個決定，
+所以只在命中時 `block`，放行一律靜默 `exit 0`，不碰權限流程。
+
+### Fail-open 情況
+
+- input 不是有效 JSON、`tool_input` 不是 object、`prompt` 不是非空字串 → 靜默放行
+
+### Timeout
+
+5 秒上限。純 regex，毫秒級完成。
+
 ## PostToolUse — `hooks/token_usage.py`
 
 只匹配 `Agent` 工具。foreground subagent 完成時，直接讀 Claude Code
@@ -163,6 +198,7 @@ agent 跑完輸出送回 orchestrator 時觸發。
 | **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Tomori** | 提到 `.maigo/plan.md` 或 `.maigo/review-rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
+| **Tomori** | `.maigo/plan(-<id>).md` 的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Soyo** | verdict 字串：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED` | 「沒下 verdict」 |
 | **Soyo** | checklist 項目：`[x]` / `[X]` / `[ ]` | 「沒 checklist」 |
