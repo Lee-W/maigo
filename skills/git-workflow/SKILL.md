@@ -238,6 +238,14 @@ parallel or an unverified delegate report. Details and recipes in
 Read `references/worktree-hygiene.md` when opening/cleaning up worktrees or
 when git history looks surprising after a delegated task.
 
+### Worktree automation (`--worktree` flag)
+
+How `/maigo:go` / `/maigo:take-issue`'s opt-in `--worktree` flag actually opens
+a sibling worktree, and where `.maigo/` artifacts written during that task
+belong (per-task artifacts vs. the Work Board, which only ever lives in the
+main checkout). Details in
+[`references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md).
+
 ## Shared worktree state volatility (references)
 
 A shared worktree's branch, commits, or push/PR state can change from
