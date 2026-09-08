@@ -15,6 +15,16 @@ description: This skill should be used when reading, writing, or migrating `.mai
 [`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)、
 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)（各自的收尾回寫段）
 
+`.maigo/` 全貌型錄（board 在其中的定位、其餘產物種類）見
+[`docs/reference/artifacts.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/artifacts.md)。
+
+**`~/.config/maigo/board-index.md` 是什麼**：跨 repo 唯讀索引，由
+`scripts/board_index.py`（`/maigo:board --cross-repo` 觸發）產生——回答「這台
+機器裝了 maigo 的所有 repo，現在該我動哪些」這句話，**不是另一份 `board.md`
+正典**。每次重新產生、沒有手寫區、沒有 upsert 語意；只逐字複製各 repo
+`board.md` 的 `## 🎯 下一件` 整段，不重新解析或合併排序。跟本節下面講的
+`board.md` 單一 repo 內的行文法、upsert 合約是完全不同的東西。
+
 ## Why this skill exists
 
 `/maigo:review` 的 `.maigo/review-board.md` 只涵蓋「reviewer 視角」。實際工作面是三種混在一起的球：
@@ -414,6 +424,11 @@ maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使�
 `.maigo/plan-<id>.md`——或遷移前留下的舊 `.maigo/plan.md`——是否存在、`git log`/`git status`
 做到哪一步）——兩者都能讓 orchestrator 從既有進度接著跑，不必
 等原 session 復活，也不必整個重新走一次 Raana 探索 + Tomori 規劃。
+
+**不確定該任務在哪個 repo時**：這台機器裝了 maigo 的 repo 不只一個，先查
+`~/.config/maigo/board-index.md`（沒有就先跑一次 `/maigo:board --cross-repo`
+產生）縮小範圍，再進到命中的那個 repo 查 `board.md` / `plan-<id>.md`，比逐一
+`cd` 進每個 repo 問一輪快。
 
 ## What this skill does NOT cover
 

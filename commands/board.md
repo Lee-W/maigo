@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_index.py:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -25,6 +25,7 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 /maigo:board --check <n...> # 標記「我親自處理過」，作為 --learn 訊號
 /maigo:board --uncheck <n...> # 取消「我親自處理過」標記
 /maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄，7 天後跟其他結案行一起清）
+/maigo:board --cross-repo   # 本地刷新照舊，額外產出跨 repo 總索引
 ```
 
 `targets` 可混用裸編號、GitHub issue URL、GitHub PR URL。裸編號以當前 repo 判定；
@@ -115,6 +116,21 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 `已放棄`，整行移進 `✅ 最近結案`——跟其他結案行共用同一條 7 天老化規則，不再有獨立的
 留痕區。保留原 checkbox 與 `🧠` 狀態；對應細節檔不動，等 7 天老化清除時跟索引行一起刪
 （見 [`skills/work-board` §3 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
+
+### 8. `--cross-repo`
+
+opt-in，預設不開——跨 13 個 repo 掃描比本地刷新慢得多，不該預設每次都跑。
+先照舊完成本地 `.maigo/board.md` 刷新（步驟 1–4），flag 有帶時追加呼叫：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config/maigo/repos.txt]
+```
+
+印出輸出檔 `~/.config/maigo/board-index.md` 的路徑。**不影響本地 `board.md`
+的行文法／upsert 規則**——`board_index.py` 全程唯讀，只讀各 repo 的
+`board.md`、逐字複製 `## 🎯 下一件` 整段，不重寫任何被掃描 repo 的內容，也不
+新增獨立命令（併入這個 flag）。正典規格見
+[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
 
 ## 與其他命令的差異
 
