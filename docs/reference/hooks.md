@@ -1,6 +1,6 @@
 # Hooks Reference
 
-Maigo 的 Claude Code plugin 註冊五個 hook，定義在 `hooks/hooks.json`。
+Maigo 的 Claude Code plugin 註冊六個 hook，定義在 `hooks/hooks.json`。
 只要 Claude Code plugin 載入就自動生效，使用者不用設定。
 
 Codex manifest 會用空的 inline hooks 覆蓋這組 Claude Code lifecycle hooks；
@@ -34,8 +34,8 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 
 不分 project，每次 SessionStart 都跑（在 rule 偵測之前）。maigo 的所有 command
 （go / quick / team / review / address-comments）都把 plan、review rubric、
-pr-comments、retry log 等 artefact 寫進 repo root 的 `.maigo/`，這些絕不該被
-commit。
+review 報告（`review-<id>.md`）、pr-comments、retry log 等 artefact 寫進 repo
+root 的 `.maigo/`，這些絕不該被 commit。
 
 為了不動到 host repo 被追蹤的 `.gitignore`（例如 apache/airflow 的 `.gitignore`
 是上游檔案），hook 改寫該 repo 的 `info/exclude`——路徑用
@@ -153,6 +153,38 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 ### Fail-open 情況
 
 - input 不是有效 JSON、`tool_input` 不是 object、`prompt` 不是非空字串 → 靜默放行
+
+### Timeout
+
+5 秒上限。純 regex，毫秒級完成。
+
+## PreToolUse — `hooks/legacy_artifact_path_check.py`
+
+匹配 `Write` / `Edit` 兩種工具。擋下寫入 `.maigo/` 底下**舊固定檔名**的產物
+（`plan.md` / `review-rubric.md` / `review.md` / `triage-rubric.md` /
+`pr-comments.md`）——跨 13 個實際安裝 maigo 的 repo 實測，散文說「一律呼叫
+`scripts/artifact_path.py`」的採用率是 0%，這支 hook 改用程式碼擋。
+
+反向判準：`kind` 清單動態組自 `from artifact_path import _KNOWN_KINDS`
+（不重複列一份 kind 清單字面值），regex 錨定 `.maigo/` 目錄下、且必須是
+`<kind>.md`（stem 整個等於某個 kind）——`plan-main.md` 這類已含識別碼的新
+命名、`board.md`、`local-model-dispatch-plan.md`、`.maigo/i/9201.md` 都天然
+不命中，不必特別寫排除規則。
+
+命中時 block，訊息附上正確的 `artifact_path.py` 呼叫指令範例，以及
+[artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
+規則 4 的提醒。
+
+### 放行為什麼不輸出 decision
+
+同 `delegation_criteria_check.py`：PreToolUse 的 `approve` 等於跳過權限系統，
+這個 hook 沒有資格代替使用者做那個決定，所以只在命中時 `block`，放行一律靜默
+`exit 0`。
+
+### Fail-open 情況
+
+- input 不是有效 JSON、`tool_name` 不是 `Write`/`Edit`、`tool_input` 不是
+  object、`file_path` 不是非空字串 → 靜默放行
 
 ### Timeout
 
@@ -329,6 +361,10 @@ python3 -c "import json,sys; print(json.dumps({'teammate_role':'Soyo','teammate_
 # 模擬 Stop 觸發
 python3 -c "import json,sys; print(json.dumps({'cwd':'/path/to/project'}))" \
   | python3 hooks/verify_completion.py
+
+# 模擬 Write 到舊固定檔名（應該 block）
+python3 -c "import json; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'.maigo/plan.md'}}))" \
+  | python3 hooks/legacy_artifact_path_check.py
 
 # 模擬 foreground Agent usage metadata
 python3 -c "import json; print(json.dumps({'hook_event_name':'PostToolUse','tool_name':'Agent','session_id':'demo','cwd':'/path/to/project','tool_input':{'subagent_type':'maigo:Soyo'},'tool_response':{'status':'completed','agentId':'agent-1','resolvedModel':'claude-sonnet','usage':{'input_tokens':100,'output_tokens':20}}}))" \
