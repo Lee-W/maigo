@@ -30,6 +30,13 @@ file when writing the rubric or assembling the final report.
 
 ## 輸出
 
+這個骨架不只是聊天視窗的形狀，現在也是逐字寫進 `.maigo/review-<id>.md`
+（`kind="review"`，見
+[`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)，
+呼叫方式見
+[`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)「## 輸出」）
+的檔案內容——兩者是同一份骨架，不要各自維護一份。
+
 ### 單一 PR / branch / range（預設）
 
 ```markdown

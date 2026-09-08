@@ -3,8 +3,9 @@
 Single source of truth for `.maigo/` markdown artifact paths (naming + ownership).
 
 背景見 `.maigo/plan-maigo-artifact-collision.md`：`.maigo/` 底下固定檔名的
-產物（`plan.md` / `review-rubric.md` / `triage-rubric.md` / `pr-comments.md`）
-被兩個並行 session 覆寫過一次，因為它們共用同一個檔名，語意上卻該有各自一份。
+產物（`plan.md` / `review-rubric.md` / `review.md` / `triage-rubric.md` /
+`pr-comments.md`）被兩個並行 session 覆寫過一次，因為它們共用同一個檔名，
+語意上卻該有各自一份。
 
 這個模組有**雙職責**，都是為了讓「拿到路徑就整份覆寫」在 API 層面做不到：
 
@@ -55,7 +56,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from board_state import github_ref
 
-_KNOWN_KINDS = ("plan", "review-rubric", "triage-rubric", "pr-comments")
+_KNOWN_KINDS = ("plan", "review-rubric", "review", "triage-rubric", "pr-comments")
 
 _SLUG_INVALID_RE = re.compile(r"[^a-z0-9._-]+")
 _SLUG_COLLAPSE_RE = re.compile(r"-{2,}")

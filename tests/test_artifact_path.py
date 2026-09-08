@@ -58,6 +58,12 @@ class TestNaming:
     def test_legacy_path_format(self):
         assert ap.legacy_path("plan") == ".maigo/plan.md"
 
+    def test_review_artifact_path_format(self):
+        assert ap.artifact_path("review", "x") == ".maigo/review-x.md"
+
+    def test_review_legacy_path_format(self):
+        assert ap.legacy_path("review") == ".maigo/review.md"
+
     @pytest.mark.parametrize(
         "kind",
         [
@@ -215,6 +221,20 @@ class TestResolveForWrite:
         )
         assert result.status == "new"
         assert result.path == ".maigo/plan-42.md"
+        assert result.existing_topic is None
+        assert result.suggested_path is None
+        assert result.legacy_path is None
+
+    def test_new_for_review_kind_when_target_path_absent(self, tmp_path: Path):
+        result = ap.resolve_for_write(
+            "review",
+            "Review: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.status == "new"
+        assert result.path == ".maigo/review-42.md"
         assert result.existing_topic is None
         assert result.suggested_path is None
         assert result.legacy_path is None
