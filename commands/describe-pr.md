@@ -90,7 +90,7 @@ orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
 ## 失敗處理
 
 - base / branch 的問題（找不到 base、HEAD == base、無 commit）在**步驟 1 前置**就判掉，不啟動燈。
-- 燈回的草稿被 TeammateIdle hook 擋下（缺 `## Loaded memory entries`，或 PR 草稿缺 `## Suggested PR title` / `## Suggested PR description`）→ orchestrator 把擋下原因完整轉給燈重產。
+- 🩵 燈回的草稿被 SubagentStop hook 擋下（缺 `## Loaded memory entries`，或 PR 草稿缺 `## Suggested PR title` / `## Suggested PR description`）→ orchestrator 把擋下原因完整轉給 🩵 燈重產。
 
 ## Orchestrator 守則
 

@@ -46,8 +46,9 @@
         ]
       }
     ],
-    "TeammateIdle": [
+    "SubagentStop": [
       {
+        "matcher": "^(maigo:)?(Raana|Tomori|Anon|Soyo|Taki)$",
         "hooks": [
           {
             "type": "command",

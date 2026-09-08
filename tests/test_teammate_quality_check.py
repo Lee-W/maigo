@@ -4,11 +4,36 @@ from __future__ import annotations
 
 import io
 import json
+import re
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 import hooks.teammate_quality_check as tqc
 from tests.conftest import run_hook_main
+
+
+CHECKLIST = (
+    "## Checklist\n"
+    + "\n".join(
+        f"- [x] {item}"
+        for item in (
+            "acceptance match",
+            "evidence per function",
+            "edge case coverage",
+            "convention conformance",
+            "no unsafe pattern",
+            "no unexplained magic",
+            "no TODO evasion",
+            "no defensive bloat",
+            "no completeness theatre",
+        )
+    )
+    + "\n"
+)
+MEMORY = "## Loaded memory entries\n（無相關 entry）\n"
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +56,7 @@ class TestCheckRaana:
         with pytest.raises(SystemExit):
             tqc.check_raana("## Loaded memory entries\n（無相關 entry）\n")
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
@@ -66,7 +91,7 @@ class TestCheckTomori:
                 ".maigo/plan.md\n## Goal\n## Steps\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_chinese_headings_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
@@ -75,7 +100,7 @@ class TestCheckTomori:
                 ".maigo/plan.md\n## 目標\n## 步驟\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_missing_memory_header_blocks(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
@@ -93,7 +118,7 @@ class TestCheckTomori:
                 "## Suggested PR description\n## Summary\n...\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "PR 草稿" in result["reason"]
 
     def test_pr_draft_missing_description_blocks(self, capsys: pytest.CaptureFixture):
@@ -124,7 +149,7 @@ class TestCheckTomori:
                 "## Category\nbug\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_triage_path_but_no_category_heading_blocks(
         self, capsys: pytest.CaptureFixture
@@ -147,7 +172,7 @@ class TestCheckTomori:
                 ".maigo/review-rubric-71380.md\n## Rubric\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +212,7 @@ class TestTomoriPlanCriteria:
         with pytest.raises(SystemExit):
             tqc.check_tomori(self.OUT)
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_missing_plan_file_fails_open(
         self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
@@ -196,7 +221,7 @@ class TestTomoriPlanCriteria:
         with pytest.raises(SystemExit):
             tqc.check_tomori(self.OUT)
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
 
 # ---------------------------------------------------------------------------
@@ -258,19 +283,18 @@ class TestCheckSoyo:
 
     def test_approved_with_checklist_approves(self, capsys):
         result = self._run(
-            "## Loaded memory entries\n（無相關 entry）\n"
-            "APPROVED\n[x] all good\n[x] verified\n",
+            "## Loaded memory entries\n（無相關 entry）\nAPPROVED\n" + CHECKLIST,
             capsys,
         )
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_blocked_with_checklist_and_must_fix_approves(self, capsys):
         result = self._run(
             "## Loaded memory entries\n（無相關 entry）\n"
-            "BLOCKED\n[x] done\n[ ] pending\nmust-fix: broken import\n",
+            "BLOCKED\n" + CHECKLIST + "must-fix: broken import\n",
             capsys,
         )
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_missing_memory_header_blocks(self, capsys):
         result = self._run("APPROVED\n[x] all good\n[x] verified\n", capsys)
@@ -293,8 +317,7 @@ class TestSoyoRetryCount:
 
     _BLOCKED_OUTPUT = (
         "## Loaded memory entries\n（無相關 entry）\n"
-        "BLOCKED\n[x] done\n[ ] pending\n"
-        "## Must-fix\n- `hooks/foo.py:10` — broken import\n"
+        "BLOCKED\n" + CHECKLIST + "## Must-fix\n- `hooks/foo.py:10` — broken import\n"
     )
 
     def test_extract_must_fix_keys_with_file_ref(self):
@@ -329,7 +352,7 @@ class TestSoyoRetryCount:
         with pytest.raises(SystemExit):
             tqc.check_soyo(self._BLOCKED_OUTPUT)
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         # log file should exist with 1 line
         log_file = tmp_path / "soyo-must-fix.jsonl"
         assert log_file.is_file()
@@ -373,13 +396,12 @@ class TestSoyoRetryCount:
         monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", tmp_path)
         monkeypatch.chdir(tmp_path)
         approved_output = (
-            "## Loaded memory entries\n（無相關 entry）\n"
-            "APPROVED\n[x] all good\n[x] verified\n"
+            "## Loaded memory entries\n（無相關 entry）\nAPPROVED\n" + CHECKLIST
         )
         with pytest.raises(SystemExit):
             tqc.check_soyo(approved_output)
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         # No log file should be written
         log_file = tmp_path / "soyo-must-fix.jsonl"
         assert not log_file.exists()
@@ -429,7 +451,12 @@ class TestCheckTaki:
 
     def test_clean_pass_approves(self, capsys):
         result = self._run("exit 0\nPASS\nAll tests passed.", capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
+
+    @pytest.mark.parametrize("exit_code", [1, -1, 137])
+    def test_pass_with_nonzero_exit_blocks(self, exit_code, capsys):
+        result = self._run(f"PASS\nexit {exit_code}", capsys)
+        assert result["decision"] == "block"
 
 
 # ---------------------------------------------------------------------------
@@ -450,21 +477,21 @@ class TestCheckAnon:
 
     def test_with_py_path_approves(self, capsys):
         result = self._run("我動了 hooks/foo.py\n", capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_with_md_path_approves(self, capsys):
         result = self._run("更新了 docs/reference/hooks.md\n", capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_hedge_language_does_not_block(self, capsys):
         result = self._run(
             "可能要先確認 X 是否需要再動。我改了 commands/retro.md\n", capsys
         )
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_no_memory_header_does_not_block(self, capsys):
         result = self._run("我改了 hooks/check.py\n", capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_url_with_md_does_not_approve(self, capsys):
         result = self._run(
@@ -479,20 +506,93 @@ class TestCheckAnon:
 
 
 class TestMain:
+    @pytest.mark.parametrize(
+        ("role", "output", "blocked"),
+        [
+            ("maigo:Soyo", MEMORY + "APPROVED\n" + CHECKLIST, False),
+            ("maigo:Soyo", MEMORY + "APPROVED\n## Checklist\n- [x] done", True),
+            (
+                "maigo:Soyo",
+                MEMORY + "APPROVED\n" + CHECKLIST.replace("[x]", "[ ]", 1),
+                True,
+            ),
+            ("maigo:Soyo", MEMORY + "READY\n" + CHECKLIST, False),
+            ("maigo:Taki", "PASS\nexit 1", True),
+            ("maigo:Taki", "PASS\nexit 0", False),
+            ("maigo:Anon", "Updated src/example.py", False),
+            ("maigo:Anon", "", True),
+            ("other-plugin:Soyo", "", False),
+        ],
+    )
+    def test_documented_subagent_stop_contract(self, role, output, blocked, tmp_path):
+        root = Path(__file__).resolve().parents[1]
+        payload = {
+            "hook_event_name": "SubagentStop",
+            "session_id": "test-session",
+            "agent_id": "test-agent",
+            "agent_type": role,
+            "cwd": str(tmp_path),
+            "stop_hook_active": False,
+            "transcript_path": str(tmp_path / "parent.jsonl"),
+            "agent_transcript_path": str(tmp_path / "agent.jsonl"),
+            "last_assistant_message": output,
+        }
+        proc = subprocess.run(
+            [sys.executable, str(root / "hooks/teammate_quality_check.py")],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+        )
+        assert proc.returncode == 0
+        assert not proc.stderr
+        result = json.loads(proc.stdout)
+        assert result.get("decision") == ("block" if blocked else None)
+
+    def test_registered_event_matches_maigo_only(self):
+        root = Path(__file__).resolve().parents[1]
+        hooks = json.loads((root / "hooks/hooks.json").read_text())["hooks"]
+        assert "TeammateIdle" not in hooks
+        matcher = hooks["SubagentStop"][0]["matcher"]
+        for agent in (root / "agents").glob("*.md"):
+            assert re.fullmatch(matcher, f"maigo:{agent.stem}")
+        assert not re.fullmatch(matcher, "other-plugin:Soyo")
+
+    def test_quick_skips_only_optional_items(self, monkeypatch, capsys):
+        rows = CHECKLIST.splitlines()
+        for index in (2, 3, 6, 8, 9):
+            rows[index] = rows[index].replace("[x]", "[—]") + " — skipped by mode=quick"
+        output = MEMORY + "APPROVED\n" + "\n".join(rows)
+        result = run_hook_main(
+            tqc,
+            {"agent_type": "maigo:Soyo", "last_assistant_message": output},
+            monkeypatch,
+            capsys,
+        )
+        assert result.get("decision") is None
+        output = output.replace("[x] acceptance match", "[—] acceptance match")
+        result = run_hook_main(
+            tqc,
+            {"agent_type": "maigo:Soyo", "last_assistant_message": output},
+            monkeypatch,
+            capsys,
+        )
+        assert result["decision"] == "block"
+
     def test_tomori_role_dispatches(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture,
     ):
         payload = {
-            "teammate_role": "Tomori",
-            "teammate_output": (
+            "agent_type": "Tomori",
+            "last_assistant_message": (
                 "## Loaded memory entries\n（無相關 entry）\n"
                 ".maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_planner_alias_dispatches_to_tomori(
         self,
@@ -500,14 +600,14 @@ class TestMain:
         capsys: pytest.CaptureFixture,
     ):
         payload = {
-            "teammate_role": "planner",
-            "teammate_output": (
+            "agent_type": "planner",
+            "last_assistant_message": (
                 "## Loaded memory entries\n（無相關 entry）\n"
                 ".maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_unknown_role_fail_open_approves(
         self,
@@ -515,11 +615,11 @@ class TestMain:
         capsys: pytest.CaptureFixture,
     ):
         payload = {
-            "teammate_role": "SomeUnknownRole",
-            "teammate_output": "whatever",
+            "agent_type": "SomeUnknownRole",
+            "last_assistant_message": "whatever",
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_invalid_json_fail_open_approves(
         self,
@@ -530,7 +630,7 @@ class TestMain:
         with pytest.raises(SystemExit):
             tqc.main()
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
     def test_anon_role_dispatches(
         self,
@@ -538,8 +638,8 @@ class TestMain:
         capsys: pytest.CaptureFixture,
     ):
         payload = {
-            "teammate_role": "Anon",
-            "teammate_output": "我改了 hooks/teammate_quality_check.py",
+            "agent_type": "Anon",
+            "last_assistant_message": "我改了 hooks/teammate_quality_check.py",
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None

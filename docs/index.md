@@ -68,7 +68,7 @@ claude --plugin-dir /path/to/maigo
 
 - [Getting Started](guides/getting-started.md) — 第一次裝 Maigo 的 5 分鐘入門
 - [Commands reference](reference/commands.md) — 每個命令的完整流程、合流邏輯、場景對照
-- [Hooks reference](reference/hooks.md) — SessionStart / TeammateIdle / Stop hook 行為與設定
+- [Hooks reference](reference/hooks.md) — SessionStart / SubagentStop / Stop hook 行為與設定
 - [Skills reference](reference/skills.md) — skill 機制與目前 catalog
 - [Agents reference](reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
 - [Contributing](guides/contributing.md) — 修 Maigo 本身的設定與原則

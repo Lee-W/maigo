@@ -22,11 +22,12 @@ import shlex
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hook_io import emit  # noqa: E402
+from _hook_io import emit_stop as emit  # noqa: E402
 from _retry_log import record_and_count  # noqa: E402
 from _session_head import head_moved  # noqa: E402
 from _token_usage import LOG_PATH, format_one_line, summarize  # noqa: E402
@@ -172,6 +173,8 @@ def run_command(cmd: list[str], cwd: Path) -> tuple[int, str]:
         return -1, f"command not found: {cmd[0]}"
     except subprocess.TimeoutExpired:
         return -1, f"timeout after {TEST_TIMEOUT_SEC}s: {' '.join(cmd)}"
+    except OSError as exc:
+        return -1, f"cannot run {' '.join(cmd)}: {exc}"
 
 
 def extract_failures(output: str) -> set[str]:
@@ -235,57 +238,77 @@ def approve_with_usage(reason: str, cwd: Path, session_id: object) -> NoReturn:
     raise AssertionError("emit() must exit")
 
 
-def main() -> None:
-    raw = sys.stdin.read()
-    try:
-        data = json.loads(raw) if raw.strip() else {}
-    except json.JSONDecodeError:
-        data = {}
+VerificationStatus = Literal[
+    "passed", "failed", "unavailable", "skipped", "known_failures"
+]
 
-    cwd = Path(data.get("cwd") or os.getcwd()).resolve()
+
+@dataclass(frozen=True)
+class VerificationResult:
+    """Actual command evidence shared by the hook and explicit task verification."""
+
+    status: VerificationStatus
+    reason: str
+    command: list[str] | None = None
+    exit_code: int | None = None
+    output: str = ""
+
+
+def run_verification(cwd: Path, command: str | None = None) -> VerificationResult:
+    """Always verify when explicitly invoked, including clean/committed worktrees.
+
+    The hook alone decides whether a read-only session needs verification.
+    An unavailable runner, configured skip, or known failure is never PASS.
+    """
     claude_dir = cwd / ".claude"
-    session_id = data.get("session_id")
-
-    if not has_git_modifications(cwd) and not head_moved(cwd, session_id):
-        approve_with_usage(
-            "立希 (Taki)：本次 session 無檔案修改（working tree 乾淨且 HEAD 未變動），跳過 test 驗證",
-            cwd,
-            session_id,
-        )
-
     skip_reason = read_config_line(claude_dir / "skip-test-verification")
     if skip_reason is not None:
-        approve_with_usage(f"verify_completion 跳過：{skip_reason}", cwd, session_id)
+        return VerificationResult("skipped", f"verify_completion 跳過：{skip_reason}")
 
-    custom_cmd = read_config_line(claude_dir / "test-command")
-    cmd = shlex.split(custom_cmd) if custom_cmd else detect_test_command(cwd)
+    custom_cmd = (
+        command
+        if command is not None
+        else read_config_line(claude_dir / "test-command")
+    )
+    try:
+        cmd = (
+            shlex.split(custom_cmd)
+            if custom_cmd is not None
+            else detect_test_command(cwd)
+        )
+    except ValueError as exc:
+        return VerificationResult("unavailable", f"無法解析 test command：{exc}")
 
     if not custom_cmd and (cwd / "uv.lock").is_file() and shutil.which("uv") is None:
-        approve_with_usage(
+        return VerificationResult(
+            "unavailable",
             "立希 (Taki)：偵測到 uv.lock 但 uv 不在 PATH，已跳過 test 驗證——裝 uv 或在 .claude/test-command 指定可跑的指令。",
-            cwd,
-            session_id,
         )
-        return
 
-    if cmd is None:
-        approve_with_usage(
-            "立希 (Taki)：偵測不到 test 設定，跳過（no-op）", cwd, session_id
+    if not cmd:
+        return VerificationResult(
+            "unavailable", "立希 (Taki)：偵測不到可執行的 test 設定，未驗證"
         )
-        return
 
     known = read_known_failures(claude_dir / "known-test-failures")
     exit_code, output = run_command(cmd, cwd)
 
+    def result(status: VerificationStatus, reason: str) -> VerificationResult:
+        return VerificationResult(
+            status, reason, cmd, None if exit_code == -1 else exit_code, output
+        )
+
     if exit_code == 0:
-        approve_with_usage(f"立希 (Taki)：`{' '.join(cmd)}` 通過", cwd, session_id)
+        return result("passed", f"立希 (Taki)：`{' '.join(cmd)}` 通過")
+
+    if exit_code == -1:
+        return result("unavailable", f"立希 (Taki)：無法完成驗證：{output}")
 
     build_env_match = BUILD_ENV_ERROR_RE.search(output)
     if build_env_match:
-        approve_with_usage(
+        return result(
+            "unavailable",
             f"立希 (Taki)：`{' '.join(cmd)}` 失敗於 host build env（{build_env_match.group(0)!r}），不是 test 失敗。跳過——修 host build env，或在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 永久關閉本 worktree 的檢查。",
-            cwd,
-            session_id,
         )
 
     fatal_match = FATAL_MARKER_RE.search(output)
@@ -293,8 +316,8 @@ def main() -> None:
         fatal_key = f"__fatal__:{fatal_match.group(1)}:{' '.join(cmd)}"
         counts = _record_and_count(_retry_log_path(cwd), {fatal_key})
         warning = _retry_warning(counts, {fatal_key}, "import / collection 錯")
-        emit(
-            "block",
+        return result(
+            "failed",
             f"{warning}立希 (Taki)：`{' '.join(cmd)}` 出現 {fatal_match.group(1)}（import / collection 錯，不是 test 失敗）。先修這個。",
         )
 
@@ -320,18 +343,17 @@ def main() -> None:
                 f"——同 test ID 連紅 {RETRY_LIMIT} 次即達 limit。\n\n"
             )
         details = "\n".join(f"  - {f}" for f in sorted(new_failures))
-        emit(
-            "block",
+        return result(
+            "failed",
             f"{warning}立希 (Taki)：`{' '.join(cmd)}` exit {exit_code}，"
             f"{len(new_failures)} 個新失敗：\n{details}\n\n"
             f"（已知失敗已忽略；要忽略新失敗，加到 .claude/known-test-failures）",
         )
 
     if actual and not new_failures:
-        approve_with_usage(
-            f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，放行",
-            cwd,
-            session_id,
+        return result(
+            "known_failures",
+            f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，仍有已知失敗",
         )
 
     # No parseable failures at this point. If the output looks like a
@@ -347,8 +369,8 @@ def main() -> None:
         collection_key = f"__collection__:{collection_match.group(0)}:{' '.join(cmd)}"
         counts = _record_and_count(_retry_log_path(cwd), {collection_key})
         warning = _retry_warning(counts, {collection_key}, "test collection / 設定錯")
-        emit(
-            "block",
+        return result(
+            "failed",
             f"{warning}立希 (Taki)：`{' '.join(cmd)}` 失敗於 test collection / 設定（{collection_match.group(0)!r}），suite 根本沒跑。常見於 uv-workspace monorepo 根目錄要用 `--project`。在 `.claude/test-command` 改成可跑的指令（例如 `uv run --project <pkg> pytest <path>`），或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。",
         )
 
@@ -361,14 +383,44 @@ def main() -> None:
     unparsed_key = f"__unparsed_nonzero__:{' '.join(cmd)}"
     counts = _record_and_count(_retry_log_path(cwd), {unparsed_key})
     if counts.get(unparsed_key, 0) >= RETRY_LIMIT:
-        emit(
-            "block",
+        return result(
+            "failed",
             f"⚠️ RETRY LIMIT REACHED: 立希 (Taki)：`{' '.join(cmd)}` exit {exit_code} 已連續 ≥ {RETRY_LIMIT} 次無法 parse failure（本次含）。停止重試以免無限迴圈，請人工介入確認。依 skills/failure-handling 的「無限迴圈防護」。若這是 collection / 設定問題，在 `.claude/test-command` 改成可跑的指令，或 `.claude/skip-test-verification` 寫一行 reason 明確關閉本 worktree 的檢查。Raw tail:\n{tail}",
         )
-    emit(
-        "block",
+    return result(
+        "failed",
         f"立希 (Taki)：`{' '.join(cmd)}` exit {exit_code}，無法 parse failure 名稱。Raw tail:\n{tail}",
     )
+
+
+def main() -> None:
+    raw = sys.stdin.read()
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+
+    cwd = Path(data.get("cwd") or os.getcwd()).resolve()
+    session_id = data.get("session_id")
+    if not has_git_modifications(cwd) and not head_moved(cwd, session_id):
+        approve_with_usage(
+            "立希 (Taki)：本次 session 無檔案修改（working tree 乾淨且 HEAD 未變動），跳過 test 驗證",
+            cwd,
+            session_id,
+        )
+
+    result = run_verification(cwd)
+    if result.status == "failed" or (
+        result.status == "unavailable"
+        and result.command is not None
+        and result.exit_code is None
+    ):
+        emit("block", result.reason)
+    # Preserve the optional Stop hook's existing skip/known-failure policy.
+    # Explicit verification exposes these states separately and exits nonzero.
+    approve_with_usage(result.reason, cwd, session_id)
 
 
 if __name__ == "__main__":

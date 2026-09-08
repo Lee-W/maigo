@@ -61,7 +61,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 ## `/maigo:quick` — 輕量任務入口
 
-跳過 Raana / Tomori，orchestrator 直接呼叫 Anon。Anon 做完跑 Soyo 輕量 review（9 項 → 4 項），test 由 stop hook 兜底。
+跳過 Raana / Tomori，orchestrator 直接呼叫 Anon。Anon 做完跑 Soyo 輕量 review（9 項 → 4 項），orchestrator 顯式執行驗證 CLI。
 
 ```
 /maigo:quick <小任務描述>
@@ -71,7 +71,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 跑：1（acceptance match）+ 4（convention）+ 5（safety）+ 7（no TODO evasion）
 
-略：2（evidence，由 stop hook 兜底）/ 3（edge case）/ 6（magic）/ 8（bloat）/ 9（completeness theatre）
+略：2（evidence，由顯式測試提供）/ 3（edge case）/ 6（magic）/ 8（bloat）/ 9（completeness theatre）
 
 ### 邊界
 
@@ -83,7 +83,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 |------|-------------|-------------|---------------|
 | Raana / Tomori | skip | run | run |
 | Soyo | 輕量 4 項 | 完整 9 項 | 完整 9 項 |
-| Taki | stop hook 兜底 | 顯式 | 顯式（並行） |
+| Taki | orchestrator 顯式執行 CLI | 顯式 | 顯式（並行） |
 
 ## `/maigo:review` — Review 既有變更
 

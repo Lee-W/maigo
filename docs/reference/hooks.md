@@ -142,7 +142,7 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
 pattern 會命中正當內容（註解、對照表、fixture、詞彙表）或無關的共現字串，
 判準回非預期值時錯的往往是判準而不是產物，而照字面「修好它」比原狀更糟。
 
-同一組偵測邏輯（`hooks/_grep_criteria.py`）也被 TeammateIdle 的
+同一組偵測邏輯（`hooks/_grep_criteria.py`）也被 SubagentStop 的
 燈 (Tomori) 檢查重用，掃她剛寫進 `.maigo/plan-<id>.md` 的驗收條件。
 
 ### 放行為什麼不輸出 decision
@@ -217,10 +217,15 @@ python3 scripts/token_usage_summary.py              # 最近 7 天，含角色�
 python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 ```
 
-## TeammateIdle — `hooks/teammate_quality_check.py`
+## SubagentStop — `hooks/teammate_quality_check.py`
 
-agent 跑完輸出送回 orchestrator 時觸發。
-檢查輸出符合該角色的最低規格，不符合就 block 並要求補完。
+由 Agent 工具啟動的 Maigo subagent 回覆完成時觸發。Matcher 限定 Maigo 的五位角色，
+以 `agent_type`（例如 `maigo:Soyo`）辨識角色，從 `last_assistant_message` 取得輸出，
+並以事件提供的 `cwd` 檢查 artifact、寫入 retry log。
+
+不符合最低規格就輸出 `{"decision":"block","reason":"..."}`，exit 0；通過時省略
+`decision`。這是 [SubagentStop 的官方契約](https://code.claude.com/docs/en/hooks#subagentstop)。
+原先使用的 TeammateIdle 屬於 agent team 的閒置事件，沒有直接提供角色輸出，已移除該註冊。
 
 ### 各角色擋的條件
 
@@ -232,12 +237,14 @@ agent 跑完輸出送回 orchestrator 時觸發。
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
 | **Tomori** | `.maigo/plan(-<id>).md` 的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
-| **Soyo** | verdict 字串：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED` | 「沒下 verdict」 |
-| **Soyo** | checklist 項目：`[x]` / `[X]` / `[ ]` | 「沒 checklist」 |
-| **Soyo** | 非 APPROVED 時：`must-fix` / `改法` / `evidence` / `待補` 之一 | 「擋下卻沒列 must-fix」 |
+| **🟡 Soyo** | review verdict：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`；triage：`READY` / `NEEDS_INFO` / `DUP` / `CLOSE` | 「沒下 verdict」 |
+| **🟡 Soyo** | `## Checklist` 段依序保留至少 9 項：`[x]` / `[X]` / `[ ]` / `[—]`；quick 只允許略過 2、3、6、8、9，附 `skipped by mode=quick`；triage 的非 bug 情境可略過 2–4 | 「checklist 不完整或略過必要項目」 |
+| **🟡 Soyo** | `APPROVED` / `READY` 時不可有 `[ ]` | 「尚有未通過項目」 |
+| **🟡 Soyo** | review 非 APPROVED 時：`must-fix` / `改法` / `evidence` / `待補` 之一 | 「擋下卻沒列 must-fix」 |
 | **Soyo** | 同 must-fix key 連續 ≥ 2 次 | block reason 前綴 `⚠️ RETRY LIMIT REACHED (Soyo):` |
 | **Taki** | `exit <number>` 模式 | 「沒貼 exit code」 |
 | **Taki** | `PASS` 或 `FAIL` 之一 | 「沒給最終 verdict」 |
+| **🟣 Taki** | `PASS` 時最後列出的 command exit code 必須是 0 | 「PASS 與 exit code 矛盾」 |
 | **Taki** | **不能包含** `should work` / `looks good` / `應該可以` / `看起來沒問題` 等 hedge 語 | 「verifier 只能拿 exit code 講話」 |
 | **Anon** | 至少一個 file path reference（regex 抓 `*.py` / `*.md` / `*.yml` / `*.yaml` / `*.json` / `*.toml` / `*.txt` / `*.sh` / `*.cfg`）| 「沒看到檔案路徑 reference」 |
 
@@ -261,8 +268,12 @@ backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 
 ### Fail-open 情況
 
-- malformed input（沒 `teammate_role` 或 `teammate_output`）→ approve
-- input 不是有效 JSON → approve
+- 沒有有效 `agent_type`、非 Maigo 角色，或 input 不是有效 JSON object → 略過，不輸出 decision
+- 已辨識的 Maigo 角色缺少 `last_assistant_message`、或 `cwd` 無效 → block
+
+這是輸出格式檢查，不能證明 checklist 判斷正確或 command 真的執行過；實際測試證據由
+下節的顯式驗證 CLI 取得。Review 的 NEEDS_CHANGES／BLOCKED 格式完整時可交回 orchestrator，
+不代表變更已獲 APPROVED。
 
 ### Timeout
 
@@ -272,6 +283,37 @@ backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
 
 編輯 `hooks/teammate_quality_check.py`，在 `ROLE_HANDLERS` 字典加一個新 mapping，
 並寫對應的 `check_<role>` 函式。每個 handler 都要呼叫 `emit("block", ...)` 或 `emit("approve", ...)`。
+
+## Explicit task verification
+
+`quick` 在所有宿主都明確執行以下 CLI；不需要 lifecycle hooks、subagents 或特定模型。
+`--cwd` 必須指向本次工作目錄，即使該 repo 乾淨、工作已 commit，也會執行驗證。
+
+```bash
+python3 /path/to/maigo/scripts/verify_task.py --cwd /path/to/project
+python3 /path/to/maigo/scripts/verify_task.py --cwd /path/to/project --command 'uv run pytest tests/test_example.py'
+```
+
+CLI 與 Stop hook 共用 `run_verification()`。stdout 為單一 JSON object，包含
+`schema_version`、`cwd`、開始／結束時間、`status`、`reason`、實際執行的 `command`、
+子程序 `exit_code` 和 `output`。未執行或無法取得完成狀態時，`exit_code` 為 `null`。
+可用 shell redirect 保存本次結果；改動後必須重跑。
+
+| status | CLI exit | 意義 |
+|---|---|---|
+| `passed` | 0 | 該次驗證 command exit 0 |
+| `failed` | 1 | 測試或 collection／設定檢查失敗 |
+| `unavailable` | 2 | 無 runner／測試設定、無法啟動、逾時、或 host build env 失敗 |
+| `skipped` | 3 | `.claude/skip-test-verification` 已設定原因，沒有執行測試 |
+| `known_failures` | 4 | command 非零，能解析的失敗都在已知失敗名單中 |
+
+`--command` 優先於 `.claude/test-command`，以 argv 解析，沒有 shell expansion。
+既有 skip 設定仍生效。未指定 command 時沿用以下 Stop hook 的 runner 偵測與設定。
+CLI 的 status 不代表 review 已通過，也不涵蓋未執行的其他檢查。
+
+沒有 hook 的宿主仍靠 command 顯式呼叫，不能宣稱有機器強制的 completion gate。
+Stop hook 保留既有 skip／known-failure 放行政策；CLI 用獨立狀態和非零 exit code 表示這些例外，
+讓呼叫端依已授權的政策決定後續動作，不能把它們當成測試全綠。
 
 ## Stop — `hooks/verify_completion.py`
 
@@ -354,8 +396,8 @@ message 強調「這不是 test fail，是 import 錯」。
 要看 hook 真的有跑、回傳什麼：
 
 ```bash
-# 模擬 TeammateIdle 觸發
-python3 -c "import json,sys; print(json.dumps({'teammate_role':'Soyo','teammate_output':'## Verdict\nBLOCKED\n## Checklist\n- [ ] foo'}))" \
+# 模擬 SubagentStop 觸發
+python3 -c "import json; print(json.dumps({'hook_event_name':'SubagentStop','agent_type':'maigo:Soyo','last_assistant_message':'## Verdict\nBLOCKED\n## Checklist\n- [ ] foo'}))" \
   | python3 hooks/teammate_quality_check.py
 
 # 模擬 Stop 觸發

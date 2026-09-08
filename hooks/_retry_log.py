@@ -38,7 +38,8 @@ def record_and_count(log_path: Path, keys: set[str], entry_key: str) -> dict[str
                         counts[k] = counts.get(k, 0) + 1
                 except json.JSONDecodeError:
                     pass  # corrupted line — skip, don't crash
-        ts = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # verify_task.py also calls this from a standalone system Python.
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
         new_entry = json.dumps({"ts": ts, entry_key: sorted(keys)}, ensure_ascii=False)
         with log_path.open("a", encoding="utf-8") as f:
             f.write(new_entry + "\n")

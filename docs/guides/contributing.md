@@ -113,9 +113,9 @@ maigo/
 ├── skills/                          # 跨 agent/command 共用的 process
 │   └── strict-review/ / teammate-flow/ / commit-message/ / failure-handling/ / memory-loading/ / memory-propose-confirm/ / narration/ / pr-context-cache/ / github-title-description/ / doc-link-convention/ / airflow-aware/ / commitizen-aware/
 ├── hooks/
-│   ├── hooks.json                   # 註冊 SessionStart + TeammateIdle + Stop
+│   ├── hooks.json                   # 註冊 SessionStart + SubagentStop + Stop
 │   ├── repo_detect.py               # SessionStart：偵測 repo 自動載 domain skill
-│   ├── teammate_quality_check.py    # TeammateIdle：agent 輸出規格檢查
+│   ├── teammate_quality_check.py    # SubagentStop：agent 輸出規格檢查
 │   ├── verify_completion.py         # Stop：任務宣告完成前強制跑 test
 │   ├── _hook_io.py                  # 共用 emit() payload
 │   └── _retry_log.py                # 共用 JSONL retry-log（Soyo must-fix / Taki test 失敗）
