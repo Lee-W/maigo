@@ -113,6 +113,7 @@ def check_hooks_schema() -> CheckResult:
         "PreToolUse",
         "PostToolUse",
         "TeammateIdle",
+        "SubagentStop",
         "Stop",
     }
     for event, configs in hooks.items():

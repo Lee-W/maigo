@@ -238,6 +238,26 @@ class TestHasGitModifications:
 
 
 class TestMain:
+    def test_unavailable_command_still_blocks_stop(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion,
+            "run_verification",
+            lambda cwd: verify_completion.VerificationResult(
+                "unavailable",
+                "runner timed out",
+                ["pytest"],
+                None,
+                "timeout",
+            ),
+        )
+        result = run_hook_main(
+            verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys
+        )
+        assert result["decision"] == "block"
+
     def test_skip_test_verification(
         self,
         tmp_path: Path,
@@ -251,7 +271,7 @@ class TestMain:
         )
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "跳過" in result["reason"]
 
     def test_no_test_command_detected(
@@ -263,7 +283,7 @@ class TestMain:
         # empty tmp_path — detect_test_command returns None
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "偵測不到" in result["reason"]
 
     def test_approve_includes_session_usage(
@@ -295,7 +315,7 @@ class TestMain:
             capsys,
         )
 
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "Token usage：input 1.2k" in result["reason"]
         assert "已追蹤 1 agents" in result["reason"]
 
@@ -314,7 +334,7 @@ class TestMain:
         result = run_hook_main(
             verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys
         )
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "無檔案修改" in result["reason"]
 
     def test_clean_tree_but_moved_head_still_verifies(
@@ -335,7 +355,7 @@ class TestMain:
         result = run_hook_main(
             verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys
         )
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "無檔案修改" not in result["reason"]
         assert "uv 不在 PATH" in result["reason"]
 
@@ -355,7 +375,7 @@ class TestMain:
         monkeypatch.setattr(verify_completion.shutil, "which", lambda cmd: None)
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
         assert "uv 不在 PATH" in result["reason"]
 
     def test_run_command_succeeds(
@@ -368,7 +388,7 @@ class TestMain:
         monkeypatch.setattr(verify_completion, "run_command", lambda cmd, cwd: (0, ""))
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        assert result["decision"] == "approve"
+        assert result.get("decision") is None
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Maigo TeammateIdle hook：各 agent 輸出規格檢查。
+"""Maigo SubagentStop hook：各 agent 輸出規格檢查。
 
 失敗時 block（要 agent 補完輸出）；輸入異常 / 角色未定義時 fail-open。
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _grep_criteria import block_reason, find_literal_grep_criteria
-from _hook_io import emit
+from _hook_io import emit_stop as emit
 from _retry_log import record_and_count
 
 SOYO_RETRY_LIMIT = 2
@@ -172,22 +172,47 @@ def check_tomori(out: str) -> None:
 
 def check_soyo(out: str) -> None:
     require_memory_header(out, "爽世 (Soyo)")
-    verdict_match = re.search(r"\b(APPROVED|NEEDS_CHANGES|BLOCKED)\b", out)
+    verdict_match = re.search(
+        r"\b(APPROVED|NEEDS_CHANGES|BLOCKED|READY|NEEDS_INFO|DUP|CLOSE)\b", out
+    )
     if not verdict_match:
         emit(
             "block",
-            "爽世 (Soyo) 的輸出沒看到 verdict（APPROVED / NEEDS_CHANGES / BLOCKED）。預設 BLOCKED，所有 review 都要明確寫出 verdict。",
+            "爽世 (Soyo) 的輸出沒看到 review verdict（APPROVED / NEEDS_CHANGES / BLOCKED）或 triage verdict（READY / NEEDS_INFO / DUP / CLOSE）。",
         )
         return
     verdict = verdict_match.group(1)
 
-    if not re.search(r"\[[xX ]\]", out):
+    checklist = re.search(
+        r"^##\s+Checklist\b[^\n]*\n(.*?)(?=^##\s|\Z)",
+        out,
+        re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    if checklist is None:
+        emit("block", "爽世 (Soyo) 的輸出缺少 ## Checklist 段。")
+        return
+    rows = re.findall(r"^.*\[([xX —-])\].*$", checklist.group(1), re.MULTILINE)
+    if len(rows) < 9:
         emit(
             "block",
-            "爽世 (Soyo) 的輸出缺少 checklist（[x] / [ ] 項目）。9 項強制檢查必須逐項標示。",
+            "爽世 (Soyo) 的 ## Checklist 必須依序列出至少 9 項（[x] / [ ] / [—]）；quick 的略過項也要列出原因。",
         )
 
-    if verdict != "APPROVED":
+    triage = verdict in {"READY", "NEEDS_INFO", "DUP", "CLOSE"}
+    skipped = {index for index, mark in enumerate(rows, 1) if mark in {"—", "-"}}
+    allowed_skips = {2, 3, 4} if triage else {2, 3, 6, 8, 9}
+    if skipped and (
+        not skipped <= allowed_skips
+        or (not triage and "skipped by mode=quick" not in checklist.group(1))
+    ):
+        emit(
+            "block",
+            "爽世 (Soyo) 的 checklist 略過了必要項目，或缺少 skipped by mode=quick 原因。",
+        )
+    if verdict in {"APPROVED", "READY"} and " " in rows:
+        emit("block", f"爽世 (Soyo) 的 checklist 仍有 [ ]，不能給 {verdict}。")
+
+    if not triage and verdict != "APPROVED":
         if not re.search(r"(must[-\s]?fix|改法|evidence|待補)", out, re.IGNORECASE):
             emit(
                 "block",
@@ -344,7 +369,8 @@ def check_anon(out: str) -> None:
 
 
 def check_taki(out: str) -> None:
-    if not re.search(r"exit\s+[0-9]+", out):
+    exit_codes = re.findall(r"exit\s+(-?[0-9]+)", out)
+    if not exit_codes:
         emit(
             "block",
             "立希 (Taki) 沒看到 exit code。要拿真的 command 跑過，不是憑感覺說 PASS / FAIL。",
@@ -355,6 +381,11 @@ def check_taki(out: str) -> None:
         emit("block", "立希 (Taki) 沒給最終 verdict（PASS / FAIL）。")
         return
     verdict = verdict_match.group(1)
+    if verdict == "PASS" and int(exit_codes[-1]) != 0:
+        emit(
+            "block",
+            "立希 (Taki) 宣告 PASS，但最後列出的 command exit code 非 0。請分開列出失敗與修正後的驗證結果。",
+        )
 
     hedge_patterns = [
         r"should\s+work",
@@ -400,18 +431,37 @@ def main() -> None:
     except json.JSONDecodeError:
         emit("approve", "輸入不是有效 JSON，Maigo teammate check 跳過")
 
-    role = (data.get("teammate_role") or "").strip()
-    output = data.get("teammate_output") or ""
-
-    if not role or not output:
-        emit("approve", "輸入缺少 teammate_role 或 teammate_output，跳過")
+    if not isinstance(data, dict):
+        emit("approve", "輸入不是 JSON object，Maigo subagent check 跳過")
+        return
+    role = data.get("agent_type")
+    if not isinstance(role, str) or not role.strip():
+        emit("approve", "輸入缺少 agent_type，無法辨識 Maigo subagent，跳過")
+        return
+    role = role.strip().removeprefix("maigo:")
 
     handler = ROLE_HANDLERS.get(role)
     if handler is None:
         emit("approve", f"{role}：未設規格，預設通過")
         return
 
-    handler(output)
+    output = data.get("last_assistant_message")
+    if not isinstance(output, str) or not output.strip():
+        emit(
+            "block",
+            f"{role} 的 SubagentStop 缺少 last_assistant_message，請補完角色輸出。",
+        )
+        return
+    cwd = data.get("cwd") or os.getcwd()
+    if not isinstance(cwd, str) or not Path(cwd).is_dir():
+        emit("block", "SubagentStop 的 cwd 不是有效目錄，無法檢查角色產物。")
+        return
+    previous_cwd = os.getcwd()
+    try:
+        os.chdir(cwd)
+        handler(output)
+    finally:
+        os.chdir(previous_cwd)
 
 
 if __name__ == "__main__":

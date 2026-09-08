@@ -18,7 +18,7 @@ description: This skill should be used after a change is complete — at the wra
 
 改動完成、收尾階段，且當前 branch **可能**已經對應一個開啟中的 PR 時。三個既有收尾點套用：
 
-- `/maigo:quick` 步驟 4（Stop hook 綠、commit message 草擬前後皆可）
+- `/maigo:quick` 步驟 4（顯式驗證 passed、commit message 草擬前後皆可）
 - `/maigo:go` / `/maigo:team`（經 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)「Commit message draft」段，Taki 全綠後）
 - `/maigo:address-comments` 步驟 6 Finale（這裡已知 PR 存在——步驟 1 的 pre-flight gate 已經核過，可以省略步驟 1）
 

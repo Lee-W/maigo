@@ -9,10 +9,11 @@ flowchart TD
     Anon --> Soyo[爽世 Soyo<br/>輕量 review<br/>4 項 subset]
     Soyo --> SoyoVerdict{APPROVED?}
     SoyoVerdict -- BLOCKED --> Anon
-    SoyoVerdict -- APPROVED --> StopHook([Stop hook<br/>自動跑 test])
-    StopHook --> HookVerdict{test 綠?}
-    HookVerdict -- FAIL --> Anon
-    HookVerdict -- PASS --> Commit[Orchestrator<br/>草擬 commit msg]
+    SoyoVerdict -- APPROVED --> Verification[Orchestrator<br/>verify_task.py]
+    Verification --> HookVerdict{status?}
+    HookVerdict -- failed --> Anon
+    HookVerdict -- passed --> Commit[Orchestrator<br/>草擬 commit msg]
+    HookVerdict -- unavailable / skipped / known_failures --> Unverified([回報未通過驗證與原因])
     Commit --> Done([完成])
 
     classDef raana fill:#6EEB83,stroke:#333,color:#000

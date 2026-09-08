@@ -73,7 +73,7 @@ Translate Claude Code concepts without changing the workflow's intent:
 - Map explicit agent or `Task` delegation to Codex sub-agents when collaboration tools are available. If unavailable, execute the named roles sequentially in the main agent and disclose the fallback.
 - Use Codex planning tools for command-level plans when available, while preserving `.maigo/*.md` artifacts required by the command.
 - Use patch-based file editing and the current shell/tooling policies rather than Claude-specific Read, Write, Edit, or Bash tool names.
-- Claude Code lifecycle hooks are not installed by the Codex manifest. Run the command's required review and verification steps explicitly; never claim that TeammateIdle or Stop hooks enforced completion.
+- Claude Code lifecycle hooks are not installed by the Codex manifest. Run the command's required review and verification steps explicitly; never claim that SubagentStop or Stop hooks enforced completion. For `quick`, run `<plugin-root>/scripts/verify_task.py --cwd <project-cwd>` and follow its status contract in `commands/quick.md`; hook exit 0 is not a test result.
 - If a command needs to write outside the active workspace, request the required approval instead of silently skipping the write.
 
 ## Poor command UX

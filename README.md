@@ -107,13 +107,13 @@ Codex session 有提供多 agent 工具時，Maigo 會依 command 進行分工�
 只要 plugin 載入就生效，使用者不用設定：
 
 - **PostToolUse** — 本機記錄 foreground subagent 回傳的 token usage metadata；不估算、不額外呼叫模型
-- **TeammateIdle** — agent 輸出不符規格（如 Soyo 沒下 verdict、Taki 沒貼 exit code）就 block
+- **SubagentStop** — agent 輸出不符規格（如 🟡 Soyo 沒下 verdict、🟣 Taki 沒貼 exit code）就 block
 - **Stop** — 任務宣告完成前自動偵測專案類型跑 test，並在成功訊息附上本 session 的一行 token 摘要
 
 → 完整擋下條件、設定檔（`.claude/skip-test-verification` 等）：[docs/reference/hooks.md](docs/reference/hooks.md)
 
 Codex manifest 不會安裝這些 Claude Code lifecycle hooks；`command-router` 會要求明確跑完
-command 裡的 review 與 verification 步驟，但不宣稱 TeammateIdle / Stop hook 已強制擋下。
+command 裡的 review 與 verification 步驟，但不宣稱 SubagentStop / Stop hook 已強制擋下。
 
 ## 產出檔案
 
@@ -129,7 +129,7 @@ Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`�
 - [Getting Started](docs/guides/getting-started.md) — 第一次裝 Maigo 的 5 分鐘入門
 - [Commands reference](docs/reference/commands.md) — 每個命令的完整流程、合流邏輯、場景對照
 - [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
-- [Hooks reference](docs/reference/hooks.md) — SessionStart / TeammateIdle / Stop hook 完整行為與設定
+- [Hooks reference](docs/reference/hooks.md) — SessionStart / SubagentStop / Stop hook 完整行為與設定
 - [Skills reference](docs/reference/skills.md) — skill 機制與完整 catalog（`strict-review`、`teammate-flow`、`commit-message`、`doc-link-convention`、`copyable-deliverable`、`failure-handling` 等）
 - [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
