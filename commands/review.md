@@ -146,7 +146,29 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 單一 PR / branch / range（預設）輸出 Context / Rubric / Verdict / Verification / Bottom line
 五段；batch 內最後一個 PR 跑完後把「Queue 還剩...」那行換成 roll-up；`--bilingual` 或
 repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal rule 再接英文 detail。
-三種版型的完整骨架見 `skills/strict-review/references/review-templates.md`「輸出」。
+三種版型的完整骨架見
+[`skills/strict-review/references/review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)「輸出」——
+這份骨架同時是要逐字寫入的檔案內容，兩者不分開維護。
+
+印出五段報告之前，orchestrator 先呼叫：
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review \
+    --topic "Review: <PR title / branch / range>"
+```
+
+取得落檔路徑（歸屬規則見
+[`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）：
+
+- `status: conflict`（exit 3）→ 依 artifact-ownership 規則 3，把 `conflict_owner:` 與
+  `suggest:` 呈現給使用者，不擅自覆寫既有檔案，等使用者決定要不要採用 `suggest:` 路徑
+- 其餘 status → 把完整的五段（或 `--bilingual` 版、或 batch roll-up 版）報告內容
+  **逐字寫入**該路徑的檔案，再照舊在對話裡印一份——檔案是真相、對話是即時可讀，
+  兩者都要，不是二選一
+
+**多 PR batch**：每顆 PR 各自呼叫一次 `artifact_path.py review --topic "Review: <該 PR 的
+title>"`（H1 各自不同），各自落一份 `review-<id>.md`——GitHub PR 有 `--url` 天然走
+`resolve_identifier()` 第 1 級，identifier 各自不同，不會互相覆寫，不需要額外機制。
 
 ## Work Board 回寫
 
@@ -161,7 +183,8 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
   （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
 - merged / closed → 👀 行進 ✅ 最近結案
-- 這份 `review-<n>.md` 產物路徑寫進對應細節檔（`.maigo/i/<slug>.md`，見
+- 上面「## 輸出」段呼叫 `artifact_path.py review` 拿到的 `path:`（即這份
+  `review-<id>.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
   的 `## 筆記` 區，一行裸相對路徑連結——不再寫進索引行
 

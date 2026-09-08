@@ -46,8 +46,8 @@ description: This skill should be used when the maigo orchestrator, running in t
 
 ## `.maigo/` 產物歸屬
 
-`.maigo/` 底下 agent 寫的 markdown 產物（plan / review-rubric / triage-rubric /
-pr-comments 這類）一律呼叫 `scripts/artifact_path.py` 取路徑，不要自己組檔名、
+`.maigo/` 底下 agent 寫的 markdown 產物（plan / review-rubric / review /
+triage-rubric / pr-comments 這類）一律呼叫 `scripts/artifact_path.py` 取路徑，不要自己組檔名、
 也不要自己記得比對 H1——判斷邏輯在有測試把關的程式碼裡，散文只提醒你呼叫它。
 完整規則見
 [`references/artifact-ownership.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)。
