@@ -14,7 +14,28 @@ allowed-tools: Bash(gh issue view:*), Read
 
 ```
 /maigo:take-issue <issue 編號或 URL>
+/maigo:take-issue --worktree <issue 編號或 URL>   # 在獨立的 sibling worktree 裡跑整趟流程
 ```
+
+## `--worktree`（opt-in，預設不開）
+
+帶這個旗標時，在 🐱 樂奈開始之前，orchestrator 親自跑：
+
+```bash
+git fetch <remote>
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --repo <name> --topic "<issue 標題>"
+git worktree add -b <branch> <path> <remote>/<default-branch>
+```
+
+`<remote>` 判定：先試 `upstream`，否則退回 `origin`。之後每個 delegate 的 prompt
+都要帶上這個 `path` 當 cwd（見
+[`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)
+的 cwd 交辦紀律）。
+
+收尾（🟣 立希全綠、commit 草擬完）時印出這個 worktree 的路徑與 branch，明講
+「留在原地，等 PR merge 後可用 `/maigo:repo-audit` 看到清理建議」——**不在這裡
+自動移除**。細節、`.maigo/` 歸屬規則見
+[`skills/git-workflow/references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)。
 
 ## 流程
 

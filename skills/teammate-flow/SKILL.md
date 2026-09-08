@@ -69,6 +69,12 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 - 不要跳關。即使任務看起來很小，每一步都要走
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code
   的 Stop hook 會自行附上一行 token usage；orchestrator 不讀 usage log、不把統計塞回 prompt
+- **呼叫端命令帶了 worktree cwd 時**（`/maigo:go` / `/maigo:take-issue` 的
+  `--worktree`，見
+  [`skills/git-workflow/references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)），
+  **每一個** delegate prompt（🐱 樂奈 / 🩵 燈 / 🎀 愛音 / 🟡 爽世 / 🟣 立希）都必須
+  明講絕對路徑的 cwd，不能假設「上一位講過這次就會記得」——五個 agent 各自是獨立
+  context，沒有隱含繼承
 - 🐱 樂奈探索 / 🩵 燈規劃階段若發現某項要求是重複造輪子、會腐蝕既有設計、或時機未到，
   **直說並建議砍或延**，不要為了把整份清單做完、或為了功能對稱性而硬做——攤出具體
   證據（哪裡已覆蓋、會腐蝕什麼、時機為何未到）讓使用者拍板，不擅自省略。「重複造

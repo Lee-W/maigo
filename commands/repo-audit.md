@@ -1,6 +1,6 @@
 ---
-description: repo 自身內部健診（read-only orchestrator 主持）——掃已合併可刪的 branch、未關 PR、TODO/FIXME 積壓、skill 健診（孤兒 / 重疊候選 / 指向失效），彙整成可複製的處置 checklist，不執行任何寫入。🌑 Mortis 一句結算。不 delegate 五人，orchestrator 直跑。
-allowed-tools: Bash(git branch --merged:*), Bash(gh pr list:*), Bash(grep:*), Read
+description: repo 自身內部健診（read-only orchestrator 主持）——掃已合併可刪的 branch、未關 PR、TODO/FIXME 積壓、skill 健診（孤兒 / 重疊候選 / 指向失效）、已合併可清的 sibling worktree，彙整成可複製的處置 checklist，不執行任何寫入。🌑 Mortis 一句結算。不 delegate 五人，orchestrator 直跑。
+allowed-tools: Bash(git branch --merged:*), Bash(gh pr list:*), Bash(grep:*), Bash(git worktree list:*), Bash(gh search prs:*), Read
 ---
 
 <!-- mkdocs-include-start -->
@@ -20,7 +20,7 @@ read-only 內部健診——不刪 branch、不關 PR、不改 code。
 
 無參數。對當前所在的 git repo 執行。
 
-## 四個資料源（全 read-only）
+## 五個資料源（全 read-only）
 
 ### A. 已合併可刪的 branch
 
@@ -72,6 +72,24 @@ orchestrator 讀 `skills/*/SKILL.md`（不開新 agent），三類檢查：
 → **三類都只列出，不合併、不刪除、不改指向**——advisory，判斷與執行留給使用者或後續
 [`/maigo:crystallize`](https://github.com/Lee-W/maigo/blob/main/commands/crystallize.md)。
 
+### E. 已合併可清的 sibling worktree
+
+```bash
+git worktree list --porcelain
+```
+
+列出所有 linked worktree（不能用「目錄名長得像 `<repo>-*`」去猜——`ring` /
+`ring-codex` 是兩個各自獨立的 clone，不是彼此的 worktree，必須用 `git worktree
+list --porcelain` 這種權威來源）。對每個 worktree 的 branch 名，比照 A 段既有的
+「已合併」判斷方法（squash-merge 場景用 `gh search prs` 而非 `git branch
+--merged`，見
+[`skills/git-workflow/references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)）
+判斷是否已合併，命中就把 `git worktree remove <path>` + `git branch -D
+<branch>` 加進處置 checklist。
+
+→ **列出，不執行。** 這是 repo-audit 既有的「單一 repo、cwd 視角」報告——跟
+Group F 的跨 repo 總索引是不同東西，不在這裡順手加跨 repo 掃描。
+
 ## 輸出結構
 
 各段有發現時，彙整成**單一 fenced code block** 的處置 checklist：
@@ -96,9 +114,13 @@ gh pr view <number>
 # 重疊候選：<skill A> / <skill B> — <一句理由>
 # 指向失效：<skill>/SKILL.md → `<path>` 不存在
 # → 合併 / 退役 / 修指向，交你或 /maigo:crystallize 判斷
+
+## E. 已合併可清的 sibling worktree
+git worktree remove <path>
+git branch -D <branch-name>
 ```
 
-各段無發現則**省略該段**；四段全空則省略整個 checklist。
+各段無發現則**省略該段**；五段全空則省略整個 checklist。
 **範例 code block 內不寫絕對路徑**——以相對路徑或 `~/` 表示。
 
 ## 結算
@@ -115,7 +137,7 @@ gh pr view <number>
 - **完全 read-only**：不刪 branch、不關 PR、不改 code；處置只輸出文字，不執行。
 - **不 delegate 五人**：orchestrator 直接執行 git / gh / grep 指令 + 讀 SKILL.md 判斷，彙整輸出。
 - **任一指令失敗 → 跳過該段 + Mortis 1 句告知，不中斷整輪**：
-  - `gh` 失敗（未安裝 / 未登入）→ 跳過 B 段
+  - `gh` 失敗（未安裝 / 未登入）→ 跳過 B 段（判斷 E 段合併狀態用的 `gh search prs` 同樣受影響，跳過即可，不擋 E 段其餘列表輸出）
   - `git` / `grep` 失敗 → 跳過對應段
 - **D 段是判斷型 advisory**：孤兒 / 重疊 / 指向失效三類都只列出候選，不代使用者拍板合併或刪除。
 - **開場**：🌙 Doloris 帶入（鋪陳語氣，見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)）。
