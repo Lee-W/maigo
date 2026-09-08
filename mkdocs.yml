@@ -23,6 +23,7 @@ nav:
       - Hooks: reference/hooks.md
       - Skills: reference/skills.md
       - Memory: reference/memory.md
+      - Artifacts: reference/artifacts.md
       - Character colors: reference/character-colors.md
   - Guides:
       - Getting Started: guides/getting-started.md
