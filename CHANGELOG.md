@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.58.0 (2026-09-08)
+
+### Feat
+
+- **scripts**: migrate legacy artifact names and index boards across repos
+- **hooks**: block writes to legacy fixed artifact filenames
+- **worktree**: compute sibling worktree paths and add an opt-in flag
+- **artifact-path**: give the final review report a managed filename
+- **scripts**: add a .maigo/ directory catalog
+
 ## v0.57.0 (2026-09-07)
 
 ### Feat
