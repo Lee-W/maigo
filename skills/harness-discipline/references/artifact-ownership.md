@@ -2,17 +2,20 @@
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
 `.maigo/` 底下 agent 寫的 markdown 產物（`plan.md` / `review-rubric.md` /
-`triage-rubric.md` / `pr-comments.md` 這類）曾經被兩個並行 session 靜默覆寫過，
-因為它們共用同一個固定檔名，語意上卻該有各自一份。Read this file when 你要在
-`.maigo/` 寫入這類 markdown 產物、或需要幫它取路徑之前。
+`review.md` / `triage-rubric.md` / `pr-comments.md` 這類）曾經被兩個並行
+session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻該有各自一份。
+Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要幫它取
+路徑之前。`.maigo/` 全貌型錄（含非 markdown 機器狀態檔、Work Board、舊固定
+檔名與未登記檔案）見
+[`docs/reference/artifacts.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/artifacts.md)。
 
 ---
 
 ## 規則（四條，全部程式碼強制，不是靠你記得檢查）
 
 1. **每份這類 markdown 必須以能識別主題的 H1 開頭**（例：`# Plan: <task>`、
-   `# Review rubric: <PR title>`、`# Triage rubric: <issue title> (#<N>)`、
-   `# PR comments: <PR title> (#<number>)`）。
+   `# Review rubric: <PR title>`、`# Review: <PR title / branch / range>`、
+   `# Triage rubric: <issue title> (#<N>)`、`# PR comments: <PR title> (#<number>)`）。
 
    這些範例**必須與各自模板實際寫出的 H1 逐字相同** —— `--topic` 與 H1 對不上，
    `same_topic` 就不成立，續跑會被誤判成 `conflict`。pr-comments 的權威模板在
@@ -37,7 +40,10 @@ Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Le
 
 4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）只可讀、不可當寫入
    目標**——有續跑語意的產物（如 `plan.md`）在新路徑讀不到內容時可以退回讀舊
-   檔繼續，但下一次寫入一律寫到 script 回的新路徑，不回寫舊檔。
+   檔繼續，但下一次寫入一律寫到 script 回的新路徑，不回寫舊檔。這條現在不是只
+   靠你記得——`Write` / `Edit` 寫入 `.maigo/` 底下的舊固定檔名會被
+   [`hooks/legacy_artifact_path_check.py`](https://github.com/Lee-W/maigo/blob/main/hooks/legacy_artifact_path_check.py)
+   （PreToolUse）直接擋下，訊息會附上正確的 `artifact_path.py` 呼叫指令。
 
 `pr-comments` 另外還有
 [`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
