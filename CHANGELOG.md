@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.58.1 (2026-09-09)
+
+### Fix
+
+- verify quick tasks across agent hosts
+
 ## v0.58.0 (2026-09-08)
 
 ### Feat
