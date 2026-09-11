@@ -1,13 +1,16 @@
 ---
-description: 跟 /maigo:go 一樣的流程，但 Soyo + Taki 並行跑。Wall-clock 省 ~30%；fallback 用 --force-sequential。
+description: 跟 /maigo:go 一樣的流程，宿主可並行時由 Soyo + Taki 同時跑；否則自動順序執行，也可用 --force-sequential。
 ---
 
 <!-- mkdocs-include-start -->
 
 # /maigo:team
 
-跟 `/maigo:go` 同一條工作流，差別在最後審查 + 驗證階段**並行**。
-🟡 爽世跟 🟣 立希互不依賴（爽世讀 diff、立希跑 command），可同時動。
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
+跟 `/maigo:go` 同一條工作流，宿主支援時在最後審查 + 驗證階段**並行**。
+🟡 爽世跟 🟣 立希互不依賴（🟡 爽世讀 diff、🟣 立希跑 command），可同時動。
 
 ## 使用
 
@@ -21,7 +24,10 @@ description: 跟 /maigo:go 一樣的流程，但 Soyo + Taki 並行跑。Wall-cl
 共通 sequential 段（🐱 樂奈 → 🩵 燈 → 使用者確認 → 🎀 愛音）依
 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)。
 
-**Parallel（同時觸發兩個 Task）**
+**宿主可並行時，同時觸發兩個角色**
+
+只有 model-dispatch 回傳 `parallel=true` 且未帶 `--force-sequential` 才並行；
+否則明示退回先 🟡 爽世、再 🟣 立希的順序版。沒有 subagents 時在主線依序執行。
 
 5a. **🟡 爽世 (Soyo)** — review 變更（依 `skills/strict-review`）。「你說的『應該』，是有跑過、還是只是『應該』？」
 5b. **🟣 立希 (Taki)** — 跑 test / lint / type check。「跑出來爆了，看 line 42。」
@@ -31,7 +37,7 @@ description: 跟 /maigo:go 一樣的流程，但 Soyo + Taki 並行跑。Wall-cl
 Orchestrator 守則（旁白、不自實作、不跳關、commit message draft、fence tracking）依
 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)，
 並行專屬追加規則：
-- **真的並行**：用一條 message 內兩個 Task tool call 觸發 🟡 爽世和 🟣 立希
+- **真的並行**：用宿主支援的並行呼叫觸發 🟡 爽世和 🟣 立希；只有順序能力時依上述 fallback
 - **不要假裝並行**（先爽世完才呼叫立希不算）
 - 合流時把兩份輸出**分開呈現**給使用者，不要混在一起
 

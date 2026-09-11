@@ -6,6 +6,9 @@ description: 輕量任務入口。Anon 做小改動、Soyo 跑 4 項 checklist s
 
 # /maigo:quick
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 「這個小東西改一下」級別的任務。跳過 Raana 探索 / Tomori 寫 plan 的 overhead，
 orchestrator 直接呼叫 Anon 動手，做完跑 Soyo 輕量 review（9 項 → 4 項）。
 測試由 orchestrator 顯式呼叫共用驗證 CLI，不需另外啟動 🟣 立希。

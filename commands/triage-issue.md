@@ -6,6 +6,9 @@ description: 從 maintainer 視角批次 triage 進來的 GitHub issue——樂�
 
 # /maigo:triage-issue
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 > Maintainer 視角的 issue triage——大批 inbound issue 一輪掃完，告訴你哪些 ready / 哪些缺資訊 / 哪些是 dup / 哪些該 close。
 > 跟 [`/maigo:review`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) 的結構平行——只是對象從 PR diff 換成 issue body + comments，所以**立希不上場**（issue 沒 diff 可跑、沒 test 可驗）。
 
@@ -151,7 +154,7 @@ board 是本地檔；這不違反本命令「不主動寫 GitHub」原則。回�
 - **不能跳過樂奈**——沒抓完整 body + comments 就 triage 等於猜
 - 爽世的 verdict 不因為「reporter 是長期貢獻者」放水
 - **立希不啟動**——triage 沒驗證對象
-- 你（orchestrator）不要自己 triage，每個 agent 都用 Task tool 啟動
+- 有 subagents 時把 triage 交給角色執行；沒有時依 model-dispatch 的 inline 流程，rubric 與分類要求不省略
 - **不寫 GitHub**——不下 label、不 close、不 reply、不 assign；只產草稿。reply 草稿以「issue 連結 + 純內文 fenced code block」呈現（不用 `gh issue comment`）；label / close 仍用 `gh` 指令草稿（無純文字等價物）。
 - draft response 與 gh 指令草稿呈現給使用者時，遵守 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)——放單一 fenced code block 供複製。
 - **不主動拉 issue 清單**——v1 只吃顯式 list

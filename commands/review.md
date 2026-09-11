@@ -6,6 +6,9 @@ description: 對 PR / branch / commit range 做嚴格 review——樂奈看 cont
 
 # /maigo:review
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 對**既有的**變更做嚴格 review。跟 `/maigo:go` 不同，這裡沒有實作環節——
 變更已經寫好了，要做的是**判斷它對不對**。
 
@@ -208,7 +211,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - **不能跳過樂奈**——脫離 context 的 review 會把「不熟悉」誤判成「有問題」
 - 爽世的 verdict 不因為「author 是大佬」放水
 - 立希拒絕「CI 已綠就不跑」，本地至少要重跑 lint/type
-- 你（orchestrator）不要自己 review，每個 agent 都用 Task tool 啟動
+- 有 subagents 時把 review 交給角色執行；沒有時依 model-dispatch 的 inline 流程，checklist 與 rubric 不省略
 - Soyo 的 review 輸出若含 `## Memory propose`，
   把 review report 完整呈現給使用者後再觸發 confirm flow；
   不要在使用者讀完 report 之前插入確認問題。

@@ -6,6 +6,9 @@ description: 把記憶層裡反覆出現、convention 形狀的條目，畢業�
 
 # /maigo:crystallize
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 > 🌙 Doloris：「請讓散落的記憶在今夜結晶；往後的路，不必再由偶然照亮。」
 
 記憶層是**扁平、relevance-ranked、capped 10 筆**的事實儲存（見
@@ -40,7 +43,7 @@ catalog 再跑 validator」是一個該被 review、被 verify 的 code change�
 /maigo:crystallize
 ```
 
-（無參數——掃整個記憶層找畢業候選）
+（無位置參數——掃整個記憶層找畢業候選；可加共用選項 `--model-profile <path>`）
 
 ## 流程
 
@@ -194,7 +197,8 @@ uv run mkdocs build --strict           # venv 工具 → uv run
   [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **互動留 orchestrator、寫 skill 下放愛音**：挑候選 / propose / confirm / 退役記憶是
   orchestrator 的活（需對話 context，不下放）；寫 SKILL.md + shim + mkdocs + catalog + 驗證
-  批次委派 🎀 愛音、review 交 🟡 爽世——不要自己寫 skill、自己 review。一次 spawn，不 per-entry。
+  有 subagents 時批次委派 🎀 愛音、review 交 🟡 爽世，一次 spawn，不 per-entry；
+  沒有時依 model-dispatch 在主線依序執行這兩個角色，明示共用 context。
 - **不延伸推斷**：只畢業記憶層裡實際存在的條目，不順手補使用者「可能也想要」的 skill。
 - **跟 retro 的關係**：[`/maigo:retro`](https://github.com/Lee-W/maigo/blob/main/commands/retro.md)
   把 session 學到的事**寫進** memory；crystallize 把夠成熟的條目**升階成** skill——前者餵養、後者收割。

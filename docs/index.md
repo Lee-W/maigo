@@ -57,7 +57,7 @@ claude --plugin-dir /path/to/maigo
 
 ```bash
 /maigo:go <task>          # 5 人順序：探索 → 計畫 → 實作 → review → 驗證
-/maigo:team <task>        # 同上，但 Soyo + Taki 並行（省 ~30% 牆鐘）
+/maigo:team <task>        # 宿主可並行時同時 review + test；否則順序執行
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
 /maigo:board              # 跨 session 看現在球在誰手上
 ```

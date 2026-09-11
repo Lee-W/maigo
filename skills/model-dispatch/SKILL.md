@@ -1,6 +1,6 @@
 ---
 name: model-dispatch
-description: This skill should be used when the maigo orchestrator, running in the Claude Code harness (Agent tool available for spawning subagents), decides which model tier to dispatch a subagent task to, or judges an escalation / de-escalation after a subagent's result. Scope note: 只在 Claude Code harness 下才適用——這裡的 Agent tool 支援逐次 `model` override；其他 harness（例如 Codex 的 command-router 環境）沒有這個能力，此 skill 不適用。
+description: Resolve Maigo role models and delegation from an explicitly selected profile and the current host's tools. Use before role execution in Maigo commands, including single-model or no-subagent hosts.
 ---
 
 <!-- mkdocs-include-start -->
@@ -8,52 +8,66 @@ description: This skill should be used when the maigo orchestrator, running in t
 # Model Dispatch
 
 **Owner**: orchestrator
-**Consumers**: maigo orchestrator，在 Claude Code harness 下透過 Agent tool spawn subagent 時
+**Consumers**: 有角色執行步驟的 Maigo commands；Claude Code、Codex 或其他能讀取這份流程的宿主。
 
-只在 Claude Code harness 下適用——Agent tool 的 `model` 參數能讓 orchestrator 對每次
-spawn 個別 override 檔位；沒有這個能力的 harness（例如 Codex 的 command-router 環境）
-不適用本 skill，交辦一律走該 harness 原生的模型設定。
+角色的責任、工具限制與交棒契約留在 `agents/*.md`；模型由宿主提供。
+不要從宿主品牌、模型名稱、參數量或安裝了 Ollama 推測派工能力。
 
-## 檔位政策
+## 派工前
 
-| 檔位 | 用途 |
-|------|------|
-| `haiku` | 機械批次：格式轉換、read-back、逐檔套用已定型的修法 |
-| `sonnet` | 預設工作馬：搜尋、實作、重構、審查、研究——多數交辦都用這檔 |
-| `opus` | 升級檔位：卡關救援、高風險判斷的第二意見 |
+1. 讀當前 session 的工具 schema 與限制，確認能否啟動 subagent、逐次指定模型、同時執行
+   互不相依的 subagents。未確認就視為沒有；工具存在也不代表本次任務獲准使用。
+2. 只有使用者明確指定 `--model-profile <path>`（或在本次 session 指定沿用某份 profile）
+   才載入該檔；從命令參數移除這一對，剩餘內容交給原 command。
+   不掃描 repo、家目錄或環境變數找設定。相對路徑以入口的 project cwd 解析為絕對路徑，
+   再進 worktree；內層 quick/go/team 沿用同一個明確選擇。
+3. 呼叫下面的 resolver，`--roles` 只列本次會執行的角色；保留 command 原本的順序與
+   mode 造成的省略。只有步驟 1 確認可用的能力才加對應旗標。沒有角色要執行時
+   （例如 crystallize 沒有候選），不呼叫 resolver。
 
-Orchestrator 本身執行所在的模型若高於以上三檔，只用在規劃、制度設計、品味判斷這類需要
-「取捨」的工作——**不實作、不掃 repo、不批次改檔**。凡是可交辦的機械或搜尋工作，一律往
-下派給對應檔位的 subagent，不因為自己在高檔位上就順手代勞。
+```bash
+python3 <maigo-root>/scripts/resolve_dispatch.py --roles Anon Soyo
+# 可用時追加：--subagents --model-override --parallel
+# 有明確選擇時追加：--profile <absolute-profile-path>
+```
 
-## 升降級
+`<maigo-root>` 是目前讀取的 Maigo plugin 的絕對路徑；不能用 target repo 代替。
+設定格式、單一模型與混用範例見 [Agents reference](../../docs/reference/agents.md#model-profiles)。
+沒有 profile 時仍呼叫 resolver，讓沒有 subagents 的宿主走明確的 fallback。
 
-- **haiku 錯 1 次** → 同任務升 `sonnet` 重派。
-- **sonnet 同一子任務連錯 2 次** → 升 `opus`，且必須帶完整失敗軌跡（原始交辦 prompt、
-  前兩次的輸出與錯誤原文）——不是重講一次題目給 opus 猜。
-- **opus 解出模式後** → 降回 `sonnet` / `haiku` 批次套用到其餘案例。「解出模式」的判準：
-  解法能寫成 ≤5 步、不需再做判斷、其他檔位可照抄執行的固定步驟；寫不成就還沒解出，
-  不要降級。
+## 套用結果
 
-## 重試預算
+CLI exit 0 / `status=ready` 是派工計畫，**不代表模型已連線或任務驗證通過**。
+exit 2 / `status=error` 時顯示原因，先解決設定或能力衝突；不能默默忽略指定模型。
 
-同一件事最多重試兩輪，計數明確定義：初次交辦不算重試；重試第 1 輪＝原檔位修一次；
-重試第 2 輪＝升級後（`opus`）修一次。**opus 輪在兩輪預算之內**；opus 輪仍失敗即停手——
-判斷是方向錯（換路）還是需要使用者輸入（去問），不再無聲重試第三輪。
+- `roles[].model` 為字串：原樣交給宿主的逐次 model 參數；先確認它是宿主實際接受的值。
+  不把模型名稱翻成 `haiku` / `sonnet` / `opus`，也不自行換 endpoint 或 provider。
+- `roles[].model` 為 `null`：省略逐次 model override，保留宿主原生預設。
+  Claude Code 可能沿用 agent frontmatter；其他宿主可能沿用主線模型，不能宣稱一定相同。
+- `execution=subagents`：依 command 派工，載入對應 `agent_file`，遵守宿主的工具權限與
+  context 傳遞方式。有 fresh context 選項時，review 不繼承實作過程，只傳需求、diff 與證據。
+- `execution=inline`：主 agent 依序執行各角色，逐段讀取角色定義並保留原本的讀寫限制、
+  產物、checklist 與驗證步驟。明示「同一模型、共用 context」，不能宣稱獨立審查。
+- `parallel=true` 只容許 command 原本可並行的階段；探索 → 計畫 → 實作仍有相依順序。
+  `parallel=false` 時 `/maigo:team` 自動改為先 🟡 爽世、再 🟣 立希；`--force-sequential`
+  永遠優先。角色數量不等於同時啟動數量。
 
-## SendMessage 續用與換檔位
+這裡的能力判斷與 fallback 限定 command 中「如何啟動角色」的規則：沒有 subagents
+時不要求不存在的 Task tool，但不可省略該 command 的 review / verification。
+沒有 hook 時明確執行檢查，依 command 與 target repo 規範留下 command、exit code、output。
+宿主若回報替代模型，記錄實際值並處理與要求的差異；無回報則標「實際模型未確認」。
 
-`SendMessage` 續用既有 agent 時**不能換 model**；要換檔位就開新 agent、附上前情
-（原交辦內容＋已知結果），不能讓新 agent 從零猜任務背景。
+## 模型選擇與重試
 
-## 不升檔的情況
+未指定 profile 時保留宿主既有預設。使用者可以讓全部角色共用同一模型，也可以只替
+規劃或審查配置別的模型；角色職責不依賴模型廠牌。
 
-Reviewer 已指定具體修法、且修法已機械化（可照抄執行、不需再判斷）時，續用原檔位即可——
-不因為「上一輪出過錯」就自動升檔；升檔只在「同一子任務連錯」時觸發，不是每次失敗都升。
+同一子任務最多重試兩輪（初次不計），換模型也計入這兩輪，不能藉換模型重設計數。
+先根據實際失敗證據修正；只有使用者已選定並授權的替代模型、且宿主能套用時才換。
+沒有替代模型時可在原模型預算內修正，預算用完就回報卡點。具體 must-fix / 測試失敗
+閉環依 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)，
+不因模型較小放寬標準。Reviewer 已指定機械修法時，不自動升級。
 
-## 與既有 skill 的分工
-
-「要不要派 subagent」與「派了之後怎麼交辦、怎麼防止 orchestrator 失焦」屬於
+續用 agent 能否更換模型也看當前工具 schema；若需新 agent，附原始任務與失敗證據。
 [`skills/harness-discipline`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md)
-的範圍；本 skill 只管「派給哪個檔位」。兩者搭配使用：先用 harness-discipline 的門檻判斷
-要不要派，再用本 skill 判斷派給誰。
+在它適用的環境處理委派門檻；本 skill 處理模型選擇與能力不足時的角色執行方式。

@@ -7,6 +7,9 @@ allowed-tools: Bash(gh issue view:*), Read
 
 # /maigo:take-issue
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 接住 [`/maigo:triage-issue`](https://github.com/Lee-W/maigo/blob/main/commands/triage-issue.md)
 判定 READY 之後斷掉的那一段——把 issue 接進真正的實作。
 
@@ -92,7 +95,7 @@ push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github
   [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依
   [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
-- **步驟 1 orchestrator 親自跑、不開新 agent**；步驟 2 一律用 Task tool 啟動各 agent，不要自己探索 / 實作 / review。
+- **步驟 1 orchestrator 親自跑、不開新 agent**；步驟 2 依 teammate-flow 的 model-dispatch 結果啟動角色，有 subagents 時委派，沒有時依序在主線執行。
 - **不硬做、不寫 GitHub、不自動 commit**：issue 不是 READY 就建議 `/maigo:triage-issue`；commit 只草擬文字，push / 開 PR 交使用者或 `/maigo:describe-pr`。
 
 → 跟 `/maigo:triage-issue` / `/maigo:go` 的差異、場景對照：[Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)

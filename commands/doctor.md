@@ -7,6 +7,9 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 
 # /maigo:doctor
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 > 「哪裡不舒服嗎。讓我看看。」 —— 🌑 Mortis
 
 檢查 Maigo 運行所需的外部依賴與配置是否到位。
@@ -112,7 +115,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
-- **你（orchestrator）不要自己實作**。Taki 用 Task tool 啟動
+- 依 model-dispatch 執行 🟣 Taki 的檢查階段；沒有 subagents 時在主線執行，照常回報實際檢查結果
 - 報告最終由 orchestrator 彙整，不是 Taki 直接輸出
 - 不論任何項目缺失，都要完整跑完所有檢查項目再彙整，不中途停止
 - 完成後給使用者一份最終報告：環境狀態、缺失項清單、具體改進建議

@@ -6,6 +6,9 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 # /maigo:describe-pr
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 幫忙寫 PR 的 title 跟 description——拿你 branch 已經有的 commits / diff，
 產出符合「user-impact title + Why / What / Test Plan」結構的草稿。
 你 review / 修改後再用 `gh pr create` 或 GitHub UI 開 PR。
@@ -51,7 +54,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 ### 2. 燈 (Tomori) — 把料寫成 PR 草稿。「……讓我先理清楚它想做什麼。」
 
-orchestrator 用 Task tool 啟動燈，把前置 bundle 交給她。燈：
+orchestrator 依 model-dispatch 執行 🩵 燈的階段，把前置 bundle 交給她。🩵 燈：
 
 - 做啟動時的記憶載入（照 [`agents/Tomori.md`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md)），輸出開頭印 `## Loaded memory entries`——
   若有相關 `user` / `convention` entry（例：PR 描述偏好、語言偏好）納入草稿考量
