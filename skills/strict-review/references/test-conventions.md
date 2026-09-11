@@ -179,6 +179,53 @@ How to apply:
 
 ---
 
+## Prose-guard tests need a bounded window and both directions
+
+Tests that guard "does this documentation section list the right N items"
+have three independent gaps — any one of them lets the test look like a
+guard while actually passing a broken edit:
+
+1. **Unbounded slice.** Extracting the section via `text[start:]` (no upper
+   bound) cuts from the marker to the **end of the file**, not to the end of
+   that section. Removing the item under test from that slice, then
+   re-adding it anywhere further down the file, passes. If the section under
+   test happens to be the last one in the file, this gap produces no visible
+   symptom until something reorders the file later.
+2. **One-directional assertion.** `all(item in section for item in
+   expected)` only catches **under-listing** — an item silently dropped. It
+   says nothing about **over-claiming** — the section naming an item it
+   shouldn't. For a customer-facing page, over-claiming is usually the worse
+   defect (a false claim, not just an omission).
+3. **Red-only mutation check.** Confirming the test goes red when the
+   guarded content is broken only proves the test isn't a no-op — it does
+   not prove the test tolerates unrelated edits, i.e. that it hasn't been
+   over-corrected into "any edit turns this red."
+
+How to apply during review:
+
+- For gap 1: the slice must stop at the **next same-level marker**, not run
+  to EOF — `end = text.find("\n<next-marker>", start); text[start:] if end
+  == -1 else text[start:end]`. Normalize whitespace before comparing
+  (`" ".join(chunk.split())`), otherwise a name that wraps across a line
+  break produces an unexplained failure.
+- For gap 2: require a reverse assertion — `others = full_set - expected_set
+  - {self}`; none of `others` may appear in the section. Before trusting a
+  substring-based reverse check, verify the full set has no member that's a
+  substring of another (e.g. `"AWS Bedrock"` ⊂ `"AWS Bedrock Mantle"`,
+  `"OpenAI"` ⊂ `"Azure OpenAI"`) — if it does, require a boundary-aware match
+  instead of bare substring.
+- For gap 3: every red-mutation case needs a paired should-stay-green case —
+  an edit that changes something adjacent but immaterial (reorders the
+  section, adds an unrelated same-level item elsewhere) — and that case must
+  still pass.
+- Check all three independently. Passing two of the three while failing the
+  third still leaves the guard useless in that one dimension. Related: the
+  "Numeric caps need an at-cap + one-over-cap test pair" entry above is the
+  same "pin both directions of a boundary" discipline applied to numeric
+  thresholds instead of prose sections.
+
+---
+
 ## No thin one-use test helpers; assert only the decided value
 
 Don't add thin helper functions to a test for one or two uses — e.g. a

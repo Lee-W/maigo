@@ -406,6 +406,17 @@ touches `sandbox/`. If `sandbox/` itself needs fixing later, treat the root
 cause as unconfirmed and read `base.py`'s path-comparison logic before
 proposing a fix.
 
+### `Run black on docs` reformats long Python inside RST code blocks, failing the first commit
+
+The `Run black on docs` prek hook rewrites Python code embedded in RST
+`code-block` directives when a line runs too long (confirmed: a long call in
+`quickstart.rst` got wrapped). Like any hook that modifies files, it fails
+the **first** `git commit` with `files were modified by this hook` — that's
+not a real problem, just the hook's own rewrite landing on disk between the
+first and second attempt. `git add` the reformatted file and commit again;
+the second attempt is green because there is nothing left to rewrap. Keep
+doc-example lines short to begin with to avoid the extra round trip.
+
 ## 4. Attribution — don't accept a red's cause without proving it
 
 ### A scoped test run being red doesn't mean your diff caused it
@@ -487,3 +498,65 @@ otherwise-identical runs** on your own code. Fix: give the worktree its own
 private `AIRFLOW_HOME` (outside the repo, so it doesn't dirty `git status`),
 and delete-and-recreate that DB before each run rather than relying on an
 in-place reset flag, which can itself fail on a half-broken schema.
+
+## 5. Repo-scoped commands need a pinned working directory across worktrees
+
+When multiple git worktrees of the same repo exist side by side, the Bash
+tool's working directory **gets reset between invocations**, and `cd` can be
+intercepted by a directory-jump wrapper (e.g. zoxide) that fails silently on
+a miss instead of raising an error and without changing directory. Running
+any repo-scoped command with relative paths — `prek`, `uv run --project`,
+`pytest`, a code-generation script — while sitting in the wrong worktree
+does not error. It matches nothing, and every hook/step reports `0 files` /
+`(no files to check)` / `Skipped`, with the overall exit code still **0**.
+Confirmed shape: `prek run --files <relative paths> --stage pre-commit` run
+from the wrong worktree reported 250 hooks `Skipped` and only 4 `Passed`,
+exit 0 — the relative paths resolved to unmodified files in that worktree,
+not the ones actually changed.
+
+How to apply: wrap repo-scoped commands in a subshell that pins the
+directory explicitly, and print `pwd` in the *same* invocation as evidence —
+don't rely on "the previous command already put me there":
+
+```zsh
+(builtin cd "<worktree>" && pwd && prek run --files <paths> --stage pre-commit)
+```
+
+`builtin cd` bypasses a directory-jump wrapper that shadows the `cd`
+builtin. For pure git operations, `git -C <worktree>` is enough on its own
+and needs no subshell.
+
+Judgment: seeing a large fraction of `Skipped` / `(no files to check)` /
+`0 files` while the exit code is still 0 is itself the signal to suspect the
+wrong directory or an unexpanded argument — never read it as "passed."
+
+## 6. Verifying a generated file's idempotence needs a mutation canary, not just a shasum diff
+
+Re-running a generator and diffing the resulting shasum against the
+committed file only shows "the file didn't change." That is indistinguishable
+from "the generator never touched this file at all" — wrong working
+directory, an unexpanded `--files` argument, or a hook scoped to a different
+path all produce the exact same unchanged shasum. A matching shasum is
+necessary but not sufficient evidence that a committed file is truly kept in
+sync by its generator.
+
+How to apply — add a mutation canary before trusting the shasum match:
+
+1. Back up the file with an absolute-path copy that bypasses any `cp -i`
+   alias (e.g. `/bin/cp -f <file> <backup-path>`), and record its shasum.
+2. Deliberately corrupt the file (e.g. `printf '\n# canary\n' >> <file>`)
+   and confirm the shasum **actually changed** — this proves the mutation
+   took effect and the file isn't, say, read-only or symlinked elsewhere.
+3. Re-run the generator or hook that is supposed to produce this file.
+4. Judge success only when **both** signals hold together: the
+   generator/hook itself reports non-zero / `Failed` (proof that it read
+   and rewrote the file), **and** the file's shasum is back to the original
+   value recorded in step 1.
+5. If the shasum did not return to the original value, restore from the
+   backup rather than trusting a partial rewrite.
+
+This applies to any committed-but-generated artifact: provider registry
+modules like `get_provider_info.py`, OpenAPI specs, Task SDK/ctl datamodels,
+metrics registries, supervisor schema snapshots — anywhere a "the generator
+produced this, don't hand-edit it" claim needs to be verified rather than
+assumed.

@@ -408,6 +408,12 @@ sub-check states. The file covers:
 - **10.18** `providers/common/ai` hook capability additions: check three parity axes (Request changes, scope-gated)
 - **10.19** A `DAGResponse` (or derived-model) field addition must exist on `DagModel` (Block, scope-gated)
 - **10.20** Two queries scanning the same rows under the same `WHERE` predicate should merge (Request changes)
+- **10.21** Don't flag release-manager/CI-generated docs as scope creep, and don't require a per-PR edit to them (judgment gate, scope-gated to `providers/*/docs/index.rst` and `airflow-ctl/RELEASE_NOTES.rst`)
+- **10.22** Dialect-dispatch catch-all `else` branch defaulting to sqlite is a footgun — reuse the canonical upsert helper or fail loud (Request changes)
+- **10.23** registry class-level module `category` string is not user-visible — don't confuse it with the type `label` (Request changes, scope-gated to `dev/registry/` and `registry/`)
+- **10.24** Operator's own `xcom_push()` calls for extra keys need their own `do_xcom_push` guard (Request changes)
+- **10.25** Frame an SDK/Core capability gap as feature completion, not a bugfix — but check release state first (judgment gate)
+- **10.26** `common.ai` vendor enumeration must come from `infer_provider_class`, not `known_model_names()` (Request changes, scope-gated to `providers/common/ai`)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -513,7 +519,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.20, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.26, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 
