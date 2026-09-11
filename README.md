@@ -95,7 +95,7 @@ Codex session 有提供多 agent 工具時，Maigo 會依 command 進行分工�
 
 ```bash
 /maigo:go <task>          # 5 人順序：探索 → 計畫 → 實作 → review → 驗證
-/maigo:team <task>        # 同上，但 Soyo + Taki 並行（省 ~30% 牆鐘）
+/maigo:team <task>        # 宿主可並行時同時 review + test；否則順序執行
 /maigo:review <pr|branch> # Anon 不上場；review 既有變更
 /maigo:board              # 跨 session 看現在球在誰手上
 ```
@@ -131,7 +131,7 @@ Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`�
 - [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
 - [Hooks reference](docs/reference/hooks.md) — SessionStart / SubagentStop / Stop hook 完整行為與設定
 - [Skills reference](docs/reference/skills.md) — skill 機制與完整 catalog（`strict-review`、`teammate-flow`、`commit-message`、`doc-link-convention`、`copyable-deliverable`、`failure-handling` 等）
-- [Agents reference](docs/reference/agents.md) — 五位 agent 的 model tier 選擇邏輯
+- [Agents reference](docs/reference/agents.md) — 角色模型 profile、單一模型用法與 Claude Code 隨附預設
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
 - [CHANGELOG](CHANGELOG.md) — 版本歷史
 

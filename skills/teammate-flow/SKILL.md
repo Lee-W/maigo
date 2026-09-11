@@ -12,6 +12,12 @@ description: This skill should be used when orchestrating the full MyGO!!!!! tea
 teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探索到實作到審查到驗證，
 每個角色各自負責自己那一段，Orchestrator 負責串起來。
 
+開始流程前先依
+[`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+解析 `--model-profile <path>` 與宿主能力。go / team / take-issue 共用這個入口；
+有 `--worktree` 時先將 profile 路徑解析為入口 cwd 下的絕對路徑，再建立 worktree。
+五個角色可使用相同模型；沒有 subagents 時在主線依序執行，保留交棒與驗證要求。
+
 ## 共通流程（Sequential 段）
 
 以下四步在 `/maigo:go` 和 `/maigo:team` 都必須照順序走：
@@ -22,7 +28,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 4. **🎀 愛音 (Anon)** — 按 plan 動手實作。「OK 那我先做這步！」
 
 步驟 5 以後由各 command 決定——`/maigo:go` 是順序（先 🟡 爽世再 🟣 立希），
-`/maigo:team` 是並行（🟡 爽世和 🟣 立希同時觸發）。
+`/maigo:team` 在宿主支援時並行（🟡 爽世和 🟣 立希同時觸發），否則順序執行。
 
 ## 交棒契約
 
@@ -64,7 +70,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 
 ### 執行規則
 
-- **你（orchestrator）不要自己實作**。每個 agent 都用 Task tool 啟動
+- **有 subagents 時交由角色執行**，使用當前宿主的派工工具；沒有時依 model-dispatch 的 inline 流程，明示共用 context
 - 每個 agent 完成後給使用者一行 summary（不是貼全文）
 - 不要跳關。即使任務看起來很小，每一步都要走
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code
@@ -114,7 +120,7 @@ Commit message 草擬完後，依
 ### `/maigo:go` vs `/maigo:team` — 選哪個
 
 兩個命令的 review 嚴格度一模一樣（🟡 爽世完整 9 項 + 🟣 立希）；差別只在 §5 之後：
-`/maigo:go` 是 🟡 爽世先、🟣 立希後（序列）；`/maigo:team` 是兩者並行（省約 30% 牆鐘）。
+`/maigo:go` 是 🟡 爽世先、🟣 立希後（序列）；`/maigo:team` 在宿主支援時讓兩者並行。
 
 **預設選 `/maigo:team`** 的條件（全部符合）：
 - scope 清楚（邊界已定、不需邊探邊改）

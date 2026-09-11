@@ -22,9 +22,14 @@ description: 讀當前 branch 對應 PR 的 review 意見，列出讓使用者�
 /maigo:address-comments
 ```
 
-不收參數——一律針對**當前 branch** 對應的 PR。當前 branch 讀不到 PR 就擋下（見步驟 1）。
+只接受共用選項 `--model-profile <path>`；一律針對**當前 branch** 對應的 PR。
+當前 branch 讀不到 PR 就擋下（見步驟 1）。
 
 ## 流程
+
+若入口帶 `--model-profile <path>`，在步驟 1 前依
+[`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+消費此參數、解析成入口 cwd 下的絕對路徑。每個 work item 的內層 route 沿用這份選擇。
 
 orchestrator 親自跑步驟 1–4：
 

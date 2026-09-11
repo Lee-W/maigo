@@ -6,6 +6,9 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 # /maigo:go
 
+開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
+
 > 「It's MyGO!!!!!」
 
 把這件事交給 MyGO!!!!!。從前奏到尾聲，五個人各自負責自己那一段。

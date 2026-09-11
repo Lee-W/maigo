@@ -1,3 +1,5 @@
+下圖呈現宿主可並行且未指定 `--force-sequential` 的路徑；否則依下方命令規則順序執行。
+
 ```mermaid
 flowchart TD
     Start([使用者: /maigo:team 任務]) --> Raana[樂奈 Raana]

@@ -24,7 +24,8 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 ## `/maigo:team` — 並行版的 /maigo:go
 
-跟 `/maigo:go` 同流程，但 step 5 和 step 6（Soyo + Taki）並行跑：
+跟 `/maigo:go` 同流程，宿主可並行時讓 step 5 和 step 6（🟡 Soyo + 🟣 Taki）同時跑；
+否則自動順序執行。角色模型與宿主能力依 [model profiles](agents.md#model-profiles) 解析。
 
 ```
 /maigo:team <任務描述>
