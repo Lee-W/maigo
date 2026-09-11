@@ -35,15 +35,30 @@ fields, so mixed-version rollouts break silently otherwise.
 ## 10.2 Multi-PR split: wire-format symbol cross-check
 
 If the PR body says "PR N of M", "split from #NNNNN", "consumes what was added in
-#NNNNN", or `cc:` mentions the same reviewer across sibling PRs, fetch the sibling
-PR's diff (`gh pr diff <sibling> --repo apache/airflow`) and compare wire-format /
-API field names character-for-character (singular vs plural, underscore placement,
-casing, type — e.g. `list[str]` vs `str`).
+#NNNNN", `cc:` mentions the same reviewer across sibling PRs, **or the PR body/commit
+message explicitly references a sibling PR** ("see #NNNNN", "lands with #NNNNN") —
+that reference alone is a trigger, not just a structurally-declared multi-PR split —
+fetch the sibling PR's diff (`gh pr diff <sibling> --repo apache/airflow`) and verify:
+
+1. **Field names** on dict/Pydantic payloads match character-for-character (singular
+   vs plural, underscore placement, casing).
+2. **Field types** match (e.g. `list[str]` on the producer matching `list[str]`
+   reader on the consumer, not `str`).
+3. **Method/kwarg names on shared interfaces line up across all three of the SDK,
+   wire, and backend layers** — not just one layer against another; a name can agree
+   between two of the three and still diverge on the third.
 
 Mismatches are typically **Block-level**: silent end-to-end breakage that the PR's
 own tests will not catch because they're self-consistent against the wrong shape.
 Past examples: #66699 renamed `retention_days` → `expires_at` in prod but not tests;
-#66782 consumer reads `partition_key` while #65447 producer emits `partition_keys`.
+#66782 consumer reads `partition_key` while #65447 producer emits `partition_keys`;
+#66859's backend test stub kept `retention_days=None`, which works against current
+`main` but breaks once sibling #66699's rename lands first.
+
+**How to apply**: when fetching the current PR's diff, also fetch the named sibling
+PR(s) in the same pass. Build a small "symbol table" — literally list each wire/API
+name from each side side-by-side — and compare it, rather than reading each diff
+separately and trusting memory to catch a mismatch.
 
 ## 10.3 Top-level imports of Unix-only modules
 
@@ -110,7 +125,60 @@ Three related sub-judgments for unreleased-version work:
   a precedent bug-fix commit on the same file and follow what it did, even when the
   endpoint is confirmed already shipped in a release.
 
-## 10.7 Revert of a recent fix: check for a tracking issue first *(judgment gate — avoid a false-positive regression flag)*
+  Second instance of the same method, this time for an additive field: for a
+  `DAGResponse` new optional field + UI prefill behavior change, walk the last
+  ~25 commits touching `api_fastapi/core_api/datamodels/dags.py`
+  (`git log --format=%H -25 -- <file>`, then check each for a matching
+  `newsfragments/` entry) rather than guessing from the golden-rule intuition
+  or the feature's release status. Precedent: an additive optional response
+  field + UI detail-page display got **no** newsfragment; an API type change
+  got **no** newsfragment; a config-option PR that also introduced a behavior
+  tier **did**. Conclusion for this shape (additive optional field + UI
+  prefill): don't add one, let a reviewer request it if they disagree — this
+  is a convention-conformance input, not a waiver on the checklist item.
+
+## 10.7 Provider changelog: breaking/important behavior changes must be hand-edited into `docs/changelog.rst` *(Request changes)*
+
+**Scope gate**: only applies to diffs under `providers/<name>/`. Does not
+apply to `airflow-core/`, `chart/`, `dev/mypy/` (10.6's newsfragment rule) or
+`airflow-ctl/` (fully RM-generated, PRs must not touch `RELEASE_NOTES.rst`).
+
+`providers/AGENTS.md`'s documented rule runs the **opposite** direction from
+10.6's newsfragment rule: a breaking or important behavior change must be
+hand-edited into that provider's `docs/changelog.rst`, directly below the
+`Changelog` header, in the same PR. Routine feature/bugfix/misc entries are
+collected automatically by the release manager from commit messages — most
+PRs should **not** touch the changelog at all. pre-1.0 is not an exemption;
+the rule applies regardless of the provider's version — confirmed precedents:
+#69695 (exasol, `pyexasol` 2.x bump), #69474 (postgres, `psycopg` v3 default),
+and #67644 (common.ai, Pydantic XCom — that provider is itself pre-1.0);
+`gh pr diff <n> --name-only` on each hits `providers/<p>/docs/changelog.rst`.
+
+Two traps when judging this:
+
+- **Don't use "this provider's changelog.rst has never been touched by a
+  feature PR" as evidence the rule doesn't apply.** A young provider's
+  changelog only shows `Prepare providers release` entries because the file
+  itself is young, not because hand-edited entries are unusual in this repo —
+  check a mature provider's changelog (e.g. `providers/amazon/docs/changelog.rst`)
+  for the counter-example before concluding otherwise.
+- **Don't conflate this with `airflow-ctl/RELEASE_NOTES.rst`, which is fully
+  RM-generated and explicitly forbids PR edits** — the two files have
+  opposite contribution models; a lesson learned from one does not transfer
+  to the other.
+
+Judge "is this breaking" by **actual runtime behavior**, not the diff's type
+annotations: a return-type change from `tuple[bool, str | None]` to
+`tuple[bool, str | None, str | None]` breaks any caller that unpacks it
+(needs a changelog entry); a signature narrowing from `-> Any` to a concrete
+type, where the `return` statement itself is unchanged, has zero runtime
+delta (no changelog entry needed) even though the type annotation looks like
+a bigger change. Misjudging toward "breaking" forces a false changelog
+entry; misjudging toward "routine" leaves downstream users with an
+unrecorded `ValueError: too many values to unpack` after upgrading. This is
+a convention-conformance input, not a waiver on the checklist item.
+
+## 10.8 Revert of a recent fix: check for a tracking issue first *(judgment gate — avoid a false-positive regression flag)*
 
 **Scope gate**: only applies when the diff/PR title/description reverts, or
 partially reverts, a commit that landed recently.
@@ -125,7 +193,7 @@ tracking issue's content and confirm the revert is actually listed in it
 before treating it as intentional; absence of any such reference is when to
 treat it as a real regression.
 
-## 10.8 Self-discovered bugfix: verify upstream doesn't already have it *(Request changes if evidence is missing)*
+## 10.9 Self-discovered bugfix: verify upstream doesn't already have it *(Request changes if evidence is missing)*
 
 **Scope gate**: only applies to a bugfix PR/branch where the bug was
 **self-discovered** (found by the agent itself while working on something
@@ -149,7 +217,7 @@ adds value — sometimes only a small leftover, like a missing translation
 string, survives); an open PR means review or build on it rather than
 opening a near-duplicate.
 
-## 10.9 Forward-looking code comments need a tracking-issue URL or a neutral rewrite *(Request changes)*
+## 10.10 Forward-looking code comments need a tracking-issue URL or a neutral rewrite *(Request changes)*
 
 **Scope gate**: only applies when the diff contains a forward-looking phrase
 naming a possible future change with no inline tracking-issue URL — e.g.
@@ -182,7 +250,7 @@ The same judgment also governs log/audit/error message text, not just code comme
 see `skills/strict-review/references/recurring-patterns.md`'s "Log/audit/error messages
 state what happened, not why it might change later."
 
-## 10.10 Newsfragment content must reflect a genuine capability delta vs upstream *(Request changes)*
+## 10.11 Newsfragment content must reflect a genuine capability delta vs upstream *(Request changes)*
 
 Presence of a newsfragment file (10.6) doesn't mean its content is accurate.
 Before accepting one, diff the branch against `upstream/main` to confirm the
@@ -204,7 +272,7 @@ actual pre-PR code, not the PR's own framing of "before"). If the net delta is
 apply the repo's own golden rule (`CLAUDE.md` / `AGENTS.md`: only add a
 newsfragment when certain it's user-facing).
 
-## 10.11 Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry *(Request changes)*
+## 10.12 Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry *(Request changes)*
 
 **Scope gate**: only applies when the diff touches a class that directly
 subclasses `BaseOperator`. The `validate_operators_init.py`-style prek hook
@@ -238,7 +306,7 @@ Case study: apache/airflow#70628 — `DocumentLoaderOperator.execute()` guarded
 `TypeError: argument of type 'NoneType' is not iterable` instead of a
 readable error.
 
-## 10.12 registry `slice`/`first` cutoffs need a sort key *(Request changes)*
+## 10.13 registry `slice`/`first` cutoffs need a sort key *(Request changes)*
 
 **Scope gate**: only applies when the diff touches `registry/src/*.njk`
 templates, or the `_data/*.js` layer feeding them.
@@ -256,7 +324,7 @@ collection with a downstream slice, grep that collection's consumers for a
 truncation point and require a sort key as part of the same change, not a
 follow-up.
 
-## 10.13 New provider, or new major capability surface, needs a governance-gate check *(informational — report separately from the code verdict)*
+## 10.14 New provider, or new major capability surface, needs a governance-gate check *(informational — report separately from the code verdict)*
 
 **Scope gate**: only applies when the diff adds a substantial new
 provider-level capability — a whole new toolset, a new integration surface —
@@ -272,6 +340,191 @@ line item, not folded into code must-fix, and don't let a code APPROVE imply
 mergeability either. Seen enforced on apache/airflow#68847 (SandboxToolset):
 clean code review (APPROVED, full test/mypy/ruff pass) still blocked without
 the governance thread and a named maintainer.
+
+## 10.15 Cross-timetable `partition_date` comparisons must normalize via `localize_partition_datetime` *(Request changes)*
+
+**Scope gate**: only applies when the diff compares, sorts, or validates a
+`partition_date`-related `datetime` bound across timetables (e.g. an
+inverted-window guard, a CLI/API range check).
+
+`Timetable.localize_partition_datetime` has exactly two implementations
+repo-wide, with different semantics: the base `Timetable`'s
+`timezone.coerce_datetime(dt)` is a no-op pass-through for an already-aware
+datetime — it compares as an **absolute instant**, keeping the original
+offset. `CronMixin` (the shared base for `CronDataIntervalTimetable`,
+`CronPartitionTimetable`, and other cron-scheduled timetables) instead does
+`convert_to_utc(make_aware(dt.replace(tzinfo=None), self._timezone))` — it
+**discards** the original offset and reinterprets the wall-clock reading
+using the timetable's own timezone.
+
+A comparison written against a `datetime` without first normalizing through
+`dag.timetable.localize_partition_datetime()` will diverge from downstream
+query semantics (e.g. `apply_partition_date_window`) whenever the Dag's
+timetable is `CronMixin`-based, because the guard is silently comparing
+absolute instants while the downstream query discards the caller's explicit
+UTC offset.
+
+How to apply: when reviewing partition-date bound comparison logic, check
+whether it normalizes through the same `localize_partition_datetime` call
+the downstream query uses — don't assume "aware datetime, direct comparison"
+is equivalent to downstream behavior. Case study: PR #69454's inverted-window
+guard compared absolute instants, which disagreed with `CronMixin`'s
+wall-clock semantics and could wrongly reject a legal window or wrongly
+allow an inverted one; the fix moved the guard after `dag` resolution and
+compared via `dag.timetable.localize_partition_datetime()`.
+
+## 10.16 Logging/audit field review: cap+sort unbounded collections; reject fields redundant with a sibling *(Request changes)*
+
+**Scope gate**: applies whenever a diff adds or changes a field rendered
+into a DB row (`Log.extra`) or a structured log/audit line.
+
+Two related checks surfaced in the same PR review round:
+
+- **Any unbounded, user-data-sized collection rendered into a DB row or log
+  field needs a cap and a stable sort, by default — don't wait for a
+  reviewer to ask.** An unbounded collection written into `Log.extra` is an
+  unbounded DB payload; iterating an unordered `set` also makes the message
+  differ between otherwise-identical scheduler ticks, defeating comparison
+  across audit rows. Pick the sort key so survivors after truncation are the
+  informative ones (e.g. `(-backlog_count, dag_id)` so the most-backlogged
+  Dags survive, not an arbitrary prefix), and state *what* was dropped in the
+  truncation suffix, not just how many. Don't rely on SQL `ORDER BY` alone —
+  it usually lacks a tie-break column, and row order isn't a contract across
+  backends. Watch the reverse direction too: if an earlier review round
+  already removed truncation at a reviewer's request, say so explicitly when
+  re-introducing a cap so it doesn't read as ignoring that round.
+- **Before accepting a new log/audit field, check it isn't mathematically
+  forced to equal a sibling field already in the same log line, on every
+  code path that reaches the log call.** This kind of redundancy passes
+  review by inspection (both fields "look" like independent metrics) and
+  passes tests that only assert the log dict's shape rather than reasoning
+  about whether the two values could ever actually differ. Example: a
+  per-tick cap log carried both `cap` and `pending_count=len(pending_apdrs)`,
+  but `pending_apdrs` was always sliced to exactly `cap` elements before the
+  log call fired — `pending_count` could never differ from `cap`. Reviewer
+  caught it on PR #71072; fixed in commit `8b2aaf8e72` by replacing it with a
+  real `backlog_total` from a separate count query (see 10.17 for why that
+  separate query still needs to avoid a row-locking probe). If a new field is
+  provably redundant with a sibling, either drop it or replace it with a
+  genuinely independent computation.
+
+## 10.17 A capped, row-locked query must not use a `LIMIT cap + 1` probe row *(Request changes)*
+
+**Scope gate**: applies to any query wrapped in `with_row_locks`
+(`SELECT ... FOR UPDATE` / `SKIP LOCKED`) that needs to distinguish "exactly
+at the cap" from "more backlog behind it."
+
+A `LIMIT cap + 1` "probe row" trick — fetching one extra row beyond the cap
+to cheaply tell "there's more backlog" apart from "this batch is everything"
+without a separate `COUNT` query — is unsafe once the fetch is row-locked:
+the probe row gets locked too, even though it doesn't belong to this
+process's batch and is never processed. Under HA (multiple scheduler
+replicas), that's contention on a row another replica may need on its next
+tick. Surfaced on PR #71072 (`scheduler_job_runner.py`, partitioned Dag run
+per-tick cap) — a reviewer flagged it, fixed in commit `8b2aaf8e72`.
+
+How to apply: when a capped, row-locked query needs this distinction, drop
+the `+1`. Only when the capped fetch comes back full, issue a **separate,
+lock-free** `select(func.count())` with the same predicates (no
+`with_row_locks` — counting is a read, not a claim) to get the real backlog
+size. Row-locking reads should only ever touch rows this tick's process
+actually claims and processes.
+
+## 10.18 `providers/common/ai` hook capability additions: check three parity axes *(Request changes)*
+
+**Scope gate**: applies when a diff gives a `providers/common/ai` hook (or a
+sibling object it constructs, e.g. an embedder) a new capability.
+
+Check for parity with sibling hooks on three axes — catching these up front
+turns a multi-round review into one round:
+
+1. **Per-capability `*_conn_id`, with sibling hooks as the reference.**
+   Hooks that already support a second capability (e.g. an embedding
+   provider distinct from the chat provider) take a dedicated `*_conn_id`
+   that falls back to the primary `conn_id`, because the second provider
+   often isn't the primary one. A capability that unconditionally reuses the
+   primary connection will hand one vendor's credentials to a different
+   vendor's provider class — and the generic `{api_key, base_url}` kwargs
+   are legal for almost every provider class, so nothing raises. Watch the
+   fallback expression itself too: `x_conn_id if x_conn_id is not None else
+   primary_conn_id` makes a cross-vendor mis-wiring *avoidable*, not
+   *detected* — if both resolve to a `vendor:model` string, compare the
+   vendor prefixes and raise `ValueError` when they differ under a fallback.
+2. **Instrumentation must reach the new call path.** If the hook's primary
+   object applies instrumentation settings, a new object built alongside it
+   (e.g. an embedder) must receive the same instrumentation, or the
+   provider's OTel-export config silently produces spans for the primary
+   path and nothing for the new one. The mechanism can legitimately differ
+   per class (one class may not accept an `instrument` constructor kwarg in
+   the pinned library version, requiring a sentinel dance, while another
+   does) — that's not itself an inconsistency to flag.
+3. **`provider.yaml` conn-field parity across the whole connection-type
+   family.** If sibling connection types in the same family declare a
+   conn-field for a capability, every member of a newly-added family needs
+   it too, mirrored into `get_provider_info.py` (see 10.7's sibling
+   concern, and this file's "`provider.yaml`'s `ui-field-behaviour`/`conn-fields`
+   override the hook" note) — otherwise the UI offers no input for that
+   capability and users must hand-edit the Extra JSON.
+
+Also check `test_connection()` when two capabilities can be configured
+independently: an early `return` after validating only the first means a
+misconfigured second capability reports as healthy, defeating the point of
+the UI's Test button. Validating both costs the same order of work, since
+`test_connection()` only resolves strings and constructs provider classes
+without calling a real API.
+
+## 10.19 A `DAGResponse` (or derived-model) field addition must exist on `DagModel` *(Block)*
+
+**Scope gate**: applies when a diff adds or removes a field on `DAGResponse`
+or a derived response model in `api_fastapi/core_api/`.
+
+The Dags-list UI route builds `DAGWithLatestDagRunsResponse` by iterating
+`DAGResponse.model_fields` and calling **default-less**
+`getattr(dag, DAG_ALIAS_MAPPING.get(f, f))` against a bare `DagModel`. Adding
+any `DAGResponse` field that is **not** a `DagModel` attribute (one only
+populated by route-level `setattr`, or one that only has a pydantic default)
+raises `AttributeError`, and the Dags-list UI route returns a 500.
+`computed_field`-based fields (e.g. `is_backfillable`, `file_token`) are
+unaffected — they never enter `model_fields`.
+
+**The two consumer routes fail differently, so both must be checked
+separately.** The public `GET /dags` route goes through pydantic's
+`from_attributes` and only silently falls back to a default (wrong value,
+no exception) — passing `routes/public/test_dags.py` is not evidence the UI
+route is fine. The route that actually breaks is
+`routes/ui/test_dags.py`; a self-review or CI run that only exercises the
+public route's tests can miss the regression entirely (confirmed instance:
+two sibling PRs each added one field, each showed a clean public-route test
+run and a failing UI-route test run).
+
+How to apply: for any new `DAGResponse`-family field, require either (a) the
+route defines a `DAG_RESPONSE_ROUTE_SUPPLIED_FIELDS`-style frozenset and the
+UI route's comprehension explicitly excludes fields it supplies via
+`setattr`, or (b) confirm the field genuinely maps to a `DagModel` attribute.
+Flag a bare `getattr(dag, name, None)`-with-default rewrite as insufficient —
+it silently converts a real typo in the field-mapping into a quietly-`None`
+value instead of a loud error. A tripwire that asserts
+`hasattr(DagModel, name)` for every non-excluded field name is the
+preferred shape, since it surfaces the next add-a-field mistake at the
+route rather than 500ing in production.
+
+## 10.20 Two queries scanning the same rows under the same `WHERE` predicate should merge *(Request changes)*
+
+When two queries share the same `WHERE` predicate over the same rows, and
+each derives one value (e.g. a total count and a distinct-id count), prefer
+merging them into a single `group by` / aggregate query and deriving both
+values from that one result, rather than issuing two separate queries.
+
+Why: a single query scans once instead of twice, and a single query's
+result is internally consistent by construction — two separately-issued
+queries can drift apart if only one of them is updated the next time the
+predicate changes, with no compiler or test catching the mismatch.
+
+How to apply: when reviewing a diff (or writing a query) that issues two
+queries with an identical or heavily-overlapping `WHERE` clause, check
+whether both derived values can come from one `group_by(...)` call —
+e.g. a `count()` and a `sum()` both computed off the same grouped result —
+before accepting two separate round trips.
 
 ## Don't proliferate example Dags — fold into an existing one
 
@@ -417,6 +670,35 @@ skill's "shared constant changes tuple arity/field count" row — grep the
 constant name (`MODULE_TYPES`, the hardcoded section lists), not the type
 name, and re-grep after the change to confirm no further site remains.
 
+## `provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's `get_ui_field_behaviour()` entirely (narrow — read when a diff changes connection-form UI text)
+
+**Scope note**: applies when a diff changes a connection type's user-visible
+field text (placeholder, label, hidden fields, external-services) by editing
+a hook's Python methods.
+
+`ProvidersManager._import_hook` first computes `ui_metadata_loaded =
+conn_config is not None and bool(conn_config.get("conn-fields") or
+conn_config.get("ui-field-behaviour"))`, and only falls back to the hook's
+`get_connection_form_widgets()` / `get_ui_field_behaviour()` when that is
+**False**. Once a connection type's `provider.yaml` entry declares
+`conn-fields` or `ui-field-behaviour`, the hook's same-named Python method
+becomes dead code — every placeholder, relabeling, and hidden-field the
+connection UI (and the provider registry) shows for that connection type
+comes from `provider.yaml`.
+
+**How to apply**: to change a connection type's user-visible field text,
+treat `provider.yaml` as the only source of truth — edit it, then run `prek
+run update-providers-build-files --files providers/<p>/provider.yaml` to
+regenerate `get_provider_info.py` (a generated file — never hand-edit it).
+The reverse also applies when checking whether a stale claim has been fully
+cleaned up: enumerate `provider.yaml` alongside the hook source and docs —
+grepping only the hook's Python file and docs misses the file that actually
+drives the UI. Case study: apache/airflow#72013 (fixing `LlamaIndexHook`'s
+false claim of Ollama/vLLM support) initially edited only the docs and
+`hooks/llamaindex.py`'s `get_ui_field_behaviour()`; review caught that the
+connection UI and provider registry both read `provider.yaml`, so the edited
+method was dead code and the false claim was still user-visible.
+
 ## Migration PR conventions (narrow — read only when the diff touches `airflow-core/src/airflow/migrations/`)
 
 **Scope note**: this only applies when a diff touches
@@ -514,6 +796,26 @@ A trigger-policy commit claimed _"pre-existing serialized Dags default to
 reverse. Pre-release status does **not** downgrade this: wire-format mutations are
 acceptable pre-release, but the commit body's promise about behaviour must still
 align with the diff.
+
+### Commit body is a contract — the `SharedStreamManager` case
+
+`airflow.triggers.shared_stream.SharedStreamManager`'s module docstring and
+`event-scheduling.rst` both promised an at-most-one-in-flight guarantee in
+ack mode — "the producer waits for acks before yielding the next event." The
+actual code does not implement this: `_poll` is a plain `async for` over
+`open_shared_stream`, and nothing awaits an outstanding ack between
+iterations. The real backpressure comes entirely from the **subscriber
+queue's bound** — a full queue force-fails that subscriber with `QueueFull`,
+which is a different mechanism than the documented one and a different
+failure mode for callers who design around the doc's promise (e.g. an
+SQS/Kafka producer built assuming at-most-one-in-flight). A green test suite
+does not catch this class of defect, because it's a mismatch between the
+documented contract and the code, not a logic bug — treat any "producer
+waits for acks" / "does not yield until all subscribers ack" phrasing in
+ack-mode shared-stream docs or docstrings as a claim to verify against the
+actual `_poll` implementation, and require the wording rewritten to describe
+queue-bounded backpressure (full queue force-fails the subscriber) rather
+than producer-side awaiting.
 
 ### Underscore-private exception promotion — the `_AckTimeout` case
 

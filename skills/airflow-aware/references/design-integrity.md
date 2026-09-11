@@ -32,6 +32,18 @@ both), and write a single `is not` comparison. If one side already has the
 declared attribute and the other doesn't, add it to the missing side rather
 than working around the gap with an override check.
 
+Airflow already has a prek-hook precedent for the "two definitions must stay
+manually in sync" version of this risk:
+`scripts/ci/prek/check_partition_mapper_defaults_in_sync.py` (see
+`.pre-commit-config.yaml:344-350`), which diffs the field-name sets core and
+SDK each maintain. A second instance surfaced on PR #69761 —
+`shared/plugins_manager`'s TypedDict vs. the Pydantic response model in
+`airflow.api_fastapi.core_api.datamodels.plugins` — when review flagged the
+lack of an automated sync check between the two. When a review raises this
+class of "two definitions need to stay in sync" nit, point at this existing
+hook as the concrete pattern to replicate rather than suggesting "this should
+be automated somehow" in the abstract.
+
 ---
 
 ## Name a parameter's obvious counterpart symmetrically, not descriptively
@@ -115,3 +127,55 @@ object consumed by a hot path:
   kind of loud signal.
 - Don't add `__init_subclass__`-style runtime hard-enforcement — it's heavier
   than the encoder-level reject and still advertises the extension point.
+
+---
+
+## New `Window` subclass or direction: default to uniform semantics, not calendar special-casing
+
+When designing AIP-76 partition fan-out `Window` direction semantics, prefer
+a single uniform rule applied across every window type over special-casing
+for calendar alignment — even when the uniform rule produces a
+non-calendar-aligned result. The accepted rule is the *trailing period ending
+at* the anchor — the half-open `(anchor - period, anchor]` — mirrored by the
+*period starting at* the anchor `[anchor, anchor + period)`, with the anchor
+as the last/first member respectively. This is deliberately accepted even
+when it makes `WeekWindow(2024-03-04)` fan out `02-27…03-04` (Tue→Mon, not a
+calendar week) rather than special-casing to align to the calendar week.
+
+Direction-label update (a later review, addressing a reviewer's comment): the
+enum labels were swapped to follow the time axis. This was deliberately not
+aligned to the linked issue's literal wording; the author chose the
+temporally-intuitive reading instead.
+
+How to apply: when a new `Window` subclass or direction raises a "should this
+align to a calendar boundary?" question, default to the rule that stays
+consistent with the other windows (mirror / fixed-stride / anchor-as-boundary),
+and only break uniformity when explicitly asked for calendar alignment.
+
+---
+
+## Version-skew tolerance belongs at the client/transport boundary, not in generated models
+
+When a versioned client (Task SDK talking to the Execution API, a Python
+client talking to a REST API) hits a missing field because the server is
+older than the client's generated models, the fix is **not** to relax the
+generated model's `required` declaration to make the field optional.
+
+Why: a generated model faithfully reflects the contract of the spec version
+it was generated from — those fields really were required in that version;
+the codegen didn't mis-mark them. Relaxing them to optional has two costs:
+(a) it also drops validation for a version-**matched** server, sacrificing a
+correct check to accommodate a mismatched one; and (b) the model then
+misrepresents its own version's contract from that point on. The actual
+problem is a version mismatch between client and server, not an error in the
+model definition.
+
+How to apply: put compatibility tolerance at the **call site / transport
+boundary** (e.g. the response-validation step in the client's operations
+layer), never in the model definition or codegen template. Keep the
+tolerance as narrow as possible — catch only the specific error shape a
+version skew produces (e.g. a pydantic `ValidationError` where
+`error["type"] == "missing"`), re-raise everything else, and log the
+synthesized field so the fabricated value leaves a trace. The same judgment
+applies to any client/server pair with independently-versioned generated
+models on each side, not just one specific API.

@@ -24,6 +24,12 @@ hands, not delegate to the orchestrator.
    copyable fenced block) with the commands the user would run themselves.
    Don't auto-run `git commit` / `git push` / `gh pr create` /
    `--force-with-lease`.
+   **After a commit is made, report what changed and its state (committed,
+   not pushed) — don't add "push this" as an action item.** He tracks which
+   branch/worktree he's on and pushes himself; spelling it out as a pending
+   TODO is unnecessary noise, not a helpful reminder. If a push is genuinely
+   blocked on something non-obvious (e.g. a rebase is needed first), say
+   that — but don't restate the push action itself as something owed.
 2. **Re-verify current git state at the start of every turn**
    (`git rev-parse --abbrev-ref HEAD` + `git status --short` + `git log -1`)
    — don't trust a snapshot from an earlier turn. Branch/tip state can have

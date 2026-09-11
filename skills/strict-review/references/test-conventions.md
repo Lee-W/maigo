@@ -263,6 +263,50 @@ ready.
 
 ---
 
+## A test double gated by a value it can't produce should emit that value directly
+
+When the code under test is gated by a computed value the test double
+doesn't know how to produce — a cost/usage figure looked up from a
+real-world pricing table by model name, a checksum, a signature — don't try
+to make the double satisfy the real computation. Make the double emit the
+gating value directly in its response.
+
+Case study: pydantic-ai's `UsageLimits(cost_limit=...)` checks
+`RunUsage.cost`, normally computed by `genai-prices` from the model's *name*
+against a pricing table. A test's `FunctionModel` isn't in that table, so
+its cost is always `0` — "set a tiny `cost_limit` and confirm it trips"
+never triggers, no matter how small the limit is. The fix is having the
+fake model's response report its own cost directly, bypassing the pricing
+table:
+
+```python
+def _priced_model_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+    return ModelResponse(
+        parts=[TextPart(content="the answer")],
+        usage=RequestUsage(input_tokens=100, output_tokens=50, cost=Decimal("0.10")),
+    )
+```
+
+`Agent(FunctionModel(_priced_model_fn)).run_sync(..., usage_limits=UsageLimits(cost_limit=Decimal("0.05")))`
+then raises `UsageLimitExceeded` as expected; `run_sync` and async `run` share
+the same graph path, so no separate recipe is needed for either.
+
+Two adjacent traps when writing this kind of test: pydantic-ai's comparison
+is strict `>`, so `cost_limit` exactly equal to the actual cost is
+*allowed*, not tripped — don't write a boundary test expecting a trip at
+equality. And match the assertion message against something that
+identifies *which* limit fired (e.g. `r"cost_limit.*0\.05"`), not just the
+number (`r"0\.05"`), since a bare-number match can't distinguish which kind
+of limit tripped when a test exercises more than one.
+
+How to apply: before reaching for a fake object's "real" computation to
+satisfy a gating check, ask whether the fake can just declare the gating
+value in its own output instead — this generalizes beyond pydantic-ai to
+any test double blocked by a value it would otherwise have to genuinely
+compute.
+
+---
+
 ## Log assertion when the log IS the observable behaviour
 
 Airflow's `AGENTS.md` guidance ("Do not use `caplog` in tests, prefer

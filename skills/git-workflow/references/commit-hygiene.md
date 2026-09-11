@@ -93,3 +93,33 @@ staging by concern; before the first commit of a batch the user hasn't tested
 yet, default to `git checkout -b <descriptive-branch-name>` first. Use the
 repo's own commit-message convention for each per-concern commit (see
 [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)).
+
+## After `rebase --continue` / `cherry-pick`: a shrinking file count means the message is now stale
+
+After `git rebase --continue` or `cherry-pick` finishes, **reconcile `git
+show --stat`'s file count against the original commit's before trusting the
+result**. A smaller count means upstream already carried out part of that
+change itself, and git silently dropped the now-already-applied hunks —
+there is no warning, only a file/line count that no longer matches.
+
+Why: a rebase of a commit describing four kinds of edits (a connection-form
+placeholder, a hook docstring, `get_provider_info.py`, and a test) landed as
+a single-file diff (test only) because upstream had already merged a PR
+that made the other three edits. The commit message still described all
+four — a message describing changes absent from the diff misleads both the
+reviewer reading the PR and anyone reading `git log` afterward.
+
+How to apply, in order:
+
+1. `git show --stat HEAD` and compare the file count to the pre-rebase
+   commit.
+2. If it shrank, `git show HEAD` and read the actual remaining diff to
+   determine what content is genuinely left.
+3. If the message no longer matches the diff, `--amend` it — rewrite the
+   subject for the remaining scope's user impact, and note in the body why
+   only this much survived (name the upstream PR that already absorbed the
+   rest, if known).
+
+The same check applies mid-conflict-resolution, not just after `--continue`:
+a hunk in a non-conflicting region that "is already correct" is often
+upstream having done it first, not your hunk having applied cleanly.

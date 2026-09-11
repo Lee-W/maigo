@@ -125,6 +125,31 @@ flag it for a rename to the general operation. Verb-first naming
 (`resolve_`, `compute_`, `get_`, `build_`, `find_`, `extract_`) generally
 reads better once decoupled from the specific caller.
 
+## Naming: guard-then-hook pairs use two distinct verbs, not an underscore
+
+Flag a new guard-then-hook (template-method) pair — a public entry point
+plus a private override point it delegates to — that's named with the same
+verb differing only by a leading underscore (`x` / `_x`), when the same file
+already has an existing pair that uses two distinct verbs for the same
+shape. The underscore-only idiom itself has legitimate Airflow precedent
+(`get_dep_statuses` / `_get_dep_statuses`, `is_authorized_*`) — the problem
+isn't the idiom, it's **two different naming conventions coexisting in one
+file**. A neighboring pair that already reads "public = intent, private =
+mechanism" via two distinct verbs sets the file's convention; an
+underscore-only pair placed a few lines away forces the reader to jump to
+the definition to figure out which one is the entry point.
+
+How to apply: before naming a new guard-then-hook pair, check the same file
+for an existing pairing convention and follow it. Without a precedent, name
+the private hook after what it mechanically does, and name it distinctly
+from any other private method operating on similar-but-different input in
+the same class (don't let two private methods differ only by which value
+they take). Keep the public name aligned with the external vocabulary it
+serves (e.g. a wire-format field name it implements). If a file mixes both
+idioms and needs collapsing, collapse the **whole set** at once — leaving
+one pair unconverted just adds a third style to the file, which is worse
+than the original inconsistency.
+
 ## State the rule, don't enumerate a set derivable from code
 
 Flag a comment or docstring that lists "all the other X" or enumerates a
