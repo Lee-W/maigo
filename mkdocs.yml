@@ -28,6 +28,7 @@ nav:
   - Guides:
       - Getting Started: guides/getting-started.md
       - Contributing: guides/contributing.md
+      - Model Evaluation: guides/model-evaluation.md
   - Agents (source):
       - Raana: agents/raana.md
       - Tomori: agents/tomori.md
