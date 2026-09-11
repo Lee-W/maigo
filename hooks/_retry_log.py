@@ -1,50 +1,61 @@
-"""Shared JSONL retry-log helper used by Maigo hooks.
+"""Append retry evidence and count consecutive failures in one run/task/check.
 
-Both `teammate_quality_check.py` (Soyo must-fix counts) and
-`verify_completion.py` (Taki test-failure counts) need the same logic:
-append a timestamped entry to a JSONL file, then return how many times each
-key has been recorded across history. This module is the single source of
-truth for that shape.
-
-Failures (OSError, PermissionError) → return empty dict (fail-open, hooks
-must continue). Corrupted JSON lines in the log are skipped, not raised.
+Unscoped and legacy entries remain historical evidence, never retry-limit input.
+An empty key set records a successful check and resets that scope's streaks.
+Retries of the same check must be sequential; unrelated scopes may interleave.
 """
 
 from __future__ import annotations
 
 import datetime
 import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
-def record_and_count(log_path: Path, keys: set[str], entry_key: str) -> dict[str, int]:
-    """Append `keys` to the JSONL `log_path`; return total count per key.
+@dataclass(frozen=True)
+class RetryScope:
+    run_id: str
+    task_id: str
+    check_id: str = ""
 
-    `entry_key` is the JSON field name used for the list of keys in each
-    entry (e.g. `"must_fix_keys"` for Soyo, `"failures"` for Taki). Keeping
-    the field name configurable preserves backward compatibility with
-    existing on-disk logs written by either hook.
+
+def record_and_count(
+    log_path: Path,
+    keys: set[str],
+    entry_key: str,
+    *,
+    scope: RetryScope | None = None,
+) -> dict[str, int]:
+    """Record one complete result; return streaks for its current failure keys.
+
+    Scope-less calls return only this attempt's counts. Corrupted records are
+    ignored and I/O failure returns no counts, preserving hooks' fail-open policy.
     """
     counts: dict[str, int] = {}
+    scope_data = asdict(scope) if scope is not None else None
     try:
-        if log_path.is_file():
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        if scope is not None and log_path.is_file():
             for line in log_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
                 try:
                     entry = json.loads(line)
-                    for k in entry.get(entry_key, []):
-                        counts[k] = counts.get(k, 0) + 1
                 except json.JSONDecodeError:
-                    pass  # corrupted line — skip, don't crash
-        # verify_task.py also calls this from a standalone system Python.
+                    continue
+                if not isinstance(entry, dict) or entry.get("scope") != scope_data:
+                    continue
+                values = entry.get(entry_key)
+                if not isinstance(values, list) or not all(
+                    isinstance(k, str) for k in values
+                ):
+                    continue
+                counts = {key: counts.get(key, 0) + 1 for key in set(values)}
+        counts = {key: counts.get(key, 0) + 1 for key in keys}
+        # Standalone CLI also runs under macOS system Python 3.9.
         ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
-        new_entry = json.dumps({"ts": ts, entry_key: sorted(keys)}, ensure_ascii=False)
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(new_entry + "\n")
-        for k in keys:
-            counts[k] = counts.get(k, 0) + 1
-    except (OSError, PermissionError):
+        entry = {"ts": ts, "scope": scope_data, entry_key: sorted(keys)}
+        with log_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except (OSError, UnicodeError):
         return {}
     return counts

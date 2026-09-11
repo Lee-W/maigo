@@ -248,19 +248,20 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 | **Taki** | **不能包含** `should work` / `looks good` / `應該可以` / `看起來沒問題` 等 hedge 語 | 「verifier 只能拿 exit code 講話」 |
 | **Anon** | 至少一個 file path reference（regex 抓 `*.py` / `*.md` / `*.yml` / `*.yaml` / `*.json` / `*.toml` / `*.txt` / `*.sh` / `*.cfg`）| 「沒看到檔案路徑 reference」 |
 
-### Soyo must-fix 計次
+### 🟡 Soyo must-fix 計次
 
-Soyo verdict 非 APPROVED 時，hook 會從輸出抽 must-fix 條目，用
-backtick 內的 file path（去掉 `:line` 後綴）當 key；無 file 引用的
-條目用 normalized 文字當 fallback key。
+🟡 Soyo verdict 非 APPROVED 時，hook 從輸出抽 must-fix 條目，以
+backtick 內的 file path（去掉 `:line`）當 key；沒有檔案引用時用 normalized 文字。
+這是格式層的近似 key；是否為同一個語意問題仍由 orchestrator 依 failure-handling 判斷。
 
-計數寫到 `.maigo/soyo-must-fix.jsonl`，每行一筆
-`{"ts": "...Z", "must_fix_keys": [...]}`。同一 key 累計到
-`SOYO_RETRY_LIMIT`（預設 2）時，block reason 前綴
-`⚠️ RETRY LIMIT REACHED (Soyo):`，提醒 orchestrator 停下找使用者
-——hook 本身仍 block，不會放行。
+`.maigo/soyo-must-fix.jsonl` 每行記錄 `ts`、`scope` 與 `must_fix_keys`。
+SubagentStop 用真實事件的 `session_id` / `agent_id` 作為 run / task 範圍：
+同一 agent 的相鄰結果都含同一 key、達 `SOYO_RETRY_LIMIT`（預設 2）時，
+block reason 加上 `⚠️ RETRY LIMIT REACHED (Soyo):`。APPROVED 寫入空 keys，清除該範圍的連續計數。
+換 session 或 agent 就重新計數；換新 agent 做 re-review 時，orchestrator 仍須自行延續同一邏輯任務的預算。
 
-對齊 Stop hook 的 `RETRY_LIMIT` 機制（見下面 Stop 段）。
+缺少任一識別碼或舊紀錄沒有 scope 時，只留歷史證據，不累計跨呼叫的 retry limit。
+各範圍可以交錯寫入；同一範圍的重試須依序執行。
 
 ### 不檢查的角色
 
@@ -299,6 +300,20 @@ CLI 與 Stop hook 共用 `run_verification()`。stdout 為單一 JSON object，�
 子程序 `exit_code` 和 `output`。未執行或無法取得完成狀態時，`exit_code` 為 `null`。
 可用 shell redirect 保存本次結果；改動後必須重跑。
 
+首次呼叫會回傳新 `run_id` 與 `task_id`。同一任務重試時，沿用該次 JSON 的兩個 ID：
+
+```bash
+python3 /path/to/maigo/scripts/verify_task.py --cwd /path/to/project \
+  --run-id <previous-run-id> --task-id <previous-task-id>
+```
+
+兩個旗標須一起給；新任務省略兩者以取得新範圍，或明確指定新的 task ID。
+重試計數還會按實際 argv 分開，避免 lint 通過清掉另一個 test command 的失敗。
+同範圍同 command 的相鄰可判定結果才累計：本次未出現的失敗 key 不延續；通過或只剩已知失敗時寫入空 keys 重設。
+無法執行、逾時、skip 等沒有有效測試結果的情況，不作為成功重設。
+舊的無 scope 紀錄保留供 doctor 歷史統計，不用來觸發當前任務的 retry limit。
+
+
 | status | CLI exit | 意義 |
 |---|---|---|
 | `passed` | 0 | 該次驗證 command exit 0 |
@@ -319,6 +334,9 @@ Stop hook 保留既有 skip／known-failure 放行政策；CLI 用獨立狀態�
 
 任務宣告完成前觸發。即使 orchestrator 想跳過 Taki 也擋下。成功 approve 時，若 input
 帶有 `session_id`，會附上該 session 的 token usage 一行摘要；不會把完整 JSONL 放進訊息。
+
+Stop 事件沒有可靠的 task ID，因此這條入口不累計跨呼叫的重試次數；失敗仍照常 block。
+需要任務級計次時用上述顯式 CLI，orchestrator 仍遵守 failure-handling 的重試預算。
 
 ### 偵測順序
 

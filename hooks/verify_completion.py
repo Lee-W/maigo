@@ -28,7 +28,7 @@ from typing import Literal, NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit_stop as emit  # noqa: E402
-from _retry_log import record_and_count  # noqa: E402
+from _retry_log import RetryScope, record_and_count  # noqa: E402
 from _session_head import head_moved  # noqa: E402
 from _token_usage import LOG_PATH, format_one_line, summarize  # noqa: E402
 
@@ -205,12 +205,13 @@ def read_known_failures(path: Path) -> set[str]:
 
 def _retry_log_path(cwd: Path) -> Path:
     log_dir = cwd / _RETRY_LOG_BASE
-    log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "test-failures.jsonl"
 
 
-def _record_and_count(log_path: Path, failures: set[str]) -> dict[str, int]:
-    return record_and_count(log_path, failures, "failures")
+def _record_and_count(
+    log_path: Path, failures: set[str], scope: RetryScope | None = None
+) -> dict[str, int]:
+    return record_and_count(log_path, failures, "failures", scope=scope)
 
 
 def _retry_warning(counts: dict[str, int], keys: set[str], label: str) -> str:
@@ -254,7 +255,9 @@ class VerificationResult:
     output: str = ""
 
 
-def run_verification(cwd: Path, command: str | None = None) -> VerificationResult:
+def run_verification(
+    cwd: Path, command: str | None = None, *, retry_scope: RetryScope | None = None
+) -> VerificationResult:
     """Always verify when explicitly invoked, including clean/committed worktrees.
 
     The hook alone decides whether a read-only session needs verification.
@@ -290,6 +293,10 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
             "unavailable", "立希 (Taki)：偵測不到可執行的 test 設定，未驗證"
         )
 
+    if retry_scope is not None:
+        retry_scope = RetryScope(
+            retry_scope.run_id, retry_scope.task_id, json.dumps(cmd)
+        )
     known = read_known_failures(claude_dir / "known-test-failures")
     exit_code, output = run_command(cmd, cwd)
 
@@ -299,6 +306,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
         )
 
     if exit_code == 0:
+        _record_and_count(_retry_log_path(cwd), set(), retry_scope)
         return result("passed", f"立希 (Taki)：`{' '.join(cmd)}` 通過")
 
     if exit_code == -1:
@@ -314,7 +322,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
     fatal_match = FATAL_MARKER_RE.search(output)
     if fatal_match:
         fatal_key = f"__fatal__:{fatal_match.group(1)}:{' '.join(cmd)}"
-        counts = _record_and_count(_retry_log_path(cwd), {fatal_key})
+        counts = _record_and_count(_retry_log_path(cwd), {fatal_key}, retry_scope)
         warning = _retry_warning(counts, {fatal_key}, "import / collection 錯")
         return result(
             "failed",
@@ -325,7 +333,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
     new_failures = actual - known
 
     if new_failures:
-        counts = _record_and_count(_retry_log_path(cwd), new_failures)
+        counts = _record_and_count(_retry_log_path(cwd), new_failures, retry_scope)
         over_limit = {
             tid: c
             for tid, c in counts.items()
@@ -351,6 +359,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
         )
 
     if actual and not new_failures:
+        _record_and_count(_retry_log_path(cwd), set(), retry_scope)
         return result(
             "known_failures",
             f"立希 (Taki)：{len(actual)} 個失敗全在 known-test-failures 名單，仍有已知失敗",
@@ -367,7 +376,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
     collection_match = COLLECTION_ERROR_RE.search(output)
     if collection_match:
         collection_key = f"__collection__:{collection_match.group(0)}:{' '.join(cmd)}"
-        counts = _record_and_count(_retry_log_path(cwd), {collection_key})
+        counts = _record_and_count(_retry_log_path(cwd), {collection_key}, retry_scope)
         warning = _retry_warning(counts, {collection_key}, "test collection / 設定錯")
         return result(
             "failed",
@@ -381,7 +390,7 @@ def run_verification(cwd: Path, command: str | None = None) -> VerificationResul
     # The key is stable per command so distinct commands count independently.
     tail = output[-OUTPUT_TAIL_CHARS:] if len(output) > OUTPUT_TAIL_CHARS else output
     unparsed_key = f"__unparsed_nonzero__:{' '.join(cmd)}"
-    counts = _record_and_count(_retry_log_path(cwd), {unparsed_key})
+    counts = _record_and_count(_retry_log_path(cwd), {unparsed_key}, retry_scope)
     if counts.get(unparsed_key, 0) >= RETRY_LIMIT:
         return result(
             "failed",

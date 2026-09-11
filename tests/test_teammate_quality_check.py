@@ -359,7 +359,7 @@ class TestSoyoRetryCount:
         lines = [line for line in log_file.read_text().splitlines() if line.strip()]
         assert len(lines) == 1
 
-    def test_blocked_second_round_emits_retry_warning(
+    def test_legacy_history_does_not_trigger_retry_warning(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture,
@@ -382,12 +382,10 @@ class TestSoyoRetryCount:
         with pytest.raises(SystemExit):
             tqc.check_soyo(self._BLOCKED_OUTPUT)
         result = json.loads(capsys.readouterr().out.strip())
-        assert result["decision"] == "block"
-        assert "⚠️ RETRY LIMIT REACHED (Soyo):" in result["reason"]
-        assert "hooks/foo.py" in result["reason"]
-        assert "次" in result["reason"]
+        assert result.get("decision") is None
+        assert "RETRY LIMIT" not in result["reason"]
 
-    def test_approved_does_not_write_log(
+    def test_approved_records_empty_keys_to_reset_streak(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture,
@@ -402,9 +400,9 @@ class TestSoyoRetryCount:
             tqc.check_soyo(approved_output)
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
-        # No log file should be written
+        # An approved result ends the previous failure streak.
         log_file = tmp_path / "soyo-must-fix.jsonl"
-        assert not log_file.exists()
+        assert json.loads(log_file.read_text())["must_fix_keys"] == []
 
     def test_corrupted_log_line_does_not_crash(
         self,
@@ -422,8 +420,8 @@ class TestSoyoRetryCount:
             + "\n"
         )
         counts = tqc._soyo_record_and_count(log_file, {"foo.py"})
-        # 1 from good existing line + 1 from current call = 2
-        assert counts["foo.py"] == 2
+        # Historical entries have no task identity.
+        assert counts["foo.py"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -643,3 +641,40 @@ class TestMain:
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
         assert result.get("decision") is None
+
+
+def test_real_subagent_events_scope_retry_and_approval_reset(tmp_path):
+    script = Path(__file__).resolve().parents[1] / "hooks/teammate_quality_check.py"
+    blocked = (
+        MEMORY
+        + "BLOCKED\n"
+        + CHECKLIST
+        + "## Must-fix\n- `src/app.py` — broken import\n"
+    )
+    approved = MEMORY + "APPROVED\n" + CHECKLIST
+
+    def run(output=blocked, session="session", agent="review-task"):
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            input=json.dumps(
+                {
+                    "hook_event_name": "SubagentStop",
+                    "session_id": session,
+                    "agent_id": agent,
+                    "agent_type": "maigo:Soyo",
+                    "cwd": str(tmp_path),
+                    "last_assistant_message": output,
+                }
+            ),
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0 and not proc.stderr
+        return json.loads(proc.stdout)
+
+    assert "RETRY LIMIT" not in run()["reason"]
+    assert "RETRY LIMIT" not in run(agent="another-task")["reason"]
+    assert "RETRY LIMIT" not in run(session="another-session")["reason"]
+    assert "RETRY LIMIT" in run()["reason"]
+    assert run(approved).get("decision") is None
+    assert "RETRY LIMIT" not in run()["reason"]

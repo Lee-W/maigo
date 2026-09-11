@@ -50,6 +50,10 @@ orchestrator 直接呼叫 Anon 動手，做完跑 Soyo 輕量 review（9 項 →
 python3 <maigo-root>/scripts/verify_task.py --cwd <project-cwd>
 ```
 
+首次結果的 `run_id` / `task_id` 要隨本 work item 保存；修復後重試時傳
+`--run-id <同一 run_id> --task-id <同一 task_id>`，新 work item 則取新範圍。
+不要靠新建 ID 規避同一任務的重試上限。
+
 可用 `--command '<實際測試指令>'` 指定任務需要的驗證；參數以 argv 解析，不執行 shell。
 未指定時沿用 `.claude/test-command` 與既有 runner 偵測，設定格式見
 [Hooks reference](../docs/reference/hooks.md#explicit-task-verification)。
