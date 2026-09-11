@@ -72,6 +72,19 @@ explicitly asked for them to be committed separately rather than swept into
 one commit — the request itself is the evidence this default should exist,
 not just a general best-practice preference.
 
+Splitting by concern only holds if each concern's files actually made it into
+the index — `git status --short` isn't proof of that. A leading-space ` A`
+(space, then `A`) in its first column means **intent-to-add**: the path is
+known to the index but its content is not, typically left behind by a stray
+`git add -N` or by a delegate/tool creating a new file. Committing at that
+point succeeds and silently produces an empty file — `git status` never
+flags it. The authoritative check before committing is `git diff --cached
+--numstat` on every path in the batch: real staged content lists as
+`<added>\t<deleted>\t<path>`; an intent-to-add path is simply absent from
+that output, and that absence is the signal, not an error message. Fix with
+`git add <path>` again, re-check `--numstat`, then commit; confirm the total
+afterwards with `git show --stat`.
+
 **Open a branch before the first commit the user will actually test**, don't
 land straight on the main/default branch. Once a batch of unreleased changes
 is about to be exercised by the user (especially anything they'll run and
@@ -93,6 +106,78 @@ staging by concern; before the first commit of a batch the user hasn't tested
 yet, default to `git checkout -b <descriptive-branch-name>` first. Use the
 repo's own commit-message convention for each per-concern commit (see
 [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)).
+
+## Repo `CLAUDE.md`/`AGENTS.md` attribution rules win over harness defaults
+
+A harness's session layer commonly carries a default instruction to append a
+co-author trailer (e.g. `Co-Authored-By: <agent> <noreply@...>`) to every
+commit message. When the target repo's own `CLAUDE.md` / `AGENTS.md`
+explicitly forbids this — e.g. apache/airflow: "NEVER add Co-Authored-By
+with yourself as co-author of the commit. Agents cannot be authors, humans
+can be, Agents are assistants." — the repo's rule wins: drop the trailer,
+and don't re-litigate or report on it every time.
+
+Why: these commits go into the project's permanent history, under its own
+maintainers' own contribution conventions — a harness-layer default has no
+standing there. The conflict recurs on every session against that repo;
+re-deciding and re-reporting it each time is pure overhead once the repo's
+position is known.
+
+How to apply:
+
+- Before writing a commit message, check whether the target repo's
+  `CLAUDE.md`/`AGENTS.md` has an attribution clause. If it forbids agent
+  co-authorship, comply silently — no trailer, no comment about it.
+- PR **description** disclosure is a separate axis: a repo can still require
+  its own AI-disclosure format there (a checkbox plus a `Generated-by:`
+  line) even while forbidding a commit-message co-author trailer — give the
+  repo what it asks for in each place.
+- Repos with no such clause **do not** fall back to the harness's own trailer
+  default: maigo's own default for the co-author trailer is unconditional —
+  never add one, clause or no clause, harness default or not (see
+  [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)'s
+  `## Trailers` section). "Follow the harness's own attribution default when a
+  repo is silent" applies only to attribution conventions *other than* the
+  trailer — e.g. a PR description's disclosure format.
+
+The point that matters is which source of truth wins — repo docs over a
+harness or session-level default — not the location either one lives in.
+
+## Splitting one working tree into multiple PRs needs a standalone test run per side
+
+When splitting one batch of changes into two (or more) PRs, an empty
+file-list intersection between the diffs is not evidence of independence —
+it only proves the two diffs won't conflict on the same tree. The question
+that actually matters is whether each half, applied standalone to the base
+branch, passes its own tests, and that's unrelated to file overlap: one
+half's code can read a field the other half only just added to a schema, a
+test fixture can reference something the other half introduced, an import
+can point at a module that doesn't exist without the other half.
+
+**Verify both directions, from a clean base**:
+
+1. Save the second half as a patch (`git diff HEAD -- <second-half-paths> >
+   <patch-path>`) and note its checksum.
+2. Stage and commit the first half in the original worktree, per concern —
+   not `git add -A`.
+3. From a **fresh worktree cut off the remote default branch** (not off the
+   first half's branch), `git apply` the second half's patch and run its own
+   tests there — this is the actual independence evidence.
+4. **Run the reverse too**: back in the original worktree, revert the second
+   half (`git checkout --` is safe here — its content already lives in the
+   patch and in the new worktree's commit) and re-run the first half's own
+   tests.
+
+Why step 4 isn't optional: the pre-split verification ran with both halves
+present on the tree at once, which cannot prove either half independently.
+Only once both directions pass can each PR be called independently
+reviewable — "the files don't overlap" was never that proof.
+
+One more thing to check rather than assume when cutting the fresh worktree:
+its remote tracking ref may have moved since an earlier worktree in the same
+session last fetched it, so the two branches' bases can differ. Confirm with
+`git merge-base --is-ancestor <old-base> <remote>/main` and report it — don't
+assume the bases match.
 
 ## After `rebase --continue` / `cherry-pick`: a shrinking file count means the message is now stale
 

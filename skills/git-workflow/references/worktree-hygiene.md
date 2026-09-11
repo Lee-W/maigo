@@ -104,6 +104,7 @@ How to apply:
 - Name each split-out worktree/branch per the sibling-layout convention above.
   The combined worktree used for central implementation is an intermediate
   artifact — remove it once the split verifies clean.
+- Before calling a split independent, verify each side's tests pass standalone from a clean worktree in both directions — see [`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md)'s "Splitting one working tree into multiple PRs needs a standalone test run per side" section.
 
 ## Colliding work: defer the overlapping subset
 

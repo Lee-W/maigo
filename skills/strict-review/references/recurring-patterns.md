@@ -410,6 +410,41 @@ alias rule specifically) are also covered in
 
 ---
 
+## Enumerate each independent why before deleting a stale comment block
+
+A comment block that accumulated over several revisions usually bundles more
+than one independent rationale. When asked to refresh or delete a stale
+comment, treating the whole block as a single rationale is the failure mode:
+"this rationale is already documented at the source of truth" is often true
+for **one** of the whys in the block, not all of them — deleting the whole
+paragraph then silently drops the others, leaving a bare `if`/guard with no
+stated reason. No test, ruff, or mypy check catches a missing why; it only
+surfaces in read-back.
+
+Case study: apache/airflow #71072 — a stale comment above
+`if len(pending_apdrs) >= self._max_partition_dag_runs_per_loop:` was
+deleted wholesale on the grounds that its rationale already lived next to the
+code it described. True for one of the two whys bundled in the paragraph;
+the other vanished with it.
+
+How to apply during review: before accepting a deletion or rewrite of a
+multi-sentence comment block, list each distinct why it carries as a
+separate item, and judge each one on its own:
+
+- still true and not documented elsewhere → keep it, or move it next to the
+  code it explains
+- the mechanism it describes changed but the underlying question still
+  stands → rewrite it around the new mechanism, don't drop it
+- genuinely duplicated elsewhere → demand the specific `file:line` that
+  carries it before letting this copy go
+
+Anything that survives as a bare conditional/branch with no stated reason is
+the signal a why got dropped silently. The "comment sparingly, don't repeat
+a rationale in several places" convention argues against duplicating a why
+— it does not license deleting one that has no other home.
+
+---
+
 ## Log/audit/error messages state what happened, not why it might change later
 
 Don't add clauses to a log/audit/error message that pre-justify a design

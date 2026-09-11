@@ -97,6 +97,54 @@ block. A named constant for a single-usage trivial default (e.g.
 constants for non-obvious values (timeouts, sizes, magic numbers) that appear
 in multiple places or whose value itself carries meaning.
 
+### Don't add an underscore prefix to a cross-file-called function just because its callers are in the same package
+
+In `providers/common/ai/src/airflow/providers/common/ai/utils/`, functions
+that get imported and called across files within the package (e.g. from
+`operators/*.py`) stay unprefixed — `build_file_analysis_request`,
+`log_run_summary`, `resolve_sqlglot_dialect`, `validate_prompt`,
+`coerce_usage_limits` all follow this, and the package declares no
+`__all__`. Only functions that are purely internal helpers within a single
+module (e.g. `usage.py`'s `_coerce_value`, `_validate_range`) get the
+underscore.
+
+"All the callers happen to live in the same package" is not, on its own, a
+reason to add an underscore prefix — check the existing naming pattern in
+the same directory (cross-file-called vs. purely-internal) before deciding,
+rather than defaulting toward a leading underscore because the call sites
+are nearby (apache/airflow PR #71403).
+
+## Provider hooks
+
+### Keep only connection-backed calls on the hook
+
+Before adding a `@staticmethod` to a provider hook, ask whether it touches
+`self.conn`. A staticmethod that doesn't — e.g. a one-line `model_dump()`
+call that flattens an SDK response into an XCom-safe dict — becomes part of
+the hook's public API the moment the provider releases, which means the
+provider carries it as a back-compat surface for years. That's not worth it
+for a pure data-transform helper; inline it into the operator's `execute`
+instead, and keep the hook to connection-related calls only.
+
+Exception: the helper stays on the hook if another **connection-backed**
+method on the same hook reuses it. Contrast
+`providers/anthropic/.../hooks/anthropic.py:709` `summarize_usage` — staying
+is correct, since the connection method `get_session_usage` (:706) calls it
+internally — against the removed
+`providers/openai/.../hooks/openai.py` `summarize_response_usage`, which had
+no hook-internal caller and was only ever called once from an operator
+(inlined in apache/airflow PR #72151). A neighboring provider putting the
+same shape of helper on its hook is not, by itself, a reason to follow suit —
+check whether it has an internal caller first.
+
+Before removing such a method, confirm it hasn't shipped yet (check the
+provider's `pyproject.toml` version and `docs/changelog.rst`, and whether the
+commit that added it is already on `main`). Unreleased means it isn't a
+breaking change and needs no changelog entry or newsfragment (providers never
+use newsfragments). If it has already released, treat the removal as a
+breaking change instead. When moving the code, carry over every `why` from
+the original docstring to its new home — don't leave bare logic behind.
+
 ## Validation and enforcement
 
 ### Raise at construction instead of documenting a structural footgun
@@ -129,7 +177,54 @@ enumeration of an enforced invariant drifts from the enforcement over time
 spec, so a comment duplicating it is a maintenance liability, not a safety
 net.
 
-## mypy Optional narrowing
+### `raise X from <expr>` silently suppresses the chain when `<expr>` is `None`
+
+`raise X from <expr>` evaluates `<expr>`; when it evaluates to `None`, Python
+treats it exactly like `raise X from None` — the explicit syntax for
+suppressing exception chaining. `__cause__` and the implicit context are
+dropped, and the traceback stops showing why the original error happened.
+This is worse than not chaining at all, because it looks intentional.
+
+Watch for it when re-raising out of a caught object whose payload can be
+absent — e.g. tenacity's `RetryError`:
+`except RetryError as e: raise AirflowException(...) from e.last_attempt.exception()`
+looks like proper chaining, but `Future.exception()` returns `None` when the
+retry stopped for a non-exception reason, quietly suppressing the chain
+(apache/airflow PR #69238, databricks hook). Chain `from e` instead — the
+caught exception object itself is never `None` — and reserve
+`e.last_attempt.exception()` for the message text, where a `None` is merely
+cosmetic ("last error: None").
+
+Before writing `raise ... from <expr>`, confirm `<expr>` cannot evaluate to
+`None` for any code path that reaches the `raise`.
+
+## Concurrency
+
+### Clear a `ContextVar` opened in an async generator with `set(None)`, not `reset(token)`
+
+When an async generator opens a `ContextVar` window before a `yield`
+(`token = var.set(x)`) and closes it in a `finally: var.reset(token)`, don't
+keep the standard `reset(token)` form if the generator can be resumed from a
+different asyncio task than the one that called `set()` — it raises
+`ValueError: token created in a different Context`. Use `var.set(None)` to
+clear the window instead (only valid when windows don't nest, since clearing
+to `None` — not to the prior value — is exactly correct there).
+
+The failure is a runtime context-propagation issue, not something ruff or
+mypy will flag: an async generator's `__anext__` runs in whichever task calls
+it, and a driver (an `async for` loop, or a test helper resuming past a
+`yield`) is often a different task than the one that opened the window.
+`ContextVar.reset(token)` requires the token to have been created in the
+*current* context, so it rejects the cross-task resume. Confirmed empirically
+on apache/airflow's `shared_stream.py` `_ack_drain` (PR #67523):
+`reset(token)` failed 20 existing ack tests; `set(None)` fixed all of them.
+
+When writing this pattern, document the invariant in a docstring or comment
+("this ContextVar assumes the generator and its consumer share a task /
+windows don't nest") so a future refactor that introduces nesting doesn't
+silently break it.
+
+## mypy
 
 ### Restructure branches so the assignment and the access sit in the same block — don't `assert` past it
 
@@ -144,6 +239,35 @@ later resolves a `dag` object should instead read
 `if has_date_window: dag = get_db_dag(...); if has_start and has_end: ...`
 inside one branch, rather than resolving `dag` unconditionally and asserting
 non-`None` before use several lines later.
+
+### Widening a `Literal` to `str` for templating relocates the mypy error, it doesn't fix it
+
+Adding an operator field to `template_fields` when its declared type is a
+third-party SDK's `Literal[...]` requires widening it to `str` so a
+Jinja-templated Dag value type-checks. That widening doesn't make mypy pass —
+it only pushes the `arg-type` error one layer down: past the operator to the
+hook's call into the SDK (and further, if the hook is widened too, to the
+SDK boundary itself, which still expects the `Literal`).
+
+Only trust `uv run --project providers/<provider> mypy <changed files>`
+returning exit 0 as evidence the widening is complete — "both call sites are
+widened now" from a diff read is not sufficient, because the same shape of
+error keeps reappearing one level lower.
+
+Fix it at the SDK boundary, not by copying the SDK's `Literal` values into
+the provider — those drift out of date the moment the SDK adds a value (e.g.
+a provider hard-coding 3 endpoint names when the installed SDK already
+accepts 8). The repo convention (15+ existing sites under
+`providers/*/src/airflow/providers/*/hooks/*.py`, e.g.
+`providers/slack/.../hooks/slack.py`, `providers/docker/.../hooks/docker.py`)
+is a `# type: ignore[arg-type]` on the exact line of the SDK call, with a
+one-line comment explaining why, and the call split across multiple lines so
+the ignore covers only the affected argument. `cast(...)` is viable only when
+the SDK exports a named type alias for the literal (e.g.
+`providers/anthropic/.../hooks/anthropic.py`'s
+`cast("agent_create_params.Model", ...)`); a `Literal` inlined in a method
+signature has no symbol to cast to, so casting there just recreates the same
+copy-and-drift problem.
 
 ## Docstrings
 
@@ -180,6 +304,31 @@ Before writing a new `:param name:` entry, scan the existing parameters and
 add brief `:param` lines for any that are missing. Keep each line short — one
 sentence is enough.
 
+### Adding a per-item qualifier obliges re-checking sibling entries
+
+In a list of parallel entries (a docstring's `:param:` list, a config table,
+a set of flag descriptions), the moment you add a qualifier to **some**
+entries ("only used when X", "only supported in version Y"), go back and
+re-check whether the unqualified **existing** entries in the same list are
+still accurate.
+
+The existing entries may not have been wrong before — they can become
+misleading purely because of the new context. Once neighboring entries carry
+an explicit scope, a reader treats an entry without one (or with a stale one)
+as unconditionally true.
+
+Case in point: `OpenAITriggerBatchOperator`'s docstring started qualifying
+`wait_seconds` ("only used when `deferrable` is False") and the newly added
+`poll_interval` ("only used when `deferrable` is True"), while `timeout`
+kept its pre-existing "Only used when `deferrable` is False" — except the
+deferred path also passes `timeout` to the trigger, so both modes are
+governed by it. Before the qualifiers were added, that line was merely
+vague; after, it became a specific falsehood (apache/airflow PR #72051).
+
+When adding a qualifier, trace every entry in the same list against the
+source (which branches actually consume each field), not just the one
+you're editing.
+
 ### User-facing docstrings describe behavior, not internal mechanism
 
 User-facing docstrings and CLI `--help` text should describe the
@@ -199,6 +348,33 @@ with the behavioral statement: "any time-of-day or timezone offset in the
 value is ignored; only the calendar date is used." Keep the *contract* (what
 goes in, what the effect is), drop the *how*. Verify the real behavior before
 documenting it — the mechanism you assume may be wrong.
+
+## Tests
+
+### Don't assert a class attribute equals a literal
+
+Don't write `assert SomeOperator.template_fields == ("a", "b")` (or the same
+pattern for any other class attribute / constant). It only fails when
+someone edits the attribute and the assertion separately — it restates the
+source line rather than testing behavior, and Airflow reviewers will push
+back on it.
+
+Test the behavior instead: for `template_fields`, that means asserting the
+fields actually render as expected after
+`operator.render_template_fields(context=...)`.
+
+The diagnostic question is "under what circumstances does this assertion
+fail?" — if the only answer is "someone changed the source without updating
+the test," it has no discriminating power.
+
+Before deleting an existing literal-equality assertion in favor of a
+behavior test, check whether it covers something the new behavior test
+doesn't (e.g. `template_fields == ("file_id", "endpoint", "metadata")`
+asserts `file_id` is present, which a render test might not exercise). If
+that gap is pre-existing behavior, leave it untested per this repo's
+"don't backfill tests for existing logic" convention; if the PR introduced
+it, add a behavior test for it before deleting the literal-equality
+assertion.
 
 ## CI / prek hook scripts
 
@@ -229,3 +405,19 @@ example propagates a deprecated pattern and breaks for non-scheduled runs.
 When an example needs "the period this run is for," write
 `dag_run.run_after` rather than `dag_run.logical_date`. Verify the exact
 field for the context before asserting it.
+
+### Template a Variable reference with `.get(name, default)`, never the bare `var.value.<name>` form
+
+When an example Dag templates an Airflow Variable, write
+`{{ var.value.get('my_var', 'default') }}`, not `{{ var.value.my_var }}`. The
+bare `var.value.<name>` form raises if the Variable isn't set — it does not
+fall back to an empty string — so anyone who copies the example verbatim
+gets an immediate crash. `.get()` with a default keeps the example runnable
+out of the box while still demonstrating the Variable-driven templating
+pattern.
+
+Found in `example_llm.py`'s `{{ var.value.llm_cost_cap_per_task }}` (PR
+#71403) — the repo defines that Variable nowhere, and no other provider's
+example Dags use the bare form (0 hits). When writing or reviewing an
+example Dag, treat any bare `{{ var.value.<name> }}` reference as a defect
+unless that Variable is demonstrably defined elsewhere in the same example.
