@@ -138,3 +138,53 @@ def test_bug_fix_changes_verification_from_failed_to_passed(tmp_path):
     assert rc == 0
     assert after["status"] == "passed"
     assert "Ran 1 test" in after["output"]
+
+
+def test_retry_scope_is_reused_explicitly_and_success_resets(tmp_path):
+    # Reuse one executable command so a passing run tests the same check scope.
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "from pathlib import Path\nprint('FAILED tests/x.py::test_a') if not Path('fixed').exists() else None\nraise SystemExit(0 if Path('fixed').exists() else 1)\n"
+    )
+    argv = [
+        sys.executable,
+        str(SCRIPT),
+        "--cwd",
+        str(tmp_path),
+        "--command",
+        shlex.join([sys.executable, str(runner)]),
+    ]
+
+    def run(extra=()):
+        proc = subprocess.run([*argv, *extra], capture_output=True, text=True)
+        return proc.returncode, json.loads(proc.stdout)
+
+    rc, first = run()
+    assert rc == 1 and "RETRY LIMIT" not in first["reason"]
+    scope = ["--run-id", first["run_id"], "--task-id", first["task_id"]]
+    rc, second = run(scope)
+    assert rc == 1 and "RETRY LIMIT" in second["reason"]
+    assert "RETRY LIMIT" not in run()[1]["reason"]  # New task by default.
+    assert (
+        "RETRY LIMIT"
+        not in run(["--run-id", first["run_id"], "--task-id", "another-task"])[1][
+            "reason"
+        ]
+    )
+    (tmp_path / "fixed").touch()
+    assert run(scope)[0] == 0
+    (tmp_path / "fixed").unlink()
+    assert "RETRY LIMIT" not in run(scope)[1]["reason"]
+
+
+@pytest.mark.parametrize(
+    "extra", [["--run-id", "r"], ["--task-id", "t"], ["--run-id", "", "--task-id", "t"]]
+)
+def test_incomplete_retry_scope_is_rejected(tmp_path, extra):
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--cwd", str(tmp_path), *extra],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 2
+    assert not (tmp_path / ".maigo").exists()

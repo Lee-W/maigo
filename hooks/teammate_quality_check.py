@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _grep_criteria import block_reason, find_literal_grep_criteria
 from _hook_io import emit_stop as emit
-from _retry_log import record_and_count
+from _retry_log import RetryScope, record_and_count
 
 SOYO_RETRY_LIMIT = 2
 _RETRY_LOG_BASE = Path(".maigo")
@@ -76,12 +76,13 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
 
 def _soyo_log_path(cwd: Path) -> Path:
     log_dir = cwd / _RETRY_LOG_BASE
-    log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "soyo-must-fix.jsonl"
 
 
-def _soyo_record_and_count(log_path: Path, keys: set[str]) -> dict[str, int]:
-    return record_and_count(log_path, keys, "must_fix_keys")
+def _soyo_record_and_count(
+    log_path: Path, keys: set[str], scope: RetryScope | None = None
+) -> dict[str, int]:
+    return record_and_count(log_path, keys, "must_fix_keys", scope=scope)
 
 
 MEMORY_HEADER_RE = re.compile(r"##\s+Loaded memory entries", re.IGNORECASE)
@@ -170,7 +171,7 @@ def check_tomori(out: str) -> None:
     emit("approve", "燈 (Tomori) 輸出結構齊全")
 
 
-def check_soyo(out: str) -> None:
+def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
     require_memory_header(out, "爽世 (Soyo)")
     verdict_match = re.search(
         r"\b(APPROVED|NEEDS_CHANGES|BLOCKED|READY|NEEDS_INFO|DUP|CLOSE)\b", out
@@ -221,8 +222,8 @@ def check_soyo(out: str) -> None:
 
         cwd = Path(os.getcwd()).resolve()
         keys = _extract_soyo_must_fix_keys(out)
+        counts = _soyo_record_and_count(_soyo_log_path(cwd), keys, retry_scope)
         if keys:
-            counts = _soyo_record_and_count(_soyo_log_path(cwd), keys)
             over_limit = {
                 k: c for k, c in counts.items() if k in keys and c >= SOYO_RETRY_LIMIT
             }
@@ -238,6 +239,8 @@ def check_soyo(out: str) -> None:
                     f"——同 must-fix key 連續 {SOYO_RETRY_LIMIT} 次即達 limit。",
                 )
 
+    if not triage and verdict == "APPROVED":
+        _soyo_record_and_count(_soyo_log_path(Path.cwd()), set(), retry_scope)
     emit("approve", f"爽世 (Soyo) 輸出符合規格 (verdict={verdict})")
 
 
@@ -459,7 +462,19 @@ def main() -> None:
     previous_cwd = os.getcwd()
     try:
         os.chdir(cwd)
-        handler(output)
+        if handler is check_soyo:
+            session_id, agent_id = data.get("session_id"), data.get("agent_id")
+            scope = (
+                RetryScope(session_id, agent_id)
+                if isinstance(session_id, str)
+                and session_id.strip()
+                and isinstance(agent_id, str)
+                and agent_id.strip()
+                else None
+            )
+            check_soyo(output, retry_scope=scope)
+        else:
+            handler(output)
     finally:
         os.chdir(previous_cwd)
 

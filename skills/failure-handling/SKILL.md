@@ -168,6 +168,11 @@ orchestrator 直接 inline 套用，不要再 relay 一次。真的需要委派�
 
 ### 無限迴圈防護
 
+計數只屬於同一個邏輯任務／執行批次，不帶入其他 work item 或舊 session 的歷史總數。
+`verify_task.py` 首次回傳 run/task ID，重試須沿用；SubagentStop 只能辨識同一 agent 的續跑，
+Stop 沒有可靠的 task ID。換 agent、沒有 hook 或缺識別碼時，由 orchestrator 保存本任務預算，
+不能因 runtime 無法聚合就無限重試。doctor 的歷史次數不是這個連續計數。
+
 - 爽世連續擋 **2 次**同一條 must-fix → 停下，請使用者介入（可能是計畫本身有問題）
 - 立希連續紅 **2 次**同一個 test → 停下，請使用者介入（可能 test 本身需要更新）
 

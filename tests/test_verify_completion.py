@@ -403,11 +403,13 @@ class TestRetryLogPath:
         result = verify_completion._retry_log_path(cwd)
         assert result == tmp_path / ".maigo" / "test-failures.jsonl"
 
-    def test_parent_created(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_path_lookup_does_not_create_directory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", Path(".maigo"))
         cwd = tmp_path
         result = verify_completion._retry_log_path(cwd)
-        assert result.parent.is_dir()
+        assert not result.parent.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -421,18 +423,17 @@ class TestRecordAndCount:
         counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
         assert counts["tests/x.py::test_a"] == 1
 
-    def test_second_append_same_id_count_is_two(self, tmp_path: Path):
+    def test_unscoped_history_does_not_accumulate(self, tmp_path: Path):
         log = tmp_path / "test-failures.jsonl"
         verify_completion._record_and_count(log, {"tests/x.py::test_a"})
         counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
-        assert counts["tests/x.py::test_a"] == 2
+        assert counts["tests/x.py::test_a"] == 1
 
     def test_different_ids_counted_independently(self, tmp_path: Path):
         log = tmp_path / "test-failures.jsonl"
         verify_completion._record_and_count(log, {"tests/x.py::test_a"})
         counts = verify_completion._record_and_count(log, {"tests/x.py::test_b"})
-        assert counts["tests/x.py::test_a"] == 1
-        assert counts["tests/x.py::test_b"] == 1
+        assert counts == {"tests/x.py::test_b": 1}
 
     def test_corrupted_log_line_skipped(self, tmp_path: Path):
         log = tmp_path / "test-failures.jsonl"
@@ -442,8 +443,8 @@ class TestRecordAndCount:
             encoding="utf-8",
         )
         counts = verify_completion._record_and_count(log, {"tests/x.py::test_a"})
-        # first line parsed correctly → count is 1 from history + 1 from this call = 2
-        assert counts["tests/x.py::test_a"] == 2
+        # Legacy/unscoped history cannot be attributed to this task.
+        assert counts["tests/x.py::test_a"] == 1
 
     def test_io_error_returns_empty_dict(self, tmp_path: Path):
         # Make log path unwritable by placing a file where the parent dir should be
@@ -484,7 +485,7 @@ class TestMainRetryWarning:
         assert result["decision"] == "block"
         assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
 
-    def test_second_failure_same_id_emits_warning(
+    def test_stop_without_task_identity_never_reuses_history(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -506,11 +507,10 @@ class TestMainRetryWarning:
 
         # First run — no warning
         run_hook_main(verify_completion, payload, monkeypatch, capsys)
-        # Second run — should have warning
+        # Stop does not identify the task, so this could be a different task.
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
-        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
-        assert "2 次" in result["reason"]
+        assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -565,7 +565,7 @@ class TestMainCollectionError:
         assert log.is_file()
         assert "__collection__:" in log.read_text(encoding="utf-8")
 
-    def test_repeated_collection_error_emits_retry_warning(
+    def test_unscoped_collection_error_still_blocks_without_retry_warning(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -587,7 +587,7 @@ class TestMainCollectionError:
         run_hook_main(verify_completion, payload, monkeypatch, capsys)
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
-        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
+        assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
 
     @pytest.mark.parametrize(
         "output",
@@ -695,7 +695,7 @@ class TestMainUnparsedNonZero:
         assert result["decision"] == "block"
         assert "無法 parse failure" in result["reason"]
 
-    def test_repeated_unparsed_blocks_with_retry_warning(
+    def test_unscoped_unparsed_error_still_blocks_without_retry_warning(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -706,4 +706,31 @@ class TestMainUnparsedNonZero:
         run_hook_main(verify_completion, payload, monkeypatch, capsys)
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
-        assert "⚠️ RETRY LIMIT REACHED:" in result["reason"]
+        assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "FAILED tests/x.py::test_a",
+        "ModuleNotFoundError: missing dependency",
+        "no tests ran in 0.01s",
+        "opaque nonzero error",
+    ],
+)
+def test_all_failure_classes_use_explicit_scope(tmp_path, monkeypatch, failure):
+    monkeypatch.setattr(verify_completion, "run_command", lambda cmd, cwd: (1, failure))
+    scope = verify_completion.RetryScope("run", "task")
+    first = verify_completion.run_verification(
+        tmp_path, "runner one", retry_scope=scope
+    )
+    second = verify_completion.run_verification(
+        tmp_path, "runner one", retry_scope=scope
+    )
+    other = verify_completion.run_verification(
+        tmp_path, "runner two", retry_scope=scope
+    )
+    assert first.status == second.status == other.status == "failed"
+    assert "RETRY LIMIT" not in first.reason
+    assert "RETRY LIMIT" in second.reason
+    assert "RETRY LIMIT" not in other.reason

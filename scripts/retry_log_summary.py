@@ -95,7 +95,9 @@ def format_summary(summary: LogSummary) -> str:
     count_text = ", ".join(
         f"{key}×{count}" for key, count in summary.counts.most_common()
     )
-    lines = [f"{display_path}（{summary.total_entries} 筆）：{count_text}"]
+    lines = [
+        f"{display_path}（{summary.total_entries} 筆；歷史總次數，非連續重試）：{count_text}"
+    ]
     if summary.malformed_lines:
         lines.append(f"  略過損壞 JSON：{summary.malformed_lines} 行")
     for entry in summary.recent:
