@@ -133,6 +133,7 @@ Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`�
 - [Skills reference](docs/reference/skills.md) — skill 機制與完整 catalog（`strict-review`、`teammate-flow`、`commit-message`、`doc-link-convention`、`copyable-deliverable`、`failure-handling` 等）
 - [Agents reference](docs/reference/agents.md) — 角色模型 profile、單一模型用法與 Claude Code 隨附預設
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator
+- [Model Evaluation](docs/guides/model-evaluation.md) — 隔離案例、實際工具證據與模型工作流評測
 - [CHANGELOG](CHANGELOG.md) — 版本歷史
 
 ## Acknowledgments
