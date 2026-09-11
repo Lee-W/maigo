@@ -355,6 +355,14 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 
+**Work Board 每個專案只有一份**，但它的位置**不是固定的**——它住在「當初建立它的那個
+worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree remove`，board 就得
+搬到別的存活 worktree，記下來的舊路徑會過期（2026-09-09 實例：一份記憶條目原記 `<repo>-main`，
+但 board 實際已經在一個 topic worktree 裡）。跑 board 回寫類命令（`/maigo:board`、
+`address-comments` 步驟 8 等）時，**先 `find <workspace 根> -maxdepth 3 -name board.md`
+找到現存的那一份再 upsert**，不要假設它在主 worktree、也不要照抄任何舊記錄的路徑；
+找不到任何 `board.md` → 問使用者要建在哪，不要自己挑一個 worktree 建。
+
 **Upsert 紀律**（單項 upsert 的日期更新、容易被漏掉的獨立檢查、verdict 未必已送出 GitHub）
 三條實務守則見
 [`references/upsert-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/upsert-discipline.md)。

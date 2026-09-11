@@ -58,6 +58,34 @@ it as open when it isn't.
 
 ---
 
+## Connection docs stay actionable-only — cut implementation-mechanism detail
+
+Connection docs (`provider.yaml` descriptions, hook docstrings,
+`docs/connections/*.rst`) should only carry what a user can act on: what to
+do, why, the concrete consequence, and a diagnostic clue (e.g. "check the
+task log for the XX warning"). Cut:
+
+- exception mechanism detail ("raises a TypeError that the hook catches")
+- log strings copied verbatim
+- version-verification provenance ("verified against pinned `<lib>` X.Y.Z")
+
+Why: this content belongs in a commit message or PR description — evidence
+for a reviewer, not guidance for a user. It reads like an internal debugging
+note, and a version-verification note goes stale the moment a follow-up PR
+lands, with nobody thinking to clean up a stray version string in a docs
+file afterward.
+
+Case study: `providers/common/ai/docs/connections/pydantic_ai_vertex.rst`'s
+`vertexai` field warning box was rewritten from an internal-mechanism
+description to pure consequence + diagnostic clue.
+
+How to apply: before shipping a connection-doc edit, re-read it and cut any
+sentence whose audience is actually "the reviewer of this PR" rather than
+"the user configuring this connection" — move that content to the PR
+description instead.
+
+---
+
 ## Name a default in its own module — don't tell users to import a symbol that moves
 
 Docs must not tell a user to import a private or unstable symbol that belongs

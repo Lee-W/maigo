@@ -291,6 +291,15 @@ status doc for a feature that ships:
   fix into the same PR (ask before editing the shared artifact) — a broken
   example is a broken user-facing artifact, and fixing it is part of
   finishing the QA.
+- **Scope an unreleased-version doc/QA plan to the release branch's actual
+  HEAD, not just a beta/rc tag.** When only a beta/rc tag exists (e.g.
+  `3.3.0b1`), the release branch (e.g. `v3-3-test`) keeps accumulating
+  commits after the tag — the tag is not the source of truth. After scoping
+  against a tag, run `git log --oneline <tag>..HEAD -- <relevant paths>` and
+  fold in the behavior-changing commits found there before calling the doc
+  current. A beta tag isn't a real release for this purpose either — it
+  doesn't freeze scope or API, the same instinct as treating a pre-release
+  tag as authoritative for API stability.
 
 ### 7. Testing
 
@@ -385,13 +394,20 @@ sub-check states. The file covers:
 - **10.4** `TYPE_CHECKING` guards for heavy type-only imports (Request changes)
 - **10.5** Security finding classification (3-way triage before reporting)
 - **10.6** Newsfragment file presence (Request changes)
-- **10.7** Revert of a recent fix: check for a tracking issue first (judgment gate, scope-gated to revert PRs)
-- **10.8** Self-discovered bugfix: verify upstream doesn't already have it (Request changes, scope-gated)
-- **10.9** Forward-looking code comments need a tracking-issue URL or neutral rewrite (Request changes, scope-gated)
-- **10.10** Newsfragment content must reflect a genuine capability delta vs upstream (Request changes)
-- **10.11** Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry (Request changes, scope-gated to direct `BaseOperator` subclasses)
-- **10.12** registry `slice`/`first` cutoffs need a sort key (Request changes, scope-gated to `registry/src/*.njk` and its data source)
-- **10.13** New provider, or new major capability surface, needs a governance-gate check (informational, scope-gated)
+- **10.7** Provider changelog: breaking/important behavior changes must be hand-edited into `docs/changelog.rst` (Request changes, scope-gated to `providers/`)
+- **10.8** Revert of a recent fix: check for a tracking issue first (judgment gate, scope-gated to revert PRs)
+- **10.9** Self-discovered bugfix: verify upstream doesn't already have it (Request changes, scope-gated)
+- **10.10** Forward-looking code comments need a tracking-issue URL or neutral rewrite (Request changes, scope-gated)
+- **10.11** Newsfragment content must reflect a genuine capability delta vs upstream (Request changes)
+- **10.12** Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry (Request changes, scope-gated to direct `BaseOperator` subclasses)
+- **10.13** registry `slice`/`first` cutoffs need a sort key (Request changes, scope-gated to `registry/src/*.njk` and its data source)
+- **10.14** New provider, or new major capability surface, needs a governance-gate check (informational, scope-gated)
+- **10.15** Cross-timetable `partition_date` comparisons must normalize via `localize_partition_datetime` (Request changes, scope-gated)
+- **10.16** Logging/audit field review: cap+sort unbounded collections; reject fields redundant with a sibling (Request changes)
+- **10.17** A capped, row-locked query must not use a `LIMIT cap + 1` probe row (Request changes)
+- **10.18** `providers/common/ai` hook capability additions: check three parity axes (Request changes, scope-gated)
+- **10.19** A `DAGResponse` (or derived-model) field addition must exist on `DagModel` (Block, scope-gated)
+- **10.20** Two queries scanning the same rows under the same `WHERE` predicate should merge (Request changes)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -465,6 +481,16 @@ as both-ends-inclusive instants; always add a sub-day cron case
 (`"0 * * * *"`) to the tests — day-grained tests alone give a false green on
 day-bound bugs.
 
+#### UI conventions
+
+Four Airflow-specific `airflow-core/src/airflow/ui` conventions — long value
+lists render by line not comma-joined, "Partition Key" vs "Mapped Partition
+Key" is an intentional label split (never unify), no ref+`DataTable`-key
+remount hack for data-driven column visibility, and free-form keys that may
+contain `/` go in a query param not a path segment — are in
+[`references/ui-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/ui-conventions.md).
+Read it when building or reviewing a UI change touching any of these.
+
 #### Backport judgment
 
 When a backport branch's drift-check fails because it references something
@@ -487,7 +513,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.13, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.20, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

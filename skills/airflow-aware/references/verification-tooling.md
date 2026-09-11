@@ -190,6 +190,79 @@ directly rather than through prek, and confirm the Passed/Skipped
 distribution, not just the exit code — the same diagnostic used for the zsh
 word-splitting trap above applies here too.
 
+### `scripts/in_container/run_provider_yaml_files_check.py` cannot be pytest-unit-tested — verify by behavior instead
+
+This validator script is blocked from pytest coverage by three independent
+mechanisms (confirmed by trying both the unit-test and subprocess routes):
+
+1. **An import guard** — `if __name__ != "__main__": raise SystemExit(...)`
+   at the top of the file — blocks importing it to call its internal
+   `check_*` functions directly. This is not the general convention for
+   `scripts/in_container/` — of ~25 scripts there, only this one has the
+   guard; a sibling script without the guard is exactly what makes
+   `scripts/tests/in_container/test_run_generate_constraints.py`'s
+   import-based test possible.
+2. **`AIRFLOW_ROOT_PATH` cannot be overridden** — it's hardcoded as
+   `Path(__file__).resolve().parents[2]` with no env-var escape hatch, so
+   even a subprocess invocation can only ever act on the real repo tree, not
+   a tmp fixture. Testing a "broken input" case means mutating a real
+   `providers/<p>/provider.yaml` and reverting it — a test that mutates a
+   tracked file, leaves the tree dirty on failure, and races with a parallel
+   run (the corresponding prek hook is itself marked `require_serial: true`).
+3. **The most disqualifying one: it wrecks the dev environment on
+   startup.** The script's `sync_dependencies_without_dev()` runs `uv sync
+   --no-dev --all-packages` at the top of every execution, stripping dev
+   dependencies from the contributor's `.venv`. Running this under pytest
+   would sabotage the very environment pytest runs in.
+
+The third point is *why* the first point's guard exists: this script is
+designed to run only inside the Breeze container, where wrecking the venv is
+a non-issue. Testing it on the host conflicts with that design premise.
+
+How to apply: when changing this script's check logic, don't plan a pytest
+unit test — it's a dead end. Verify behaviorally instead: deliberately break
+a target field in some `provider.yaml` → run `cd providers && prek run
+check-provider-yaml-valid --files <p>/provider.yaml` and confirm non-zero
+exit with the broken value named in the error → `git checkout --
+providers/<p>/provider.yaml` to restore → confirm `git status --short` is
+clean. This matches the file's existing state — all 20+ `@run_check`
+functions in it have no unit tests; the prek hook itself is the verification
+mechanism. If a reviewer asks for tests anyway, the correct response is "that
+needs `AIRFLOW_ROOT_PATH` to become injectable and
+`sync_dependencies_without_dev` to become skippable first — suggest a
+separate PR," not simply asserting tests aren't needed.
+
+### A provider optional dependency without a matching `dev` group entry silently skips its own test file
+
+Adding a dependency to `[project.optional-dependencies]` alone does **not**
+make it available to the unit-test environment. Every optional dependency in
+`providers/common/ai` that has unit tests appears in *both* places —
+`[project.optional-dependencies]` and `[dependency-groups] dev`. Combined
+with the usual `pytest.importorskip("<pkg>")` at the top of the test file,
+listing it in only the extras means the entire test file is skipped — **and
+CI still reports green**, because skips are not failures. "There are tests"
+and "the tests run" are different claims; a green CI badge is only evidence
+of the first.
+
+How to apply: when a PR adds an optional dependency plus tests that
+`importorskip` it, check the `dev` group in the same diff. To verify rather
+than infer:
+
+```bash
+uv sync --project providers/<name>
+python -c "import importlib.util as u; print(u.find_spec('<pkg>'))"  # None = can't run
+```
+
+Also pull a provider CI job log
+(`gh api repos/apache/airflow/actions/jobs/<id>/logs
+--allow-escape-sequences`) and grep for both the test file name and an
+install line for the package — absence of both is strong evidence the tests
+never ran; say "please confirm the tests execute" rather than asserting they
+never do unless every job was checked. Found via PR #71725 (a sandbox
+backend's optional dependency added only to extras, guarding 353 lines of
+tests over a path that ships user commands/file contents to a third-party
+service).
+
 ## 3. Local-machine false reds
 
 These are environment states that make real, unmodified code look broken.
@@ -303,6 +376,36 @@ by recurrence pattern: **stable, same failures every run → stale schema**
 concurrency** (no fix beyond not writing it to a known-failures list, since
 that would silence a real future regression too).
 
+### `providers/common/ai`'s sandbox tests are stuck at 12 reds on macOS, unrelated to branch content
+
+Running `uv run --project providers/common/ai pytest
+providers/common/ai/tests` on macOS locally gets a stable **12 failed / 1380
+passed**, all in
+`.../tests/unit/common/ai/sandbox/test_base.py::TestDefaultFileOperations`
+(round-trip, binary content, hostile filenames, `list_directory`, oversized
+file). Every failure raises the same shape of `SandboxError` claiming a
+temp-directory file "does not exist in the sandbox, or is not readable" —
+e.g.:
+
+```
+SandboxError: '/private/var/folders/.../pytest-of-<user>/pytest-NNN/<tmpdir>/a.txt'
+  does not exist in the sandbox, or is not readable.
+```
+
+This is not a regression: confirmed by diffing the branch against `main` —
+`sandbox/`'s src and tests were byte-identical, yet the same 12 failed. The
+suspected (unconfirmed) root cause is a macOS `/tmp` → `/private/var`
+realpath mismatch defeating the sandbox's path allowlist check — that's a
+guess, not something read through the comparison logic yet.
+
+How to apply: when verifying a `providers/common/ai` hook change in this
+repo, scope both `.claude/test-command` and manual verification to
+`providers/common/ai/tests/unit/common/ai/hooks` (fast — under 5s) rather
+than running the whole `tests/` directory, unless the change actually
+touches `sandbox/`. If `sandbox/` itself needs fixing later, treat the root
+cause as unconfirmed and read `base.py`'s path-comparison logic before
+proposing a fix.
+
 ## 4. Attribution — don't accept a red's cause without proving it
 
 ### A scoped test run being red doesn't mean your diff caused it
@@ -334,6 +437,41 @@ and make the configured command a one-liner that invokes it
 (`/bin/sh /abs/path/to/run-tests.sh`). Verify by testing the way the harness
 actually runs it, not via an interactive shell — a shell-eval green proves
 nothing about argv-exec.
+
+### A PR that raises a dependency floor makes an unsynced venv produce a false red — and defeats the usual base-commit attribution check
+
+When a PR changes a `pyproject.toml` version floor or `uv.lock`, **neither
+the local `.venv` nor the Breeze image picks it up automatically**. Running
+that package's tests without syncing first produces `ImportError: cannot
+import name '<NewSymbol>'`-style collection errors — that's the environment
+missing the version the PR requires, not a code defect.
+
+**Why this false red is unusually dangerous**: the usual attribution check —
+"rerun on the base commit; if it's broken there too, it's pre-existing, not
+this PR's fault" — gives the *right procedure* but the *wrong conclusion*
+here. The base commit is broken too (it also needs the new floor, since the
+floor bump usually comes from a lower layer of the same stack), so the
+result gets attributed to "pre-existing, ignore" — but the true story is
+"the PR's required version was never installed," and **the entire test run
+carries zero information, including the tests that "passed."**
+
+Judgment: **before running tests, check whether the PR (or a layer beneath
+it in the same stack) touched a version floor or the lock file.** If so,
+sync the environment first.
+
+```bash
+uv sync --project <PROJECT>           # install per the PR's lock
+# probe with the PR's own newly-introduced symbol, not just a version string
+uv run --project <PROJECT> python -c \
+  "from <pkg>.<mod> import <NewSymbol>; import <pkg>; print(<pkg>.__version__)"
+```
+
+Only proceed to tests once the probe prints the expected version and
+imports cleanly; if it doesn't, stop and report where it's stuck rather than
+running tests against a half-synced environment. Don't reach for Breeze as
+a shortcut here either — the image's packages are equally stale, and a
+fresh worktree's first Breeze run can separately stall on an image build.
+`uv run --project <PROJECT> pytest` is sufficient once synced.
 
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 

@@ -24,6 +24,15 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 
 1. **🐱 樂奈 (Raana)** — 探 codebase，找出相關位置與既有慣例。「看完了。相關的在這三個檔案。」
 2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`，路徑由 `scripts/artifact_path.py` 算出）。「……讓我先理清楚它想做什麼。」
+   **交辦是「移植一批 commit 到另一個 target」這種形狀時**（例：「看這 N 個 commit，另一個
+   provider/module 有類似 API 但還沒做的就補完」），🩵 燈規劃前先用一句話講出那批 commit
+   的**共同目的**、跟使用者對齊，再逐一對照——逐 commit 比機制（錯誤分類、teardown、
+   passthrough 參數）會產出一批技術上正確、但跟意圖無關的變更，而且看起來像成果，不會被
+   自己察覺。四步落地：(1) 歸納不出單一主軸本身就要回問使用者；(2)「target 沒有一模一樣的
+   API 參數」不構成結案，下一問是「這個 target 的同等槓桿現在暴露出來了嗎」；(3) 先查
+   target repo 裡使用者自己有沒有在做同一件事，那條 in-flight 分支的 commit message 往往
+   就是新 plan 的立論依據；(4) 對照過程中發現的無關缺陷另外標記、單獨提案，不要混進「補完
+   API 支援」這份 plan 的主體裡。
 3. **使用者確認 plan**（如果有 open questions，先回答再往下）
 4. **🎀 愛音 (Anon)** — 按 plan 動手實作。「OK 那我先做這步！」
 
@@ -42,6 +51,14 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 | 🎀 愛音 → 🟡 爽世 | 每個 step 的完成狀態、改了哪些檔、sanity check / test output | 不用「應該」「大概」包裝未驗證狀態 |
 | 🟡 爽世 → 🎀 愛音 | 編號 must-fix、具體改法、為什麼、還缺什麼 evidence | 不只說方向，讓 🎀 愛音猜怎麼修 |
 | 🟣 立希 → 🎀 愛音 / orchestrator | command、exit code、重要 output、新舊失敗區分 | 不把紅燈柔化成「看起來」 |
+
+**🟡 爽世給的「具體改法」本身也是產出，同樣可能錯。** 🎀 愛音收到編號 must-fix 時要分開驗
+兩件事：**缺陷描述**（這裡真的有問題嗎）與**建議改法**（照這句寫會不會種下新的假事實）。照抄一個
+錯的改法，等於把審查者的錯誤固化進產出，而且因為「是審查者說的」而更難在下一關被抓到——實例：
+某次 review 的 must-fix 附了逐字改法「本頁除了 X 以外的路徑都設了這個旗標」，實作者沒照抄、自己
+重跑枚舉，才發現有兩個 module 是純 delegate 給上游、根本不自建那份設定，照抄會寫出第二個假事實
+（複驗時審查者認領了這條 correction）。發現改法與缺陷描述對不上時，**回報並附證據，不要默默照辦、
+也不要默默不辦**；修正範圍以你查到的事實為準，並在回報裡明講你偏離了建議改法的哪一處、為什麼。
 
 Orchestrator 每次轉場 summary 只說一行，但要說清楚「上一位留下了什麼、下一位要接什麼」。
 例如：「🐱 樂奈找到兩個慣例衝突點；🩵 燈會把它們寫進 plan 的 Risks。」
@@ -95,6 +112,13 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
   [`skills/strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)
   本身的規則（"Commit / staging state is not in review scope"）——真正會出錯的是 orchestrator 這裡
   下的 prompt 覆寫掉它，不是爽世本身理解錯。
+- **`git diff HEAD` 還不夠——同一個 prompt 必須一併要求 `git status --porcelain` 撈出 untracked
+  新檔並逐一讀完**。`git diff HEAD` 只涵蓋**已追蹤**檔案的改動，全新檔案一行都不會出現；而新檔
+  往往正是主要交付物。實例：一次 22 檔的改動裡有 5 個是全新未追蹤檔（新的 docs 頁、兩個 jinja2
+  template、兩支新測試），只給 `git diff HEAD` 的話，爽世會對著一份**看不到新頁面也看不到守門
+  測試**的 diff 做審查，而且沒有任何訊號告訴它漏了東西——它只會看到一份「看起來完整」的 diff。
+  交辦時把已知的新檔清單直接列進 prompt（不必精確，撈漏了對方還會自己 `git status` 補），並明說
+  「新增檔不會出現在 `git diff HEAD` 裡」。同理適用於 🟣 立希的驗證交辦。
 
 ### Commit message draft
 
@@ -175,3 +199,7 @@ Confirm flow 完成後繼續主線流程——不改變各 command 的步驟結�
 - **不能跳過 🟡 爽世**直接給 🟣 立希
 - **不能用「test 過了就 = 通過 review」**——爽世擋下時，test 過了也不能 APPROVE
 - **不能因為「來第三輪了」放水**——標準從第一輪到第三輪都一樣
+- **「標準一樣」是雙向的**——不能為了維持嚴格姿態，在核心問題已實質關閉時還留一條保險的
+  NEEDS_CHANGES。第三輪還在找碴，跟第一輪就放行一樣是失職。Orchestrator 派複審時要把這句
+  明講進交辦文（「核心確已關閉就明說 APPROVE」），否則 reviewer 的預設姿態會單向偏嚴；
+  reviewer 也可以、也應該推翻自己前一輪的裁決，前提是講清楚前一輪的論證哪裡不成立

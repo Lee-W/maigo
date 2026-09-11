@@ -102,6 +102,23 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 - Refs #<n>
 ```
 
+**`Closes:` vs `Refs:` 判斷——colocated TODO 不代表這是誰的改動**：一個緊貼著
+某段程式碼異味（code smell）的 `TODO: AIP-XX ... See #N` 註解，**不代表**修那個
+異味屬於 AIP-XX 這個 feature 的 scope。要分清楚「誰引入」跟「誰只是標註」——
+一個 feature commit 若剛好落在異味旁邊，可能只是**標註**了早就存在的問題，不是
+它引入的。判斷方式：`git log -S"<name-or-string>"` 找出真正引入異味的 commit，
+`git show <introducing-commit>^:<file>` 確認異味在該 commit 之前就存在；再用
+`gh issue view N` 看連結 issue 的 title/labels 是 feature item 還是單純的
+`kind:bug`/`kind:meta`。異味早於 feature、issue 也不是 feature item 時，
+用 `Refs:`（issue 範圍比這次改動大），不要用 `Closes:`——把長期存在的清理工作
+歸給恰好標註它的 feature 會誇大這個 PR 的 scope，也會誤導 reviewer 理解這個 PR
+在做什麼。
+
+跟同屬「斷言資料歷史前先查 git」家族的
+[`skills/harness-discipline/references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)
+第 1 節同精神——那條講「別把推測寫成事實」，這條是它在 `closes:`/`related:`
+判斷上的具體應用。
+
 **若 repo 有 PR template**（Inputs 第 6 條）：
 - 以 template 的 section 結構作為描述框架
 - 用 commits / diff 萃取的內容填入對應 section

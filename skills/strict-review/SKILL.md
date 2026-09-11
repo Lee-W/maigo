@@ -184,6 +184,15 @@ rebase-range pitfall, and `isResolved` reliability (see below) are in
 審查紀律」的安全流程執行，並用備份檔／`git diff` byte-compare 證明復原乾淨、無殘留改動——
 這份 mutation-test 證據是修正輪 evidence 的必要項，不是加分項。
 
+**Canary 回報要點名哪個斷言轉紅，不是只看檔案級 exit code**——同一個 bug 常補了不只一支
+測試，跑 canary 只記「這個測試檔轉紅」會蓋掉「其中只有一支真的有鑑別力」這件事：兩條
+code path 可能在某個測試餵的 input 上收斂到同一個值，這種測試無法區分修法與 bug，看起來
+像覆蓋、實際是裝飾。要求：逐測試（或 `-v`/`--tb=line`）跑 canary，記一張 baseline→
+post-mutation 的小表；對每一支在 mutation 下仍是綠的測試，追問「為什麼」並講清楚它守的是
+別的東西還是什麼都沒守住；跑之前先預測預期的紅/綠分布，一支「本該綠卻紅」或「本該紅卻綠」
+本身就是資訊。命中一次後，回覆裡順手給一個兩條 path 真的會分岔的 input，讓下一輪能直接
+驗證鑑別力，而不是重新摸索。
+
 ## Adapting per context
 
 | Context | Adaptation |
@@ -221,6 +230,7 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
   Details: `references/recurring-patterns.md`.
 - **Naming: by what it is, not its first caller's use case** — a name coupled to one caller's context misleads and blocks reuse; generalize it.
 - **Naming: private helper name carries the domain noun** — behavioral qualifiers ("once", "dedup") go in the docstring, not the name.
+- **Naming: guard-then-hook pairs use two distinct verbs, not an underscore** — check for an existing same-file pairing convention before naming; collapsing to `x`/`_x` when the file's other pairs use two verbs reads as confusing, not idiomatic. Details: `references/recurring-patterns.md`.
 - **State the rule, don't enumerate a code-derived set** — a comment/docstring listing "all the other X" goes stale as the set grows; require the rule itself. Hitting the same incomplete-enumeration defect a second round is a signal to change approach, not add the N+1th member.
   Details: `references/recurring-patterns.md`.
 
