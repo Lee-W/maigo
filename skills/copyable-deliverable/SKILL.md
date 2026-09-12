@@ -1,6 +1,6 @@
 ---
 name: copyable-deliverable
-description: This skill should be used whenever a maigo command produces a deliverable destined to be pasted elsewhere (a PR/issue comment, a reply draft, a commit message, a gh command draft). It mandates wrapping that content in a single fenced code block so the user gets raw, one-click-copyable markdown instead of a rendered-only version.
+description: This skill should be used whenever a maigo command produces a deliverable destined to be pasted elsewhere (a PR/issue comment, a reply draft, a commit message, a gh command draft). It mandates wrapping that content in a single fenced code block so the user gets raw, one-click-copyable markdown instead of a rendered-only version, and keeps the content itself paste-friendly (no markdown tables, no hard-wrapped prose).
 ---
 
 <!-- mkdocs-include-start -->
@@ -59,6 +59,22 @@ fenced code block 內容不受影響（本來就一行一項 / 逐字保留）�
 
 理由同上：hard-wrap 的段落，使用者每次改字都要重排、diff 也雜；一段一行才好
 複製、好編輯、diff 乾淨。
+
+## 不用表格，改成條列
+
+Deliverable 內**不要用 markdown 表格**——欄位式的內容改寫成條列，一項一行
+（`- **<欄位>**：<值>`），或拆成小節。
+
+理由：deliverable 的宿命是被貼走、被改。表格在純文字編輯器裡欄寬對不齊，補一個
+欄位要重排整列，改一個字 diff 就整列全變；條列改一項只動一行。而且貼上的目的地
+不一定 render markdown——commit message、終端機、純文字 issue tracker 收到的就是
+一堆 `|`。
+
+**唯一例外**：deliverable 要逐字引用的既有內容本來就是表格（例如貼一段原文的比較
+表），照原樣保留，不要為了本規則改寫別人的文字。
+
+適用範圍同上面的 When to apply——對話裡的狀態表、review checklist、queue 表不受
+影響，那些本來就不是 deliverable。
 
 ## What this skill does NOT cover
 
