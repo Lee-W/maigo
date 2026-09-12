@@ -320,7 +320,7 @@ plan，須引用 issue 編號與 acceptance criteria → 🎀 愛音實作 → �
 |------|-----|--------|
 | 1 | Orchestrator | `gh issue view` 抓 body/comments，萃取需求敘述；不是 READY 形狀就建議先 triage |
 | 2-6 | teammate-flow | 依 [`skills/teammate-flow`](../skills/teammate-flow.md) 標準五段 |
-| 7 | Orchestrator | 草擬帶 issue 參照的 commit，不自動 push / 開 PR |
+| 7 | Orchestrator | 落地帶 issue 參照的 commit，不自動 push / 開 PR |
 
 → Source: [`commands/take-issue.md`](../commands/take-issue.md)
 

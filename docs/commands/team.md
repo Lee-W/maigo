@@ -17,7 +17,7 @@ flowchart TD
     Fork --> Taki
     Soyo --> Join{合流: 爽世 x 立希}
     Taki --> Join
-    Join -- APPROVED + PASS --> Commit[Orchestrator<br/>草擬 commit msg]
+    Join -- APPROVED + PASS --> Commit[Orchestrator<br/>落地 commit]
     Commit --> Done([完成: summary])
     Join -- APPROVED + FAIL --> AnonFixTest[Anon 修 test]
     Join -- BLOCKED + PASS --> AnonFixMust[Anon 修 must-fix]

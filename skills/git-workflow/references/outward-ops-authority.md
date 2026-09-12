@@ -2,28 +2,32 @@
 
 Loaded on demand by `skills/git-workflow/SKILL.md`'s "Pushing and opening a
 PR" section — **case studies for why outward/irreversible git and GitHub
-operations (commit, push, force-push, opening an issue/PR) stay the user's
-to run**, not the orchestrator's default action.
+operations (push, force-push, opening an issue/PR) stay the user's to run**,
+not the orchestrator's default action. `git commit` is deliberately *not* in
+that set — see item 1 below.
 
 ---
 
-## The user drives outward git ops; the orchestrator only drafts
+## The user drives outward git ops; the orchestrator commits but never pushes
 
 A peer-level maintainer commonly commits, `--amend`s, `fixup!`s, and
 `force-push`es **between** conversation turns, and opens PRs themselves —
 branch tip and PR state can change several times across one session without
 the orchestrator having run any of those commands.
 
-**Why:** outward / irreversible git actions (commit, push, force-push,
-opening a PR) are the kind of thing this user wants to keep in their own
-hands, not delegate to the orchestrator.
+**Why:** outward / irreversible git actions (push, force-push, opening a
+PR) are the kind of thing this user wants to keep in their own hands, not
+delegate to the orchestrator. A local commit is none of those things — it
+stays on the branch, is trivially amendable, and reaches nobody.
 
 **How to apply:**
 
-1. At wrap-up, only **draft** the commit message and PR title+body (in a
-   copyable fenced block) with the commands the user would run themselves.
-   Don't auto-run `git commit` / `git push` / `gh pr create` /
-   `--force-with-lease`.
+1. **Committing is authorized; pushing is not.** Once the change is
+   verified green, run `git commit` on the branch yourself — don't stop at
+   "here's the `git add` line and the message, paste it yourself". Draft the
+   PR/issue title+body in a copyable fenced block with the commands the user
+   would run themselves, and don't auto-run `git push` / `gh pr create` /
+   `gh issue create` / `--force-with-lease`.
    **After a commit is made, report what changed and its state (committed,
    not pushed) — don't add "push this" as an action item.** He tracks which
    branch/worktree he's on and pushes himself; spelling it out as a pending

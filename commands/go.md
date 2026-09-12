@@ -42,7 +42,7 @@ git worktree add -b <branch> <path> <remote>/<default-branch>
 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)
 的 cwd 交辦紀律）。
 
-收尾（🟣 立希全綠、commit 草擬完）時印出這個 worktree 的路徑與 branch，明講
+收尾（🟣 立希全綠、commit 已落地）時印出這個 worktree 的路徑與 branch，明講
 「留在原地，等 PR merge 後可用 `/maigo:repo-audit` 看到清理建議」——**不在這裡
 自動移除**。細節、`.maigo/` 歸屬規則見
 [`skills/git-workflow/references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)。

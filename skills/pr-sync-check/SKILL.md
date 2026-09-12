@@ -12,7 +12,7 @@ description: This skill should be used after a change is complete — at the wra
 
 ## Why this skill exists
 
-改動收尾時，現有流程只草擬 commit message（[`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)），完全沒有回頭核對「這個 branch 如果已經開著一個 PR，它的 title/description 是否還符合現在的實際改動」。PR 的 title/description 常在多輪 review、追加 commit 之後跟原始描述脫鉤——reviewer 讀到的第一印象已經過期，但沒有任何收尾步驟會發現這件事。這個 skill 補上那個核對步驟，需要時草擬更新，但**絕不代跑 `gh pr edit`**——編輯既有 PR description 是使用者自己的動作，不是「開 PR」那個授權範圍的延伸（見下方「絕不自動編輯」）。
+改動收尾時，現有流程落地 commit（訊息依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)），完全沒有回頭核對「這個 branch 如果已經開著一個 PR，它的 title/description 是否還符合現在的實際改動」。PR 的 title/description 常在多輪 review、追加 commit 之後跟原始描述脫鉤——reviewer 讀到的第一印象已經過期，但沒有任何收尾步驟會發現這件事。這個 skill 補上那個核對步驟，需要時草擬更新，但**絕不代跑 `gh pr edit`**——編輯既有 PR description 是使用者自己的動作，不是「開 PR」那個授權範圍的延伸（見下方「絕不自動編輯」）。
 
 ## 何時套用
 
