@@ -1,5 +1,5 @@
 ---
-description: 把 /maigo:triage-issue 判定 READY 的 GitHub issue 接進實作——orchestrator 前置抓料，整理成需求敘述後交給標準 teammate-flow（樂奈探索、燈寫 plan、愛音實作、爽世 review、立希驗證），收尾草擬帶 issue 參照的 commit，不自動 push / 開 PR。
+description: 把 /maigo:triage-issue 判定 READY 的 GitHub issue 接進實作——orchestrator 前置抓料，整理成需求敘述後交給標準 teammate-flow（樂奈探索、燈寫 plan、愛音實作、爽世 review、立希驗證），收尾落地帶 issue 參照的 commit，不自動 push / 開 PR。
 allowed-tools: Bash(gh issue view:*), Read
 ---
 
@@ -35,7 +35,7 @@ git worktree add -b <branch> <path> <remote>/<default-branch>
 [`skills/teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)
 的 cwd 交辦紀律）。
 
-收尾（🟣 立希全綠、commit 草擬完）時印出這個 worktree 的路徑與 branch，明講
+收尾（🟣 立希全綠、commit 已落地）時印出這個 worktree 的路徑與 branch，明講
 「留在原地，等 PR merge 後可用 `/maigo:repo-audit` 看到清理建議」——**不在這裡
 自動移除**。細節、`.maigo/` 歸屬規則見
 [`skills/git-workflow/references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)。
@@ -71,8 +71,8 @@ body + comments 整理成需求敘述：acceptance criteria 從 body 與 maintai
 
 🟣 立希全綠後，依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md) /
 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)
-草擬 commit（body 帶 issue 參照，如 `Fixes #<n>` 或 repo 既有慣例）——**不自動 commit、不
-push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md) 產 PR title/description。
+草擬 commit 訊息（body 帶 issue 參照，如 `Fixes #<n>` 或 repo 既有慣例）並**直接落地**——
+**不 push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md) 產 PR title/description。
 
 ### 4. Work Board 回寫
 
@@ -96,6 +96,6 @@ push、不開 PR**。完成後提示可接 [`/maigo:describe-pr`](https://github
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依
   [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **步驟 1 orchestrator 親自跑、不開新 agent**；步驟 2 依 teammate-flow 的 model-dispatch 結果啟動角色，有 subagents 時委派，沒有時依序在主線執行。
-- **不硬做、不寫 GitHub、不自動 commit**：issue 不是 READY 就建議 `/maigo:triage-issue`；commit 只草擬文字，push / 開 PR 交使用者或 `/maigo:describe-pr`。
+- **不硬做、不寫 GitHub**：issue 不是 READY 就建議 `/maigo:triage-issue`；commit 驗證綠了就落地，push / 開 PR 交使用者或 `/maigo:describe-pr`。
 
 → 跟 `/maigo:triage-issue` / `/maigo:go` 的差異、場景對照：[Commands reference](https://github.com/Lee-W/maigo/blob/main/docs/reference/commands.md)

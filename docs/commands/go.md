@@ -11,7 +11,7 @@ flowchart TD
     SoyoVerdict -- APPROVED --> Taki[立希 Taki<br/>test / lint / type]
     Taki --> TakiVerdict{全綠?}
     TakiVerdict -- FAIL --> Anon
-    TakiVerdict -- PASS --> Commit[Orchestrator<br/>草擬 commit msg]
+    TakiVerdict -- PASS --> Commit[Orchestrator<br/>落地 commit]
     Commit --> Done([完成: summary])
 
     classDef raana fill:#6EEB83,stroke:#333,color:#000

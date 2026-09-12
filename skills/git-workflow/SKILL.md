@@ -196,7 +196,8 @@ before calling `gh pr create`. After committing and pushing a branch, default to
 stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 **Outward git/GitHub operations are the user's to run, not just PR creation.**
-- Default to drafting (commit message, PR/issue title+body) and stop — never auto-run `git commit` / `git push` / `gh issue create` unless explicitly asked this turn.
+- **`git commit` is authorized; pushing is not.** Once verification is green, commit directly on the branch (never `SKIP=`, never `git add -A`) and report the hash and `--stat` — don't stop at "here's the command, paste it yourself".
+- Everything outward stays drafted-and-stopped — never auto-run `git push` / `--force-with-lease` / `gh pr create` / `gh issue create` unless the user explicitly asks this turn.
 - A "Recommended" pick inside a batch `AskUserQuestion` is not authorization to open an issue — show the draft, wait for "post this".
 - Fixing an already-pushed branch: commit/amend locally and stop; mention `--force-with-lease` but neither run it nor frame it as the recommended next step. Case studies: `references/outward-ops-authority.md`.
 

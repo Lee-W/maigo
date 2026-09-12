@@ -120,7 +120,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
   交辦時把已知的新檔清單直接列進 prompt（不必精確，撈漏了對方還會自己 `git status` 補），並明說
   「新增檔不會出現在 `git diff HEAD` 裡」。同理適用於 🟣 立希的驗證交辦。
 
-### Commit message draft
+### Commit message draft + 落地
 
 Taki 全綠（或 `/maigo:team` 合流 APPROVED + PASS）後，若還有未 commit 的本次變更，
 依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。
@@ -131,7 +131,9 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 **target repo 的成文慣例優先於 skill 預設**（例：apache/airflow 明禁 CC 前綴，且有
 `check-no-conventional-commit-message` 這個 commit-msg hook 會直接拒收）。
 
-**不自動跑 git commit**——只給文字，使用者自決定要 `git commit -F -` / amend / 改寫。
+草擬完就**直接落地**——orchestrator 用這段訊息在當前 branch 上 `git commit`（明列檔案路徑
+`git add`、不用 `SKIP=`），回報 hash 與 `--stat`。**push 不代跑**，那是使用者的動作。
+使用者要改 wording / amend / 拆合，自己接手即可。
 
 若使用者或後續步驟確實要跑 git 操作（stage / amend / 診斷 diff 大小），
 依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)

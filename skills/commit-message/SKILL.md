@@ -119,6 +119,6 @@ When the caller **presents the commit message to the user** as a deliverable (ra
 
 - The PR description / motivation / test plan — that is [`github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md).
 - Choosing what to commit (`git add` strategy, hunk staging) — caller's job.
-- Running `git commit` — this skill only drafts text.
+- Running `git commit` — this skill only drafts text. Who runs the commit (the orchestrator, once verification is green) and who runs the push (the user, always) is [`git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)'s "Pushing and opening a PR" section.
 - Conventional Commits scope taxonomy — if the repo uses CC, the caller decides the scope from the diff; this skill only mirrors the detected style.
 - Multi-commit history shaping (squash decisions, rebase plans) — separate concern.

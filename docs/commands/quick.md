@@ -12,7 +12,7 @@ flowchart TD
     SoyoVerdict -- APPROVED --> Verification[Orchestrator<br/>verify_task.py]
     Verification --> HookVerdict{status?}
     HookVerdict -- failed --> Anon
-    HookVerdict -- passed --> Commit[Orchestrator<br/>草擬 commit msg]
+    HookVerdict -- passed --> Commit[Orchestrator<br/>落地 commit]
     HookVerdict -- unavailable / skipped / known_failures --> Unverified([回報未通過驗證與原因])
     Commit --> Done([完成])
 

@@ -39,7 +39,7 @@ orchestrator 直接呼叫 Anon 動手，做完跑 Soyo 輕量 review（9 項 →
    - 不寫 plan.md
 2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫，應該不對。」
 3. **Orchestrator 顯式驗證** — 🟡 爽世 APPROVED 後，依下節執行驗證 CLI，保存 command、cwd、exit code 與 output。修過檔案就重跑，不能沿用修改前的結果。
-4. **Orchestrator** — 驗證 `passed` 後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。格式照該 skill 的偵測跑，**不預設 CC**——target repo 的成文慣例優先（例：apache/airflow 明禁 CC 前綴並有 commit-msg hook 擋）。**不自動跑 git commit**。接著依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對當前 branch 若已開 PR，其 title/description 是否仍符合現在的實際改動；沒有對應 PR 就跳過，不算失敗。
+4. **Orchestrator** — 驗證 `passed` 後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。格式照該 skill 的偵測跑，**不預設 CC**——target repo 的成文慣例優先（例：apache/airflow 明禁 CC 前綴並有 commit-msg hook 擋）。驗證綠了就**直接落地 commit**（明列檔案路徑 `git add`、不用 `SKIP=`），回報 hash 與 `--stat`；**push 不代跑**。接著依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對當前 branch 若已開 PR，其 title/description 是否仍符合現在的實際改動；沒有對應 PR 就跳過，不算失敗。
 
 ### 顯式驗證契約（所有宿主共用）
 
