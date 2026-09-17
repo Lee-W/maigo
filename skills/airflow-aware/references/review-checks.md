@@ -178,6 +178,27 @@ entry; misjudging toward "routine" leaves downstream users with an
 unrecorded `ValueError: too many values to unpack` after upgrading. This is
 a convention-conformance input, not a waiver on the checklist item.
 
+**What shape the entry takes** depends on whether the provider's version has
+been cut yet. If `pyproject.toml`'s `version =` for that provider is
+unchanged vs `main`, the release hasn't happened — the entry is a single
+`.. <short label>` rst comment (e.g. `.. Behavior note`, `.. Bug fix`),
+followed by a blank line and a plain, fully unindented text paragraph,
+placed under the `Changelog\n---------` header and above the
+then-current-latest version heading. Don't take the file's current state as
+the template for this: an already-released version section shows the same
+note as an indented `.. note::` directive — that's the release manager's
+release-prep transform of the contributor's original comment form, not what
+a contributor should write. Find same-file precedent with
+`git show <commit> -- providers/<p>/docs/changelog.rst` on a commit that
+*introduced* an entry (not the released state), and match its label style.
+Verify with `prek run --files providers/<p>/docs/changelog.rst`, which runs
+the `Check changelog format` hook. Case study: openai provider's
+`changelog.rst` — precedent commits `ef1a92bd80` (#69408, `.. Behavior
+note`) and `b2d1d8183d` (#69534, `.. Bug fix`) both used the unindented
+pre-release comment form; apache/airflow#72151 was where a contributor
+initially wrote the indented `.. note::` form and was asked to match these
+two precedents instead.
+
 ## 10.8 Revert of a recent fix: check for a tracking issue first *(judgment gate — avoid a false-positive regression flag)*
 
 **Scope gate**: only applies when the diff/PR title/description reverts, or
@@ -290,6 +311,28 @@ either way.
   (`is None` / `is not None`) as provision checks — a truthiness form
   (`not field` / `if field`) is still flagged even in `__init__`, so rewrite
   to the identity form rather than just relocating the check.
+- **Template-field type dispatch.** For a template-field constructor
+  parameter typed as a non-`str` union (`int | str | None` and similar),
+  branch eager-vs-deferred validation on the value's runtime type, not a
+  blanket rule. A non-`str` value (`int`/`bool`/`float`) is already final in
+  `__init__` — Jinja rendering always produces a string, so a Dag author
+  cannot produce a non-str value through templating — validate it eagerly
+  in `__init__`. A `str` value may be an unrendered template or a literal
+  string, and the two aren't safely distinguishable at `__init__` time
+  (sniffing for `{{`/`{%` is brittle at the boundary), so defer its
+  validation to `execute()` (after `render_template_fields()`). This follows
+  from an architectural invariant: template rendering
+  (`task-sdk/src/airflow/sdk/execution_time/task_runner.py`'s `_prepare()`
+  calling `render_templates`) happens after `__init__` (Dag-parse time) and
+  before `execute()`, in a separate worker phase. Case study:
+  apache/airflow#72150 (`OpenAIResponseOperator`) — `max_output_tokens` /
+  `max_tool_calls` type checks ran only on the `execute()` path, so
+  `max_output_tokens=0` passed Dag parsing silently; the fix added an eager
+  validation call in `__init__` gated on `isinstance(value, str)` being
+  False, leaving `str` values validated in `execute()` as before. Don't add
+  `{{`/`{%` content-sniffing to further narrow which strings could be
+  pre-validated — that follow-up was evaluated and rejected on this PR
+  (false-positive risk outweighed the boundary cases it would catch).
 - **Rendered-guard symmetry.** When `execute()` has a rendered-value guard for
   one template field, every other template field feeding the same downstream
   call in that function needs the same guard. An asymmetric guard is a

@@ -376,6 +376,34 @@ that gap is pre-existing behavior, leave it untested per this repo's
 it, add a behavior test for it before deleting the literal-equality
 assertion.
 
+### A hand-written stub shape can't contradict the docstring it copies
+
+When a test stubs a third-party object's serialization method
+(`model_dump` / `to_dict` / `dict()`) and hand-writes the return value, that
+hand-written value is also the assertion's expected value — so it can never
+disagree with anything the docstring claims about that shape. The docstring
+and the test end up agreeing on a shape the upstream SDK never actually
+returns, and CI stays green. `spec=` only constrains the interface (which
+attributes/methods exist), not the data shape.
+
+Fix: for a plain value object (pydantic model, dataclass, attrs class),
+construct a real instance and let upstream decide the shape; reserve
+mocking for actual I/O boundaries (client, connection, hook). Before
+switching to a real instance, confirm it works across the provider's
+supported version range — if the package's model uses `extra="allow"`,
+pass fields that are only required in newer versions too, so the same
+literal expected dict holds against both the pin floor and latest. Don't
+paste a full literal dump into a *doc* (fields can be added between
+versions) — that level of literal detail belongs in the test, not the
+docstring. If replacing the mock removes an assertion's discriminating
+power (e.g. an all-int payload makes `mode="json"` and the default dump
+identical), don't reintroduce the mock just to keep that assertion.
+
+Case study: apache/airflow#72151 — a stub for `ResponseUsage.model_dump`
+was hand-written as a flat dict; the real SDK object nests two levels deep.
+The docstring copied the same flat shape, so a user following it hit a
+`KeyError`.
+
 ## CI / prek hook scripts
 
 ### New `scripts/ci/prek/*.py` hooks: `requires-python = ">=3.10"`, keep the shebang

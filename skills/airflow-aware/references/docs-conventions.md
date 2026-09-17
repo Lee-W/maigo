@@ -438,3 +438,30 @@ XCom-into-argument example. If the target field needs to be added to
 pattern in `providers/amazon/tests/unit/amazon/aws/operators/test_glue.py:1348`),
 and run a mutation canary: remove the field from `template_fields` and
 confirm the new test actually goes red.
+
+---
+
+## Provider docs describing vendor usage/cost fields link out for pricing, never restate it
+
+When a provider doc or operator docstring describes a usage/cost field
+returned by a vendor SDK, only state what's verifiable from the installed
+SDK itself: field paths, nesting depth, whether one field is a subset of
+another. Don't restate pricing semantics (rates, discounts) — link to the
+vendor's own pricing/usage guide instead.
+
+Two reasons: there's usually no primary source for the rate inside the
+SDK's own docstrings, so any rate written into Airflow's docs is
+unverifiable at review time; and vendor pricing changes without Airflow's
+docs changing with it, so a restated rate silently rots. A reviewer's own
+pricing claim in a review comment doesn't count as a primary source either
+— either find a first-party source or link out.
+
+Keep the verifiable half of a sentence (a subset/superset relationship
+between two fields, if the docstring can actually support it) and cut the
+pricing half, replacing it with "see `<vendor>`'s `<topic>` guide" plus a
+link; match the link's domain to whichever vendor domain this file's other
+links already use.
+
+Case study: apache/airflow#72151, the openai provider's `cached_tokens`
+field — the field's docstring said it billed at a discounted rate, which
+isn't something the SDK's `Usage` model itself asserts.
