@@ -5,9 +5,8 @@ from __future__ import annotations
 import io
 import json
 
-import pytest
-
 import hooks.delegation_criteria_check as dcc
+import pytest
 from hooks._grep_criteria import block_reason, find_literal_grep_criteria
 
 
@@ -54,6 +53,31 @@ class TestFindLiteralGrepCriteria:
     def test_hit_drops_bullet_and_checkbox_markers(self):
         (hit,) = find_literal_grep_criteria("- [ ] `grep -c TODO src/` 必須回 0")
         assert hit.startswith("`grep -c TODO")
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            # 兩個訊號同一行。
+            "Forbidden: the literal string `foo_bar` must not appear anywhere.",
+            # 軟換行版：句子跨行、續行沒有 bullet 標記（英文 plan 常見寫法）。
+            "Forbidden: the literal strings `prompt_cache_retention` and\n"
+            "`prompt_cache_options` must not appear anywhere in the page text",
+        ],
+    )
+    def test_literal_string_ban_prose_is_flagged_without_grep_mention(self, text: str):
+        assert len(find_literal_grep_criteria(text)) == 1
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "no credentials must appear in the log",  # 講性質，沒有點名字面字串
+            "the file must not contain tabs",  # 同上
+            "- `git diff | grep -c` the literal string must not appear",  # 限縮到本次改動＝正解
+            "- 不要把 the literal string must not appear 這種寫法當驗收條件",  # 引用規則本身
+        ],
+    )
+    def test_literal_string_ban_prose_respects_scope_and_negation(self, text: str):
+        assert find_literal_grep_criteria(text) == []
 
     def test_limit_caps_reported_hits(self):
         text = "\n".join(f"- `grep -c x{i} .` 為零" for i in range(10))

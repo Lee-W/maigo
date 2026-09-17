@@ -1,4 +1,5 @@
-"""Detect acceptance criteria that lean on a literal grep count as proof.
+"""
+Detect acceptance criteria that lean on a literal grep count as proof.
 
 Registered harness lesson family「字面 grep 當判準」(2026-07-25 / 07-31 /
 08-11)：把「掃某 pattern，命中數必須是 0」寫成驗收條件，只證明了那串**字面**
@@ -20,12 +21,31 @@ _GREP_RE = re.compile(r"\b(?:grep|rg|ripgrep)\b")
 _COUNT_ZERO_RE = re.compile(
     r"為零|為 ?0(?![.\d])|回 ?0(?![.\d])|=\s*0(?![.\d])|應為 ?0(?![.\d])"
     r"|必須是 ?0(?![.\d])|零命中|沒有任何命中|不得有任何命中|只准剩"
-    r"|no matches|count\s*(?:==|=|:)?\s*0(?![.\d])"
+    r"|\bno matches\b|\bzero matches\b|(?<!\d)\b0\s+matches\b|\bno hits\b"
+    r"|count\s*(?:==|=|:)?\s*0(?![.\d])",
+    re.IGNORECASE,
 )
 # 已經把範圍限縮到「本次改動」的判準不算違規——那是教訓本身給的正解。
 _SCOPED_RE = re.compile(r"git diff|新增行|added lines|本次新增|本次修改|diff 的")
 # 引用這條規則本身（反例、禁令）不該被自己擋下。
 _NEGATION_RE = re.compile(r"不要|不得用|別用|禁止|避免|不可用|反例|wrong example")
+# 驗收段落標記——中文用「驗收」，英文 plan 常見寫法列這幾種（大小寫不敏感）；
+# 同一行內「標記：內容」也算（`Acceptance: \`grep ...\` — 0 matches`）。
+_ACCEPTANCE_MARKER_RE = re.compile(
+    r"驗收|acceptance\s*:|acceptance\s+criteria|verification\s*:",
+    re.IGNORECASE,
+)
+# 第三條偵測路徑：prose 版的字面比對，不點名 grep 工具，直接禁止某個「字面字串」
+# 出現——點名「literal string」本身就是這種反模式的 tell，正當的存在性條件講的
+# 是性質或種類（credentials、TODO、tabs），不會強調「這個字面字串」。
+# 兩個訊號都要出現才算：這條路徑窄，不要放寬成任何 must not appear。
+_LITERAL_STRING_MENTION_RE = re.compile(
+    r"\bliteral strings?\b|\bthe literal\b", re.IGNORECASE
+)
+_FORBID_APPEAR_RE = re.compile(
+    r"must not appear|must not contain|may not appear|should not appear",
+    re.IGNORECASE,
+)
 
 MAX_HITS = 3
 _HIT_MAX_LEN = 160
@@ -37,12 +57,53 @@ def _strip_bullet(line: str) -> str:
     return _CHECKBOX_RE.sub("", stripped, count=1).strip() or line
 
 
+def _iter_logical_units(text: str) -> list[str]:
+    """
+    Join soft-wrapped continuation lines into one unit per bullet/paragraph.
+
+    English acceptance prose often wraps a single sentence across lines with
+    no bullet marker on the continuation; a bullet/heading line or a blank
+    line starts a fresh unit, anything else merges into the previous one.
+    """
+    units: list[str] = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not units or _BULLET_RE.match(raw) or not stripped:
+            units.append(stripped)
+        else:
+            units[-1] = f"{units[-1]} {stripped}".strip()
+    return units
+
+
+def _find_literal_string_ban_hits(text: str, limit: int) -> list[str]:
+    """
+    Flag prose that names a literal string and bans it from appearing.
+
+    Doesn't require a grep/rg mention — this is exactly how the antipattern
+    slips through when phrased as prose instead of a shell command.
+    """
+    hits: list[str] = []
+    for unit in _iter_logical_units(text):
+        if not unit:
+            continue
+        if not _LITERAL_STRING_MENTION_RE.search(unit) or not _FORBID_APPEAR_RE.search(
+            unit
+        ):
+            continue
+        if _SCOPED_RE.search(unit) or _NEGATION_RE.search(unit):
+            continue
+        hits.append(_strip_bullet(unit)[:_HIT_MAX_LEN])
+        if len(hits) >= limit:
+            break
+    return hits
+
+
 def find_literal_grep_criteria(text: str, limit: int = MAX_HITS) -> list[str]:
     """Return acceptance-criteria lines that prove a property by grep count."""
     hits: list[str] = []
     for raw in text.splitlines():
         line = raw.strip()
-        if not _BULLET_RE.match(raw) and "驗收" not in line:
+        if not _BULLET_RE.match(raw) and not _ACCEPTANCE_MARKER_RE.search(line):
             continue
         if not _GREP_RE.search(line) or not _COUNT_ZERO_RE.search(line):
             continue
@@ -51,6 +112,8 @@ def find_literal_grep_criteria(text: str, limit: int = MAX_HITS) -> list[str]:
         hits.append(_strip_bullet(line)[:_HIT_MAX_LEN])
         if len(hits) >= limit:
             break
+    if len(hits) < limit:
+        hits.extend(_find_literal_string_ban_hits(text, limit - len(hits)))
     return hits
 
 
