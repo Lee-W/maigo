@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.60.1 (2026-09-17)
+
+### Fix
+
+- **hooks**: catch English-phrased literal-grep acceptance criteria
+
 ## v0.60.0 (2026-09-11)
 
 ### Feat
