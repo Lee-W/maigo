@@ -47,6 +47,18 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 ````
 `````
 
+## 一次交付的多筆 deliverable 放同一則回覆
+
+一組 deliverable 若屬於**同一次**交付（例：11 則 PR comment 回覆草稿 ＋ 一份 PR description），
+全部放在**同一則回覆**裡，不要跨訊息拆。使用者是逐筆貼出去的——散在多則訊息等於把翻找成本轉嫁給他。
+那是一次交付，不是十二次。
+
+後續任何一筆過期（例如又落地一支 commit，讓 PR description 與 diff 脫鉤）→ **整份重發**，
+不要只補變動的那一筆。使用者手上沒有「最新的那份在哪」的索引，只補差異會逼他自己拼。
+
+deliverable 數量多時，每筆前面給一行標題與來源連結（哪條 comment / 哪個檔），
+讓使用者能對照著逐筆處理；標題與連結放在 fenced block **外面**，block 內只留純內文。
+
 ## Why
 
 平台 render markdown 後，使用者從 UI 框選複製到的是 rendered 結果，不是 raw 語法——

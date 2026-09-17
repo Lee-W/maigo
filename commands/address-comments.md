@@ -120,6 +120,14 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 續跑（例如上次 session 中途中斷）——這時保留既有 work item 的 `Status`（`done` /
 `in-progress` / `blocked`），只在步驟 3 新選中但尚未出現在檔案裡的意見上新增條目，
 **不要把已完成的進度覆寫回 `pending`**（這是本命令特有的加碼規則，對應 `status: same_topic`）。
+
+**但既有意見的「現狀分桶」欄要全部重評，不可沿用**：work item 的 `Status` 記的是「我們做到哪」，
+續跑時保留；每條 comment 的 `status at HEAD`（`已處理`/`部分處理`/`仍有效`）記的是「對照當時 HEAD
+的判定」，上一輪之後只要有任何實作落地，它幾乎必然過期。逐條依步驟 2 的驗證紀律重判一次，
+**尤其是上一輪標成 `已處理` 的**——那正是最可能藏著「只做了一半」的位置：上一輪判它已處理就不再回頭看，
+而 reviewer 下一輪會把沒做的那半原封不動再提一次。
+（實例：2026-09-12 apache/airflow #72049，一條 comment 同時要求「加 API reference 連結」與
+「別寫死 `service_tier` 的值」，上一輪加了連結、留著值列舉就標 `已處理` 收工，reviewer 第二輪重提第二項。）
 triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（哪種訊號建議走
 `/maigo:quick` / `/maigo:go` / `/maigo:team`）見
 `skills/github-reply-draft/references/comment-fetch-and-triage.md`「Triage 檔模板」與「路由判斷」。
@@ -178,6 +186,12 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
    依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)：回覆內文放單一 fenced block（內文若可能含三個 backtick 就用四個 backtick 外層）。不加 `>` blockquote。
 
    每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
+
+   **產草稿前重抓一次 thread 狀態，已 resolve 的不列**：步驟 2 的抓取到這裡已隔了整個實作階段
+   （可能數小時、數個 work item、一次 rebase），reviewer 很可能在期間按了 resolve。重跑步驟 2 的
+   inline thread 查詢，`isResolved` 為 true 的**不列入草稿清單**，只在 summary 裡一行帶過
+   「另有 N 條已在期間被 resolve」。沿用開工時的快照，會讓使用者拿到一份含已關閉 thread 的草稿，
+   逐條貼上時才發現貼不進去。
 
 3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
 4. **PR title/description 核對**：這裡已知 PR 存在（步驟 1 pre-flight gate 已核過），依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對現有 title/description 是否仍符合上面落地的改動，脫鉤就草擬更新交給使用者複製貼上。
