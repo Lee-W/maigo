@@ -560,3 +560,37 @@ modules like `get_provider_info.py`, OpenAPI specs, Task SDK/ctl datamodels,
 metrics registries, supervisor schema snapshots — anywhere a "the generator
 produced this, don't hand-edit it" claim needs to be verified rather than
 assumed.
+
+## 7. Docs page screenshot procedure
+
+When a PR adds or changes a docs page, attach a screenshot at PR-open time —
+see `airflow-aware/SKILL.md` §8. This section is the how-to.
+
+1. Build only the affected distribution, not the whole docs site:
+
+   ```bash
+   ANSWER=no breeze build-docs <provider short name> --docs-only --clean-build
+   ```
+
+   Use the short name (e.g. `common.ai`), not the full distribution name
+   (`apache-airflow-providers-common-ai`) — the full name exits 2.
+
+2. The built output lands under
+   `generated/_build/docs/apache-airflow-providers-<dist>/stable/`. Open the
+   HTML file directly with `file://` — no server needed to get real styling.
+
+3. Take at least three screenshots:
+   - The new page itself (the full page, so the reviewer sees surrounding context).
+   - The index/toctree entry that links to it (proof a reader can actually find it).
+   - The **after** state of any existing page whose section this PR rewrote.
+
+   Getting a true before/after pair means building `base` branch separately
+   too, which doubles the cost — ask before doing that extra build.
+
+4. Before reusing an existing build's output, compare its mtime against the
+   current `HEAD`. A stale build predating the current commit will screenshot
+   old content while the file still exists and the build command still
+   exits 0 — nothing about that failure mode is visible from the command's
+   own output. Before trusting a screenshot, assert
+   `document.styleSheets.length > 0` in the page to catch an unstyled blank
+   capture.

@@ -129,6 +129,11 @@ consumer 清單已補上 orchestrator）。
 (1) 那個假旗標檔案不會被任何東西建立，停掉那個迴圈；(2) 明確給出它自己啟動的背景任務的真實
 output 檔案路徑或 task id，叫它直接讀那個檔案或用 TaskOutput 查真實狀態。
 
+同理，也**不要為了「等待」而 spawn 一隻 placeholder / fork agent**——harness 會在背景 agent
+結束時自動發 task-notification，不需要任何 tool call 觸發。想等待時直接結束當前 turn（回一句
+短訊息告訴使用者正在等什麼）即可。實例：一次為了等 review 完成而 spawn 的「placeholder to
+force wait」agent 燒掉約 28 萬 subagent token 卻什麼都沒做。
+
 ### Subagent 拒絕 relay 而卡死
 
 Orchestrator 用 `SendMessage` 把 Soyo 的 must-fix 轉給一個正在跑的 Anon 時，Anon 可能把這個
@@ -165,6 +170,18 @@ orchestrator 直接 inline 套用，不要再 relay 一次。真的需要委派�
 3. 使用者明確說「忽略這個 hook」時，**輸出零字元**——連 `.`、`[ignored]`、空白都不行。任何輸出
    都會結束該輪、讓 harness 重跑 Stop hook、hook 再次擋下，形成迴圈。等使用者修 hook 設定 /
    中斷 session / 送新任務，不要逐次確認每次觸發。
+4. **受限權限模式下，第 1、2 點的寫檔動作本身可能被擋。** `.claude/` 是 harness 的設定目錄，
+   權限 classifier 會把寫入判成 self-modification / safety bypass（實例 2026-09-17，Claude Code
+   auto mode：Bash heredoc 回 `[Self-Modification]`、Write 工具回 `[Safety Bypass Flag]`，同一個
+   檔案兩條路都不通，hook 連擋五輪）。這道防護的用意是對的——不該讓模型自己關掉測試驗證——
+   所以**不要繞**，也**不要換工具重試**（換工具做同一個動作，仍是同一個動作）。第一次被擋就
+   停手交給使用者，並給**可直接執行的一行**，而不是「請你去寫個檔案」：
+
+   ```text
+   ! printf '%s\n' "<scoped test command>" > .claude/test-command
+   ```
+
+   `!` 前綴讓使用者在自己的 session 裡跑，輸出直接進對話。使用者授權後再由模型寫入亦可。
 
 ### 無限迴圈防護
 

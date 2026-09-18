@@ -441,3 +441,35 @@ member that fits anything, an index entry that matches everything, a DOM
 attribute that renders unconditionally. Reviewing a "default path
 unchanged" claim means actively looking for where the shared path picked
 up new reach, not just confirming the branch you expect wasn't hit.
+
+---
+
+## Part K — A broad catch-all is only for someone else's failure
+
+### Rule
+
+A catch-all exception written for resilience is judged by **whose failure
+it is**, not by how important the surrounding code looks. Someone else's
+failure can be swallowed — a failover member's label can't be parsed, but
+that label isn't the precondition for calling another member, and the
+member's own exception tree can't be enumerated anyway. A component's own
+failure must not be swallowed — when its own identity or config is broken
+there is no sibling to fall back to, and swallowing it just turns a
+subclass's bug into a one-line warning plus an `"unknown"` tag, on a call
+that had nobody left to serve it anyway. Let it raise.
+
+Orthogonal to this: a control-flow exception must be re-raised regardless
+of how broad the catch is. A control-flow signal (e.g. a retry signal) that
+subclasses `Exception` will get silently swallowed by any `except
+Exception`, while other parts of the same module assume it always
+propagates — the two assumptions contradicting each other is the bug.
+
+### How to apply during review
+
+- On any catch-all used for observability/label/metrics purposes, ask
+  "whose failure is this value's parse failure — who has a fallback for
+  it?" No answer → it shouldn't be swallowed.
+- Write the helper's docstring as "for reading someone **else's** X only,"
+  so the next caller doesn't point it at its own state.
+- Scan the same module for any control-flow exception that this broad catch
+  could intercept.

@@ -26,6 +26,10 @@ inline 純文字把問題談透並給出建議與取捨，不要急著用 widget
   拿到同樣的空結果）。改用純文字重述問題與選項讓使用者回文字，尤其在逐項確認的迴圈（例如
   retro 候選、review route 確認）裡，別讓使用者看兩次同一份清單
 - **同一件事的互斥做法用 single-select**（或拆成獨立一題），別並列進同一個 multiSelect——勾選 UI 會誘導使用者把同一目標的互斥路徑都勾起來，造成矛盾組合（例：amend 加 footer vs 手動補記錄，只能擇一）。能並存的選項（feature-flag 類）才用 multiSelect。
+- **一則訊息只承載一個決策軸**。已經在問「A 還是 B」時，不要在結尾再夾「順便要不要做 X」——
+  使用者會精準回答主決策（常常只回一個字母或數字），附帶問題連帶被丟掉，而你無法判斷是被否決
+  還是沒看到。純文字問時結尾只留一個問號；次要項目寫成**不帶問號**的待辦陳述，等主決策落地後
+  再單獨問。
 
 Why: widget 在選項未定時反而打斷思考；使用者往往用一句話（「對」「不對」）推進，
 不需要選項框。
@@ -126,6 +130,8 @@ PR description / issue 留言、commit message、聊天回覆。
 |--------|------|------|
 | `reach for`（建議動作） | `use` | 表格欄位標題、選單型清單的動作欄也算；`the temptation to reach for it` 這種一般英文慣用不在此列 |
 | `temporal`（prose） | `time-based` | `Temporal` 是這個領域的產品名，對外文字用這個詞會讀成在指涉那個產品；命名一組跟時間有關的 mapper / window / timetable 時用「time-based」當集合名詞 |
+| `Acceptance pending your review.`（或任何「等你確認 / acceptance pending」變體） | 說完改了什麼、有什麼 trade-off 就停 | 接不接受本來就是 reviewer 的事，寫出來零資訊量；GitHub thread 側的同一規則見 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md) |
+| `You're right.` / 「你說得對」/「好問題」等奉承開場 | 直接從改了什麼開始 | 同上，交叉引用 `skills/github-reply-draft` |
 
 **豁免**：原始碼路徑與符號名照抄不改——上游確實有
 `task-sdk/src/airflow/sdk/definitions/partition_mappers/temporal.py` 這個模組，那是識別字不是選詞。
@@ -133,6 +139,19 @@ PR description / issue 留言、commit message、聊天回覆。
 
 改標題時記得一起掃**講者備註**——備註是要念出來的，漏掉等於還是說了。
 使用者會用 `:claude-wave:` 這個標記帶出這類禁用字，看到就當同一類偏好處理。
+
+## 聊天回覆不用 markdown table
+
+對話回覆不用 markdown table 呈現內容，即使內容天然是表格形狀。使用者在終端機裡常會想把
+內容複製出去，table 渲染後欄位會被斷行或對齊符號污染。改用條列——每筆一個 bullet，內部用
+「標籤：內容」或分行呈現多個欄位。fenced code block 與 diff 不在此限。
+
+## 除錯時先給指令，推論放後面
+
+追查現行症狀時，開頭給編號、可複製的指令（shell 指令前綴 `! ` 讓輸出落進 session）；排除過的
+假說每條壓成一行放在指令**下面**，不影響下一步要跑什麼的直接砍掉。輸出與結論的對應關係也用
+條列呈現（每個可能輸出一個 bullet：`輸出 → 結論`），不要用表格——上一段已禁止聊天回覆用
+markdown table，這裡同樣適用。此規則不適用於設計決策：那時使用者在選擇，不是在解阻塞。
 
 ## 收到「角色感」需求時的釐清流程
 

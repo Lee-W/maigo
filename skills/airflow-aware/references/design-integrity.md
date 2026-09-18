@@ -179,3 +179,20 @@ version skew produces (e.g. a pydantic `ValidationError` where
 synthesized field so the fabricated value leaves a trace. The same judgment
 applies to any client/server pair with independently-versioned generated
 models on each side, not just one specific API.
+
+The same principle governs the **dependency floor**. When a drift tripwire — a
+test that derives what the package can reach from what is actually installed —
+fails on a low-dependency CI job because the declared feature set names things a
+newer upstream release introduced, raising the package's own lower bound is the
+wrong fix: it forces every downstream user to upgrade so that a documentation
+page reads complete. Absorb the skew in the layer that knows about it. Assert
+the direction that holds on every supported version (anything installed must be
+declared) unconditionally, and gate the opposite direction (anything declared
+must exist upstream) on the release that carries the whole declared set, naming
+that release in a constant so the next reader sees which version the list was
+derived from. Prove with a mutation canary that the unconditional direction is
+still red when something is genuinely missing — a gate that silently disables
+both directions is not a tripwire. (2026-09-17, `common.ai` `external-services`:
+`snowflake` landed in pydantic-ai 2.27.0 and `crusoe` in 2.28.0, while the
+provider supports `pydantic-ai-slim` from 2.23.0 upward and CI exercises that
+floor.)

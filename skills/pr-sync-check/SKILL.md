@@ -55,6 +55,15 @@ git diff <baseRefName>...HEAD
 - title 只反映最早一版的改動，後續 review 追加的行為完全沒提到
 - description 的 Breaking changes / Test Plan 段落跟目前 diff 對不上
 
+**兩類漂移，逐句判斷是哪一類**：(1) 沒涵蓋新改動＝漏寫，讀者少知道一件事；(2) 描述的行為已不
+存在＝**敘述錯誤**，讀者被主動誤導。第 2 類是多輪 review 的 PR 特有的——review 常常就是在改
+行為，而 body 寫的是第一版行為。只問「新改動有沒有寫進去」只抓得到第 1 類。
+
+做法：每輪把行為改掉之後，拿反面描述詞（`ignored` / `inert` / `no-op` / `never enforces` /
+`silently` / `defaults to`）回掃 body，逐句判斷「這句現在還成立嗎」。案例：某 PR body 留著
+「a group's own `timeout` is inert too」，而行為已改成 `__init__` 直接丟 `ValueError`
+（apache/airflow #72786）——這句在多輪之前是對的，多輪之後變成敘述錯誤。
+
 ### 3. 不符 → 套 `github-title-description` 邏輯草擬新版，交給使用者
 
 依 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 的 Title 規則與 Description 結構，用步驟 2 抓到的 commits/diff 重新草擬 title + description。呈現方式依

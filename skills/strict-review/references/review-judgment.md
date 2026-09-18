@@ -579,6 +579,16 @@ The danger is that applying the citation literally produces **no error
 signal** — the line hit is syntactically valid and semantically plausible,
 tests stay green, and the diff looks completely normal.
 
+A third failure mode, harder to catch than the first two: **when the same
+file goes through several consecutive work items, line numbers shift after
+every commit.** The most common failure here isn't a wrong judgment — it's a
+*correct* judgment pointing at *stale coordinates*: the conclusion holds but
+the location it names no longer exists, or now names something else, and the
+reasoning itself has nothing wrong with it. That's exactly what makes it hard
+to notice on your own. Rule of thumb: any time a deliverable will pass
+through multiple rounds of edits, or a cited line number wasn't produced by
+a command you ran this minute, treat it as already stale.
+
 How to apply:
 
 - When turning a must-fix into an instruction (for yourself or a delegate),
@@ -592,6 +602,55 @@ How to apply:
 - If the line number turns out wrong, correct it back to the reviewer before
   re-submitting for re-review; otherwise the re-review will reuse the same
   wrong coordinates.
+- When delegating across multiple rounds, say explicitly that line numbers
+  are for locating the rough neighborhood only — use content — and attach a
+  searchable string alongside any cited line.
+- Before reporting or citing any `file:line`, re-run `grep -n` yourself that
+  minute rather than trusting a number carried over from an earlier turn.
+- When citing across files, cross-check with `wc -l` that the target file
+  actually has that many lines — this immediately surfaces a wrong filename.
+
+Case: across four commits touching the same file, a reviewer's citation read
+`<file>:510-511`, but that file only had 493 lines — the real target was a
+different file. The implementer's own reported line numbers were all
+systematically off by 3 lines from where the content actually was.
+
+---
+
+## §25. A reviewer's style nit is a sample, not a list
+
+Treat a style/markup/naming/quoting nit as "one spot the reviewer happened to
+sample." A reviewer reads the diff hunk, not the whole file's distribution —
+you have the entire file. Before fixing it, ask "what's this file's existing
+convention for this," then sweep **every section your own change touches**
+for that convention (grep for the convention's positive pattern, not the
+literal token the reviewer named).
+
+Case: a reviewer flagged a newly added description for a symbol missing
+double-backtick wrapping. Checking the file's convention before fixing it
+turned up a more obvious deviation in the same section — a value wrapped in
+single quotes, the only place in the whole file written that way; every
+other value of that kind used double backticks. Both were fixed together,
+so the next round didn't have to re-raise the same class of issue.
+
+---
+
+## §26. Wording inside an unmerged PR: improving it beats internal consistency
+
+The internal-consistency argument only holds for content that is **old,
+already used across contexts, and already depended on externally**. While a
+PR is unmerged, its wording is something this PR itself just introduced —
+"it's already consistent within the PR" is a coincidence, not an existing
+convention worth protecting. Change it directly, and sweep the PR's other
+commits for the same wording while you're at it. Content already merged to
+mainline, or wording stabilized and reused across multiple independent
+already-merged PRs, is not covered by this rule.
+
+**Anonymized on purpose — don't write branch names or commit hashes into
+this case.** Case: an unmerged fork branch used the same anthropomorphizing
+phrase describing a timeout in both a changelog entry and a commit message;
+"the same commit already reused it" was floated as a reason to keep it, and
+the user overruled that ("this PR just introduced it, didn't it?").
 
 ---
 

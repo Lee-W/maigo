@@ -127,3 +127,25 @@ source:
   number and check what it actually touched
   (`gh pr view <n> --json files -q '.files[].path'`); if no touched path
   belongs to the distribution whose notes you're reading, the line is noise.
+
+## Diff the pushed head against local HEAD before fixing a CI red
+
+A CI failure message describes the **SHA that was pushed**, not the local
+working tree. The user often rebases/amends locally without pushing right
+away, so the first step on "fix this CI failure" is computing the delta:
+
+1. `gh pr list --head <branch> --json headRefOid` — get the PR's head SHA.
+2. `gh run view <run-id> --json headSha` — cross-check that run actually ran
+   against that SHA.
+3. `git diff <pushed-head> HEAD -- <files the failure touches>` — see whether
+   local already fixed it.
+
+Case: of three reported reds, two (a ruff `F811` duplicate test def, a mypy
+`already defined`) had already been fixed locally during a rebase; only a
+docs spelling one remained. Applying every item in the CI log literally would
+have deleted a definition that no longer existed. Report which reds are
+"already fixed locally" separately from which ones you fixed this round.
+
+Cross-reference "Recompute base refs live" and "A green/skipped CI check and
+a changelog line are proxies, not proof" above — same family of stale-proxy
+traps, this one specific to CI-red triage.

@@ -329,6 +329,10 @@ status doc for a feature that ships:
   Changes in other subdirectories do not need one.
 - **Imminent fixes** (obvious bugs, small refactors with no design question) can go straight
   to a PR — no need to open an issue first.
+- If this PR adds or changes a docs page, attach a before/after screenshot at PR-open time —
+  a new reader-facing docs page counts as user-facing for the PR template's screenshot
+  requirement, even though "it's just docs." Don't wait for a reviewer to ask. See the
+  screenshot procedure in `references/verification-tooling.md` §7.
 
 ### 9. Architecture boundaries *(optional, for architectural review)*
 

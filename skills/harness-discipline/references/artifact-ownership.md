@@ -38,6 +38,14 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    使用者，不要自作主張換名或覆寫。`status: same_topic` 才是安全續寫；
    `status: new` 直接照 `path:` 那行的路徑寫入。
 
+   **`suggest:` 只是單層候選，永遠是 `<identifier>-2`，不會檢查這個檔名本身
+   是否也已被別的主題占用**——如果同一個 identifier 底下已經有 `-2`、`-3`
+   甚至更多份不同主題的產物（常發生在同一個 branch/PR 上跑過多輪
+   `/maigo:go`、`/maigo:quick` 之後），`suggest:` 給的路徑可能撞到其中一份。
+   使用 `suggest:` 之前，自己（或無 Bash 的 subagent 手動推算後）逐一
+   `ls .maigo/` 加讀 H1 核對，確認候選檔名真的沒被佔用，必要時往下遞增到
+   `-3`、`-4`；不要對 `suggest:` 的路徑照單全收。
+
 4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）只可讀、不可當寫入
    目標**——有續跑語意的產物（如 `plan.md`）在新路徑讀不到內容時可以退回讀舊
    檔繼續，但下一次寫入一律寫到 script 回的新路徑，不回寫舊檔。這條現在不是只

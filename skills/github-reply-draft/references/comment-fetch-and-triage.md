@@ -131,3 +131,10 @@ or writing the triage file.
 地方可能是 reviewer 在 inline thread 指定、使用者已用 `fixup!` 落地的刻意改動。PR 進行中時，
 review threads 是「現狀真相」的一部分；用「一致性」理由把它蓋回去，等於默默回退了 reviewer 的
 要求。
+
+## 禁用填充句的由來
+
+`SKILL.md` 的 word-level conventions 禁用 `Acceptance pending your review.` 與
+`You're right.` 這類開場——實例：一輪 address-comments 產出五則 thread 回覆草稿，每則都以
+`Acceptance pending your review.` 收尾；接不接受本來就是 reviewer 的事，這句話零資訊量，
+當場被要求禁用。

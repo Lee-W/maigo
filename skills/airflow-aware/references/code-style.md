@@ -84,9 +84,19 @@ Avoid a `_def` / `_ref` suffix on a variable that holds the actual runtime
 object (`asset = Asset(...)`, not `asset_def = Asset(...)`) — reserve those
 suffixes for genuinely indirect objects (e.g. an `AssetRef`). Don't copy a
 `_def`-suffixed name from a neighboring test just because it's already there
-if the variable in question holds the real object. Also avoid Sphinx `#:`
-attribute-doc comments on class attributes — they aren't an idiom this repo
-uses; a plain `#` comment is the convention.
+if the variable in question holds the real object.
+
+### Sphinx `#:` attribute-doc comments aren't a repo idiom
+
+Use a plain `#` comment, not Sphinx's `#:` variable-documentation syntax, on
+module-level constants too — especially `_`-prefixed private ones — not just
+class attributes. `#:` exists to make autodoc pick up the following variable
+as a documented public attribute; internal/private constants are never
+collected by autodoc in the first place, so `#:` has no actual effect there
+and only leaves two comment styles coexisting in the same file. Case: within
+one PR, in the same hook file, two private constants used `#:` while a third
+one added later used plain `#`. The only exception is when you've actually
+confirmed a public attribute/constant should be picked up by autodoc.
 
 ### Simple default values don't need a named constant
 
@@ -164,6 +174,19 @@ the case is genuinely ambiguous, document it. If eager validation would break
 existing callers relying on the silent behavior, prefer a migration path
 (deprecation warning + future raise + tracking issue) over leaving the
 footgun undocumented-but-silent forever.
+
+A parameter inherited from a base class that is **always** a no-op in a
+subclass belongs to the same category — reject it at construction, don't
+just document "this is ignored." Judge it by precedent: if the class already
+rejects other invalid input in `__init__`, an always-no-op inherited
+parameter is the same class of problem and should be rejected the same way.
+Shape: `__init__` raises `ValueError` on a non-default value, and the
+message names **where to set it instead** ("set timeout on each member
+instead"), not just "not supported." Update the property docstring and any
+usage guide from "ignores" to "rejects" at the same time — leaving even one
+of the two in the old wording gives the next review round the same thing to
+re-raise. A documentation-only mitigation is a weak fix whenever an existing
+validation shape can reject the input outright instead.
 
 ### Once a check enforces an invariant, drop the comment that manually enumerates it
 

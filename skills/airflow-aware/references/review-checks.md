@@ -166,6 +166,23 @@ Two traps when judging this:
   RM-generated and explicitly forbids PR edits** — the two files have
   opposite contribution models; a lesson learned from one does not transfer
   to the other.
+- **Don't copy another provider's "unreleased heading" as if it were the
+  convention, without verifying insertion first.** Before adding an
+  unreleased behavior note, actually simulate where the next release-prep
+  will insert the next version by running
+  `_find_insertion_index_for_version()` from
+  `dev/breeze/src/airflow_breeze/prepare_providers/provider_documentation.py`,
+  and cross-check `providers/AGENTS.md`'s `NOTE TO CONTRIBUTORS` template for
+  whether a version heading belongs there at all. A version heading that
+  looks like established practice may actually be wrapped in the manual
+  `.. Below changes are excluded from the changelog. Move them...` staging
+  block and have sat there, un-migrated into a real version section, since it
+  was added — that's years-old unpaid-down debt, not a convention to cite.
+  Copying it makes the next release-prep insert the real release notes
+  **above** that fake heading, permanently trapping the behavior note under
+  the wrong version and outside the actual release section. The correct
+  placement is directly under the `Changelog` header with no version heading
+  layered on top.
 
 Judge "is this breaking" by **actual runtime behavior**, not the diff's type
 annotations: a return-type change from `tuple[bool, str | None]` to
@@ -786,6 +803,99 @@ machine, and would drift from what `provider.yaml` declares). Treat
 missing vendor pass silently) comparing `provider.yaml`'s declared connection
 types against `infer_provider_class`'s accepted strings, with any exclusions
 named explicitly and each carrying a one-line justification comment.
+
+## 10.27 Metric ratio three-question check *(Request changes)*
+
+**Scope gate**: applies whenever a diff turns two counters into a ratio
+(a rate, a success percentage, a per-call average). Same family as 10.16
+(logging/audit field review).
+
+Before accepting a metric written as a ratio of two counters, ask three
+things:
+
+1. **When does the denominator increment?** It must increment **before**
+   the counted operation starts. A counter that only increments on the
+   success path disappears exactly when it's needed most — under total
+   failure the numerator keeps climbing, the denominator stays flat, and the
+   ratio spikes to its highest value at the moment the system has stopped
+   working, or there's nothing to divide by at all. Case: a counter was
+   originally placed **after** `await invoke(...)`, counting answers, not
+   attempts; moving it to before the `await` is what makes it a valid
+   denominator. Require a test that asserts the counter still fires when
+   every call fails.
+2. **What is this ratio's upper bound?** If the numerator increments once
+   per conversion/retry, a single call can contribute more than once, so the
+   ratio isn't bounded by 1 and **must not be called a rate**. Name it "per
+   call" instead, and document an example where it exceeds 1 (e.g. a
+   three-member group where the first two fail: numerator +2, denominator
+   +1).
+3. **Do the two counters share the same population?** If not, say so and
+   don't force a ratio. Case: one counter existed only at the group level
+   and counted successful replies only, while the other counted a call path
+   that a direct call bypasses entirely — a warning documenting that the two
+   don't share a denominator is better than shipping a success rate that
+   misleads.
+
+New metric names still need a registry entry — see the metrics registry
+rule (cross-reference the relevant registry section if this repo's docs
+already cover it).
+
+## 10.28 A schema-validated new field needs an authoring-schema cross-check *(Request changes)*
+
+**Scope gate**: only triggers when a diff adds a new schema-validated field
+(e.g. a `provider.yaml` sub-key) to drive a new screen or new behavior.
+
+Don't only look at the consumer side (extraction/display logic) and judge it
+correct in isolation — go back and check the **authoring schema** (the one
+that actually validates authored data, e.g. `provider.yaml.schema.json`) has
+been opened up for that field too. Otherwise the feature is dead for any
+real data: the code never receives real values and the screen stays empty
+until a separate schema PR catches up. Running a pytest fixture or hand-fed
+fake data that renders the screen is not sufficient proof that "this PR
+makes the feature usable." Cross-reference the "New provider.yaml module
+section: registry + validator touchpoints" narrow section below.
+
+## 10.29 Template-field value-path check *(Request changes)*
+
+**Scope gate (important — do not reuse 10.12's gate)**: this item applies to
+**any** operator with a template field, not just direct `BaseOperator`
+subclasses — 10.12's gate is deliberately narrower (that prek hook only
+scans direct subclasses, so an intermediate base class such as a shared
+`LLMOperator` isn't scanned), and this item's source case is precisely an
+operator behind such an intermediate base. State this difference up front
+when citing this item and cross-reference 10.12.
+
+- **Coercion/validation belongs at the top of `execute()`** — after the
+  existing cheap guards, but before **any** I/O or expensive construction.
+  "Validate at the point of use" reads clean, but it gives up fail-fast: a
+  typo'd or empty Variable ends up reported only after the file finishes
+  reading, every connection finishes schema introspection, and durable
+  storage plus the agent are already built. When adding any check that can
+  only run post-render, count how many I/O or construction steps precede it
+  in `execute()` — more than zero means move it up. It **cannot** live in
+  `__init__`, because the field may still be an unrendered Jinja string when
+  the constructor runs (this coexists with 10.12's provision-check rule:
+  "was it provided" belongs in `__init__`; "is the rendered value valid"
+  belongs in `execute()`).
+- **Check every entry point that shares the same coercion.** A class with a
+  second entry point (e.g. HITL's `regenerate_with_feedback()`) needs the
+  same fix — patching only `execute()` misses it.
+- **The native value and the rendered-string paths must accept the same set
+  of values.** A template field has two paths to runtime: the native value
+  an author writes directly, and the string Jinja renders. When the two
+  disagree, the same Dag expression succeeds or fails depending on whether
+  that Dag has `render_template_as_native_obj` turned on — a Dag-level
+  setting the field's author doesn't control. Case: a `_coerce_int` accepted
+  only integer literals natively — `5.0` (and `Decimal("5.0")`, `1e3`)
+  passed and coerced to `5` — while the templated `"5.0"` raised. **Jinja's
+  `/` is true division**, so `{{ a / b }}` renders as `"5.0"` even when it
+  divides evenly — meaning the same expression passes in one Dag and raises
+  in another purely because of the render mode. The fix parses the templated
+  path through `Decimal` first, then applies the same integer check as the
+  native path. Write paired tests: the same value's native form and string
+  form should assert the same result (cross-reference the "reject-path
+  tests need one case per shape" section of
+  [`skills/strict-review/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/test-conventions.md)).
 
 ## Don't proliferate example Dags — fold into an existing one
 

@@ -357,8 +357,12 @@ Stop 事件沒有可靠的 task ID，因此這條入口不累計跨呼叫的重�
 | 檔案 | 行為 |
 |------|------|
 | `skip-test-verification` | 第一行非空非註解視為原因，整個檢查跳過 |
-| `test-command` | 完全覆寫 test 指令（用 `shlex.split` 解析，支援引號） |
+| `test-command` | 完全覆寫 test 指令（用 `shlex.split` 解析，支援引號；以 argv 執行，無 shell expansion） |
 | `known-test-failures` | 已知失敗名單（一行一個），不擋這些；只擋「新的」失敗 |
+
+`test-command` 是 argv，不是 shell command line——`shlex.split` 之後直接 `subprocess.run`，所以 `&&`、`||`、`|`、`;`、重導向、glob、變數展開全部不生效，它們會變成前一個指令的**參數**。要跑多個 target 就用單一指令帶多路徑（`pytest <path1> <path2>`）；真的需要串接，包成 script 再讓 `test-command` 指向它。
+
+實例（2026-09-17，apache/airflow worktree）：`test-command` 寫成 `uv run --project A pytest <path1> && uv run --project B pytest <path2>`，hook 回報 `unrecognized arguments`、suite 根本沒跑——`&&` 之後整串都成了第一個 pytest 的參數。改用 `uv run --project A pytest <path1> <path2>`（該 monorepo 的兩個 target 共用同一個 workspace venv）後通過。注意 `bash -c "$(< .claude/test-command)"` 這類自我驗證**不會**重現這個失敗，因為那條路徑有 shell；要複現 hook 的行為，得照它的方式 `shlex.split` 再 `subprocess.run`。
 
 這三個檔的查找位置是 **`cwd/.claude/`**，其中 `cwd` 來自 stdin JSON——而該值會跟著 session 的 shell 工作目錄移動，不是固定在 repo 根。在 monorepo 的子目錄工作時（例：`cd airflow-core/src/airflow/ui`），`claude_dir` 變成 `<子目錄>/.claude`；repo 根那三個檔全部靜默失效，`detect_test_command` 也改用子目錄的標記重新偵測。
 

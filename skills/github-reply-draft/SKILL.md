@@ -41,6 +41,11 @@ The user will ask for more, not less — default short.
   the concrete, quantifiable mechanism behind it (a number of seconds, a count, an
   explicit configurable flag). A vague noun reads as hand-waving; a measurable mechanism
   is something a reviewer can actually evaluate and implement.
+- Never close a reply with `Acceptance pending your review.` or any variant of
+  "waiting for your confirmation" — whether to accept is the reviewer's call by
+  definition; writing it out is zero-information filler. State what changed and stop.
+- Never open with `You're right.` or another flattering opener ("good question",
+  "great catch") — start directly with what changed.
 
 **Good:**
 
@@ -97,13 +102,14 @@ Distinguish between:
 
 A thread becoming `outdated` because of an edit is not the same as resolved;
 the reviewer has not clicked Resolve yet. State what changed and what deliberate
-trade-off was made (if any); leave acceptance pending.
+trade-off was made (if any), then stop — whether to accept is the reviewer's
+call, not something the draft narrates.
 
 **Good:**
 
 > Changed `_serialize_keys` to return a `frozenset` (was `list`). Trade-off:
 > callers that relied on ordering will need adjustment — flagging here in case
-> that affects your side. Acceptance pending your review.
+> that affects your side.
 
 **Bad:**
 

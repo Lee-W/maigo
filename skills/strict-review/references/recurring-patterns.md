@@ -467,3 +467,54 @@ code structure; it applies equally to log messages, not only to code comments
 (see the "forward-looking code comments" check in
 [`skills/airflow-aware/references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
 §10.9 for the code-comment counterpart).
+
+## Removing an exclusivity word can leave a bigger absolute claim behind
+
+When fixing an overclaim, deleting an exclusivity/comparison word (`unlike
+every other route here`, `the one that…`, `only X does…`) doesn't
+automatically narrow the claim — that word was often the sentence's *only*
+scope limiter. Once it's gone, the remaining scope noun gets reinterpreted
+according to the document's existing register, and that new, wider scope is
+often false.
+
+How to apply: before deleting any exclusivity/comparison word, ask "what word
+is defining this sentence's scope?" If the answer is that word itself,
+deleting it requires adding an explicit scope anchor back in. Bind to the
+smallest concrete subject (`this route` / `this backend` / `this toolset`),
+not a collective noun that reads as the layer above it (`this provider`,
+`this page`, `the library`). After the rewrite, re-read every other
+occurrence of that scope noun in the same document — a mismatch in register
+is itself a defect. See also the companion pattern below (same review round).
+
+Case: removing `unlike every other route here` left "nothing in this
+provider guarantees…" — but the other four occurrences of `this provider`
+elsewhere in the document all referred to the entire provider package, so
+the sentence now read as "nothing in the entire package guarantees a
+connection will be used," when in fact three routes did guarantee it.
+
+## Splitting a coordinated clause drops the fact that belonged to both halves
+
+When you discover "A and B actually behave differently" and split what used
+to be one coordinated sentence, the easiest thing to lose isn't the newly
+written half — it's the fact that belonged to the **shared subject** and,
+after the split, only travels with one of the two halves. The diff looks
+completely normal, because no line was deleted; the fact simply never got
+copied into the other half.
+
+How to apply: when splitting a coordinated sentence, list every predicate
+that belonged to the shared subject in the original sentence, and confirm it
+appears once for each of A and B in the new structure (or explicitly state
+that it only holds for one). Write "what's the same between the two" first,
+then "where they diverge" — reversing that order tends to produce a
+forward reference with no antecedent. Re-read the whole split passage once
+and ask only: "can the reader tell where the divergence point is?" See also
+the companion pattern above (same review round).
+
+Case: the original sentence said two SQL commands both pass when a certain
+setting is unset. Investigation found the two diverge **after** the setting
+is applied, so the sentence was split to describe that — but only one half
+kept "passes when unset"; the other half's copy of that fact went missing,
+so the reader could no longer tell that the divergence point was "after the
+setting is applied," which was the entire point of the passage. The same
+round also caught a backward reference the split introduced (the antecedent
+didn't appear until the following sentence).

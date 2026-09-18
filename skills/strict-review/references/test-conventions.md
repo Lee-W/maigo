@@ -19,14 +19,27 @@ When delivering new tests, self-check two things before calling it done:
   existing shared helper first (e.g. Airflow's `tests_common.test_utils.db.clear_db_*`)
   rather than writing a fresh `session.execute(delete(...))` per test.
 
-Don't force tests with genuinely different body **structure** (a multi-step sequence,
-a mid-test rollback or state change) into the same parametrize — that turns into a pile
-of `if`/`else` branches, harder to read than separate tests.
+Don't force tests into the same parametrize when any of these three signals is present —
+the judgment call isn't "how many lines would this save" but "does the reader have to
+mentally decode the param table after merging":
+
+- A param field carries a flag that steers **which execution path** runs
+  (`via="call_tool"` vs `"invoke"`), not just a plain input/expected value.
+- The test body needs `if`/`else` to pick a different class or fixture per case.
+- The field count is high enough that the `pytest.param(..., id=...)` needs its own
+  sentence to explain what the case is testing.
+
+Counter-signal that merging is fine: three cases, each four lines, where the variable
+names alone tell the story — the reader never has to look back at the param table.
 
 How to apply: this is a delivery self-check, not something to wait for a reviewer to
-ask for — apply it before handing the tests over. When reviewing, treat "should this
-have been parametrized / had its setup extracted to a fixture" as part of convention
-conformance, not an optional nit.
+ask for — apply it before handing the tests over. When asked to merge tests that hit
+one of the three signals above, write out what the merged version would actually look
+like and read it once yourself first. If it needs a control field or in-body branching,
+report "can merge, but it gets harder to read — recommend keeping these separate" with
+the merged draft attached, rather than silently handing over the parametrized version.
+When reviewing, treat "should this have been parametrized / had its setup extracted to
+a fixture" as part of convention conformance, not an optional nit.
 
 ---
 
@@ -176,6 +189,29 @@ How to apply:
 - Same shape for a `max(floor, x)` / `min(ceil, x)` clamp: a single case
   sitting exactly on the floor does not pin the clamp. Pair `x < floor`
   (clamps to `floor`) with `x >= floor` (passes `x` through).
+
+---
+
+## Reject-path tests need one case per shape, not one representative value
+
+Testing "this kind of input gets rejected" with a single representative value can pass
+for the wrong reason: that value may trip a *different* rejection branch in the
+implementation than the one the test claims to cover. The test goes green, but it isn't
+pinning what its name says it is.
+
+How to apply: first ask "what judgment is the implementation actually rejecting on?",
+then check whether each param case can only reach that judgment — not some other
+rejection path that happens to also fire on that value. A single-parameter generic
+(`list[int]`) and a two-parameter generic (`dict[str, int]`) count as different shapes;
+empty vs. non-empty container, signed vs. unsigned, finite vs. non-finite are each their
+own shape too.
+
+Case: a coercion reduced a type annotation using the **argument count** returned by
+`typing.get_args()`. `dict[str, int]` passed because it has two arguments, not because
+the code actually recognized it as a container — meanwhile `list[int]`, the case that
+would actually misbehave, was never rejected and got silently reduced to its element
+type instead. Switching to `get_origin()` was the real fix. When coverage is uncertain,
+verify with a mutation canary (see the Mutation test section of `strict-review/SKILL.md`).
 
 ---
 
@@ -543,3 +579,21 @@ How to apply during review:
 - A test that only asserts `mock.call_args` on a mocked hook/dependency is
   not behavioral evidence; ask for a real-object substitution or an
   integration path.
+
+---
+
+## A fixture returning the same constant everywhere makes paired-field assertions vacuous
+
+When a field returns the same constant from every fixture, asserting on it in a
+**paired** way (`from`/`to`, `src`/`dst`, before/after) compares the value against
+itself — swapping the two lines in production code that assign them would still pass.
+This kind of assertion looks solid on review (it checks the tag together with the full
+`call_args_list`) but it only proves "this key was emitted," not "the value came from
+the right source."
+
+How to apply: give the fixture an additional kwarg with a default value (existing call
+sites need zero changes), and make only one side of the pair use a distinct value; then
+run a mutation canary (swap the two production-code values) to confirm the test actually
+turns red. When reviewing metric tags, event fields, state-transition fields, or
+source/destination fields, ask first: "are these two values actually different in the
+test?"
