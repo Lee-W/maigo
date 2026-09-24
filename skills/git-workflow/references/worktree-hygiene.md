@@ -36,6 +36,16 @@ A new worktree needs its own per-worktree tooling setup (e.g. a repo-specific
 environment bootstrap script) run once — don't assume it's inherited from the
 main checkout.
 
+This sibling convention applies to worktrees maigo's own delegation flow
+creates for you. It doesn't constrain how you manage worktrees for your own
+day-to-day use of a repo — e.g. a personal worktree manager (such as
+[worktrunk](https://github.com/max-sixty/worktrunk)) keeping a repo's
+worktrees nested inside it (`<repo>/.worktrees/<branch>`, gitignored) is a
+different, unrelated layer. [`/maigo:repo-audit`](https://github.com/Lee-W/maigo/blob/main/commands/repo-audit.md)'s
+merged-worktree cleanup section works off `git worktree list --porcelain`, so
+it catches worktrees in either layout — it isn't scoped to the sibling
+convention.
+
 ## When to open a new worktree for a pre-existing issue
 
 When reviewing or working on a feature branch and a **pre-existing** issue

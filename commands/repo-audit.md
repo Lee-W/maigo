@@ -1,5 +1,5 @@
 ---
-description: repo 自身內部健診（read-only orchestrator 主持）——掃已合併可刪的 branch、未關 PR、TODO/FIXME 積壓、skill 健診（孤兒 / 重疊候選 / 指向失效）、已合併可清的 sibling worktree，彙整成可複製的處置 checklist，不執行任何寫入。🌑 Mortis 一句結算。不 delegate 五人，orchestrator 直跑。
+description: repo 自身內部健診（read-only orchestrator 主持）——掃已合併可刪的 branch、未關 PR、TODO/FIXME 積壓、skill 健診（孤兒 / 重疊候選 / 指向失效）、已合併可清的 worktree（不限佈局），彙整成可複製的處置 checklist，不執行任何寫入。🌑 Mortis 一句結算。不 delegate 五人，orchestrator 直跑。
 allowed-tools: Bash(git branch --merged:*), Bash(gh pr list:*), Bash(grep:*), Bash(git worktree list:*), Bash(gh search prs:*), Read
 ---
 
@@ -72,7 +72,7 @@ orchestrator 讀 `skills/*/SKILL.md`（不開新 agent），三類檢查：
 → **三類都只列出，不合併、不刪除、不改指向**——advisory，判斷與執行留給使用者或後續
 [`/maigo:crystallize`](https://github.com/Lee-W/maigo/blob/main/commands/crystallize.md)。
 
-### E. 已合併可清的 sibling worktree
+### E. 已合併可清的 worktree（不限佈局）
 
 ```bash
 git worktree list --porcelain
@@ -80,12 +80,15 @@ git worktree list --porcelain
 
 列出所有 linked worktree（不能用「目錄名長得像 `<repo>-*`」去猜——`ring` /
 `ring-codex` 是兩個各自獨立的 clone，不是彼此的 worktree，必須用 `git worktree
-list --porcelain` 這種權威來源）。對每個 worktree 的 branch 名，比照 A 段既有的
-「已合併」判斷方法（squash-merge 場景用 `gh search prs` 而非 `git branch
---merged`，見
-[`skills/git-workflow/references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)）
-判斷是否已合併，命中就把 `git worktree remove <path>` + `git branch -D
-<branch>` 加進處置 checklist。
+list --porcelain` 這種權威來源）。這個指令不管實體路徑在哪——不管是 maigo 代理
+任務慣用的 sibling 佈局（`<repo>-<topic>`，見
+[`skills/git-workflow/references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)），
+還是使用者個人用其他工具（如 worktrunk）建立、放在 repo 內部的 `<repo>/.worktrees/`
+之類佈局，只要是這個 repo 的 linked worktree 都會列出來。對每個 worktree 的
+branch 名，比照 A 段既有的「已合併」判斷方法（squash-merge 場景用 `gh search
+prs` 而非 `git branch --merged`，見上述 worktree-hygiene.md）判斷是否已合併，
+命中就把 `git worktree remove <path>` + `git branch -D <branch>` 加進處置
+checklist。
 
 → **列出，不執行。** 這是 repo-audit 既有的「單一 repo、cwd 視角」報告——跟
 Group F 的跨 repo 總索引是不同東西，不在這裡順手加跨 repo 掃描。
@@ -115,7 +118,7 @@ gh pr view <number>
 # 指向失效：<skill>/SKILL.md → `<path>` 不存在
 # → 合併 / 退役 / 修指向，交你或 /maigo:crystallize 判斷
 
-## E. 已合併可清的 sibling worktree
+## E. 已合併可清的 worktree
 git worktree remove <path>
 git branch -D <branch-name>
 ```
