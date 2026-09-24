@@ -17,7 +17,7 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 ```
 /maigo:go <任務描述>
-/maigo:go --worktree <任務描述>   # 在獨立的 sibling worktree 裡跑整趟流程
+/maigo:go --worktree <任務描述>   # 在獨立的 worktree（`<repo>/.worktrees/<topic>`）裡跑整趟流程
 ```
 
 ## 流程
@@ -33,7 +33,9 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 ```bash
 git fetch <remote>
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --repo <name> --topic "<任務描述>"
+root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+git -C "$root" check-ignore -q .worktrees/probe || echo "not ignored — see pre-flight check below"
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --topic "<任務描述>" --cwd "$root"
 git worktree add -b <branch> <path> <remote>/<default-branch>
 ```
 
