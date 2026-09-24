@@ -80,15 +80,14 @@ git worktree list --porcelain
 
 列出所有 linked worktree（不能用「目錄名長得像 `<repo>-*`」去猜——`ring` /
 `ring-codex` 是兩個各自獨立的 clone，不是彼此的 worktree，必須用 `git worktree
-list --porcelain` 這種權威來源）。這個指令不管實體路徑在哪——不管是 maigo 代理
-任務慣用的 sibling 佈局（`<repo>-<topic>`，見
-[`skills/git-workflow/references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)），
-還是使用者個人用其他工具（如 worktrunk）建立、放在 repo 內部的 `<repo>/.worktrees/`
-之類佈局，只要是這個 repo 的 linked worktree 都會列出來。對每個 worktree 的
-branch 名，比照 A 段既有的「已合併」判斷方法（squash-merge 場景用 `gh search
-prs` 而非 `git branch --merged`，見上述 worktree-hygiene.md）判斷是否已合併，
-命中就把 `git worktree remove <path>` + `git branch -D <branch>` 加進處置
-checklist。
+list --porcelain` 這種權威來源）。這個指令不管實體路徑在哪——不論 worktree
+放在 `.worktrees/`（見
+[`skills/git-workflow/references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)）
+或其他位置（例如舊的 sibling 佈局遺留），只要是這個 repo 的 linked worktree
+都會列出來。對每個 worktree 的 branch 名，比照 A 段既有的「已合併」判斷方法
+（squash-merge 場景用 `gh search prs` 而非 `git branch --merged`，見上述
+worktree-hygiene.md）判斷是否已合併，命中就把 `git worktree remove <path>` +
+`git branch -D <branch>` 加進處置 checklist。
 
 → **列出，不執行。** 這是 repo-audit 既有的「單一 repo、cwd 視角」報告——跟
 Group F 的跨 repo 總索引是不同東西，不在這裡順手加跨 repo 掃描。

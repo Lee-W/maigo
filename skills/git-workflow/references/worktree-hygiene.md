@@ -7,44 +7,58 @@ worktree, or when git history looks surprising after a delegated task.
 
 ---
 
-## Worktree layout: sibling of the main checkout, plain branch name
+## Worktree layout: nested under the main worktree, plain branch name
 
-Worktrees live as **siblings of the main checkout**, under the same parent
-directory as the primary clone, named `<repo>-<topic>`, on a branch named
-plainly `<topic>` (no prefix, no issue number) — e.g. a main checkout at
-`<workspaces-root>/<repo>-main` gets a sibling worktree at
-`<workspaces-root>/<repo>-<topic>` on branch `<topic>`.
-
-A harness's built-in "create worktree" tool may default to a nested path
-(e.g. under `.claude/worktrees/`) with a prefixed/decorated branch name (e.g.
-`worktree-<topic>-<issue-number>`) — that default does not match this
-convention and should be corrected:
+Worktrees live **nested inside the main worktree's own directory**, under
+`.worktrees/<topic>`, on a branch named plainly `<topic>` (no prefix, no
+issue number) — e.g. a main worktree at `<root>` gets a new worktree at
+`<root>/.worktrees/<topic>` on branch `<topic>`. `<root>` is the **main
+worktree's root directory** (not just "current directory" — running from a
+linked worktree or a subdirectory would otherwise nest a worktree inside a
+worktree), found via:
 
 ```bash
-git worktree add -b <topic> <workspaces-root>/<repo>-<topic> upstream/main
+git worktree list --porcelain | head -1 | sed 's/^worktree //'
 ```
 
-If the harness already created the nested one, fix it after the fact rather
-than discarding the commit:
+(the porcelain output's first entry is always the main worktree, regardless
+of which worktree the command runs from).
+
+A harness's built-in "create worktree" tool may default to a differently
+decorated branch name (e.g. `worktree-<topic>-<issue-number>`) — that default
+does not match this convention and should be corrected:
 
 ```bash
-git worktree move <nested-path> <workspaces-root>/<repo>-<topic>
-git -C <workspaces-root>/<repo>-<topic> branch -m <old-name> <topic>
+git worktree add -b <topic> <root>/.worktrees/<topic> upstream/main
+```
+
+If the harness already created a differently-named one, fix it after the
+fact rather than discarding the commit:
+
+```bash
+git worktree move <wrong-path> <root>/.worktrees/<topic>
+git -C <root>/.worktrees/<topic> branch -m <old-name> <topic>
 ```
 
 A new worktree needs its own per-worktree tooling setup (e.g. a repo-specific
 environment bootstrap script) run once — don't assume it's inherited from the
 main checkout.
 
-This sibling convention applies to worktrees maigo's own delegation flow
-creates for you. It doesn't constrain how you manage worktrees for your own
-day-to-day use of a repo — e.g. a personal worktree manager (such as
-[worktrunk](https://github.com/max-sixty/worktrunk)) keeping a repo's
-worktrees nested inside it (`<repo>/.worktrees/<branch>`, gitignored) is a
-different, unrelated layer. [`/maigo:repo-audit`](https://github.com/Lee-W/maigo/blob/main/commands/repo-audit.md)'s
+This `<repo>/.worktrees/<topic>` path template is the same shape a personal
+worktree manager (such as [worktrunk](https://github.com/max-sixty/worktrunk))
+uses for a repo's own worktrees, so `wt list` / `wt switch` / `wt remove` can
+manage worktrees maigo's delegation flow creates for you too, without a
+separate mental model. [`/maigo:repo-audit`](https://github.com/Lee-W/maigo/blob/main/commands/repo-audit.md)'s
 merged-worktree cleanup section works off `git worktree list --porcelain`, so
-it catches worktrees in either layout — it isn't scoped to the sibling
-convention.
+it catches worktrees regardless of where they actually live.
+
+The target repo needs `.worktrees/` excluded from git before a worktree is
+created there — via the repo's own `.gitignore`,
+`$(git rev-parse --git-dir)/info/exclude`, or a global `core.excludesfile`
+(any of the three counts; maigo checks with `git check-ignore`, not by
+reading `.gitignore` directly) — see
+[`references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)'s
+pre-flight check for the exact command.
 
 ## When to open a new worktree for a pre-existing issue
 
@@ -89,7 +103,7 @@ not a case for splitting out.
 A batch of changes spanning multiple independent items — multiple provider
 packages (even when unified by one theme, e.g. a docs-correctness pass across
 `openai`/`anthropic`/`common.ai`), or several independent sub-features under
-one umbrella topic — should land as **one branch, one sibling worktree, one
+one umbrella topic — should land as **one branch, one worktree, one
 commit per item**, not a single combined branch.
 
 Why: providers (and independent sub-features generally) release and get
@@ -111,7 +125,7 @@ How to apply:
   dependency is already on the default branch, base the new worktree there
   instead of on the unmerged branch — basing on in-flight work drags unrelated
   review noise into the new PR.
-- Name each split-out worktree/branch per the sibling-layout convention above.
+- Name each split-out worktree/branch per the layout convention above.
   The combined worktree used for central implementation is an intermediate
   artifact — remove it once the split verifies clean.
 - Before calling a split independent, verify each side's tests pass standalone from a clean worktree in both directions — see [`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md)'s "Splitting one working tree into multiple PRs needs a standalone test run per side" section.
@@ -196,9 +210,9 @@ first. When the task is just "check whether a PR merged", prefer querying the
 canonical upstream repo directly rather than a fork under an SSO-enforced org
 that isn't actually needed for that query.
 
-## Shared `.git` across sibling worktrees: stash is a single global stack
+## Shared `.git` across a repo's worktrees: stash is a single global stack
 
-All sibling `<repo>-<topic>` worktrees share the main checkout's `.git`, so
+All of a repo's worktrees share the main checkout's `.git`, so
 `refs/stash` is **one global stack** — two agents stashing/popping
 concurrently in different worktrees can pop and drop each other's WIP. When
 a parallel task needs a "does this fail without the fix" check, use a
@@ -210,7 +224,7 @@ patch`) instead of `git stash`. The read-only verification discipline for
 mechanism (why stash is unsafe at all), and applies beyond review too.
 
 This isn't limited to `refs/stash`: any shared-object-store operation can be
-affected by another session — a sibling worktree's branch has been observed
+affected by another session — another worktree's branch has been observed
 rebased twice by something other than the current session, visible only via
 `git reflog` (unrequested `rebase (start): checkout main` events with no
 stash involved). After any commit in a shared-checkout worktree, confirm the
@@ -221,7 +235,7 @@ self-inflicted just because no stash was involved.
 
 ## Shared `.git` also shares tracking refs: pin the diff base with `merge-base`
 
-Sibling worktrees don't just share `refs/stash` — they share every remote's
+A repo's worktrees don't just share `refs/stash` — they share every remote's
 tracking ref too. A `git fetch` in *any* worktree moves that remote's
 tracking ref (e.g. `upstream/main`) for **all** worktrees immediately; it is
 not a per-worktree snapshot.
@@ -239,7 +253,7 @@ started", don't diff directly against `<remote>/<branch>`. Pin the actual
 divergence point first — `git merge-base HEAD <remote>/<branch>` — and diff
 against that commit instead (or confirm the expected commit count with `git
 rev-list --count HEAD ^<merge-base>`). If a diff against a remote branch
-suddenly contains files you don't recognize, suspect a sibling worktree moved
+suddenly contains files you don't recognize, suspect another worktree moved
 the tracking ref before suspecting your own branch base.
 
 ## Start a task in its own worktree from the outset, and detect peer sessions with `ListAgents` before writing
@@ -250,7 +264,7 @@ awareness — at opposite ends of a task's lifecycle: before starting, and
 before every write.
 
 **Open the worktree before the first tool call, not partway through.** Start
-a new task with `git worktree add <workspaces-root>/<repo>-<topic> -b <topic>
+a new task with `git worktree add <root>/.worktrees/<topic> -b <topic>
 upstream/main` immediately, rather than beginning work on the shared main
 checkout and moving into a worktree only once a collision surfaces. If a task
 is already partway done on the shared checkout when this is noticed, **stay
@@ -364,11 +378,11 @@ Apply one of two orderings instead: finish your own edit and let it settle
 (commit) *before* dispatching the verifier, or wait for the currently-running
 verifier to finish before editing the worktree it's using. Don't interleave.
 
-## Sweep sibling worktrees for stray contamination after parallel dispatch
+## Sweep other worktrees for stray contamination after parallel dispatch
 
 When dispatching several delegated agents in parallel, each assigned its own
-sibling `<repo>-<topic>` worktree (e.g. implementing parallel tracks of the
-same issue), a delegate can write to the **wrong** absolute path — a stray
+worktree (e.g. implementing parallel tracks of the same issue), a delegate
+can write to the **wrong** absolute path — a stray
 `cd`, a copy-pasted path from a different track's prompt — and land its early
 edits in a completely unrelated worktree instead of the one it was told to
 use. That worktree's own commits stay untouched, but its working tree picks
@@ -380,7 +394,7 @@ self-corrects and finishes the real work in the right place. The evidence
 only surfaces by checking the *other* worktrees in play:
 
 ```bash
-for d in <other-sibling-worktrees>; do
+for d in <other-worktrees>; do
   git -C "$d" status --porcelain
 done
 ```

@@ -17,7 +17,7 @@ allowed-tools: Bash(gh issue view:*), Read
 
 ```
 /maigo:take-issue <issue 編號或 URL>
-/maigo:take-issue --worktree <issue 編號或 URL>   # 在獨立的 sibling worktree 裡跑整趟流程
+/maigo:take-issue --worktree <issue 編號或 URL>   # 在獨立的 worktree（`<repo>/.worktrees/<topic>`）裡跑整趟流程
 ```
 
 ## `--worktree`（opt-in，預設不開）
@@ -26,7 +26,9 @@ allowed-tools: Bash(gh issue view:*), Read
 
 ```bash
 git fetch <remote>
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --repo <name> --topic "<issue 標題>"
+root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+git -C "$root" check-ignore -q .worktrees/probe || echo "not ignored — see pre-flight check below"
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --topic "<issue 標題>" --cwd "$root"
 git worktree add -b <branch> <path> <remote>/<default-branch>
 ```
 

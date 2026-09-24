@@ -71,9 +71,9 @@ paths or `-C`-style flags.
 **Exception**: if a human explicitly asks to `cd` somewhere, do it.
 Otherwise default to no-`cd`.
 
-This matters most in multi-worktree setups, where several sibling worktrees
-exist off the same upstream and it's easy to accidentally run a command
-against the wrong one after a `cd`.
+This matters most in multi-worktree setups, where several worktrees off the
+same repo exist at once and it's easy to accidentally run a command against
+the wrong one after a `cd`.
 
 ## Commit assembly (amend vs. new commit vs. which branch)
 
@@ -203,16 +203,17 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 ## Worktree hygiene (references)
 
-Fourteen conventions for worktree lifecycle and git-attribution — sibling-layout
-naming, when to open a separate worktree for a pre-existing issue, deferring
-colliding work, batch cleanup safety, squash-merge-aware "already merged"
-checks, and not over-attributing surprising git state (commits/rebases/wrong
-commit subject) to a rogue agent when it's more likely the user working in
-parallel or an unverified delegate report. Details and recipes in
-`references/worktree-hygiene.md`:
+Fourteen conventions for worktree lifecycle and git-attribution — worktree
+layout naming, when to open a separate worktree for a pre-existing issue,
+deferring colliding work, batch cleanup safety, squash-merge-aware "already
+merged" checks, and not over-attributing surprising git state
+(commits/rebases/wrong commit subject) to a rogue agent when it's more likely
+the user working in parallel or an unverified delegate report. Details and
+recipes in `references/worktree-hygiene.md`:
 
-- **Sibling layout** — worktrees live as siblings of the main checkout
-  (`<repo>-<topic>`, branch `<topic>`), not nested under a tool's default path.
+- **Worktree layout** — worktrees live nested under the main worktree's own
+  `.worktrees/<topic>` (branch `<topic>`), matching the same path template a
+  personal worktree manager (e.g. worktrunk) already uses for the repo.
 - **Start a task in its own worktree from the outset, not midway** — a
   mid-task switch costs more than staying (untracked files don't follow a
   branch switch, running agents get interrupted); correct on the *next* task.
@@ -242,7 +243,7 @@ when git history looks surprising after a delegated task.
 ### Worktree automation (`--worktree` flag)
 
 How `/maigo:go` / `/maigo:take-issue`'s opt-in `--worktree` flag actually opens
-a sibling worktree, and where `.maigo/` artifacts written during that task
+a nested worktree, and where `.maigo/` artifacts written during that task
 belong (per-task artifacts vs. the Work Board, which only ever lives in the
 main checkout). Details in
 [`references/worktree-automation.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md).

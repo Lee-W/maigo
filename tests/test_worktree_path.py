@@ -1,4 +1,4 @@
-"""Tests for scripts.worktree_path — sibling worktree path + branch name computation."""
+"""Tests for scripts.worktree_path — nested worktree path + branch name computation."""
 
 from __future__ import annotations
 
@@ -11,30 +11,28 @@ class TestSlugReuse:
     """跟 tests/test_artifact_path.py 的 TestSlugify 同幾個案例，確認同一份正則邏輯。"""
 
     def test_lowercases_and_replaces_invalid_chars(self, tmp_path: Path):
-        location = wp.compute_worktree_location(
-            "maigo", "Fix/DAG Run_Stall!!", cwd=tmp_path
-        )
+        location = wp.compute_worktree_location("Fix/DAG Run_Stall!!", cwd=tmp_path)
         assert location.branch == "fix-dag-run_stall"
 
     def test_cjk_only_topic_falls_back_to_unnamed(self, tmp_path: Path):
-        location = wp.compute_worktree_location("maigo", "繁體中文字", cwd=tmp_path)
+        location = wp.compute_worktree_location("繁體中文字", cwd=tmp_path)
         assert location.branch == "unnamed"
 
     def test_empty_topic_falls_back_to_unnamed(self, tmp_path: Path):
-        location = wp.compute_worktree_location("maigo", "", cwd=tmp_path)
+        location = wp.compute_worktree_location("", cwd=tmp_path)
         assert location.branch == "unnamed"
 
 
 class TestPathComposition:
-    def test_path_is_sibling_of_cwd_named_repo_hyphen_slug(self, tmp_path: Path):
+    def test_path_is_nested_under_cwd_dot_worktrees(self, tmp_path: Path):
         checkout = tmp_path / "workspaces" / "maigo"
         checkout.mkdir(parents=True)
 
-        location = wp.compute_worktree_location(
-            "maigo", "Fix DAG run stall", cwd=checkout
-        )
+        location = wp.compute_worktree_location("Fix DAG run stall", cwd=checkout)
 
-        assert location.path == str(tmp_path / "workspaces" / "maigo-fix-dag-run-stall")
+        assert location.path == str(
+            checkout.resolve() / ".worktrees" / "fix-dag-run-stall"
+        )
         assert location.branch == "fix-dag-run-stall"
 
     def test_path_does_not_hardcode_any_fixed_root(self, tmp_path: Path):
@@ -43,14 +41,12 @@ class TestPathComposition:
         checkout_b = tmp_path / "elsewhere" / "deep" / "maigo"
         checkout_b.mkdir(parents=True)
 
-        location_a = wp.compute_worktree_location("maigo", "x", cwd=checkout_a)
-        location_b = wp.compute_worktree_location("maigo", "x", cwd=checkout_b)
+        location_a = wp.compute_worktree_location("x", cwd=checkout_a)
+        location_b = wp.compute_worktree_location("x", cwd=checkout_b)
 
-        assert location_a.path == str(tmp_path / "somewhere" / "maigo-x")
-        assert location_b.path == str(tmp_path / "elsewhere" / "deep" / "maigo-x")
+        assert Path(location_a.path).parent == checkout_a.resolve() / ".worktrees"
+        assert Path(location_b.path).parent == checkout_b.resolve() / ".worktrees"
         assert location_a.path != location_b.path
-        assert "worktrees" not in location_a.path
-        assert "worktrees" not in location_b.path
 
 
 class TestCli:
@@ -58,14 +54,12 @@ class TestCli:
         checkout = tmp_path / "maigo"
         checkout.mkdir()
 
-        exit_code = wp.main(
-            ["--repo", "maigo", "--topic", "Fix DAG run stall", "--cwd", str(checkout)]
-        )
+        exit_code = wp.main(["--topic", "Fix DAG run stall", "--cwd", str(checkout)])
 
         captured = capsys.readouterr()
         assert exit_code == 0
         assert (
             captured.out.splitlines()[0]
-            == f"path: {tmp_path / 'maigo-fix-dag-run-stall'}"
+            == f"path: {checkout.resolve() / '.worktrees' / 'fix-dag-run-stall'}"
         )
         assert captured.out.splitlines()[1] == "branch: fix-dag-run-stall"

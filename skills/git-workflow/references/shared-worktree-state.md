@@ -86,7 +86,7 @@ diff /tmp/local.diff /tmp/remote.diff && echo "IDENTICAL — safe to reset"
 ```
 
 Confirm the working tree is clean (`git status --porcelain` empty — never
-`stash` to clear it; the stash is a shared global stack across sibling
+`stash` to clear it; the stash is a shared global stack across the repo's
 worktrees, see `references/worktree-hygiene.md`), and print the SHA being left
 behind (`git rev-parse HEAD`) so it stays recoverable from the output as well
 as the reflog. Re-verify after handing back — the same branch can be rebased
