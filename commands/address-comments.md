@@ -72,6 +72,13 @@ inline comment 的 `url` 已由上方 Inline review threads 的 GraphQL query �
 「現在錨定那一行的實際內容」自己 diff 一次——**不要從建議的最終狀態反推意圖**：同一段最終文字
 可能對應完全不同的改動（例如表面像 rename，實際 diff 是拿掉一個沒用到的參數）。
 
+**「已處理」還要問修正在不在 PR 上**：本機 HEAD 符合意見字面，只證明本機改好了，reviewer 看的是
+pushed head。判進 `已處理` 的條目，先比對 `gh pr view --json headRefOid` 與 `git rev-parse HEAD`：
+相同就過；不同時用 `git range-diff <pushed>~N..<pushed> HEAD~N..HEAD`（N ＝ branch 上的 commit 數）
+確認處理該意見的 patch 在 pushed head 上也有（`=` 或內容等價）——本機只是 rebase 過、base 不同，
+兩個 SHA 就會不同，SHA 不同本身不代表沒 push。只在本機的，標成 `已處理（未 push）`，Finale 的回覆
+草稿要附一句「先 push 再貼」，否則回覆會對 reviewer 宣稱一個他看不到的修正。
+
 **reviewer 點名的 `file:line` 是他觀察到症狀的位置，不必然是唯一的修法位置**：上一段驗的是
 「這條意見**還有效嗎**」，這段驗的是「改那一處**就夠了嗎**」——兩者都做對，仍可能只修一半。
 若某條意見描述的是**使用者可見行為**（搜尋、篩選、排序、顯示），先枚舉該行為在系統裡有幾個
@@ -107,6 +114,9 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 提醒：不是每條都要改 code——像 C3 那種純提問可能只需回覆、不需改動。使用者挑完才往下。
 使用者一條都沒挑 → 印「沒有要處理的意見」並正常結束。
+選中的全屬 `已處理`（且修正已在 pushed head 上）、只需要回覆 → 沒有 work item，**跳過步驟 4–5**
+（不寫 triage 檔、不問路由與 commit 格式），直接進步驟 6 產回覆草稿與 PR 描述核對；步驟 7 照常，
+步驟 8 的 board 狀態留 `有新 comment`，細節檔 `## 判斷` 區寫「回覆還沒送」。
 
 ### 4. 寫 triage + 提路由計畫，確認
 

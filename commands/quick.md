@@ -69,6 +69,21 @@ python3 <maigo-root>/scripts/verify_task.py --cwd <project-cwd>
 後兩者只能依使用者**已授權**的例外政策收尾；沒有對應授權時回報待決定，不能自行把狀態改成 `passed`。
 若另需 lint、type check 或人工驗證，照 target repo 要求補跑；CLI 的 `passed` 只證明該次 command 成功。
 
+**work item 是 docs／docstring-only 時，`passed` 幾乎沒有區辨力——必須另跑 target repo 的 docs
+build，而且這一步只有 orchestrator 做得到。** 兩個原因疊在一起：(1) `verify_task.py` 跑的是該
+repo 的測試指令，而文件錯字、壞掉的 cross-reference、渲染失敗都不在測試覆蓋範圍內，測試全綠與
+這次改動無關；(2) 🟡 爽世的唯讀紀律禁止她跑會寫入工作區的指令，而 docs build 會寫 build 產物
+目錄——所以 docs 類缺陷**結構上**拓不到 reviewer 那一關，不是她漏了。
+
+照做：docs 類 work item 的步驟 3 除了 `verify_task.py`，另跑該 repo 的 docs build 與拼字檢查
+（指令名各 repo 不同，讀 target repo 的 AGENTS.md / CLAUDE.md，不要憑印象填），並以**渲染後的
+輸出**覆核新寫的句子與 cross-reference 真的存在——在原始檔 grep 不算，`:ref:` 解析失敗只有 build
+看得見。爽世 APPROVE 不構成跳過這一步的理由。
+
+實例（2026-09-19，apache/airflow）：一個單一 bullet 的文件修正，爽世第二輪 APPROVE 無 must-fix、
+`verify_task.py` 回 `passed`（313 tests exit 0），接著 orchestrator 跑拼字檢查 exit 1——一個動名詞
+不在該 repo 的字典裡。測試與 review 都不可能抓到它。
+
 沒有 subagents 時，由主 agent 依 🎀 愛音 → 🟡 爽世的順序執行，明示共用 context；
 有 fresh context 能力時優先用獨立審查。可以只使用同一個模型，無須有商用升級檔位。
 沒有 hooks 時，這是命令要求的顯式檢查，不能宣稱宿主已機器強制。

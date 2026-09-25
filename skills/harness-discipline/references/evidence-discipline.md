@@ -536,3 +536,23 @@ constructed」後，eager gate 只認 `isinstance(value, (bool, float, int))`，
 `Decimal("10.5")` / `Fraction(21, 2)` 仍是建構期通過、execute 才炸——新措辭對它們依舊是
 假話，最後要收窄成「A literal `bool`, `float`, or `int` …；any other non-string literal
 … only when the task executes」才成立。
+
+## 21. 缺席宣告靠索引頁／清單頁不算數，要逐項直查權威來源
+
+subagent 回報「查不到 / 不存在 / 從未建立」時，先看它的依據是不是**索引頁、清單頁或
+目錄式列表**。那種來源常有缺口，缺席不構成證據。
+
+**案例**：一隻 agent 查某個編號的 AIP 時宣告「不存在，建議拿掉引用」，依據是 wiki 的
+AIP 索引頁列到 108 就跳到 111、116、117；改用該 wiki 的 content-search API 按編號逐一
+查詢後，112、113、114、115 全都在——包含使用者實際要問的那個編號。另一隻 agent 回報
+某 provider 的 decorator 名稱是 `@llm_task`／`@agent_task`；provider 自己 registry
+檔案裡登記的使用者可見名稱其實是 `llm`／`agent`（即 `@task.llm`／`@task.agent`）——
+被拿來否決的原始說法（人類自己講的）反而是對的。
+
+**具體做法**：缺席宣告要**逐項直查權威來源**——查 wiki 用 content-search API 按確切
+編號查，不要讀索引頁；查 provider 的使用者可見名稱讀 registry 檔案的正式欄位，不要讀
+衍生的實作函式名；查單一資源用該資源自己的 API endpoint，不要讀清單式 endpoint。任何
+本質上是**間接**代理的東西——索引頁、`installed_plugins.json` 的版本號、cache 目錄的
+檔案清單、`git log -- <file>` 的檔案層級清單——都不能拿來證明「不存在」。
+
+相關：本檔第 12、13 節，同樣是「subagent 的證據經不起直接複核」的其他形狀。

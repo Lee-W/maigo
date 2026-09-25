@@ -206,8 +206,10 @@ lazy, plain name over alias, shadowing-parameter rename), class-docstring
 user-facing docstring wording, naming/constant conventions, raise-vs-document
 validation posture, dropping manually-enumerated invariants once a check
 enforces them, mypy `Optional` narrowing via branch restructure, new prek
-hook script conventions, and the "no `logical_date` in Airflow 3 examples"
-authoring rule, read `references/code-style.md`.
+hook script conventions, verifying a core/task-sdk symbol exists at the
+provider's declared version floor before adopting it, and the "no
+`logical_date` in Airflow 3 examples" authoring rule, read
+`references/code-style.md`.
 
 - **No `assert` in production code** — use a real exception (e.g., `ValueError`, `RuntimeError`).
 - **Do not add new `raise AirflowException`** — use a more specific exception class instead.
@@ -463,6 +465,11 @@ beats per-endpoint pedantic accuracy.
   generic count or umbrella ("Two styles of X" teaches nothing — name the
   styles). Keep internal-component words (e.g. "scheduler") out of
   user-facing prose; phrase from the Dag author's observable perspective.
+- **A list already owned by another section defers to it, not a partial
+  copy with a "not exhaustive" disclaimer** — the one exception is an item
+  the page already set up a forward reference to. Full criterion and case
+  study in
+  [`references/docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md).
 - **`providers/<x>/docs/index.rst` has a hand-written prologue followed by an
   auto-generated block** (marked by an "AUTOMATICALLY GENERATED" comment)
   that gets overwritten at release time. Reordering/placement feedback on

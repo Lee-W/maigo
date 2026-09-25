@@ -196,6 +196,21 @@ post-mutation 的小表；對每一支在 mutation 下仍是綠的測試，追�
 常數／固定值），不能用同一次 mutation 的結果覆蓋兩層——呼叫端的預設值可能與斷言值巧合相同
 （例如寫死 `1` 剛好等於預設 `1`），必須改用非預設值才能讓兩條路徑分岔。
 
+**重構搬動守門邏輯時，canary 要打在新位置，不是這次 diff 動過的行。** 某個 default／
+守門判斷若同一輪被搬進另一個函式，canary 打在舊位置只會讓不相關的斷言變紅——看起來像
+驗過了，但被證明的性質其實還是沒被測到。判準：canary 的落點由「被證明的性質現在住在
+哪一行」決定，不是由「這次 diff 改了哪些行」決定。對同一個守門點打兩種變異（換值、拿掉
+保護）能分別證明「接住的值是什麼」與「缺值會不會被接住」兩件不同的事，兩者紅的支數落差
+本身就是覆蓋率的證據。
+
+**Fixture liveness：production 改呼叫另一個 callable 時，patch 舊 callable 的 fixture
+會靜默死掉，測試仍全綠。** 測試綠只證明斷言成立，不證明斷言仍由測試控制的那條路徑
+產生——fixture 死掉之後，那些測試在測真實實作，不是在測宣稱要測的 dispatch。要求：把
+受影響 fixture 的 stub 改成無條件 `raise AssertionError`，重跑該 fixture 服務的整批
+測試，**紅的支數必須 > 0**；0 支紅代表這個 patch 已經是死碼、測試對它零控制。修好
+（讓 patch 指向真正被呼叫的 callable）之後再跑一次同一個 canary，確認這次真的轉紅。
+classmethod 與 instance method 是不同的 callable，patch 一個攔不到另一個即使同名。
+
 ## Adapting per context
 
 | Context | Adaptation |
@@ -263,7 +278,7 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag (references)
 
-Twenty-three principles for calibrating whether a finding is a real must-fix
+Twenty-six principles for calibrating whether a finding is a real must-fix
 and how much change a comment warrants; details in
 `references/review-judgment.md`:
 
@@ -289,6 +304,9 @@ and how much change a comment warrants; details in
 - **Trace the introducing commit before reverting a shared signature** — a type error at a changed signature's use site is usually an incomplete rollout, not a wrong change.
 - **Trace the reconciliation/self-heal loop fully before characterizing a bug's severity** — a mismatch that self-corrects within one cleanup cycle is not the same severity as one that repeats forever; find the actual consumer/cleanup loop before writing the severity language.
 - **Don't trust review-thread `isResolved` in either direction** — a resolved thread can be an empty self-resolve, an open thread can already be fixed; read the thread then verify against code before drawing either conclusion.
+- **Re-review a rewritten claim by checking the carried-over clause, not the one you rewrote** — the clause reused verbatim from the flagged sentence gets no fresh scrutiny and is just as likely to still be wrong.
+- **A reviewer's diagnosis being right doesn't make their proposed wording right** — verify the defect and the reviewer's replacement separately; rebuild the replacement from source before adopting it.
+- **A reviewer's stated success criterion outranks nit severity** — a finding pointing at an unmet criterion the reviewer explicitly stated ("byte-identical", "no behaviour change") is must-fix even if the practical impact looks small.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

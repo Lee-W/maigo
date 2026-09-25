@@ -102,16 +102,30 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ### 4.5 裁決 gate（有 Soyo findings 才觸發）
 
-report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表態：
+report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表態。選項依「PR 作者是不是使用者本人」分流
+（GitHub PR 比對 `gh pr view --json author` 與 `gh api user`；本地 branch / commit range 視為自己的變更）：
+
+**自己的變更**——要決定的是「這次修不修」：
 
 - `採納`——這次修，不寫記憶
 - `駁回（一般）`——這次跳過，不寫記憶
 - `標記本 repo 不適用 + 理由`——導向 Soyo 的即時 propose（依 `agents/Soyo.md` 寫「本 repo 不適用 X 因為 Y」、type:project、input-not-waiver entry）
 
-**只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；`採納` / `駁回（一般）` 不寫任何記憶。
+**別人的 PR**——使用者是 reviewer，不修 code；要決定的是「送出的 review 裡放什麼」：
+
+- `放進 review`——照 Soyo 的嚴重度送（must-fix → request changes 的理由；nit → 建議）
+- `降成建議`——must-fix 改以非阻擋的建議送出
+- `不提`——不寫進 review，不寫記憶
+- `標記本 repo 不適用 + 理由`——同上，導向 Soyo propose
+
+選完後 orchestrator 依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
+起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號），落檔 `.maigo/review-draft-<id>.md`
+（`<id>` 與同次 `review-<id>.md` 相同），並寫進 board 細節檔的 `## 筆記`。只起草、不送出。
+
+**只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
 **gate 不 block report、不改 verdict**——report 出完後純收集意願，不影響 Soyo 的 APPROVE / REQUEST_CHANGES / BLOCKED 結論。
-使用者沉默 / 全採納 / Soyo 無任何 finding（must-fix 與 nit 皆空，即 APPROVED 且無 suggest）→ 無聲略過整個 gate；APPROVED 但有 nit 仍觸發 gate（nit 非空）。
+使用者沉默 / 全採納（外部 PR 為全「放進 review」，仍照常起草） / Soyo 無任何 finding（must-fix 與 nit 皆空，即 APPROVED 且無 suggest）→ 無聲略過整個 gate；APPROVED 但有 nit 仍觸發 gate（nit 非空）。
 
 **無次數驅動收斂**：orchestrator 不追蹤「某條 finding 被駁回幾次」、不自動 soften；
 依 [`docs/skills/strict-review`](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md) 的「user previously accepted X is not evidence」——純駁回記錄不影響下次 review 標準。

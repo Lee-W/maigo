@@ -1,6 +1,6 @@
 # Strict Review — Review Judgment Principles (Extended)
 
-Loaded on demand by `skills/strict-review/SKILL.md` — **twenty-one principles for when
+Loaded on demand by `skills/strict-review/SKILL.md` — **twenty-nine principles for when
 NOT to flag, how to calibrate response size to comment weight, and how to verify
 a claim before escalating or reverting it**.
 Read this file when you are deciding whether a finding is a real must-fix or a
@@ -653,6 +653,74 @@ phrase describing a timeout in both a changelog entry and a commit message;
 the user overruled that ("this PR just introduced it, didn't it?").
 
 ---
+
+## §27. Re-review a rewritten claim: check the carried-over clause, not the one you rewrote
+
+When a reviewer flags multiple false clauses in one sentence and you write a corrected
+version, attention concentrates on what you rewrote. **The clause carried over verbatim
+from the original is at least as likely to still be wrong** — it reads smoothly, so it
+never triggers a fresh check.
+
+Case: apache/airflow #72786 — a review flagged three inaccurate clauses in a metric's
+description. The rewrite fixed two but reused a third verbatim ("emitted whether the
+toolset stands alone or is a member of a failover group"), which was itself wrong — a
+group member never emits that counter directly; the group only calls
+`member.invoke()`. Only cross-checking the rewrite against the reviewer's original
+three points caught it.
+
+How to apply: split the flagged sentence into clauses, mark each "changed" /
+"carried over" *before* submitting the rewrite, and re-verify every carried-over
+clause against the source of truth (the actual code, not "does it read plausibly") —
+the same standard applied to the newly-written half.
+
+## §28. A reviewer's diagnosis being right doesn't make their proposed wording right
+
+A reviewer who flags a sentence as wrong usually also supplies what they consider the
+correct version. **The defect existing and the reviewer's replacement being fully
+accurate are two different claims** — the reviewer read from a diff fragment, not
+necessarily every shape the code can produce. Adopting the replacement verbatim can fix
+one inaccuracy while introducing a second, harder to challenge later because it now
+carries the reviewer's authority.
+
+Case: apache/airflow #72786 — a reviewer correctly flagged a guide's blanket claim
+("`unknown` is never the identity-resolution-failure bucket") as unqualified, and
+proposed "for `served`/`failover`, `unknown` *is* that bucket." Rebuilding the fact
+from source showed the bucket actually covers two distinct causes that a shared helper
+collapses into the same sentinel, and one of those causes leaves the log with **no**
+accompanying warning at all — the reviewer's replacement implied a warning would
+always be present, which doesn't hold.
+
+How to apply: verify the flagged defect and the proposed replacement **separately** —
+the defect against the reviewer's own evidence, the replacement by rebuilding the fact
+from source (a truth table crossing every failure shape against every affected object
+surfaces what the reviewer's sentence missed). When the rebuilt version differs from
+what the reviewer proposed, say so explicitly in the reply — name where it diverges and
+why — rather than silently landing your own version.
+
+## §29. A reviewer's stated success criterion outranks nit severity
+
+A reviewer proposing a fix often states, in passing, what "done" looks like for it —
+"builds a byte-identical dict," "same semantics," "no behaviour change." That sentence
+is not color commentary; it is the acceptance criterion for that fix.
+
+When a later finding shows that stated criterion was not actually met, **it is not a
+nit** — regardless of whether whoever raises it labels it one, has verified the current
+output is unaffected, or the practical impact is small. The grading axis is not "does
+this break anything right now" but "did this satisfy what the reviewer explicitly asked
+for" — on the next round the reviewer checks against their own stated bar, and the gap
+resurfaces.
+
+Case: apache/airflow #71477 — a reviewer asked to replace a per-file `git show` loop
+with a single batched `git cat-file --batch` call, explicitly describing the goal as
+building "a byte-identical dict." The replacement changed the membership test from a
+falsy-content check to a key-existence check, so an empty file now produced an extra
+`relative: ""` entry the original never had. An internal review labeled this a nit
+because it had no visible effect on the final rendered output; it was elevated to
+must-fix because the reviewer's own stated bar ("byte-identical") was not met,
+independent of downstream effect.
+
+The reverse holds too: where a reviewer states no explicit success criterion, a nit
+raised by whoever reviews the fix really is just a nit, and can be left for judgment.
 
 ## See also: parallel batch review safety
 

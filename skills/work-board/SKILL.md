@@ -230,6 +230,24 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 讀到舊版任何 section 標題（球權三分區時代的四個舊標題）時同樣吃得進來：取 checkbox /
 `🧠` / 狀態詞後，整檔以新骨架（三個 section）重寫，不做逐行 in-place 遷移。
 
+**但整檔重寫與 §3 的「禁止整份 `Write`」會直接對撞——併發安全優先。** 舊格式遷移必然是
+整檔重寫，而 board 是跨 session 共用、不帶任務識別碼、且 `.maigo/` 被 gitignore（輾掉沒有
+版本可救）。所以誰能做整檔正規化是分工，不是隨手做的事：
+
+- **`/maigo:board` 的完整刷新**才做整檔正規化——它本來就要重算每一行，是唯一有理由持有整檔的
+  寫入者。
+- **五個 delegate 命令的收尾 upsert**（review / triage-issue / take-issue / describe-pr /
+  address-comments）遇到舊格式時，**只 `Edit` 自己那一行，並沿用該檔當下的舊行文法**，把正規化
+  留給下一次 `/maigo:board`。**不要把一行新格式混進舊格式檔**——那會讓檔案同時有兩種文法，比
+  整檔仍是舊格式更難解析。寫完在回覆裡告訴使用者「board 仍是舊格式，正規化留給
+  `/maigo:board`」，不要靜默略過。
+- 整檔重寫前先確認沒有其他 session 正在寫（`ListAgents`；同一台機器多個 worktree 各跑一個
+  session 時，它們共用這一份 board）。不確定就當作有。
+
+實例（2026-09-19）：一次 `address-comments` 收尾對舊格式 board 只 `Edit` 了自己那一行；同一份
+board 在那之後又被別的 session 加了一項、改了另一項、計數從 🎯 7 變 8——若當時照「整檔重寫」
+辦，那兩筆會被安靜輾掉。
+
 ### 排序
 
 - 🎯 區：**rank 升序 → 同 rank 內 `updatedAt` 升序**——排名先分先後，同一級內最久沒動的
@@ -324,6 +342,9 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 （**保留原 checkbox 與 🧠 狀態**），不存在→append 到對應 section；board 檔不存在就先建骨架。
 **整行替換時，對應細節檔（`.maigo/i/<slug>.md`）必須跟著整份重寫，不可只改索引行漏改
 細節檔**——索引行與細節檔是同一次寫回的兩個產物，不允許其中一個落後。
+**例外：board 還是舊格式時這條無從執行**——舊行文法把 URL / 規模 / 產物路徑都內嵌在索引行裡，
+`.maigo/i/` 整個目錄不存在。此時只更新索引行，不要為單一項目憑空生一份細節檔（那會讓同一份
+board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔正規化時一次建齊，見 §2 向下相容段。
 
 **併發寫回（board 是跨 session 共用的單一檔，不帶任務識別碼，所以要靠寫法自保）**：
 

@@ -2,7 +2,7 @@
 name: Tomori
 description: 把混亂的需求與探索結果，結構化成可執行的步驟計畫。用 `scripts/artifact_path.py` 取得路徑寫入 `.maigo/plan-<id>.md`。**不寫實作 code**。
 model: opus
-tools: [Read, Write, Glob, Grep]
+tools: [Read, Write, Edit, Glob, Grep]
 ---
 
 <!-- mkdocs-include-start -->
@@ -27,6 +27,8 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 | `/maigo:review` | review rubric | `.maigo/review-rubric-<id>.md`（同上） |
 | `/maigo:describe-pr` | PR title + description 草稿 | （不寫檔，直接回 orchestrator） |
 | `/maigo:triage-issue` | 每條 issue 的 triage rubric | `.maigo/triage-rubric-<id>.md`（每條 issue 各自一份，同上） |
+
+**已存在的產物檔一律用 `Edit` 追加，不要整份 `Write` 重寫。** 典型情境是 review rubric 檔：開頭已有 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 寫好的 `<!-- pr-context-cache:start v1 -->` … `<!-- pr-context-cache:end -->` 段，而且可能有上千行。rubric 要用 `Edit` 接在 end marker 之後（`old_string` 取 end marker 那一行）。整份讀出再寫回，會把長檔案抄錯，cache 的 diff sha 也會跟著失真。`Write` 只用在檔案還不存在的時候。
 
 下面「你會做的事 / 輸出格式」講的是預設**實作計畫**模式。其他模式：
 

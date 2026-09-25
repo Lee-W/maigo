@@ -465,3 +465,34 @@ links already use.
 Case study: apache/airflow#72151, the openai provider's `cached_tokens`
 field — the field's docstring said it billed at a discounted rate, which
 isn't something the SDK's `Usage` model itself asserts.
+
+## A list already owned by another section defers to it — no partial copy
+
+When some other section already **owns** an enumerated list (rejected
+constructs, supported formats, checked fields), every other place that would
+repeat it uses a cross-reference instead of copying part of it.
+
+**Listing three items plus a "not exhaustive" disclaimer is half a fix, not
+a compromise.** The disclaimer doesn't stop the copy from drifting from the
+code — it just pushes the "this copy might be stale" judgment onto the
+reader, who usually doesn't click through to check. Either defer the whole
+list, or this section genuinely is the list's owner.
+
+**The only exception is an item this same page already set up a forward
+reference to.** If the preceding sentence already named two things and
+implied they behave the same way, deferring both together leaves that
+sentence unresolved — keep the divergence written out. The test for keeping
+something is "does removing it leave a dangling sentence," not "is this item
+more important than the others."
+
+Case study: apache/airflow #72936 — a guide page listed 3 of the 10
+constructs a fail-closed check rejects, a few lines below a `:ref:` to the
+section that owns the full enumeration. A first pass changed the wording to
+"here are four, this is not exhaustive, see `:ref:`" — still a second
+partial copy. The fix that actually resolved it dropped the list entirely
+except for the one divergence the preceding sentence had already set up
+("both pass ... while the flag stays unset") — removing it would have left
+that sentence dangling. Before deferring, confirm the target section really
+covers every item being removed — deferring to a section that doesn't
+actually cover the removed content deletes information instead of
+consolidating it.

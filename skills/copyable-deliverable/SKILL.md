@@ -13,6 +13,7 @@ description: This skill should be used whenever a maigo command produces a deliv
 [`/maigo:review`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)、
 [`/maigo:triage-issue`](https://github.com/Lee-W/maigo/blob/main/commands/triage-issue.md)、
 [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)、
+[`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)、
 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md)、
 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)
 
@@ -58,6 +59,30 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 
 deliverable 數量多時，每筆前面給一行標題與來源連結（哪條 comment / 哪個檔），
 讓使用者能對照著逐筆處理；標題與連結放在 fenced block **外面**，block 內只留純內文。
+
+## 多區塊交付物預設寫成檔案，不要印在對話裡
+
+判準是**用途**，不是長度：一份輸出若目的是被複製到別處（GitHub thread、PR body、
+email、另一個 repo），且含多個區塊（多則回覆草稿、報告、對照表），**預設寫成一個
+檔案**，對話裡只留結論、路徑、以及它包含哪幾節。終端 scrollback 的多段 fenced block
+要逐段選取複製，長段落還會被換行破壞；對話一旦被壓縮，只印在對話裡的內容就沒了，
+檔案不會。
+
+一次看完就算數的（結論、verdict、一段建議）→ 直接講，不要為了寫檔而寫檔。
+
+落檔位置照 target repo 的成文慣例：
+
+- 一般外部 repo（例如 apache/airflow）：走該 repo 自己的 output convention（例：
+  `files/`，已 gitignore）。
+- **maigo 流程自己的草稿**（`/maigo:review` 等命令產生、要貼到 GitHub 的 review
+  草稿等）：放 `.maigo/`，命名比照同一次任務的產物（例：
+  [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
+  §4.5 的 `.maigo/review-draft-<id>.md`），不要落到目標 repo 自己的 output
+  convention——maigo 的產物本來就集中在 `.maigo/`（review、rubric、board、`i/`
+  細節檔），同時把新產物的路徑記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
+- 沒有成文慣例的情境用 scratchpad。
+
+對話裡給：檔案路徑、它包含哪幾節、以及**最該先看的那一節是哪一節**。
 
 ## Why
 

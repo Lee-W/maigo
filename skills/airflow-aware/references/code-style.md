@@ -155,6 +155,48 @@ use newsfragments). If it has already released, treat the removal as a
 breaking change instead. When moving the code, carry over every `why` from
 the original docstring to its new home — don't leave bare logic behind.
 
+### Adopting a core/task-sdk symbol: verify it exists at the provider's declared floor
+
+A provider must support the **oldest** core version declared in its own
+`pyproject.toml`. Before adopting any core or task-sdk symbol —
+**especially one a reviewer suggests** — verify it exists at that floor
+version; otherwise it raises `AttributeError`/`ImportError` only when a user
+runs the provider against an old core, with an error far removed from the
+actual cause. Local tests don't catch this (the local environment has the
+newer core installed).
+
+Three checks, all required:
+
+1. `git log -S '<symbol>' --oneline -- <path>` — find the commit that
+   introduced it.
+2. `git tag --contains <commit> | sort -V | head` — find its earliest tag.
+   **Insufficient alone** — the earliest tag can be a pre-release like
+   `3.3.0b1`.
+3. `git show <floor-tag>:<path> | grep '<symbol>'` — confirm presence or
+   absence **at the actual floor tag**.
+
+Read the floor from the provider's own `pyproject.toml` (e.g.
+`apache-airflow>=3.0.0`) — don't assume a provider tracks the same version
+as core.
+
+A reviewer suggesting a symbol read source on `main`; that doesn't mean the
+floor has it. If the floor genuinely lacks it and the capability is worth
+the cost, gate behind an existing version-compat flag pattern (e.g.
+`providers/common/compat/.../version_compat.py`'s `AIRFLOW_V_3_3_PLUS`) —
+but ask whether the version branch is worth it before defaulting to the
+reviewer's literal suggestion. A second signal worth flagging on its own:
+adopting an underscore-private cross-package symbol (a provider reaching
+into task-sdk's `_foo`) swaps one private dependency for another even when
+the version check passes — if the original motivation was avoiding a hook's
+private members, reaching into a class's own private cache is usually
+cleaner than reaching into another package's private internals.
+
+Case: apache/airflow #72156 — a reviewer suggested `_preset_connections`;
+`git log -S` traced it to a commit first tagged at `3.3.0b1`, and
+`git show` against `3.1.0`/`3.2.0` confirmed it absent — but the provider's
+floor was `apache-airflow>=3.0.0`. The fix seeded the hook's own cache
+instead, which cut the same query count without a version gate.
+
 ## Validation and enforcement
 
 ### Raise at construction instead of documenting a structural footgun

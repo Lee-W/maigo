@@ -51,6 +51,44 @@ anything visible in the working tree — `git reflog` showing an unrequested
 the validation call: `git merge-base HEAD upstream/main`. A stale base silently
 validates the wrong commit range while still reporting green.
 
+## Confirm reads survived an external rebase via a file-scoped diff
+
+A long session's worktree can be rebased **externally** (another terminal, another
+session) mid-task. Once that happens, anything read earlier in the session is
+potentially stale — and this produces **no error signal**: tests still pass, the diff
+still looks normal, because whatever gets written afterward is itself new.
+
+Before wrapping up, check the reflog, not just `git log`:
+
+```bash
+git reflog -15 --format='%h %gd %gs'   # look for rebase (start) / rebase (finish)
+git merge-base --is-ancestor <session-start HEAD> HEAD   # non-zero == that commit fell off the branch
+```
+
+Two rebase fingerprints: (1) `git log` shows the same commit subject under a different
+SHA — the parent changed; (2) the merge-base check above returns non-zero.
+
+Most external rebases only bring in unrelated upstream commits — don't automatically
+redo all session work. Diff the two tips **scoped to only the files this session
+actually touched**:
+
+```bash
+git diff <old-tip> <new-tip> -- <file1> <file2> ...
+```
+
+**Empty output means those files are byte-identical across the rebase — every read
+this session made of them is still valid**, and the task is done with zero rework.
+Non-empty output is the only case that needs deciding which reads are now stale and
+which step to redo.
+
+Compare the session's *starting* tip against its *post-rebase* counterpart, not
+against current HEAD — diffing against HEAD mixes in this session's own subsequent
+changes and loses the discriminating power. Case: a session's starting HEAD was
+`1b48df4f6a`; at wrap-up, `git log` showed the same subject under `5219494d4e` — a
+different parent, so a rebase rather than a new commit. `git diff 1b48df4f6a
+5219494d4e --stat` showed only an unrelated upstream commit; scoped to the four files
+this session had touched, it was empty. All prior reads stayed valid, zero rework.
+
 ## Verify before restating a state claim, not just before writing
 
 Per-write-action reverification (see `references/worktree-hygiene.md`) isn't
