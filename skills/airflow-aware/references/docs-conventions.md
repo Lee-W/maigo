@@ -496,3 +496,47 @@ that sentence dangling. Before deferring, confirm the target section really
 covers every item being removed — deferring to a section that doesn't
 actually cover the removed content deletes information instead of
 consolidating it.
+
+---
+
+## `.rst` docs spell-check rejects coined nouns — literals are exempt, autoapi-generated pages count too
+
+Airflow runs a spell-check lint over `.rst` docs that rejects words not in
+its dictionary. Coined verbal nouns and informal jargon fail: `poller`/
+`pollers` (use `poll loop`/`polling loop`), `unrendered` (say "a Jinja
+string that has not been rendered yet" / "before rendering"), and similarly
+any `-er`/`-ers` coinage built from a verb, or an `un-`-prefixed participle
+with no dictionary noun/adjective form.
+
+**Check the gerund separately from the verb** — a sentence can pass on its
+verb form and fail only on the `-ing` noun. `subsetting` failed while the
+same sentence's `to subset the advertised tool list` passed with zero
+complaints; the base verb passing is not evidence its gerund will too — the
+dictionary carries them separately.
+
+**The check only sees prose.** The same coined word written as a literal
+token — double backticks, a `:class:` role, a code block — is exempt. When
+a page names an attribute whose name is itself a coinage, only the bare
+prose sentence fails; the fix is rewording that one sentence, not renaming
+the code symbol or wrapping prose in backticks just to dodge the check
+(case: `replayable` in `providers/common/ai/docs/choosing_a_toolset.rst` —
+6 occurrences of the word, only 1 prose failure).
+
+**It also fires on autoapi-generated `.rst`.** The check runs on
+`providers/<p>/docs/_api/.../index.rst` too (gitignored, generated from
+Python docstrings) — a coined word in a public docstring fails CI exactly
+like one in hand-written docs. It does not fire on commit message bodies,
+but it's worth applying the same discipline there for consistency; inline
+`#` comments and test code are never built into docs at all.
+
+**How to apply**: before committing docs changes, eyeball any
+noun-of-the-week coinages and replace with plain phrases. If the lint fails
+on a word, the fix is wording — don't add it to a custom dictionary unless
+it's a genuine technical term that belongs there (rare). The same posture
+applies to the user-facing parts of a PR body and commit message; reviewers
+read those too. Distinct from the "A deliberate-typo test value can collide
+with codespell's dictionary" entry in
+[`references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md)'s
+Tests section — that one is about `codespell` flagging a *deliberate*
+misspelling in a `.py` test value, not a coined-but-intentional word in
+`.rst` prose.

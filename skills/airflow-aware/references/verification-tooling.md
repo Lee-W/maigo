@@ -420,6 +420,96 @@ first and second attempt. `git add` the reformatted file and commit again;
 the second attempt is green because there is nothing left to rewrap. Keep
 doc-example lines short to begin with to avoid the extra round trip.
 
+### `ANSWER=no` skips breeze's interactive rebuild prompt (background for several entries below)
+
+When a tracked file breeze cares about (e.g. `Dockerfile.ci`) has changed,
+`breeze run …` stops on an interactive "Likely CI image needs rebuild …
+Press y/N/q" prompt that hangs a non-interactive shell. Prefix any breeze
+invocation with `ANSWER=no` to decline the rebuild and reuse the existing
+image: `ANSWER=no breeze run pytest <tests> -xvs`. The env var answers all
+of breeze's yes/no prompts globally — several of the entries below assume
+it's already in place.
+
+### A brand-new worktree's first `breeze run` builds a CI image — that can outrun a harness timeout, and looks like a test failure
+
+In a git worktree (or image cache) that has never run breeze before, the
+first `breeze run pytest ...` call builds the CI image first — a
+multi-layer Docker build that can take 30–90+ seconds, counted as part of
+that call's runtime. maigo's own Stop-hook verification
+(`verify_completion.py`) has a fixed timeout (observed ≈90s); if the first
+call lands inside the image build, the hook reports a timeout that reads
+exactly like a test failure, even though pytest never started. Confirm
+before concluding the tests are broken: manually rerun the same command
+with a much longer timeout (e.g. 10 minutes) — once the image is built,
+Docker's layer cache makes later calls in the same worktree finish in
+seconds. Don't assume broken test logic, or narrow the test scope, on a
+first-call timeout alone.
+
+### A high-concurrency test hitting `QueuePool limit` in breeze is usually an environment limit, not a code defect
+
+A high-concurrency (many-thread/many-connection) airflow-core test failing
+with `sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10
+reached, connection timed out` under breeze is usually breeze's own test
+connection pool being too small for that concurrency level, not a defect in
+the code under test. Case: PR #62501's
+`test_create_dag_runs_when_concurrent_asset_events_created` (30 threads,
+needs postgres/mysql) hit the same `QueuePool` timeout across two
+independent review rounds; three separate mutations (removing the
+`created_at` ordering, the `NOT EXISTS` reverse-check, the delete guard)
+all left the timeout unchanged. **Judgment**: a mutation test not clearing
+the timeout does **not** license concluding "so it's a code bug" — that
+result is equally consistent with "the pool was never going to be enough
+regardless." To actually distinguish the two, inspect breeze's DB pool
+configuration or the code path's session lifecycle directly — don't infer
+it from a mutation canary that can't discriminate between the two
+explanations. Treat this the same as the image-build timeout above: don't
+upgrade a verdict on the strength of local reproduction alone.
+
+### `breeze ci-image build` doesn't produce a real image on this arm64 machine
+
+`breeze ci-image build --python 3.10` on this machine does not give an
+image reflecting a `uv.lock` change (observed 2026-08-24, trying to get a
+real `breeze run mypy` result after a provider's `pydantic-ai-slim` floor
+bump):
+
+| Invocation | Outcome |
+|---|---|
+| default registry cache | exit 0, but a **false green** — image `Created` timestamp unchanged, container still on the old package version |
+| `--docker-cache disabled` | fails in ~3s: `ibm-db==3.3.0` native build → `NameError: name 'arch_' is not defined` |
+| `--docker-cache local` | same `ibm-db` failure |
+
+`ibm-db` (pulled in via `apache-airflow-providers-ibm-db2`) has no arm64
+wheel and its `setup.py` breaks on this platform — nothing about the
+provider actually being worked on is involved. **Consequence**: a stale
+image reports type errors that don't exist (e.g. mypy complaining an
+attribute is missing from a third-party class, because the image holds an
+older version of that library than `uv.lock` pins); `prek run --stage
+manual`'s `mypy-providers` hook surfaces the same false failure.
+
+**How to apply**:
+
+1. Before believing a `breeze run mypy` failure naming a third-party
+   attribute, compare versions: `ANSWER=no breeze run "pip show <package>"`
+   against `uv.lock`. A gap means the image is stale, not that the code is
+   wrong.
+2. `breeze ci-image build` exiting 0 is **not** evidence the image
+   changed — check the image `Created` timestamp, or rerun the `pip show`
+   check above; the default cache path can no-op silently.
+3. Run providers' mypy on the host instead:
+   `uv run --project providers/<provider> mypy providers/<provider>/src/...`
+   — but first confirm the host venv actually matches the lock
+   (`./.venv/bin/python -c "import importlib.metadata as m;
+   print(m.version('<pkg>'))"`), or the fallback just becomes a second
+   environment with a different stale version.
+4. Two failures with this exact shape in a row is the stop signal — don't
+   try a third `--docker-cache` permutation; switch to the host fallback
+   and report the image problem separately. This is distinct from the mypy
+   coverage gap noted in §2 above (that one is "the hook set never runs
+   against `providers/`"; this one is "the image it *would* run against, if
+   invoked directly, is stale").
+5. Worth filing upstream as a local-environment defect, but it never blocks
+   a PR whose own mypy is clean on the host.
+
 ## 4. Attribution — don't accept a red's cause without proving it
 
 ### A scoped test run being red doesn't mean your diff caused it
@@ -620,6 +710,43 @@ metrics registries, supervisor schema snapshots — anywhere a "the generator
 produced this, don't hand-edit it" claim needs to be verified rather than
 assumed.
 
+### Backport conflicts on breeze-generated hash files: take incoming + verify with a scoped regenerate, not a global `--check-only`
+
+A cherry-pick/backport that conflicts on breeze-generated hash files
+(`dev/breeze/doc/images/output_*.txt`) shouldn't be resolved by guessing
+which side is right. Take the incoming commit's value, then run `breeze
+setup regenerate-command-images --command <group:command>` scoped to just
+the conflicted command(s) to verify the regenerated hash matches exactly. A
+global `--check-only` run will likely surface many unrelated pre-existing
+hash mismatches (environment/breeze-shim-version drift) — that's noise, not
+something to fix as part of resolving this conflict.
+
+### The breeze shim's `uvx` environment cache goes stale when only `dev/breeze/src/` changes
+
+The `breeze` shim (`uvx --from dev/breeze`) caches its ephemeral environment
+in `~/.cache/uv/environments-v2/`, keyed by resolution hash. Breeze's own
+version stays `0.0.1` and its `pyproject.toml` rarely changes, so an edit
+under `dev/breeze/src/` never invalidates the cache — a prek hook that
+shells out to breeze (e.g. `update-providers-build-files`) then silently
+runs the **old** generator code, dirtying generated files (e.g. re-adding a
+section a newer template commit removed). Symptom: a hook regenerates 100+
+provider files with changes that contradict a recently merged generator
+commit. `uv cache clean apache-airflow-breeze`, `uvx --reinstall`, and
+`uvx --refresh` do **not** fix it. Fix — remove the cached env symlinks
+whose archive contains `airflow_breeze`:
+
+```bash
+for link in ~/.cache/uv/environments-v2/*/*; do
+  t=$(readlink "$link") || continue
+  ls "$t"/lib/python*/site-packages/airflow_breeze >/dev/null 2>&1 && { command rm -f "$link"; command rm -rf "$t"; }
+done
+```
+
+Verify freshness by importing a recently-added symbol via `uvx --from
+./dev/breeze python -c ...` (needs `SKIP_BREEZE_SELF_UPGRADE_CHECK=1`). A
+durable upstream fix would add `cache-keys = [{ file = "pyproject.toml" },
+{ file = "src/**/*.py" }]` to `[tool.uv]` in `dev/breeze/pyproject.toml`.
+
 ## 7. Docs page screenshot procedure
 
 When a PR adds or changes a docs page, attach a screenshot at PR-open time —
@@ -632,11 +759,29 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    ```
 
    Use the short name (e.g. `common.ai`), not the full distribution name
-   (`apache-airflow-providers-common-ai`) — the full name exits 2.
+   (`apache-airflow-providers-common-ai`) — the full name exits 2. The
+   flags themselves are `--docs-only` and `--clean-build` — the
+   plausible-looking `--doc-only` / `--clean` also exit 2, with a usage
+   error and a "Did you mean" suggestion. This is a repeat mistake (plan
+   text got it wrong from memory on 2026-07-14 and again on 2026-09-11) —
+   look the flags up rather than typing them from recollection.
+
+   To reproduce a CI docs-spelling failure (`Incorrect Spelling:
+   '<word>'`) locally, run the same command with `--spellcheck-only`
+   (`-s`) instead of `--docs-only` — it only spell-checks, doesn't build,
+   and breeze self-reports "Forcing --one-pass-only" once scoped to a
+   single package, finishing in a few minutes with `Finished
+   spell-checking successfully` when clean. That command's exit code is
+   the authoritative verdict for this class of failure; a grep for the
+   flagged word only locates it, it doesn't prove the fix worked.
 
 2. The built output lands under
    `generated/_build/docs/apache-airflow-providers-<dist>/stable/`. Open the
    HTML file directly with `file://` — no server needed to get real styling.
+   Exception: a client-side search that fetches same-origin resources at
+   runtime (e.g. Pagefind) is blocked by CORS under `file://` — verifying
+   that specific behavior needs an actual `http://` server; a plain
+   static-page screenshot is unaffected.
 
 3. Take at least three screenshots:
    - The new page itself (the full page, so the reviewer sees surrounding context).
@@ -653,3 +798,24 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    own output. Before trusting a screenshot, assert
    `document.styleSheets.length > 0` in the page to catch an unstyled blank
    capture.
+
+5. **Order matters when you need both a spelling verdict and the rendered
+   page**: `--spellcheck-only` cleans the HTML output directory and its
+   builder emits no HTML, so any HTML an earlier `--docs-only` run left
+   behind is gone afterward — running `--docs-only` then `--spellcheck-only`
+   leaves the output directory with no `*.html` at all. A later screenshot
+   attempt then fails with `FileNotFoundError`, which looks like a build
+   failure but isn't one (both commands exited 0). Put `--docs-only`
+   **after** `--spellcheck-only` whenever the rendered HTML is the evidence
+   you need — it's the only direct signal that a new `:ref:` actually
+   resolved; a zero-hit warning grep or a bare exit code proves nothing
+   about one specific cross-reference.
+
+6. This machine's own ability to run `build-docs` is unrelated to whether
+   its Breeze CI image can be rebuilt. `ANSWER=no breeze build-docs
+   <short-name> --docs-only` (and `--clean-build`, and `--spellcheck-only`)
+   complete with exit 0 here in a few minutes — that's a separate image
+   from the one that fails to rebuild on arm64 (see §3's
+   `breeze-ci-image-unbuildable-arm64` entry below). Don't read "the CI
+   image is unbuildable on this machine" as "skip the docs build check" —
+   confirm the specific image involved before drawing that conclusion.

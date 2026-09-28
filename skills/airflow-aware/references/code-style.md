@@ -5,6 +5,13 @@ recur often enough across implementer / reviewer tasks to warrant a shared
 reference. Read this file when writing or reviewing Python in an Airflow
 checkout and one of the topics below applies.
 
+This file covers **static** style — conventions a reader or a linter can
+check without running the code. For **execution-time** gotchas (attrs
+eq/hash conventions, serialization field-read conventions, scheduler/session
+lifecycle traps, and Python/pydantic version-skew type-system pitfalls),
+see
+[`references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/runtime-gotchas.md).
+
 ## Imports
 
 ### Default to top-level imports in always-called sites
@@ -468,6 +475,26 @@ Case study: apache/airflow#72151 — a stub for `ResponseUsage.model_dump`
 was hand-written as a flat dict; the real SDK object nests two levels deep.
 The docstring copied the same flat shape, so a user following it hit a
 `KeyError`.
+
+### A deliberate-typo test value can collide with codespell's dictionary
+
+When an invalid-input test case's value is a *deliberate misspelling* (e.g.
+a typo'd enum value, to prove construction raises), the repo-wide
+`codespell` prek hook will flag it if that typo happens to be a real
+dictionary entry — `foward` is in codespell's dictionary (`foward ==>
+forward`), so `pytest.param("foward", ...)` fails the hook.
+
+Fix: pick a misspelling that is **not** in the dictionary (e.g. `forwrd` —
+a dropped letter, not a known typo) rather than whitelisting the word in
+`docs/spelling_wordlist.txt` — whitelisting suppresses legitimate catches
+elsewhere in the repo. Verify a candidate first with `uvx codespell
+<file-or-scratch>` (exit 0 = unflagged). The test only needs *an* invalid
+value; it doesn't need to be a realistic misspelling of the valid one.
+
+Distinct from
+[`references/docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md)'s
+`.rst` spell-check entry — that one is about coined nouns in doc prose;
+this one is about deliberate misspellings in `.py` test values.
 
 ## CI / prek hook scripts
 

@@ -211,6 +211,14 @@ provider's declared version floor before adopting it, and the "no
 `logical_date` in Airflow 3 examples" authoring rule, read
 `references/code-style.md`.
 
+For execution-time gotchas that pass a type checker and a casual read but
+fail against a specific SQLAlchemy version, Python version, or session
+lifecycle — SDK attrs eq/hash conventions, serialize/decode field-read
+conventions, the scheduler's scoped-session lifecycle, and
+Python/pydantic version-skew type-system pitfalls (`Annotated` constraints,
+nested enums, subscripted generics, `Decimal`→`int`) — read
+[`references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/runtime-gotchas.md).
+
 - **No `assert` in production code** — use a real exception (e.g., `ValueError`, `RuntimeError`).
 - **Do not add new `raise AirflowException`** — use a more specific exception class instead.
 - **`session` parameter must be keyword-only** and the callee must not call `session.commit()`;
@@ -235,7 +243,7 @@ side and validator-side touchpoints, and one specific validator check turns
 CI red if the new section's modules don't live in a directory named after the
 resource type. Full touchpoint list, the trap, and the workaround are in the
 "New provider.yaml module section" recipe in
-[`references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md#new-provideryaml-module-section-registry--validator-touchpoints-narrow--read-only-when-this-applies) —
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md) —
 read it before implementing, not just at review time.
 
 ### 6. Delivery completeness
@@ -335,6 +343,16 @@ status doc for a feature that ships:
   a new reader-facing docs page counts as user-facing for the PR template's screenshot
   requirement, even though "it's just docs." Don't wait for a reviewer to ask. See the
   screenshot procedure in `references/verification-tooling.md` §7.
+- **Don't prefix a doc-only commit's subject with `Docs:`.** `docs` is
+  itself a Conventional Commits type name, so
+  `scripts/ci/prek/check_no_conventional_commit_message.py` matches
+  `Docs:`/`Docs/` against its fixed `CONVENTIONAL_TYPES` list and fails the
+  hook — even though `AGENTS.md` explicitly allows area-tag prefixes like
+  `UI:`/`API:`/`Helm:` (those aren't in `CONVENTIONAL_TYPES`, so they pass).
+  Write plain prose describing user impact instead (e.g. "Sync
+  `LLMRetryPolicy` docs with the `redact_exception` default" rather than
+  "Docs: Sync..."). If `check-no-conventional-commit-message` fails, drop
+  the leading type-like prefix and retry — don't reach for `--no-verify`.
 
 ### 9. Architecture boundaries *(optional, for architectural review)*
 

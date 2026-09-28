@@ -371,18 +371,10 @@ readable error.
 **Scope gate**: only applies when the diff touches `registry/src/*.njk`
 templates, or the `_data/*.js` layer feeding them.
 
-Any `| slice(0, N)` (or `| first` / `[:N]`) truncation in a registry template
-must be preceded by an explicit sort — sort in the `_data/*.js` layer, not the
-template (nunjucks' `sort` filter doesn't accept a dotted attribute path, so
-sorting there requires flattening first, which is more code for the same
-result). Widening the membership of the collection feeding a slice — a
-broader match condition, an added keyword, a new data source — is a silent
-regression if the cutoff isn't sorted: known providers can drop out of a
-badge/top-N list with no test or build failure to flag it, only a visual
-discrepancy on the built page. When reviewing a change that widens any
-collection with a downstream slice, grep that collection's consumers for a
-truncation point and require a sort key as part of the same change, not a
-follow-up.
+Moved to
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+(the "10.13 registry `slice`/`first` cutoffs need a sort key" section) —
+read it when this scope gate applies.
 
 ## 10.14 New provider, or new major capability surface, needs a governance-gate check *(informational — report separately from the code verdict)*
 
@@ -522,8 +514,10 @@ turns a multi-round review into one round:
    family.** If sibling connection types in the same family declare a
    conn-field for a capability, every member of a newly-added family needs
    it too, mirrored into `get_provider_info.py` (see 10.7's sibling
-   concern, and this file's "`provider.yaml`'s `ui-field-behaviour`/`conn-fields`
-   override the hook" note) — otherwise the UI offers no input for that
+   concern, and
+   [`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)'s
+   "`provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook"
+   note) — otherwise the UI offers no input for that
    capability and users must hand-edit the Extra JSON.
 
 Also check `test_connection()` when two capabilities can be configured
@@ -626,6 +620,38 @@ Both call for the reviewer to *not* act — the opposite instinct from
 10.6/10.7's *require an edit* — so mixing up which file follows which model
 produces a false-positive finding either way.
 
+### `provider.yaml` edits: which derived files regenerate, and by which pipeline
+
+`provider.yaml` is the source of truth for a provider's description text, but
+its derived files split across two independent pipelines — conflating them
+produces either a missed regeneration or an incorrectly "fixed" file:
+
+- `prek run update-providers-build-files --files providers/<name>/provider.yaml`
+  (hook defined in `providers/.pre-commit-config.yaml`) regenerates exactly
+  two files: `src/.../get_provider_info.py` and `docs/index.rst`. Run ruff
+  on the regenerated `.py` afterward.
+- `README.rst`'s **Requirements table** specifically is re-rendered from
+  `pyproject.toml` by the `sync-provider-readme` prek hook
+  (`.pre-commit-config.yaml:1246-1252`) — a separate mechanism from the
+  `update-providers-build-files` hook above.
+- The **rest** of `README.rst`, and all of `docs/commits.rst`, are rewritten
+  only by the release manager's `prepare-provider-documentation` flow (the
+  changelog/release-prep step) — not by any prek hook. After editing
+  `provider.yaml`, these two files legitimately keep old wording until the
+  next release prep runs; that's expected, not a missed regeneration
+  (confirmed 2026-07-10: an openai provider "DAGs"→"Dags" text fix left
+  `README.rst`/`docs/commits.rst` unchanged on purpose).
+
+**How to apply**: after a `provider.yaml` edit, run
+`update-providers-build-files` and expect exactly `get_provider_info.py` and
+`docs/index.rst` to change. Don't hand-edit `README.rst`'s Requirements
+table (that's `sync-provider-readme`'s job) or the rest of `README.rst` /
+`docs/commits.rst` (that's the release manager's job), and don't flag their
+stale wording as an omission in review. See `references/verification-tooling.md`
+§2 "`scripts/in_container/run_provider_yaml_files_check.py`" for the
+`check-provider-yaml-valid` hook's own scope (run from `providers/`), and
+this skill's SKILL.md §3 for why it must run from that directory.
+
 ## 10.22 Dialect-dispatch catch-all `else` branch defaulting to sqlite is a footgun — reuse the canonical upsert helper or fail loud *(Request changes)*
 
 apache/airflow has a canonical dialect-specific upsert builder at
@@ -663,31 +689,10 @@ treat it as a fresh discovery.
 **Scope gate**: only applies when a diff touches `dev/registry/` or
 `registry/`.
 
-In `registry/src/provider-version.njk` (the provider-version page), each
-module entry's `category` field is used in exactly one place:
-`data-category="{{ module.category }}"`, an HTML attribute never rendered as
-visible text. The sidebar's "Categories" filter list (`pv.provider.categories`,
-`cat.id`/`cat.name`) is built only from `provider.yaml`'s `integrations` list,
-via `extract_integrations_as_categories` in `dev/registry/extract_metadata.py`.
-Class-level (FQCN) sections — notifications/secrets-backends/logging/executors/
-extra-links/queues/auth-managers/db-managers — have no matching integration, so
-their `category` string never appears as a clickable filter option and is
-never seen by a user.
-
-**How to apply**: when a diff renames a class-level section's category-related
-string (as in apache/airflow#70190, which renamed the `queue` type's
-user-visible **label** from "Queues" to "Message Queues"), first identify
-which string is being changed:
-
-- `MODULE_TYPES[...]["label"]` — the user-visible type label shown on the
-  module-type tab. Renaming this is a real UI change.
-- The internal `category` string (`CLASS_LEVEL_CATEGORY_OVERRIDES` or its
-  yaml-key fallback) — only a `data-*` attribute value. Renaming this has
-  **no** visible effect on the page.
-
-Flag a PR that renames only the internal `category` string, believing it
-changes user-facing text, as a no-op relative to its stated intent — point
-the author at `MODULE_TYPES[...]["label"]` instead.
+Moved to
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+(the "10.23 registry class-level module `category` string is not
+user-visible" section) — read it when this scope gate applies.
 
 ## 10.24 Operator's own `xcom_push()` calls for extra keys need their own `do_xcom_push` guard *(Request changes)*
 
@@ -836,9 +841,36 @@ things:
    don't share a denominator is better than shipping a success rate that
    misleads.
 
-New metric names still need a registry entry — see the metrics registry
-rule (cross-reference the relevant registry section if this repo's docs
-already cover it).
+### New metric names need a registry entry, and its `description` field has no CI gate
+
+Any new `Stats.incr` / `gauge` / `timer` metric name must be registered in
+`shared/observability/src/airflow_shared/observability/metrics/metrics_template.yaml`,
+or the prek hook `check-metrics-synced-with-registry` fails outright: `N
+metric(s) found in the code but missing from the registry YAML`. Required
+fields: `name` / `description` / `type` (counter, gauge, …) / `legacy_name`
+(`-` if none) / `name_variables` — the tag-key list the code actually passes
+in `tags=`, read from the real `Stats.incr` call site, not from the plan or
+PR description. **The file is not alphabetical** (`api_server.dag_bag.*` /
+`resumable_job.*` / `connection_test.*` are all counter-examples) — entries
+group by counter/gauge block, then roughly by feature, and within one metric
+family follow actual emission order. `description` is a YAML double-quoted
+scalar, so literal values (class names, tag values) use double backticks,
+never quotes — the file's only single quotes are English possessives
+("we've", "server's").
+
+**`description` itself has no CI gate.**
+`scripts/ci/prek/check_metrics_synced_with_the_registry.py` only reads
+`name` (`:85`), `legacy_name` (`:154`), and `type` (`:475`) — nowhere does
+it read `description` (verified 2026-09-19). But `description` renders
+verbatim into the public metrics reference docs, so a wrong description
+ships silently: on PR #72786, `managed_agent.invoked`'s description carried
+three clauses describing a design a later commit had already replaced
+(a stale `unknown`-bucket meaning, a wrong claim about warn-then-continue,
+and a wrong claim about group members emitting the same counter), and it
+survived several review rounds before a reviewer caught it by inspection
+alone. `prek run check-metrics-synced-with-registry` passing is **not**
+evidence the description is correct — treat it like code and re-read it
+against the current implementation whenever the metric's behavior changes.
 
 ## 10.28 A schema-validated new field needs an authoring-schema cross-check *(Request changes)*
 
@@ -853,7 +885,8 @@ real data: the code never receives real values and the screen stays empty
 until a separate schema PR catches up. Running a pytest fixture or hand-fed
 fake data that renders the screen is not sufficient proof that "this PR
 makes the feature usable." Cross-reference the "New provider.yaml module
-section: registry + validator touchpoints" narrow section below.
+section: registry + validator touchpoints" section in
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md).
 
 ## 10.29 Template-field value-path check *(Request changes)*
 
@@ -1043,59 +1076,159 @@ diff in every worktree.
    push back: it pollutes the PR diff and creates a force-push risk if `main` re-locks
    before merge.
 
+### Exception — when your own PR legitimately changes `uv.lock`
+
+If the PR's own point is a `pyproject.toml` version-floor bump (2026-08-11,
+`common.ai` cost-limit PR: raised the `pydantic-ai-slim` floor), step 3 above
+does **not** apply — `git checkout HEAD -- uv.lock` would throw away the
+change the PR actually needs. Don't hand-revert just the drift lines either:
+a partial revert leaves the lockfile inconsistent with the committed
+pyprojects, so `uvx uv@<pinned> lock --check` fails — that turns a correct
+lock into a broken one to make the diff look tidier. Keep the drift lines and
+call them out explicitly in the PR description as pre-existing `main` drift,
+so a reviewer doesn't read them as part of this PR's change.
+
+Recognize the drift in this shape too: it doesn't always show as a package
+being added or removed. An *existing* line can simply gain
+`specifier = ">=X"` for an unrelated package — e.g. `akeyless-cloud-id`,
+`pyspark`, `krb5`, `pytest` all gained specifiers on one `pydantic-ai` bump.
+Those lines also often contain `marker = `, which false-positives any
+acceptance criterion that counts `marker = ` occurrences as a
+"serialization noise" proxy for "nothing legitimate changed" (see the uv
+version-pin section below). The authority on lock consistency is
+`lock --check`'s exit code, not a grep count.
+
+### A `generate-airflowctl-datamodels` prek failure that never names `uv.lock`
+
+A clean `prek run --from-ref main --stage pre-commit` can fail on
+`generate-airflowctl-datamodels` with `- files were modified by this hook`,
+while `git diff -- airflow-ctl/src/airflowctl/api/datamodels/generated.py`
+is **empty**. The hook shells out through `uv run`, which re-locks and
+churns `uv.lock`; prek sees a modified file (`uv.lock`, not the datamodel)
+and reports the hook as failed. The codegen output itself never drifted.
+Confirm by checking that `git status --short` shows only `M uv.lock` after
+the run, then `git checkout -- uv.lock`. Don't go hunting for a datamodel
+mismatch that isn't there.
+
+## `uv` version must match the repo pin, or `uv.lock` fills with meaningless `marker =` churn
+
+If `uv lock` produces a huge `uv.lock` diff (hundreds of lines) that's
+almost entirely `{ name = "...", marker = "python_full_version < '3.13'" }`
+style entries, and **no package actually changed version**, the cause is
+usually the `uv` binary's own version — not the resolution, and not the
+change being made. Older `uv` writes explicit `marker = ...` on dependency
+entries that newer `uv` omits or normalizes away, so re-locking with an
+older `uv` than the one that generated the committed lock rewrites the whole
+file into the older serialization format.
+
+**Check before locking:**
+
+```bash
+uv --version
+grep UV_VERSION dev/breeze/src/airflow_breeze/global_constants.py
+grep '"uv>=' pyproject.toml
+```
+
+**Fix** — pin the `uv` used for the lock, don't trust whatever is on `PATH`:
+
+```bash
+uvx uv@<pinned-version> lock --upgrade-package <package>
+```
+
+Observed 2026-07-30 on the ruff 0.16 bump: `uv` on `PATH` was `0.11.15` while
+the repo pinned `0.11.29`; `uv lock --upgrade-package ruff` produced a
+**356-line** diff, and re-locking with `uvx uv@0.11.29` produced **40
+lines** — nothing about the resolution itself differed.
+
+**How to apply:**
+
+1. "Only one `version =` line changed" is the *wrong* check — it passes
+   while hundreds of marker lines are being rewritten. Also run
+   `git diff uv.lock | grep -cE '^[-+].*marker = '`, but don't treat `0` as
+   a hard requirement — see point 4 below.
+2. Any large lockfile diff a subagent explains as "a normal side-effect of
+   re-resolution" deserves this check before being accepted — that exact
+   wording was the tell in one instance.
+3. Confirm the result with `uvx uv@<pinned> lock --check`.
+4. **This is the same symptom as the uv.lock drift diagnostic above, from a
+   different cause — and the two can be live at once.** That recipe's cause
+   is a committed `pyproject.toml` and lockfile disagreeing; this section's
+   cause is the `uv` binary's own version. Don't let confirming one
+   explanation stop you from checking the other — the ruff 0.16 bump hit
+   both simultaneously in the same PR.
+5. **Marker churn with the *pinned* `uv` is not automatically a bug — it can
+   be your own dependency change re-resolving.** Seen 2026-08-24 raising a
+   provider's `pydantic-ai-slim` floor `>=2.0.0` → `>=2.23.0`: re-locking
+   produced 168 lines where every changed line stripped a marker and zero
+   `version =` lines moved, with both the host `uv` and the pinned `uv`
+   producing the same result — so the version-mismatch explanation above did
+   **not** apply.
+
+   **Decisive test** — isolate the environment from your own change: put the
+   *base branch's* `pyproject.toml` **and** `uv.lock` together in the tree,
+   then in the same environment run `uvx uv@<pinned> lock --check` (expect
+   exit 0) and `uvx uv@<pinned> lock` (expect zero diff afterward). Both
+   clean means the environment reproduces upstream's lock exactly, so the
+   churn belongs to your own dependency edit and must ride along; either
+   failing means the environment itself is the suspect.
+
+   Then prove your own result is reproducible, not a one-off resolve: run
+   `uv lock` twice and compare `shasum uv.lock` (expect identical), plus
+   `lock --check` exit 0 on the result.
+
+   Don't hand-edit the lock down to a "minimal" diff — mirroring only the
+   `specifier = ">=X"` lines to match `pyproject.toml` looks tidier but fails
+   `uv lock --check`, since `uv` wants the whole resolution, not just the
+   mirrored metadata. Same trap as the drift-diagnostic section above: the
+   "tidier" lock is the broken one.
+6. **When your PR must legitimately change `uv.lock` *and* the environment
+   has the version-pin problem, you can't use the drift-diagnostic
+   section's `git checkout HEAD -- uv.lock` escape either** — any `uv lock`
+   run with the corrected pin is forced to also repair whatever pre-existing
+   drift is sitting on `main`. Let that correction ride along in your
+   commit rather than fighting it back out, and name it explicitly in the
+   commit body ("also repairs pre-existing drift from PR #NNNNN") so a
+   reviewer doesn't read it as unrelated scope creep.
+7. A host `uv` **newer** than the pin breaks prek codegen hooks outright,
+   not just `uv.lock` — e.g. `error: Project directory 'apache-airflow-ctl'
+   does not exist` from `generate-airflowctl-datamodels` when a
+   workspace-member *name* passed to `uv run --project` is accepted (with a
+   deprecation warning) by the pinned version but rejected as a hard error
+   by a newer one. That's a pre-existing local-environment failure, not a
+   defect in the diff — run the codegen yourself with the pin instead of
+   chasing it: `uvx uv@<pinned> run -p 3.12 --no-dev --active --group codegen
+   --project apache-airflow-ctl --directory airflow-ctl/ datamodel-codegen`.
+   The pin also lives in `Dockerfile.ci` as `ARG AIRFLOW_UV_VERSION`. Same
+   family as `verification-tooling.md`'s "A fresh worktree has no UI
+   `node_modules`" entry (host `pnpm` newer than the repo's pin) — when a
+   pinned-toolchain hook fails inexplicably, compare the host binary's
+   version against the repo's pin before chasing it as a code defect.
+8. A version mismatch can also dirty `uv.lock` passively, without anyone
+   running `uv lock` on purpose — `uv run`, `breeze build-docs`, and even a
+   Stop-hook's own `uv run pytest` each re-dirty it on their own. Treat
+   "clean" as a claim with a timestamp: re-check `git status --porcelain` in
+   the same tool call as the commit, not before, and ask for the raw
+   `git status` output rather than a summarized conclusion about it.
+9. **A general shell trap, not specific to `uv`**: piping a command's
+   output to `tail`/`head` before checking `$?` reports the pipeline's last
+   stage exit code, not the command's — `cmd 2>&1 | tail -3; echo $?`
+   reports `tail`'s status. Redirect to a file and read `$?` directly
+   instead, or the whole diagnosis in this section rests on a number that
+   means nothing.
+
 ## New provider.yaml module section: registry + validator touchpoints (narrow — read only when this applies)
 
 **Scope note**: this only applies when a diff introduces a brand-new
 `provider.yaml` **module-section type** — a new category alongside
 `sensors`/`operators`/`hooks`/`triggers`/`bundles`/`toolsets` — not a new
-entry under an existing section. This is rare enough not to warrant a
-standing numbered checklist item; read this recipe when it comes up.
+entry under an existing section.
 
-The change spans two subsystems, and one of them can turn CI red if a new
-section is added to the wrong list:
-
-- **Registry side**: `dev/registry/registry_tools/types.py`'s `MODULE_TYPES`
-  (source of truth: `yaml_key` / `level` / `suffixes` / `label` / `icon`) plus
-  its base-class import list; `registry/src/_data/types.json` (generated,
-  drift-checked); CSS in `tokens.css` (a `--color-<type_id>` token) and **five**
-  `main.css` rule families, not just one — `.tab-icon`, `.type-icon`,
-  `.share-bar`, `.provider-card .modules`, and
-  `.provider-detail-page .modules .module .icon`. Missing CSS doesn't error —
-  the badge silently falls through to the bare base rule with no background.
-  Note the two naming conventions: the registry type id uses underscores
-  (`retry_policy`), the `provider.yaml` key uses hyphens (`retry-policies`);
-  CSS uses the type id.
-- **Validator side** (`scripts/in_container/run_provider_yaml_files_check.py`):
-  four hardcoded section lists exist, and they are not equally safe to
-  extend — check `check_duplicates_in_integrations_names_of_hooks_...` and
-  the `registered_modules`/`check_invalid_integration` call sites are safe to
-  add to; a fifth touchpoint pair (`base_class_resource_map` and the
-  `registered_modules` tuple) both need the new `(<BaseClass>, "<yaml-key>")`
-  entry — missing either leaves class-registration unchecked for the new
-  section.
-
-**The trap**: `check_correctness_of_list_of_sensors_operators_hook_trigger_modules`
-runs a completeness assertion whose glob is `**/{resource_type}/*.py` — it
-assumes the module lives in a directory *named after the resource type*. If
-the new section's modules don't (e.g. a hypothetical `retry-policies` module
-living under `policies/retry.py` rather than `retry-policies/`), adding it to
-this list turns CI red with `Items in the right set but not the left`. In
-that case, write a new existence-only `@run_check` function instead (shape:
-`check_hook_class_name_entries_in_connection_types`, collecting
-`python-modules` with `ObjectType.MODULE`) — and register it in the
-unconditional call sequence, not inside `if all_files_loaded:` (that block
-only runs on a full scan; a scoped single-file validation run would silently
-skip the new check and report a false green). "Yaml key ≠ directory name" is
-not unique to a hypothetical new section either — `secrets-backends` modules
-already live under `secrets/`, not `secrets-backends/` — so don't describe
-the directory-matches-key pattern as universal in a comment or PR
-description.
-
-This whole scenario is a worked example of the
-[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
-skill's "shared constant changes tuple arity/field count" row — grep the
-constant name (`MODULE_TYPES`, the hardcoded section lists), not the type
-name, and re-grep after the change to confirm no further site remains.
+Moved to
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+(the "New provider.yaml module section: registry + validator touchpoints"
+section) — read it when this scope applies. The same file also has the
+sibling "New `provider.yaml` `connection-types` sub-field" checklist for the
+narrower case of adding a sub-field to an existing connection type.
 
 ## `provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's `get_ui_field_behaviour()` entirely (narrow — read when a diff changes connection-form UI text)
 
@@ -1103,28 +1236,11 @@ name, and re-grep after the change to confirm no further site remains.
 field text (placeholder, label, hidden fields, external-services) by editing
 a hook's Python methods.
 
-`ProvidersManager._import_hook` first computes `ui_metadata_loaded =
-conn_config is not None and bool(conn_config.get("conn-fields") or
-conn_config.get("ui-field-behaviour"))`, and only falls back to the hook's
-`get_connection_form_widgets()` / `get_ui_field_behaviour()` when that is
-**False**. Once a connection type's `provider.yaml` entry declares
-`conn-fields` or `ui-field-behaviour`, the hook's same-named Python method
-becomes dead code — every placeholder, relabeling, and hidden-field the
-connection UI (and the provider registry) shows for that connection type
-comes from `provider.yaml`.
-
-**How to apply**: to change a connection type's user-visible field text,
-treat `provider.yaml` as the only source of truth — edit it, then run `prek
-run update-providers-build-files --files providers/<p>/provider.yaml` to
-regenerate `get_provider_info.py` (a generated file — never hand-edit it).
-The reverse also applies when checking whether a stale claim has been fully
-cleaned up: enumerate `provider.yaml` alongside the hook source and docs —
-grepping only the hook's Python file and docs misses the file that actually
-drives the UI. Case study: apache/airflow#72013 (fixing `LlamaIndexHook`'s
-false claim of Ollama/vLLM support) initially edited only the docs and
-`hooks/llamaindex.py`'s `get_ui_field_behaviour()`; review caught that the
-connection UI and provider registry both read `provider.yaml`, so the edited
-method was dead code and the false claim was still user-visible.
+Moved to
+[`references/registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+(the "`provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the
+hook's `get_ui_field_behaviour()` entirely" section) — read it when this
+scope applies.
 
 ## Migration PR conventions (narrow — read only when the diff touches `airflow-core/src/airflow/migrations/`)
 

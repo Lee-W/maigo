@@ -722,6 +722,95 @@ independent of downstream effect.
 The reverse holds too: where a reviewer states no explicit success criterion, a nit
 raised by whoever reviews the fix really is just a nit, and can be left for judgment.
 
+## §30. `gh pr checks`, `reviewDecision`, and a pasted compare range are all surface signals — verify each against the actual head SHA
+
+Same family as §23 (`isResolved` isn't trustworthy in either direction):
+three more GitHub surface signals that look authoritative but aren't, each
+verified against the PR's actual head commit rather than trusted at face
+value.
+
+**`gh pr checks` can look like "no real CI ran" when it did.** On an
+external-fork PR it can render as just 2 bot checks (`Mergeable`/`WIP`),
+reading as if no CI ever executed — but a full CI run may have already
+passed against the actual head commit. Before writing "CI never ran" /
+"only author self-reported" into a review, get the true head SHA
+(`gh pr view <n> --json headRefOid`) and cross-check the checks/statuses
+reported against that exact commit, not just whatever `gh pr checks` prints
+by default. Caught on apache/airflow#70096 (2026-07-23): the initial read
+assumed no real CI ran; re-checking against the head SHA showed mypy plus
+multiple `common.ai`-scoped provider test jobs had actually passed.
+
+**`reviewDecision` does not track the head SHA.** apache/airflow does not
+dismiss stale reviews, so a branch approved at one SHA and then force-pushed
+(rebase, fixup, extra commits) still reports `APPROVED` for content the
+reviewer never saw — force-pushing does **not** reset `reviewDecision`.
+Before treating an approval as merge authorization, get both SHAs and diff
+the paths the PR owns:
+
+```bash
+gh pr view <n> --json headRefOid --jq .headRefOid
+gh api graphql -f query='...reviews(first:100){nodes{state url submittedAt author{login}}}...'
+git diff --stat <approved-sha> <head-sha> -- <pr-paths>
+```
+
+The approval's own SHA isn't in `--json reviews`; find it in the review
+body / the `#pullrequestreview-<id>` page, or infer it from `submittedAt`
+against the push history. An empty diff means the approval still covers the
+head; a non-empty one is unreviewed content to judge on its own merits
+(docs-only cross-reference with a green docs build is usually fine to
+carry forward; behavior changes are not). Caught on
+apache/airflow#72156 (2026-09-19): `reviewDecision=APPROVED`, approval at
+`8d68806`, head at `c47da8210f` — the delta inside `providers/common/ai/`
+was a two-line `:ref:` the reviewer had never seen.
+
+**A pasted `/changes/A..B` compare range is frequently merge/rebase noise,
+not the author's real work.** Observed repeatedly (2026-07): #65618's range
+spanned 104 commits `ahead_by` while the author changed 1 line; #62501's
+range was 100% rebase-picked `main` files; #67637's range was a lone `Merge
+branch 'main'` commit; #69575's range ended 27 commits before the current
+head. Use `gh pr diff <n> --repo apache/airflow --name-only` for the true
+file set the author touched relative to `main`, and
+`git merge-base --is-ancestor <oldSHA> <newSHA>` — a `no` answer means the
+branch was rebased/force-pushed, so GitHub's three-dot compare is showing
+merge-base→head noise, not old-head→new-head content. `gh pr diff <n>`
+(full, no range) is the source of truth for current state.
+
+**A `gh pr checks` job marked `fail` may actually be cancelled, not
+failed** — and a cancelled pytest job loses its failure detail permanently.
+When one CI job goes red, Airflow's workflow cancels the other still-running
+jobs; those also render as `fail` in `gh pr checks`, but their log ends in
+`##[error]The operation was canceled.` A cancelled pytest job does **not**
+print a short test summary — `airflow-core`'s parallel runner only leaves an
+aggregate progress-bar number (`1 failed, 1979 passed, 9 skipped`), and the
+actual failing test name is gone: grepping the full log for `FAILED` /
+`::test` / `short test summary` is zero-hit no matter how much of it you
+read.
+
+**How to apply**, for the cancelled-job case specifically:
+
+1. Split jobs by conclusion first:
+   `gh run view <run-id> --json jobs -q '.jobs[] | select(.conclusion=="failure") | "\(.databaseId)\t\(.name)"'`,
+   then check whether each job's log ends in `Process completed with exit
+   code 1` (real failure) or `The operation was canceled` (collateral).
+2. For a cancelled job, don't keep digging in that log — check the **same
+   branch's previous run** instead
+   (`gh run list --branch <branch> --limit 10 --json databaseId,headSha,conclusion,createdAt`);
+   if it ran to completion, the real failure is visible there. (Confirmed
+   case: a `Static checks` job's true failure, a `DagCard.test.tsx` TS1360
+   error, was only recoverable from the prior run — the current run's job
+   had been cancelled.)
+3. If the previous run doesn't have it either, say plainly "the failing
+   test name is not recoverable" rather than guessing one from the diff;
+   re-triggering CI is the only reliable path.
+4. CI logs carry heavy ANSI coloring — strip it to a file first
+   (`sed 's/\x1b\[[0-9;]*m//g'`) before grepping, or color codes can split a
+   pattern across lines and produce a false zero-hit.
+
+Across all four: the common discipline is the same as §23 — a GitHub-surface
+status field (a check list, a decision field, a compare range, a job
+conclusion) answers a narrower question than it appears to, and the actual
+head SHA / actual job log is the only thing that answers the real one.
+
 ## See also: parallel batch review safety
 
 Read-only discipline for fanning out multiple PRs to parallel reviewers on a
