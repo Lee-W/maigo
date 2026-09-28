@@ -374,7 +374,10 @@ rebuilt DB gets hit by the next concurrent run just the same. Distinguish
 by recurrence pattern: **stable, same failures every run → stale schema**
 (delete + rebuild); **flickering across runs, single-file always green →
 concurrency** (no fix beyond not writing it to a known-failures list, since
-that would silence a real future regression too).
+that would silence a real future regression too). This is exactly what the
+isolated `AIRFLOW_HOME` recipe below (§ "Every worktree shares one sqlite
+test DB") prevents — apply it proactively rather than diagnosing after the
+fact.
 
 ### `providers/common/ai`'s sandbox tests are stuck at 12 reds on macOS, unrelated to branch content
 
@@ -484,6 +487,47 @@ a shortcut here either — the image's packages are equally stale, and a
 fresh worktree's first Breeze run can separately stall on an image build.
 `uv run --project <PROJECT> pytest` is sufficient once synced.
 
+### A rebase that bumps `uv.lock` makes an installed-package comparison test red — and that's the PR's responsibility, not a false red
+
+When a PR carries a test that compares against an **installed** third-party
+package's actual surface (e.g. `TestPydanticAIExternalServicesDrift` in
+`providers/common/ai`), rebasing onto a `main` that bumped `uv.lock` for that
+package makes the comparison test red. Unlike the false-red shapes above,
+**this is a real signal the PR is responsible for**, not environment noise —
+the installed package genuinely changed, and the comparison test is doing its
+job.
+
+Before attributing, compare the two lockfiles directly rather than assuming:
+
+```bash
+git show <base>:uv.lock | grep "<package-name>"
+git show HEAD:uv.lock | grep "<package-name>"
+```
+
+Once confirmed, classify every newly-appeared upstream item honestly (new
+vendor, newly-reachable module, newly-deprecated one — see
+[`references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+§10.26 for the classification rules), and give **every** new exclusion-list
+entry its own guard test — don't just widen an existing assertion to swallow
+the new item.
+
+**Then check the floor, not just the ceiling**: after reclassifying, confirm
+CI's "Low dep tests" job would still pass — it installs the version floor
+declared in `pyproject.toml`, and a newly-declared vendor (or a module a new
+guard test imports) may not exist at that floor. The local `.venv` has the
+newer version installed, so this gap is invisible locally. Follow the
+existing shape rather than inventing one: a version constant plus
+`pytest.mark.skipif` (e.g. `ALL_DECLARED_VENDORS_AVAILABLE_FROM` in
+`providers/common/ai/tests/unit/common/ai/test_provider_metadata.py`) — not a
+bare `try`/`except` that silently swallows the gap.
+
+**Don't stop at making the assertion pass.** Widening it in only one
+direction (e.g. dropping a strict two-way equality to a one-way subset check)
+just to get past the immediate red reopens the exact defect a two-directional
+check exists to catch (§10.26 again). Gate the loosened direction behind its
+own version constant, and prove the tripwire still fires with a mutation
+canary (§6 above) before considering the fix done.
+
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 
 `AIRFLOW_HOME` defaults to `~/airflow` for every worktree, so
@@ -498,6 +542,21 @@ otherwise-identical runs** on your own code. Fix: give the worktree its own
 private `AIRFLOW_HOME` (outside the repo, so it doesn't dirty `git status`),
 and delete-and-recreate that DB before each run rather than relying on an
 in-place reset flag, which can itself fail on a half-broken schema.
+
+Concrete recipe: point `AIRFLOW_HOME` at a fresh directory (e.g. under the
+scratchpad) before running, and confirm `ls $AIRFLOW_HOME` shows a
+newly-created `airflow.db`. **Every concurrently-running agent needs its own**
+`AIRFLOW_HOME`, not just every worktree — sharing one between parallel agents
+reproduces the exact same clash. Never delete the user's `~/airflow/airflow.db`
+without asking — it's their shared local dev DB, not a disposable artifact of
+this worktree.
+
+If this is wired into `.claude/test-command`, remember this section's earlier
+"runs as argv, not through a shell" rule: write it as `env AIRFLOW_HOME=<dir>
+uv run ...` (a single command, with `env` doing the prefixing) —
+`AIRFLOW_HOME=<dir> uv run ...` without `env` fails with `command not found`
+under `shlex.split` + `subprocess.run`, the same mechanism as that rule's
+`ENV=val cmd` example; it only works under an actual shell.
 
 ## 5. Repo-scoped commands need a pinned working directory across worktrees
 

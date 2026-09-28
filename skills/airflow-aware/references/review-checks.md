@@ -897,6 +897,51 @@ when citing this item and cross-reference 10.12.
   tests need one case per shape" section of
   [`skills/strict-review/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/test-conventions.md)).
 
+## 10.30 Two checks before touching a provider metadata schema *(Request changes)*
+
+**Scope gate**: applies when a diff modifies `provider.yaml.schema.json` or
+`provider_info.schema.json`, or proposes a new globally-registered Sphinx
+directive to expose a provider-specific concept.
+
+1. **A concept only one provider has doesn't belong in the shared mechanism.**
+   A single-provider concept (e.g. `common.ai`'s toolsets) should not be added
+   to core's `provider.yaml.schema.json`, nor turned into a global Sphinx
+   directive registered in `devel-common` — either move invites every other
+   provider to adopt a shape that doesn't fit them. Keep it in that
+   provider's own docs, and let that provider's own tests guard against
+   drift (e.g. a hand-written table checked against `provider.yaml`'s
+   `python-modules` by a test in that provider's own test suite). Only a
+   field that is genuinely cross-provider (e.g.
+   `connection-types[].external-services`) belongs in the shared schema.
+   Source: apache/airflow #72939.
+2. **Only the authoring schema may be tightened — never the runtime one.**
+   Two schemas look similar but their tightening safety is opposite.
+   `provider.yaml.schema.json` is the authoring/dev schema — it validates
+   only in-tree `provider.yaml` files via the `check-provider-yaml-valid`
+   prek hook, so adding `required` or `additionalProperties: false` there is
+   safe. `provider_info.schema.json` is the **runtime** schema — it
+   validates metadata submitted by an **installed** third-party provider
+   through the `apache_airflow_provider` entrypoint, and tightening it is
+   unsafe: the validation call in `discover_all_providers_from_packages`
+   isn't wrapped in `try`/`except`, and neither of its two callers —
+   `ProvidersManager.initialize_providers_list` and task-sdk's
+   `providers_manager_runtime.py` — wrap it either, so one provider failing
+   this schema aborts **all** provider discovery for the whole process
+   (including workers), not just that one provider. Contrast with an entry
+   that merely fails `_correctness_check` instead of the schema: that path
+   *is* wrapped in `except Exception`, logs a warning, and skips only that
+   one provider — tightening the schema converts this survivable
+   single-provider failure into a process-wide one. The root cause is a
+   design constraint: providers must be installable against **older** Airflow
+   versions, so the runtime schema has to tolerate fields a newer schema
+   version might add later — `additionalProperties: false` there locks the
+   API shape permanently. If a runtime-schema description is itself wrong
+   (e.g. a stale bare-key `items` entry that's actually invalid JSON Schema
+   and silently ignored), rewriting it as correct `properties` for
+   documentation is fine — just never attach `required` or similar
+   enforcement alongside that fix. Source: apache/airflow #71104 (kaxil,
+   potiuk).
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,

@@ -115,6 +115,17 @@ git state is clean..."）。**這個 `failed` 字面上看起來像整個任務�
 3. 若 git 狀態顯示工作明顯未完成或矛盾——才視同「跑到一半被切斷」，比照上面 usage/session
    limit 小節處理（SendMessage 續跑同一 agent，要求先盤點再續作）。
 
+### Handback 送達但內容遺失
+
+`<task-notification>` 正常到達且 `status: completed`，`<result>` 寫著報告已用訊息送達，
+但那則訊息從未出現——這是內容遺失，不是任務失敗。**不要**重派新 agent 重做同一輪工作、
+不要自己代跑它該做的檢查、不要假設遺失的結論是 PASS。三步處置（先自己看現場 →
+`SendMessage` 同一 agent 要求只重貼不重跑 → 採用重貼內容）與案例，見
+[`references/handback-content-missing.md`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/references/handback-content-missing.md)。
+
+**附帶**：這也代表**不能用「收到 handback」當 agent 已停止的訊號**——handback 只是那一輪
+的輸出，agent 可能仍在跑、仍在改共用 worktree；生命週期一律用 `ListAgents` 查。
+
 ### 等待自己開的背景 agent
 
 用 Agent tool 開的背景 agent 完成時會自動發 task-notification 把 orchestrator 叫回來，**不需要

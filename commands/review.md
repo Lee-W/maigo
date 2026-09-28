@@ -73,6 +73,14 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 `scripts/artifact_path.py review-rubric --topic "Review rubric: <PR title>"` 自己算），
 歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)（目錄不存在請先 `mkdir -p .maigo`）
 
+**派燈之前，先給她一份可讀的 diff 檔**：燈沒有 Bash，跑不了 `git diff` / `git show`，只靠
+樂奈的摘要加讀現檔分不出一行是不是這個 commit 新增的。orchestrator 把 diff 存成
+`<scratchpad>/diff-<id>.patch`（`git diff <base>...HEAD > <path>`；PR 來源用
+`gh pr diff <num/url> > <path>`）並把路徑寫進交辦文，要求她用 diff 的**新增行**判斷
+「是不是本次新增」——pr-context-cache 寫進 rubric 的 Full diff 段已覆蓋大部分情況，
+只有走 fallback 手動抓（第 1 步 pr-context-cache 跑不起來）時才需要額外補這份檔案。
+（實例：一次 review 曾因此把既有內容誤標成本次新增、也誤判 changelog 沒改。）
+
 從 PR description / commit message / linked issue / 變更本身，萃取出 reviewer 的**對照基準**
 （acceptance / edge case / trade-off / 待釐清點）。欄位骨架見
 `skills/strict-review/references/review-templates.md`「Review rubric 骨架」。
