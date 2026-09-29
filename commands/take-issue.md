@@ -51,10 +51,11 @@ gh issue view <n> --json title,body,labels,comments
 ```
 
 若曾跑過 `/maigo:triage-issue`，`.maigo/` 底下可能有這條 issue 的 triage 產物：呼叫
-`python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" triage-rubric --url <issue url> --topic "Triage rubric: <title> (#<n>)"`
-取得這條 issue 的候選路徑，`path:` 那行指的檔案存在就讀；`status: new`（新路徑還沒被寫過）
-或 `status: conflict`（識別碼被別的主題占用）→ 退回讀舊 `.maigo/triage-rubric.md`（`legacy_exists:`
-那行，只可讀）。兩者都讀不到也不擋，就當沒有先前 triage 產物繼續。把 issue
+`python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <title> (#<n>)"`
+取得這條 issue 的候選路徑，依序退路讀取：`path:`（`.maigo/issue/<id>/rubric.md`，巢狀正典路徑）
+那行指的檔案存在就讀；不存在則退到 `flat_exists:`（`.maigo/triage-rubric-<id>.md`，分目錄前扁平
+檔，只可讀）；再不存在才退到 `legacy_exists:`（`.maigo/triage-rubric.md`，舊固定檔名，只可讀）。
+三層都讀不到也不擋，就當沒有先前 triage 產物繼續。把 issue
 body + comments 整理成需求敘述：acceptance criteria 從 body 與 maintainer 在 comments 的
 補充萃取，帶著這份 issue context 進下一步。
 

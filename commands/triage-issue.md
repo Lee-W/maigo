@@ -74,7 +74,7 @@ gh api repos/<owner>/<repo>/issues/<N>/timeline --paginate              # linked
 
 ### 3. 燈 (Tomori) — 寫 triage rubric
 
-呼叫 `scripts/artifact_path.py triage-rubric --url <issue url> --topic "Triage rubric: <issue title> (#<N>)"` 取得路徑（目錄不存在請先 `mkdir -p .maigo`）。**每條 issue 各自一份**——同一批多條 issue 不再共用同一個檔案，爽世讀完即可，不需要長期保留（歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
+呼叫 `scripts/artifact_path.py triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <issue title> (#<N>)"` 取得路徑（`.maigo/issue/<N>/rubric.md`；父目錄不存在請先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`）。**每條 issue 各自一份**——同一批多條 issue 不再共用同一個檔案，爽世讀完即可，不需要長期保留（歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
 燈在 triage-issue 模式下的輸出結構見 [`agents/Tomori.md`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md) 的「triage-issue 模式」段。重點：
 

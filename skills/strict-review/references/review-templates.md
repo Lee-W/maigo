@@ -7,7 +7,7 @@ file when writing the rubric or assembling the final report.
 
 ---
 
-## Review rubric 骨架（`.maigo/review-rubric-<id>.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
+## Review rubric 骨架（`.maigo/review/<id>/rubric.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
 
 ```markdown
 # Review rubric: <PR title>
@@ -30,7 +30,7 @@ file when writing the rubric or assembling the final report.
 
 ## 輸出
 
-這個骨架不只是聊天視窗的形狀，現在也是逐字寫進 `.maigo/review-<id>.md`
+這個骨架不只是聊天視窗的形狀，現在也是逐字寫進 `.maigo/review/<id>/review.md`
 （`kind="review"`，見
 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)，
 呼叫方式見

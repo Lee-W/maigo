@@ -8,7 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 import scripts.pr_context_cache as pcc
 
 
@@ -192,7 +191,9 @@ class TestMainCacheFlow:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture,
     ):
-        monkeypatch.setattr(pcc, "_resolve_rubric_path", lambda source, kind: None)
+        monkeypatch.setattr(
+            pcc, "_resolve_rubric_path", lambda source, kind: (None, None)
+        )
         monkeypatch.setattr(
             pcc,
             "fetch_context",
@@ -200,25 +201,87 @@ class TestMainCacheFlow:
         )
         assert pcc.main(["my-branch"]) == 3
 
+    def test_flat_fallback_cache_hit_writes_new_path_and_leaves_flat_untouched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        """(a) 只有扁平檔、Source+sha 吻合 → cache_hit: true、新路徑寫入、扁平檔不變。"""
+        flat = tmp_path / "flat-rubric.md"
+        diff = "the diff"
+        flat.write_text(pcc.render_cache(_fields(diff=diff)) + "\n", encoding="utf-8")
+        flat_sha_before = hashlib.sha256(flat.read_bytes()).hexdigest()
+
+        new_path = tmp_path / "review" / "42" / "rubric.md"
+        monkeypatch.setattr(
+            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat)
+        )
+        monkeypatch.setattr(
+            pcc,
+            "current_diff_sha",
+            lambda *a: hashlib.sha256(diff.encode()).hexdigest(),
+        )
+        monkeypatch.setattr(
+            pcc,
+            "fetch_context",
+            lambda *a: pytest.fail("fetch_context called on flat cache hit"),
+        )
+        assert pcc.main(["my-branch"]) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("cache_hit: true")
+        assert new_path.is_file()
+        assert pcc.find_cache_section(new_path.read_text(encoding="utf-8")) is not None
+        assert hashlib.sha256(flat.read_bytes()).hexdigest() == flat_sha_before
+
+    def test_flat_fallback_sha_mismatch_refetches_leaves_flat_untouched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        """(b) 只有扁平檔、sha 不同 → cache_hit: false、扁平檔不變、新路徑被寫入。"""
+        flat = tmp_path / "flat-rubric.md"
+        flat.write_text(
+            pcc.render_cache(_fields(diff="old diff")) + "\n", encoding="utf-8"
+        )
+        flat_sha_before = hashlib.sha256(flat.read_bytes()).hexdigest()
+
+        new_path = tmp_path / "review" / "42" / "rubric.md"
+        monkeypatch.setattr(
+            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat)
+        )
+        monkeypatch.setattr(pcc, "current_diff_sha", lambda *a: "different-sha")
+        monkeypatch.setattr(pcc, "fetch_context", lambda *a: _fields(diff="new diff"))
+        assert pcc.main(["my-branch"]) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("cache_hit: false")
+        assert "new diff" in new_path.read_text(encoding="utf-8")
+        assert hashlib.sha256(flat.read_bytes()).hexdigest() == flat_sha_before
+
 
 def _stub_resolution(**overrides) -> SimpleNamespace:
     fields = {
         "status": "new",
-        "path": ".maigo/review-rubric-42.md",
+        "path": ".maigo/review/42/rubric.md",
         "existing_topic": None,
         "incoming_topic": "Review rubric: stub",
         "suggested_path": None,
         "legacy_path": None,
+        "flat_path": None,
     }
     fields.update(overrides)
     return SimpleNamespace(**fields)
 
 
 class TestResolveRubricPath:
-    """`_resolve_rubric_path()` calls `artifact_path.resolve_for_write()` per
-    kind (pr/branch/range) and translates its Resolution into either a Path
-    or the conflict stdout + None. `resolve_for_write()` itself is tested in
-    `tests/test_artifact_path.py` — these tests only check the plumbing."""
+    """
+    `_resolve_rubric_path()` calls `artifact_path.resolve_for_write()` per
+    kind (pr/branch/range) and translates its Resolution into either a
+    `(rubric_path, flat_fallback)` tuple or the conflict stdout + `(None, None)`.
+    `resolve_for_write()` itself is tested in `tests/test_artifact_path.py` —
+    these tests only check the plumbing.
+    """
 
     def test_pr_kind_builds_url_and_title_topic(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
@@ -227,11 +290,11 @@ class TestResolveRubricPath:
 
         def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
             captured.update(kind=kind, topic=topic, url=url, home_repo=home_repo)
-            return _stub_resolution(path=".maigo/review-rubric-42.md")
+            return _stub_resolution(path=".maigo/review/42/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("42", "pr")
-        assert result == Path(".maigo/review-rubric-42.md")
+        assert result == (Path(".maigo/review/42/rubric.md"), None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: Fix the thing",
@@ -245,11 +308,11 @@ class TestResolveRubricPath:
 
         def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
             captured.update(kind=kind, topic=topic, url=url)
-            return _stub_resolution(path=".maigo/review-rubric-my-branch.md")
+            return _stub_resolution(path=".maigo/review/my-branch/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("my-branch", "branch")
-        assert result == Path(".maigo/review-rubric-my-branch.md")
+        assert result == (Path(".maigo/review/my-branch/rubric.md"), None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: my-branch",
@@ -262,16 +325,33 @@ class TestResolveRubricPath:
 
         def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
             captured.update(kind=kind, topic=topic, url=url)
-            return _stub_resolution(path=".maigo/review-rubric-main-feature.md")
+            return _stub_resolution(path=".maigo/review/main-feature/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("main..feature", "range")
-        assert result == Path(".maigo/review-rubric-main-feature.md")
+        assert result == (Path(".maigo/review/main-feature/rubric.md"), None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: main..feature",
             "url": None,
         }
+
+    def test_returns_flat_fallback_when_present(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(
+            pcc,
+            "resolve_for_write",
+            lambda *a, **kw: _stub_resolution(
+                path=".maigo/review/42/rubric.md",
+                flat_path=".maigo/review-rubric-42.md",
+            ),
+        )
+        result = pcc._resolve_rubric_path("42", "pr")
+        assert result == (
+            Path(".maigo/review/42/rubric.md"),
+            Path(".maigo/review-rubric-42.md"),
+        )
 
     def test_conflict_prints_owner_and_suggestion_and_returns_none(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
@@ -284,15 +364,15 @@ class TestResolveRubricPath:
                 status="conflict",
                 path=None,
                 existing_topic="Review rubric: Some other PR",
-                suggested_path=".maigo/review-rubric-42-2.md",
+                suggested_path=".maigo/review/42/rubric-2.md",
             ),
         )
         result = pcc._resolve_rubric_path("42", "pr")
-        assert result is None
+        assert result == (None, None)
         out = capsys.readouterr().out
         assert "status: conflict" in out
         assert "conflict_owner: Review rubric: Some other PR" in out
-        assert "suggest: .maigo/review-rubric-42-2.md" in out
+        assert "suggest: .maigo/review/42/rubric-2.md" in out
 
 
 class TestRenderReviewThreads:

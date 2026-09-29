@@ -303,7 +303,7 @@ class TestClassifyReviewPr:
         assert result.rank is bs.Rank.P8
 
     def test_unposted_verdict_when_review_not_posted(self):
-        """prior 是 active verdict，但 `reviews` 裡沒有你貼出的項目 → 待送出（P3）。"""
+        """Prior 是 active verdict，但 `reviews` 裡沒有你貼出的項目 → 待送出（P3）。"""
         gh_meta = {
             "state": "OPEN",
             "isDraft": False,
@@ -318,7 +318,7 @@ class TestClassifyReviewPr:
         assert result.rank is bs.Rank.P3
         assert (
             result.next_action
-            == "gh pr review <n> --comment --body-file .maigo/review-<n>.md"
+            == "gh pr review <n> --comment --body-file <review-draft>"
         )
 
     def test_unposted_verdict_not_triggered_when_review_already_posted(self):
@@ -508,7 +508,8 @@ class TestAllowedTransitionsProperty:
     def test_classify_output_is_within_allowed_transitions(
         self, item_type, prior, gh_meta
     ):
-        """`classify()` 的輸出必須 ∈ `ALLOWED_TRANSITIONS[prior]`。
+        """
+        `classify()` 的輸出必須 ∈ `ALLOWED_TRANSITIONS[prior]`。
 
         本測試曾抓到 `ALLOWED_TRANSITIONS` 的兩個真實缺口——`NEW_REPLY` 缺
         `NEEDS_INFO` 出邊、review 的 active verdict priors 缺 `OTHERS_DRAFT`
@@ -583,7 +584,7 @@ class TestNextActionForStatus:
             pytest.param("可合併", "gh pr merge <n>", id="mergeable"),
             pytest.param(
                 "待送出",
-                "gh pr review <n> --comment --body-file .maigo/review-<n>.md",
+                "gh pr review <n> --comment --body-file <review-draft>",
                 id="unposted-verdict",
             ),
             # P4：等你審
@@ -749,3 +750,71 @@ class TestMain:
 
         assert bs.main([]) == 0
         assert json.loads(capsys.readouterr().out) == []
+
+    @staticmethod
+    def _unposted_verdict_item(url):
+        return {
+            "type": "👀",
+            "gh_meta": {
+                "state": "OPEN",
+                "isDraft": False,
+                "author": {"login": "carol"},
+                "createdAt": "2026-01-01T00:00:00Z",
+                "reviews": [],
+                "comments": [],
+            },
+            "prior_status": "APPROVE",
+            "url": url,
+        }
+
+    def test_unposted_verdict_same_repo_fills_review_draft_path(
+        self, monkeypatch, capsys
+    ):
+        # canary C 的紅燈斷言：`main()` 拿掉佔位字替換必須紅在這裡。
+        stdin_payload = json.dumps(
+            [
+                self._unposted_verdict_item(
+                    "https://github.com/apache/airflow/pull/58543"
+                )
+            ]
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_payload))
+
+        exit_code = bs.main(["--you", YOU, "--repo", "apache/airflow"])
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["status"] == "待送出"
+        assert out[0]["next_action"] == (
+            "gh pr review <n> --comment --body-file .maigo/review/58543/draft.md"
+        )
+
+    def test_unposted_verdict_cross_repo_prefixes_repo_name(self, monkeypatch, capsys):
+        stdin_payload = json.dumps(
+            [
+                self._unposted_verdict_item(
+                    "https://github.com/apache/airflow/pull/58543"
+                )
+            ]
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_payload))
+
+        exit_code = bs.main(["--you", YOU])
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["next_action"] == (
+            "gh pr review <n> --comment --body-file .maigo/review/airflow-58543/draft.md"
+        )
+
+    def test_unposted_verdict_without_url_keeps_placeholder(self, monkeypatch, capsys):
+        stdin_payload = json.dumps([self._unposted_verdict_item(None)])
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_payload))
+
+        exit_code = bs.main(["--you", YOU])
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["next_action"] == (
+            "gh pr review <n> --comment --body-file <review-draft>"
+        )

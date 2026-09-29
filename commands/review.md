@@ -70,8 +70,10 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 ### 2. 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
 
 用 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時呼叫
-`scripts/artifact_path.py review-rubric --topic "Review rubric: <PR title>"` 自己算），
-歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)（目錄不存在請先 `mkdir -p .maigo`）
+`scripts/artifact_path.py review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name>` 自己算，
+`--repo` 取值見「## 輸出」段的 `pr_context_cache.repo_slug()`；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo` 即可），
+歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
+（目錄不存在請先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`——巢狀佈局下父目錄是 `.maigo/review/<id>/`）
 
 **派燈之前，先給她一份可讀的 diff 檔**：燈沒有 Bash，跑不了 `git diff` / `git show`，只靠
 樂奈的摘要加讀現檔分不出一行是不是這個 commit 新增的。orchestrator 把 diff 存成
@@ -128,13 +130,17 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 - `標記本 repo 不適用 + 理由`——同上，導向 Soyo propose
 
 選完後 orchestrator 依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
-起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號），落檔 `.maigo/review-draft-<id>.md`
-（`<id>` 與同次 `review-<id>.md` 相同），並寫進 board 細節檔的 `## 筆記`。只起草、不送出。
+起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號）,呼叫
+`scripts/artifact_path.py review-draft --url <PR url> --repo <owner/name> --topic "Review draft: <PR title>"`
+取得落檔路徑（`.maigo/review/<id>/draft.md`），把草稿逐字寫進那個路徑，並寫進 board 細節檔的
+`## 筆記`。只起草、不送出。
 
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
 **gate 不 block report、不改 verdict**——report 出完後純收集意願，不影響 Soyo 的 APPROVE / REQUEST_CHANGES / BLOCKED 結論。
-使用者沉默 / 全採納（外部 PR 為全「放進 review」，仍照常起草） / Soyo 無任何 finding（must-fix 與 nit 皆空，即 APPROVED 且無 suggest）→ 無聲略過整個 gate；APPROVED 但有 nit 仍觸發 gate（nit 非空）。
+使用者沉默 / 全採納（外部 PR 為全「放進 review」，仍照常起草） / Soyo 無任何 finding（must-fix 與 nit 皆空，即 APPROVED 且無 suggest）→ 無聲略過整個裁決 gate（不問使用者選項），
+但仍照上面同一支 `artifact_path.py review-draft` 呼叫寫一份**最小 draft**（approve 用的短 body，例如「LGTM，見 review 報告」）——
+`board_state.py` 的 `待送出` next_action 永遠指向這個路徑，這步驟讓它永遠存在，不因為零 finding 而跳過；APPROVED 但有 nit 仍觸發完整 gate（nit 非空）。
 
 **無次數驅動收斂**：orchestrator 不追蹤「某條 finding 被駁回幾次」、不自動 soften；
 依 [`docs/skills/strict-review`](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md) 的「user previously accepted X is not evidence」——純駁回記錄不影響下次 review 標準。
@@ -180,10 +186,12 @@ repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal
 
 ```
 python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review \
-    --topic "Review: <PR title / branch / range>"
+    --topic "Review: <PR title / branch / range>" --url <PR url> --repo <owner/name>
 ```
 
-取得落檔路徑（歸屬規則見
+（`--repo` 用 `gh repo view --json nameWithOwner -q .nameWithOwner`——與
+`pr_context_cache.repo_slug()` 相同取法；本地 branch / commit range 沒有 PR url，省略
+`--url`/`--repo`）取得落檔路徑（歸屬規則見
 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）：
 
 - `status: conflict`（exit 3）→ 依 artifact-ownership 規則 3，把 `conflict_owner:` 與
@@ -193,8 +201,10 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review \
   兩者都要，不是二選一
 
 **多 PR batch**：每顆 PR 各自呼叫一次 `artifact_path.py review --topic "Review: <該 PR 的
-title>"`（H1 各自不同），各自落一份 `review-<id>.md`——GitHub PR 有 `--url` 天然走
-`resolve_identifier()` 第 1 級，identifier 各自不同，不會互相覆寫，不需要額外機制。
+title>" --url <該 PR url> --repo <owner/name>`（H1 各自不同），各自落一份
+`.maigo/review/<id>/review.md`——GitHub PR 有 `--url` 天然走 `resolve_identifier()`
+第 1 級，identifier 各自不同，落在各自的 `review/<id>/` 資料夾，不會互相覆寫，不需要
+額外機制。
 
 ## Work Board 回寫
 
@@ -209,10 +219,11 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
   （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
 - merged / closed → 👀 行進 ✅ 最近結案
-- 上面「## 輸出」段呼叫 `artifact_path.py review` 拿到的 `path:`（即這份
-  `review-<id>.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
+- 上面「## 輸出」段呼叫 `artifact_path.py review` 拿到的 `path:`（即
+  `review/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
-  的 `## 筆記` 區，一行裸相對路徑連結——不再寫進索引行
+  的 `## 筆記` 區，一行裸相對路徑連結（相對 `.maigo/`，例如 `review/9301/review.md`）——
+  不再寫進索引行
 
 回寫時必須保留原 checkbox 與 `🧠` 標記。刷新 / 查看 board 用 `/maigo:board`；
 `/maigo:review` 不提供 board-only alias。
@@ -222,7 +233,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 | 項目 | `/maigo:go` | `/maigo:review` |
 |------|---------|---------------|
 | Anon 上場 | 是（核心） | 不上場 |
-| 燈的產出 | 實作計畫 (`plan.md`) | review rubric (`review-rubric.md`) |
+| 燈的產出 | 實作計畫 (`plan-<id>.md`) | review rubric (`review/<id>/rubric.md`) |
 | 終態 | 變更落地 + 全綠 | review 報告 |
 | 適用 | 開發新功能、修 bug | PR review、code audit |
 

@@ -1,12 +1,15 @@
 # Harness Discipline — Artifact Ownership
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
-`.maigo/` 底下 agent 寫的 markdown 產物（`plan.md` / `review-rubric.md` /
-`review.md` / `triage-rubric.md` / `pr-comments.md` 這類）曾經被兩個並行
-session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻該有各自一份。
+`.maigo/` 底下 agent 寫的 markdown 產物（`plan` / `review` / `review-rubric` /
+`review-draft` / `triage-rubric` / `pr-comments` 這類）曾經被兩個並行
+session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻該有各自一份；後續
+又改成按 PR/issue 分資料夾（`.maigo/review/<id>/{review,rubric,draft,
+pr-comments}.md`、`.maigo/issue/<id>/rubric.md`；`plan` 例外，維持扁平
+`.maigo/plan-<id>.md`）。
 Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要幫它取
 路徑之前。`.maigo/` 全貌型錄（含非 markdown 機器狀態檔、Work Board、舊固定
-檔名與未登記檔案）見
+檔名、分目錄前扁平檔與未登記檔案）見
 [`docs/reference/artifacts.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/artifacts.md)。
 
 ---
@@ -38,20 +41,31 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    使用者，不要自作主張換名或覆寫。`status: same_topic` 才是安全續寫；
    `status: new` 直接照 `path:` 那行的路徑寫入。
 
-   **`suggest:` 只是單層候選，永遠是 `<identifier>-2`，不會檢查這個檔名本身
-   是否也已被別的主題占用**——如果同一個 identifier 底下已經有 `-2`、`-3`
-   甚至更多份不同主題的產物（常發生在同一個 branch/PR 上跑過多輪
-   `/maigo:go`、`/maigo:quick` 之後），`suggest:` 給的路徑可能撞到其中一份。
-   使用 `suggest:` 之前，自己（或無 Bash 的 subagent 手動推算後）逐一
-   `ls .maigo/` 加讀 H1 核對，確認候選檔名真的沒被佔用，必要時往下遞增到
-   `-3`、`-4`；不要對 `suggest:` 的路徑照單全收。
+   **`suggest:` 只是單層候選（第 2 個 attempt），不會檢查這個路徑本身是否也
+   已被別的主題占用**——非巢狀 kind（`plan`）長成 `plan-<id>-2.md`；巢狀
+   kind（`review` / `review-rubric` / `review-draft` / `pr-comments` /
+   `triage-rubric`）後綴落在檔名層、不是目錄層，長成
+   `review/<id>/rubric-2.md` 這類，不是另開一個 `review/<id>-2/` 資料夾。
+   如果同一個 identifier 底下已經有 `-2`、`-3` 甚至更多份不同主題的產物
+   （常發生在同一個 branch/PR 上跑過多輪 `/maigo:go`、`/maigo:quick` 之
+   後），`suggest:` 給的路徑可能撞到其中一份。使用 `suggest:` 之前，自己
+   （或無 Bash 的 subagent 手動推算後）`ls` 對應資料夾（非巢狀 kind 是
+   `.maigo/`；巢狀 kind 是 `.maigo/review/<id>/` 或 `.maigo/issue/<id>/`）
+   加讀 H1 核對，確認候選路徑真的沒被佔用，必要時往下遞增到 `-3`、`-4`；
+   不要對 `suggest:` 的路徑照單全收。
 
-4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）只可讀、不可當寫入
-   目標**——有續跑語意的產物（如 `plan.md`）在新路徑讀不到內容時可以退回讀舊
-   檔繼續，但下一次寫入一律寫到 script 回的新路徑，不回寫舊檔。這條現在不是只
-   靠你記得——`Write` / `Edit` 寫入 `.maigo/` 底下的舊固定檔名會被
+4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）與分目錄前扁平檔
+   （`flat_exists:` 那行指的檔案，只有巢狀 kind 才可能有）都只可讀、不可當
+   寫入目標**——有續跑語意的產物（如 `plan-<id>.md`）在新路徑讀不到內容時
+   可以退回依序讀 `flat_exists:` 再讀 `legacy_exists:` 繼續，但下一次寫入
+   一律寫到 script 回的 `path:` 新路徑，不回寫任何一種舊檔。這條現在不是只
+   靠你記得——`Write` / `Edit` 寫入 `.maigo/` 底下的舊固定檔名或分目錄前
+   扁平檔都會被
    [`hooks/legacy_artifact_path_check.py`](https://github.com/Lee-W/maigo/blob/main/hooks/legacy_artifact_path_check.py)
-   （PreToolUse）直接擋下，訊息會附上正確的 `artifact_path.py` 呼叫指令。
+   （PreToolUse）直接擋下，訊息會附上正確的 `artifact_path.py` 呼叫指令，
+   也會提醒既有舊檔可用
+   [`scripts/migrate_legacy_artifacts.py`](https://github.com/Lee-W/maigo/blob/main/scripts/migrate_legacy_artifacts.py)
+   搬過去。
 
 `pr-comments` 另外還有
 [`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)

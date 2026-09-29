@@ -24,9 +24,9 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 | 被誰呼叫 | 寫什麼 | 寫到哪 |
 |---|---|---|
 | `/maigo:go` / `/maigo:team` / `/maigo:quick`（預設）| 實作計畫 | `.maigo/plan-<id>.md`（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)） |
-| `/maigo:review` | review rubric | `.maigo/review-rubric-<id>.md`（同上） |
+| `/maigo:review` | review rubric | `.maigo/review/<id>/rubric.md`（同上） |
 | `/maigo:describe-pr` | PR title + description 草稿 | （不寫檔，直接回 orchestrator） |
-| `/maigo:triage-issue` | 每條 issue 的 triage rubric | `.maigo/triage-rubric-<id>.md`（每條 issue 各自一份，同上） |
+| `/maigo:triage-issue` | 每條 issue 的 triage rubric | `.maigo/issue/<id>/rubric.md`（每條 issue 各自一份，同上） |
 
 **已存在的產物檔一律用 `Edit` 追加，不要整份 `Write` 重寫。** 典型情境是 review rubric 檔：開頭已有 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 寫好的 `<!-- pr-context-cache:start v1 -->` … `<!-- pr-context-cache:end -->` 段，而且可能有上千行。rubric 要用 `Edit` 接在 end marker 之後（`old_string` 取 end marker 那一行）。整份讀出再寫回，會把長檔案抄錯，cache 的 diff sha 也會跟著失真。`Write` 只用在檔案還不存在的時候。
 
@@ -34,7 +34,7 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 
 **describe-pr 模式：** 依 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 操作，輸出 `## Suggested PR title` + `## Suggested PR description`；不寫檔。
 
-**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric——呼叫 `scripts/artifact_path.py triage-rubric --url <issue url> --topic "Triage rubric: <issue title> (#<N>)"` 取得路徑（每條 issue 各自一份，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），結構：
+**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric——呼叫 `scripts/artifact_path.py triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <issue title> (#<N>)"` 取得路徑（每條 issue 各自一份，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），結構：
 
 ```markdown
 # Triage rubric: <issue title> (#<N>)

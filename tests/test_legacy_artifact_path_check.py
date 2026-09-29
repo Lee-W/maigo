@@ -1,5 +1,7 @@
-"""Tests for hooks.legacy_artifact_path_check — blocks writes to legacy `.maigo/`
-fixed-name artifacts (`plan.md`, `review-rubric.md`, ...)."""
+"""
+Tests for hooks.legacy_artifact_path_check — blocks writes to legacy `.maigo/`
+fixed-name artifacts (`plan.md`, `review-rubric.md`, ...).
+"""
 
 from __future__ import annotations
 
@@ -8,9 +10,8 @@ import io
 import json
 import sys
 
-import pytest
-
 import hooks.legacy_artifact_path_check as lac
+import pytest
 
 
 def run_silent_hook(
@@ -39,6 +40,7 @@ class TestIsLegacyArtifactPath:
             ".maigo/pr-comments.md",
             ".maigo/triage-rubric.md",
             ".maigo/review.md",
+            ".maigo/review-draft.md",
             "/Users/x/repo/.maigo/plan.md",
         ],
     )
@@ -52,6 +54,7 @@ class TestIsLegacyArtifactPath:
             ".maigo/board.md",
             ".maigo/local-model-dispatch-plan.md",
             ".maigo/i/9201.md",
+            ".maigo/review/42/rubric.md",
             "plan.md",
             "notes/not.maigo/plan.md",
         ],
@@ -61,6 +64,40 @@ class TestIsLegacyArtifactPath:
 
     def test_returns_the_matched_kind(self):
         assert lac.is_legacy_artifact_path(".maigo/review-rubric.md") == "review-rubric"
+
+
+class TestIsFlatPreNestedArtifactPath:
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/review-rubric-42.md",
+            ".maigo/review-42.md",
+            ".maigo/review-draft-airflow-73559.md",
+            ".maigo/pr-comments-42.md",
+            "/Users/x/repo/.maigo/review-rubric-42.md",
+        ],
+    )
+    def test_flat_pre_nested_names_are_flagged(self, path: str):
+        assert lac.is_flat_pre_nested_artifact_path(path) is not None
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/review-batch-state.md",
+            ".maigo/review-board.md",
+            ".maigo/plan-main.md",
+            ".maigo/review/42/rubric.md",
+            ".maigo/review-rubric.md",
+        ],
+    )
+    def test_lookalikes_and_non_nested_are_not_flagged(self, path: str):
+        assert lac.is_flat_pre_nested_artifact_path(path) is None
+
+    def test_returns_the_matched_kind(self):
+        assert (
+            lac.is_flat_pre_nested_artifact_path(".maigo/review-rubric-42.md")
+            == "review-rubric"
+        )
 
 
 class TestLegacyArtifactPathHook:
@@ -128,6 +165,39 @@ class TestLegacyArtifactPathHook:
             == ""
         )
 
+    def test_flat_pre_nested_review_rubric_blocks(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/review-rubric-42.md"), monkeypatch, capsys
+            ).strip()
+        )
+        assert result["decision"] == "block"
+        assert "migrate_legacy_artifacts.py" in result["reason"]
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/review-batch-state.md",
+            ".maigo/review-board.md",
+        ],
+    )
+    def test_flat_name_lookalikes_pass(
+        self, path: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        assert run_silent_hook(_write_payload(path), monkeypatch, capsys) == ""
+
+    def test_nested_path_passes(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        assert (
+            run_silent_hook(
+                _write_payload(".maigo/review/42/rubric.md"), monkeypatch, capsys
+            )
+            == ""
+        )
+
     def test_edit_tool_also_blocks(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ):
@@ -173,14 +243,18 @@ class TestLegacyArtifactPathHook:
 
 
 class TestBrokenArtifactPathImportFailsOpen:
-    """Regression for the must-fix: `scripts/artifact_path.py` breaking (e.g. a
+    """
+    Regression for the must-fix: `scripts/artifact_path.py` breaking (e.g. a
     syntax error while a new `kind` is being added) must not take down every
-    Write/Edit in every repo with an uncaught exception."""
+    Write/Edit in every repo with an uncaught exception.
+    """
 
     def _reload_with_broken_artifact_path(self):
-        """Simulate `from artifact_path import _KNOWN_KINDS` failing at import
+        """
+        Simulate `from artifact_path import _KNOWN_KINDS` failing at import
         time, then reload the hook module so it re-runs its own top-level
-        try/except and falls back to `_KNOWN_KINDS = ()`."""
+        try/except and falls back to `_KNOWN_KINDS = ()`.
+        """
         sys.modules.pop("artifact_path", None)
         sys.modules["artifact_path"] = None  # forces ModuleNotFoundError on import
         try:
@@ -189,28 +263,38 @@ class TestBrokenArtifactPathImportFailsOpen:
             sys.modules.pop("artifact_path", None)
 
     def _restore(self):
-        """Reload again with the real `artifact_path` module so later tests in
-        this process see the normal, non-empty `_KNOWN_KINDS`."""
+        """
+        Reload again with the real `artifact_path` module so later tests in
+        this process see the normal, non-empty `_KNOWN_KINDS`.
+        """
         importlib.reload(lac)
 
     def test_import_failure_falls_back_to_empty_known_kinds(self):
         self._reload_with_broken_artifact_path()
         try:
             assert lac._KNOWN_KINDS == ()
+            assert lac._NESTED_LAYOUT == {}
+            assert lac._FLAT_NAME_LOOKALIKES == ()
             # regex built from an empty alternation must never match a real path
             assert lac.is_legacy_artifact_path(".maigo/plan.md") is None
             assert lac.is_legacy_artifact_path(".maigo/review-rubric.md") is None
+            assert (
+                lac.is_flat_pre_nested_artifact_path(".maigo/review-rubric-42.md")
+                is None
+            )
         finally:
             self._restore()
 
     def test_import_failure_still_fails_open_for_legacy_looking_path(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ):
-        """Before the fix this scenario crashed with an uncaught
+        """
+        Before the fix this scenario crashed with an uncaught
         `ModuleNotFoundError`/`SyntaxError`, exit code 1, no stdout at all.
         After the fix, main() must still run to completion (exit 0) and the
         write must not be blocked (no `block` payload) — matching this hook's
-        own documented silent fail-open style."""
+        own documented silent fail-open style.
+        """
         self._reload_with_broken_artifact_path()
         try:
             monkeypatch.setattr(

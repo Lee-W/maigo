@@ -17,7 +17,8 @@ description: This skill should be used during /maigo:review when fetching or reu
 檔開頭的機讀區段，re-review 偵測同 source 且 diff sha 未變 → 直接還原，跳過全部
 `gh` / `git` 重抓。**rubric 檔路徑不再固定**：省略 `--rubric` 時 script 會依 source
 呼叫 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
-算出 `.maigo/review-rubric-<id>.md`（歸屬規則見
+算出 `.maigo/review/<id>/rubric.md`（分目錄前的扁平 `.maigo/review-rubric-<id>.md`
+只在新路徑沒有 cache 時當唯讀退路，永遠不寫；歸屬規則見
 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
 ## 怎麼跑

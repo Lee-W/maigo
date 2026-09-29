@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Maigo SubagentStop hook：各 agent 輸出規格檢查。
+"""
+Maigo SubagentStop hook：各 agent 輸出規格檢查。
 
 失敗時 block（要 agent 補完輸出）；輸入異常 / 角色未定義時 fail-open。
 """
@@ -34,7 +35,8 @@ _NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 
 
 def _extract_soyo_must_fix_keys(out: str) -> set[str]:
-    """Extract must-fix keys from Soyo output.
+    """
+    Extract must-fix keys from Soyo output.
 
     Strategy:
     1. If a '## Must-fix' section exists, extract bullet items from that section only.
@@ -89,7 +91,8 @@ MEMORY_HEADER_RE = re.compile(r"##\s+Loaded memory entries", re.IGNORECASE)
 
 
 def require_memory_header(out: str, role_zh: str) -> None:
-    """Memory-reader agent 必須在輸出含 `## Loaded memory entries` 段。
+    """
+    Memory-reader agent 必須在輸出含 `## Loaded memory entries` 段。
 
     沒有相關 entry 也要明說「（無相關 entry）」——避免 silent skip。
     """
@@ -108,22 +111,38 @@ def check_raana(out: str) -> None:
 PR_DRAFT_RE = re.compile(r"##\s+Suggested PR title", re.IGNORECASE)
 
 # `.maigo/` artifact naming migrated from fixed filenames (`plan.md` /
-# `review-rubric.md` / `triage-rubric.md`) to identifier-suffixed ones
-# (`plan-<id>.md` / ...) — see `.maigo/plan-maigo-artifact-collision.md`.
-# The identifier group is optional so both old and new forms still match;
-# `[A-Za-z0-9]` as the first character after the hyphen rejects malformed
-# forms like `plan-.md` / `plan--x.md`.
-_TOMORI_ARTIFACT_RE = re.compile(
-    r"\.maigo/(?:plan|review-rubric|triage-rubric)(?:-[A-Za-z0-9][\w.-]*)?\.md"
-)
+# `review-rubric.md` / `triage-rubric.md`) through identifier-suffixed flat
+# ones (`plan-<id>.md` / ...) to the current nested-by-PR/issue layout
+# (`review/<id>/rubric.md`, `issue/<id>/rubric.md`) — see
+# `scripts/artifact_path.py`. `artifact_path_regex()` is the single source of
+# truth for matching all three shapes at once; dynamic import (not a literal
+# regex here) keeps this hook from drifting out of sync with that module.
+_TOMORI_ARTIFACT_KINDS = ("plan", "review-rubric", "triage-rubric")
+_TOMORI_ARTIFACT_RE: re.Pattern[str] | None
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from artifact_path import artifact_path_regex
+
+    _TOMORI_ARTIFACT_RE = re.compile(artifact_path_regex(_TOMORI_ARTIFACT_KINDS))
+except Exception:
+    # fail-open, same shape as hooks/legacy_artifact_path_check.py's import
+    # guard: scripts/artifact_path.py is still evolving (kinds get added,
+    # syntax can momentarily break). `None` disables the two path-mention
+    # checks below (`:127`-ish `_plan_criteria_hits()` and `check_tomori()`)
+    # instead of taking down every Tomori SubagentStop check.
+    _TOMORI_ARTIFACT_RE = None
 
 
 def _plan_criteria_hits(out: str) -> list[str]:
-    """Scan the plan artifact 燈 (Tomori) just wrote for literal-grep criteria.
+    """
+    Scan the plan artifact 燈 (Tomori) just wrote for literal-grep criteria.
 
     Fail-open: 讀不到檔案（還沒寫入、路徑在別的 repo、權限問題）就回空 list，
-    hook 不會因為讀檔失敗擋下計畫。
+    hook 不會因為讀檔失敗擋下計畫；`_TOMORI_ARTIFACT_RE` 匯入失敗（`None`）
+    同樣回空 list，不擋。
     """
+    if _TOMORI_ARTIFACT_RE is None:
+        return []
     match = _TOMORI_ARTIFACT_RE.search(out)
     if not match:
         return []
@@ -149,12 +168,14 @@ def check_tomori(out: str) -> None:
         emit("approve", "燈 (Tomori) PR 草稿結構齊全")
 
     # plan 模式（預設）/ review 模式 / triage 模式：把產出寫進 .maigo/ 的檔案
-    # （新命名 `plan-<id>.md` 或舊固定檔名 `plan.md` 皆可，見 _TOMORI_ARTIFACT_RE）
-    if not _TOMORI_ARTIFACT_RE.search(out):
+    # （巢狀路徑 `review/<id>/rubric.md` / `issue/<id>/rubric.md`、分目錄前扁平
+    # `<kind>-<id>.md`、舊固定檔名 `plan.md` 皆可，見 _TOMORI_ARTIFACT_RE；
+    # 匯入失敗時 `None`，fail-open 跳過此檢查，不擋）。
+    if _TOMORI_ARTIFACT_RE is not None and not _TOMORI_ARTIFACT_RE.search(out):
         emit(
             "block",
-            "燈 (Tomori) 的輸出沒提到 .maigo/plan(-<id>).md / .maigo/review-rubric(-<id>).md / "
-            ".maigo/triage-rubric(-<id>).md。呼叫 scripts/artifact_path.py 取得路徑，"
+            "燈 (Tomori) 的輸出沒提到 .maigo/plan-<id>.md / .maigo/review/<id>/rubric.md / "
+            ".maigo/issue/<id>/rubric.md。呼叫 scripts/artifact_path.py 取得路徑，"
             "把計畫 / rubric 寫進那個檔案再回報。",
         )
     if not re.search(

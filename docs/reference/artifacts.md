@@ -3,22 +3,47 @@
 `.maigo/` 全貌型錄：這個目錄底下有哪些檔、各自的正典（code + skill）是誰、
 生命週期多長。找不到某個 `.maigo/` 檔案該歸哪一類時，先查這頁；機器判斷
 邏輯（哪個檔案屬於哪一類）由 `scripts/maigo_dir_catalog.py` 執行，不是散文
-自己判斷——見 [`/maigo:doctor`](../commands/doctor.md) 的「`.maigo/` 頂層型錄」段。
+自己判斷——見 [`/maigo:doctor`](../commands/doctor.md) 的「`.maigo/` 型錄」段。
 
-## 帶識別碼命名的產物（`<kind>-<id>.md`）
+## 帶識別碼命名的產物
+
+所有 kind 全部由 `scripts/artifact_path.py` 的 `_KNOWN_KINDS` 單一正典定義，
+`resolve_for_write()` 是唯一對外寫入入口——同一路徑撞到不同主題時回
+`status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選路徑，
+不擅自覆寫。分兩種形狀：
+
+### `plan`（扁平，`<kind>-<id>.md`）
 
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | `plan` | `.maigo/plan-<id>.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 單次任務的實作計畫，任務結束後仍留存供追溯 |
-| `review-rubric` | `.maigo/review-rubric-<id>.md` | 🩵 Tomori | 同上 | 對照基準，review 全程比對用；review 結束後留存 |
-| `review` | `.maigo/review-<id>.md` | orchestrator（`/maigo:review`） | 同上 | 最終 review 五段報告的逐字檔案版；長期留存供 `grep` / board 細節檔連結 |
-| `triage-rubric` | `.maigo/triage-rubric-<id>.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
-| `pr-comments` | `.maigo/pr-comments-<id>.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 
-四種 kind 全部由 `scripts/artifact_path.py` 的 `_KNOWN_KINDS` 單一正典定義，
-`resolve_for_write()` 是唯一對外寫入入口——同一檔名撞到不同主題時回
-`status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選檔名，
-不擅自覆寫。
+### `review` / `issue`（巢狀，`<group>/<id>/<stem>.md`）——按 PR/issue 分資料夾
+
+同一顆 PR 的 `review` / `review-rubric` / `review-draft` / `pr-comments` 收進同一個
+`.maigo/review/<id>/` 目錄；同一條 issue 的 `triage-rubric` 收進
+`.maigo/issue/<id>/`；conflict 後綴（第 2 個 attempt 起）落在檔名層
+（`rubric-2.md`），不落在目錄層。
+
+| 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
+|------|----------|--------|----------|----------|
+| `review-rubric` | `.maigo/review/<id>/rubric.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 對照基準，review 全程比對用；review 結束後留存 |
+| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | 同上 | 最終 review 五段報告的逐字檔案版；長期留存供 `grep` / board 細節檔連結 |
+| `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 永遠指向這個路徑 |
+| `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
+| `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
+
+### 分目錄前的扁平檔（`flat_exists:`，只可讀）
+
+巢狀佈局採用前寫下的 `<kind>-<id>.md`（例：`review-rubric-42.md`）——`resolve_for_write()`
+發現這種檔案存在時，`Resolution.flat_path` 會填值（CLI 印 `flat_exists:` 那行），
+只供讀取退路，永遠不當寫入目標；`Write` / `Edit` 寫進這個形狀會被
+[`hooks/legacy_artifact_path_check.py`](https://github.com/Lee-W/maigo/blob/main/hooks/legacy_artifact_path_check.py)
+擋下。既有的這類檔案可用
+[`scripts/migrate_legacy_artifacts.py`](https://github.com/Lee-W/maigo/blob/main/scripts/migrate_legacy_artifacts.py)
+（先 dry-run 看清單，使用者同意後 `--apply`）搬進巢狀佈局，順手把 `.maigo/i/*.md`
+的 `## 筆記` 段裡指到舊檔名的連結改成新相對路徑。`--apply` 中途中斷時，重跑同一
+條指令即可：它照第一次寫下的搬移對應表續跑，不重新規劃。
 
 ## Work Board（`board.md` + `i/<slug>.md`）
 
@@ -36,11 +61,22 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 一行帶過，內部用，非 agent 面向格式：`session-head.json`（session 開始時的
 HEAD SHA）、`token-usage.jsonl`（token usage metadata）、
 `test-failures.jsonl` / `soyo-must-fix.jsonl`（retry / failure log）、
-`__titles.json`（內部快取）。
+`__titles.json`（內部快取）、`migrate-legacy-artifacts.manifest.json`
+（`scripts/migrate_legacy_artifacts.py --apply` 的搬移對應表，只在一次 apply
+沒跑完時留存，重跑時照它續跑，跑完即刪）。
 
 ## 舊固定檔名與未登記檔案
 
-升級前留下的舊固定檔名（`.maigo/plan.md` 這類）與不屬於上述任何種類的
-未登記檔案，一律**只列不刪**——正典邏輯見 `scripts/maigo_dir_catalog.py`，
-人讀報告見 [`/maigo:doctor`](../commands/doctor.md)。要不要清由使用者自己
-決定，這份型錄與 doctor 報告都不建議刪除哪一個。
+升級前留下的舊固定檔名（`.maigo/plan.md` 這類，`legacy_fixed_name`）、分目錄前的
+扁平檔（`flat_identifier`，見上一節）與不屬於上述任何種類的未登記檔案
+（`unregistered`），一律**只列不刪**——正典邏輯見 `scripts/maigo_dir_catalog.py`
+（六類：`nested` / `identifier_named` / `flat_identifier` / `legacy_fixed_name` /
+`registered_non_artifact` / `unregistered`），人讀報告見
+[`/maigo:doctor`](../commands/doctor.md)。要不要清由使用者自己決定，這份型錄與
+doctor 報告都不建議刪除哪一個。
+
+兩個字面上像 review kind 產物、但不是的檔名——`categorize()` 特別排除，
+不會被搬移或擋下：`review-batch-state.md`（本 repo 找不到 producer，型錄列為
+`unregistered`）、`review-board.md`（舊版 Work Board 檔名，
+[`commands/board.md`](../commands/board.md) 仍會偵測並遷移它，型錄列為
+`registered_non_artifact`）。

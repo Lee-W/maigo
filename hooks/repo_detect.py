@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Maigo SessionStart hook：偵測目前 repo，自動 dispatch 對應的 project-aware 知識。
+"""
+Maigo SessionStart hook：偵測目前 repo，自動 dispatch 對應的 project-aware 知識。
 
 命中 → emit systemMessage 要求 agent 載入對應 skill。
 未命中 → silent approve（空 systemMessage）。
@@ -126,7 +127,8 @@ def run_detector(cwd: str, detector: dict) -> tuple[bool, str]:
 
 
 def match_rule(cwd: str, rule: dict) -> tuple[bool, str]:
-    """Return (matched, matched_detector_description).
+    """
+    Return (matched, matched_detector_description).
 
     任一 detector 命中即回傳 True（目前唯一支援的策略）。
     """
@@ -143,7 +145,8 @@ def match_rule(cwd: str, rule: dict) -> tuple[bool, str]:
 
 
 def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
-    """Write seed files into .claude/ if absent. Return list of newly-written filenames.
+    """
+    Write seed files into .claude/ if absent. Return list of newly-written filenames.
 
     Never overwrites — once a file exists (user-edited or written by a prior session)
     it is treated as authoritative.
@@ -169,10 +172,12 @@ def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
 
 
 def ensure_maigo_ignored(cwd: str) -> None:
-    """Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
+    """
+    Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
 
-    maigo writes working artefacts (``plan-<id>.md``, ``review-rubric-<id>.md``,
-    ``pr-comments-<id>.md``, retry logs) into ``.maigo/`` at the repo root; those
+    maigo writes working artefacts into ``.maigo/`` at the repo root — flat
+    ``plan-<id>.md``, and per-PR/issue folders ``review/<id>/{review,rubric,
+    draft,pr-comments}.md`` / ``issue/<id>/rubric.md``, plus retry logs — those
     must never be committed. We append the rule to the repo's ``info/exclude`` —
     resolved via ``git rev-parse --git-path`` so it lands in the shared git dir
     even from a linked worktree — rather than the project's tracked ``.gitignore``,
@@ -263,7 +268,7 @@ def main() -> None:
         # No rule matched — silent approve
         emit("approve", "")
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"repo_detect: unexpected error: {exc}", file=sys.stderr)
         emit("approve", "")
 

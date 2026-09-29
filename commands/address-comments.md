@@ -120,9 +120,9 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 ### 4. 寫 triage + 提路由計畫，確認
 
-呼叫 `scripts/artifact_path.py pr-comments --url <PR url> --topic "PR comments: <PR title> (#<number>)"`
-取得路徑（`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
-目錄不存在先 `mkdir -p .maigo`），把被選中的意見寫進去，並擬路由計畫。
+呼叫 `scripts/artifact_path.py pr-comments --url <PR url> --repo <owner/name> --topic "PR comments: <PR title> (#<number>)"`
+取得路徑（`.maigo/review/<id>/pr-comments.md`；`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
+目錄不存在先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`），把被選中的意見寫進去，並擬路由計畫。
 
 **歸屬判斷依 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)**（不要自己讀檔頭比對）：
 `status: new` 直接寫；`status: conflict`（同識別碼被另一個 PR 的 triage 佔用，罕見）→ 停下把
@@ -271,7 +271,7 @@ address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 quick / go / team 的 agent 流程。
 - **不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push、不開 / 關 PR；只產草稿。
-- **repo 內唯一寫的 artefact 是本次 pr-comments 檔**（`.maigo/pr-comments-<id>.md`，路徑由
+- **repo 內唯一寫的 artefact 是本次 pr-comments 檔**（`.maigo/review/<id>/pr-comments.md`，路徑由
   `scripts/artifact_path.py` 算出）——triage / 進度追蹤用；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
 
 ## 與其他命令的差異
