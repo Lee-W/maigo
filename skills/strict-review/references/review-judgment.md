@@ -1,6 +1,6 @@
 # Strict Review — Review Judgment Principles (Extended)
 
-Loaded on demand by `skills/strict-review/SKILL.md` — **twenty-nine principles for when
+Loaded on demand by `skills/strict-review/SKILL.md` — **thirty-one principles for when
 NOT to flag, how to calibrate response size to comment weight, and how to verify
 a claim before escalating or reverting it**.
 Read this file when you are deciding whether a finding is a real must-fix or a
@@ -316,6 +316,15 @@ The bar for "must rename" scales with a symbol's visibility:
 - **Public API** (exported symbols, user-facing kwargs, sibling-class parity):
   worth pushing on — naming drift there is a real, lasting cost to every
   caller.
+
+**Exception — repo-documented naming conventions**: the visibility-based
+scale-down above assumes the nit is a matter of taste. When it instead
+enforces a convention the repo's own contributor doc states explicitly (e.g.
+Apache Airflow's `AGENTS.md` requiring an action-verb prefix on every
+function/method name), don't drop it after one round just because the name
+is private — the convention's own counter-examples are frequently private
+helpers (`_serialize_keys`), so "it's private" carries no exculpatory weight
+here. Keep pushing until the diff's new/changed `def`s comply.
 
 When the author proposes an alternative naming/design, evaluate it on its
 merits and switch to it plainly if it's better than the original suggestion
@@ -722,7 +731,35 @@ independent of downstream effect.
 The reverse holds too: where a reviewer states no explicit success criterion, a nit
 raised by whoever reviews the fix really is just a nit, and can be left for judgment.
 
-## §30. `gh pr checks`, `reviewDecision`, and a pasted compare range are all surface signals — verify each against the actual head SHA
+## §30. When a must-fix asks for a test, derive the expected value from the contract, not the current output
+
+A must-fix that says "add a test asserting X" must state what X *should* be
+by reading the docstring, user-facing docs, or changelog entry that
+describes the contracted behavior — never by running the current code and
+copying whatever it happens to output. Copying the current output turns a
+possibly-wrong behavior into a permanently pinned "correct" one; the test
+now defends the bug instead of catching it.
+
+When the contract and the implementation disagree, that disagreement **is**
+the finding — write it up as its own must-fix (fix the code, or fix the
+docstring if the code's behavior turns out to be the intended one and the
+docs are stale) rather than silently writing a test that encodes whichever
+side you happened to read first.
+
+Case: a must-fix asked for a test asserting "the value pushed to XComs
+equals the seeded cumulative total." That pinned a behavior contradicting
+the operator's own docstring, which promised "this attempt's own usage" —
+the mismatch only surfaced because the next review round re-derived the
+expected value from the docstring instead of trusting the prior round's
+test.
+
+How to apply: before writing (or asking for) a test's expected value, name
+the source of truth first (docstring / doc page / changelog line, quoted)
+and derive the assertion from it. If no such source exists, say so
+explicitly and treat the expected value as undetermined rather than
+inferring it from current behavior.
+
+## §31. `gh pr checks`, `reviewDecision`, and a pasted compare range are all surface signals — verify each against the actual head SHA
 
 Same family as §23 (`isResolved` isn't trustworthy in either direction):
 three more GitHub surface signals that look authoritative but aren't, each

@@ -59,7 +59,7 @@ Every review must walk through every item. Output explicitly marks `[x]` or `[ ]
 1. **Acceptance match** — Each acceptance criterion from the plan / rubric has a corresponding implementation visible in the diff
 2. **Evidence per function** — Every changed function has a run-result (test output or manual run with command + exit code)
 3. **Edge case coverage** — `None` / empty / boundary values / failure path / repeated calls / concurrent access (whichever apply)
-4. **Convention conformance** — Naming, structure, import style match neighbouring code (verify with `grep`, not vibes)
+4. **Convention conformance** — Naming, structure, import style match neighbouring code (verify with `grep`, not vibes). For naming specifically, mechanically enumerate every new `def` / method / inner function from the diff against a merge-base baseline before judging — reading the diff by eye misses nested helpers; see `references/recurring-patterns.md` → "Naming review: enumerate new defs mechanically, don't eyeball the diff".
 5. **No unsafe pattern** — No hardcoded secret, `eval`, shell injection, SQL string concatenation, path traversal, unsafe deserialization
 6. **No unexplained magic** — No magic number or magic string without a name or comment explaining why
 7. **No TODO evasion** — No `TODO` / `FIXME` / `XXX` used to defer real problems instead of fixing them
@@ -278,7 +278,7 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag (references)
 
-Twenty-six principles for calibrating whether a finding is a real must-fix
+Thirty-one principles for calibrating whether a finding is a real must-fix
 and how much change a comment warrants; details in
 `references/review-judgment.md`:
 
@@ -295,7 +295,7 @@ and how much change a comment warrants; details in
 - **Judge only the current/latest diff state** — commit history and prior review rounds are irrelevant to the verdict.
 - **Don't silently overwrite a prior round's verdict** — a stricter new verdict needs discriminating evidence; surface conflicts to the user instead.
 - **Verify a cited convention belongs to the same architectural layer** — a same-codebase precedent from a different layer is a category error, not support.
-- **Calibrate naming-nit persistence by visibility** — one round then drop for private names; public API naming drift is worth pushing on.
+- **Calibrate naming-nit persistence by visibility** — one round then drop for private names; public API naming drift is worth pushing on. Exception: when the nit enforces a repo-documented naming convention (e.g. Airflow AGENTS.md's action-verb-prefix rule), private names don't get the one-round-then-drop treatment — the convention's own counter-examples are often private.
 - **Verify a hard-limit claim before asserting "impossible" or "breaking"** — check release status and actual tool capability before foreclosing an option.
 - **A reviewer's "strict / validate / enforce" wording may not match the schema** — check the underlying data model and sibling commands before implementing literally.
 - **Don't demand a thin wrapper validate the wrapped library's own semantics** — and don't flag an eager-to-lazy init refactor as breaking without a concrete consumer signal.
@@ -307,6 +307,7 @@ and how much change a comment warrants; details in
 - **Re-review a rewritten claim by checking the carried-over clause, not the one you rewrote** — the clause reused verbatim from the flagged sentence gets no fresh scrutiny and is just as likely to still be wrong.
 - **A reviewer's diagnosis being right doesn't make their proposed wording right** — verify the defect and the reviewer's replacement separately; rebuild the replacement from source before adopting it.
 - **A reviewer's stated success criterion outranks nit severity** — a finding pointing at an unmet criterion the reviewer explicitly stated ("byte-identical", "no behaviour change") is must-fix even if the practical impact looks small.
+- **When a must-fix asks for a test, derive the expected value from the contract, not the current output** — read the docstring/docs/changelog for what the behavior *should* be; if the contract and the implementation disagree, flag the disagreement itself as a finding instead of pinning current output as the test's expected value.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

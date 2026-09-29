@@ -185,6 +185,38 @@ current commit" (an amend), not "vs. the merge target". Verify empirically
 against `git show`/`git diff` output — don't assert sizing from memory of
 the working tree.
 
+### Enumerate "new lines" from a merge-base baseline, not a two-dot diff
+
+When the judgment is "which lines did *this* diff add" — naming
+enumeration, "is this symbol new in this PR", scanning for a private/secret
+token that must not leak — the baseline must be `git merge-base <base> HEAD`
+or the three-dot form `git diff <base>...HEAD`. Do not use the two-dot form
+`git diff <base>`.
+
+Why: a two-dot diff compares two commits directly. If the local `<base>` ref
+has advanced past the point this branch actually forked from (someone else
+pushed to it, or it's a shared/moving ref like `main` in a long-lived
+worktree), the two-dot diff mixes in **every commit that landed on `<base>`
+since the fork point** — changes nobody on this branch wrote. Enumerating
+"new" defs, symbols, or added lines against that diff produces false
+positives that look identical to real ones: no error, a plausible-looking
+line number, a name that reads like it could be new.
+
+How to apply: `git merge-base <base> HEAD` first, then diff from that SHA
+(`git diff <merge-base-sha>...HEAD` or equivalently the three-dot form
+against `<base>` directly) before treating any line as "added by this
+branch." This applies wherever "diff 新增行" is the judgment basis — see the
+naming-enumeration and change-site-enumeration uses of this pattern in
+[`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)
+and
+[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md).
+
+Case: a review's naming-enumeration pass ran a two-dot diff against a local
+`main` that had moved ahead; the diff pulled in an unrelated commit that
+had touched `sandbox/modal.py`, and two of that commit's pre-existing names
+got flagged as naming violations introduced by the branch under review —
+neither line was written by that branch.
+
 ## Pushing and opening a PR
 
 **A widget selection is not authorization to open a PR.** Never run `gh pr create`

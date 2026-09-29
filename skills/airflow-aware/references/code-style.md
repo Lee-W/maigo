@@ -131,6 +131,27 @@ the same directory (cross-file-called vs. purely-internal) before deciding,
 rather than defaulting toward a leading underscore because the call sites
 are nearby (apache/airflow PR #71403).
 
+### Name functions and methods with action verbs — private helpers too
+
+AGENTS.md requires an action-verb prefix on every function and method name
+(`get_`, `extract_`, `find_`, `compute_`, `build_`, etc.) — a noun-only name
+reads as an attribute, not a callable. The rule applies to `_`-prefixed
+private helpers exactly as much as public ones: AGENTS.md's own
+counter-example, `_serialize_keys`, is itself private. `_model_key(step)` →
+`_build_model_key(step)` is the same defect — the name states *what the
+return value is*, not *what the function does*.
+
+The only exception is a predicate (`is_`, `has_`), which correctly reads as
+an attribute-shaped boolean. Dunder methods (`__init__`, `__eq__`) and
+pytest test functions (`test_*`) sit outside this rule's scope entirely,
+not inside it as an exception.
+
+When reviewing, check every `def` in the diff's new/changed lines — inner
+functions and test helpers included, not just top-level module functions. A
+private helper introduced deep inside a larger diff is the easiest place
+for a noun-only name to slip past review; don't grant private names a free
+pass just because they're private.
+
 ## Provider hooks
 
 ### Keep only connection-backed calls on the hook

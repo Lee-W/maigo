@@ -95,6 +95,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 **這條 command 加碼：**
 - 每條 must-fix 要對應 rubric 的哪一條（acceptance / edge case / trade-off）
 - 內部 / 外部 PR 改法粒度的差異，見 SKILL.md 的 "Adapting per context" 表格
+- item 4 命名審查：先機械列出 diff 新增的 def/method/inner function 再逐一判定，不要只讀 diff 找（見 SKILL.md item 4）
 
 **Mode-aware：** orchestrator 傳給 Soyo 的 prompt 必須明示 mode 與對應 checklist subset。Soyo 輸出 checklist 表時：mode subset 內的項照常 `[x]` / `[ ]`；不在 subset 內的項標 `[—]`，附 `skipped by mode=<name>`。
 

@@ -104,6 +104,30 @@ supersede。傾向推薦架構層解法而非繞路補丁。
 
 ---
 
+## Naming review: enumerate new defs mechanically, don't eyeball the diff
+
+Before judging item 4's naming sub-check, mechanically list every new `def` /
+method / inner (nested) function in the diff against a merge-base baseline
+(`git diff <base>...HEAD` or `git merge-base` — see
+[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
+for the general enumerate-don't-eyeball discipline), then judge each name
+one by one. Reading the diff by eye reliably misses **nested/inner test
+helpers** — they're indented, small, and easy to skim past as "just part of
+the test body" rather than a named symbol that needs its own naming
+judgment.
+
+Case: a nested test helper named `next_step` slipped through three
+consecutive review rounds untouched — none of them caught the naming defect
+because none of them produced an explicit list of new `def`s to check
+against. Only enumerating mechanically (grepping `^\s*def ` on the new lines
+and going through the resulting list one entry at a time) surfaced it.
+
+How to apply: run a `def`/`async def` extraction over the diff's added lines
+(not the whole file — unchanged names aren't this review's business), list
+every match including nested ones, and attach the judgment list to the
+review output so the enumeration itself is auditable, not just the
+conclusion.
+
 ## Naming: name by what it is, not by its first caller's use case
 
 Flag a name that encodes the calling context rather than the operation it
