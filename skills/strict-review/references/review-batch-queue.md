@@ -96,6 +96,13 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
 - **每波一完成就把結果落地到持久檔**（如 `.maigo/board.md` 或 project memory），不要
   等整批跑完才寫——撞限額時已完成的部分不丟。
 - spawn 前先想好「這波若中途死，重跑的入口在哪」，把待辦與已完成狀態都寫進持久檔。
+- 平行派出的 agent 若會跑目標 repo 的測試套件，每隻要各自隔離可寫的共享狀態，不要共用
+  同一份——Airflow 是每隻各自一個 fresh `AIRFLOW_HOME`，且要寫進交辦 prompt，不能只交給
+  agent 自行判斷；**在同一個 Bash 呼叫裡**把測試指令整段接在
+  `env AIRFLOW_HOME=<fresh-dir> uv run ...` 後面，不要拆成 `export` 一行 ＋ 跑測試另一行
+  （Bash tool 不跨呼叫保留 shell state，`export` 會在下一次呼叫消失，退回共用的
+  `~/airflow`）；根因與其他症狀見
+  [`airflow-aware` 的「Every worktree shares one sqlite test DB」一節](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)。
 
 ## 持久 Work Board（跨 session 追蹤）
 
