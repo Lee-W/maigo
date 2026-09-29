@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Fetch-or-restore PR context for /maigo:review (skills/pr-context-cache).
+"""
+Fetch-or-restore PR context for /maigo:review (skills/pr-context-cache).
 
 First run fetches PR context (title / body / diff / CI status / linked issues /
 inline review threads with resolution state / review summaries / conversation
 comments) and caches it into a machine-readable section at the top of the
-per-source rubric file — `.maigo/review-rubric-<id>.md`, resolved via
+per-source rubric file — `.maigo/review/<id>/rubric.md`, resolved via
 `scripts/artifact_path.py` (single source of truth for `.maigo/` artifact
 naming + ownership) unless `--rubric` overrides it. Re-runs with the same
-source and an unchanged diff restore the cache instead of re-fetching.
+source and an unchanged diff restore the cache instead of re-fetching. A
+pre-nested-layout flat file (`.maigo/review-rubric-<id>.md`) is read as a
+fallback when the new path has no cache yet, but is never written to.
 
 Review threads / review summaries / conversation comments are only fetched
 for a `pr` source (branch / range diffs have no GitHub review thread to
@@ -330,7 +333,8 @@ def write_cache(rubric_path: Path, section: str) -> None:
 
 
 def _pr_url(source: str, home_repo: str) -> str | None:
-    """Build a full GitHub PR URL for identifier resolution (level 1 of the chain).
+    """
+    Build a full GitHub PR URL for identifier resolution (level 1 of the chain).
 
     `source` may already be a URL, or a bare/`#`-prefixed PR number that only
     resolves against the current repo's remote (`home_repo`, from `repo_slug()`).
@@ -343,9 +347,11 @@ def _pr_url(source: str, home_repo: str) -> str | None:
 
 
 def _topic_hint(source: str, kind: str) -> str:
-    """Best-effort topic mirroring the `# Review rubric: <PR title>` H1 Tomori
+    """
+    Best-effort topic mirroring the `# Review rubric: <PR title>` H1 Tomori
     will write, so a same-PR re-run resolves to `status: same_topic` instead
-    of a false conflict."""
+    of a false conflict.
+    """
     if kind == "pr":
         title = run(
             ["gh", "pr", "view", source.lstrip("#"), "--json", "title", "-q", ".title"],
@@ -355,11 +361,15 @@ def _topic_hint(source: str, kind: str) -> str:
     return f"Review rubric: {source}"
 
 
-def _resolve_rubric_path(source: str, kind: str) -> Path | None:
-    """Resolve the rubric path via `artifact_path.resolve_for_write()`.
+def _resolve_rubric_path(source: str, kind: str) -> tuple[Path | None, Path | None]:
+    """
+    Resolve the rubric path via `artifact_path.resolve_for_write()`.
 
-    Prints the `status: conflict` lines and returns `None` on conflict —
-    the caller must stop (exit 3), not pick a path or write cache itself.
+    Returns `(rubric_path, flat_fallback)` — `flat_fallback` is the
+    pre-nested-layout path (`.maigo/review-rubric-<id>.md`) when it exists,
+    for read-only cache recovery only; it is never written to. Prints the
+    `status: conflict` lines and returns `(None, None)` on conflict — the
+    caller must stop (exit 3), not pick a path or write cache itself.
     """
     home_repo = repo_slug()
     resolution = resolve_for_write(
@@ -372,8 +382,9 @@ def _resolve_rubric_path(source: str, kind: str) -> Path | None:
         print("status: conflict")
         print(f"conflict_owner: {resolution.existing_topic}")
         print(f"suggest: {resolution.suggested_path}")
-        return None
-    return Path(resolution.path)
+        return None, None
+    flat_fallback = Path(resolution.flat_path) if resolution.flat_path else None
+    return Path(resolution.path), flat_fallback
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -390,20 +401,29 @@ def main(argv: list[str] | None = None) -> int:
     kind = classify_source(args.source)
 
     rubric_path: Path | None
+    flat_fallback: Path | None = None
     if args.rubric is not None:
         rubric_path = Path(args.rubric)
     else:
-        rubric_path = _resolve_rubric_path(args.source, kind)
+        rubric_path, flat_fallback = _resolve_rubric_path(args.source, kind)
         if rubric_path is None:
             return 3
 
     cached = None
+    read_from_flat_fallback = False
     if rubric_path.exists():
         cached = find_cache_section(rubric_path.read_text(encoding="utf-8"))
+    elif flat_fallback is not None and flat_fallback.exists():
+        # 扁平舊檔只讀，永遠不寫——命中時把 cache 段抄進新路徑
+        # （下方 write_cache(rubric_path, cached)），扁平檔本身不動。
+        cached = find_cache_section(flat_fallback.read_text(encoding="utf-8"))
+        read_from_flat_fallback = True
 
     if cached and parse_cached_field(cached, "Source") == args.source:
         sha_now = current_diff_sha(args.source, kind, args.base)
         if parse_cached_field(cached, "Diff sha") == sha_now:
+            if read_from_flat_fallback:
+                write_cache(rubric_path, cached)
             print("cache_hit: true")
             print(f"rubric: {rubric_path}")
             print(cached)

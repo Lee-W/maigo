@@ -9,11 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import hooks.teammate_quality_check as tqc
 import pytest
 
-import hooks.teammate_quality_check as tqc
 from tests.conftest import run_hook_main
-
 
 CHECKLIST = (
     "## Checklist\n"
@@ -38,7 +37,8 @@ MEMORY = "## Loaded memory entries\n（無相關 entry）\n"
 
 @pytest.fixture(autouse=True)
 def _redirect_soyo_log_base(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """Redirect tqc._RETRY_LOG_BASE to tmp_path for every test in this module.
+    """
+    Redirect tqc._RETRY_LOG_BASE to tmp_path for every test in this module.
 
     Prevents the real .maigo/ from being polluted and makes tests
     deterministic regardless of prior runs.
@@ -87,8 +87,7 @@ class TestCheckTomori:
     def test_path_and_heading_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
             tqc.check_tomori(
-                "## Loaded memory entries\n（無相關 entry）\n"
-                ".maigo/plan.md\n## Goal\n## Steps\n"
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/plan.md\n## Goal\n## Steps\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
@@ -96,8 +95,7 @@ class TestCheckTomori:
     def test_chinese_headings_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
             tqc.check_tomori(
-                "## Loaded memory entries\n（無相關 entry）\n"
-                ".maigo/plan.md\n## 目標\n## 步驟\n"
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/plan.md\n## 目標\n## 步驟\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
@@ -168,11 +166,35 @@ class TestCheckTomori:
     ):
         with pytest.raises(SystemExit):
             tqc.check_tomori(
-                "## Loaded memory entries\n（無相關 entry）\n"
-                ".maigo/review-rubric-71380.md\n## Rubric\n"
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/review-rubric-71380.md\n## Rubric\n"
             )
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
+
+    def test_nested_review_rubric_path_approves(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/review/58543/rubric.md\n## Rubric\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result.get("decision") is None
+
+    def test_nested_triage_rubric_path_approves(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/issue/12/rubric-2.md\n## Category\nbug\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result.get("decision") is None
+
+    def test_review_report_path_alone_blocks(self, capsys: pytest.CaptureFixture):
+        """`review`（報告，非 rubric）不是燈 (Tomori) 追蹤的 kind——只提它必須擋。"""
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/review/58543/review.md\n## Rubric\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +245,22 @@ class TestTomoriPlanCriteria:
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
 
+    def test_literal_grep_criterion_in_nested_rubric_blocks(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        rubric_dir = tmp_path / ".maigo" / "review" / "58543"
+        rubric_dir.mkdir(parents=True)
+        (rubric_dir / "rubric.md").write_text(
+            "## Acceptance\n- [ ] `grep -c old_field .` 必須回 0\n", encoding="utf-8"
+        )
+        monkeypatch.chdir(tmp_path)
+        out = "## Loaded memory entries\n（無相關 entry）\n.maigo/review/58543/rubric.md\n## Rubric\n"
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(out)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "字面 grep 當判準" in result["reason"]
+
 
 # ---------------------------------------------------------------------------
 # _TOMORI_ARTIFACT_RE — accepts both the old fixed filenames and the new
@@ -242,6 +280,8 @@ class TestTomoriArtifactRegex:
             pytest.param(
                 ".maigo/triage-rubric-airflow-9201.md", id="new-triage-rubric"
             ),
+            pytest.param(".maigo/review/58543/rubric.md", id="nested-review-rubric"),
+            pytest.param(".maigo/issue/12/rubric-2.md", id="nested-triage-rubric"),
         ],
     )
     def test_matches_old_and_new_forms(self, text: str):
@@ -290,8 +330,9 @@ class TestCheckSoyo:
 
     def test_blocked_with_checklist_and_must_fix_approves(self, capsys):
         result = self._run(
-            "## Loaded memory entries\n（無相關 entry）\n"
-            "BLOCKED\n" + CHECKLIST + "must-fix: broken import\n",
+            "## Loaded memory entries\n（無相關 entry）\nBLOCKED\n"
+            + CHECKLIST
+            + "must-fix: broken import\n",
             capsys,
         )
         assert result.get("decision") is None
@@ -312,8 +353,10 @@ class TestCheckSoyo:
 
 
 class TestSoyoRetryCount:
-    """Tests for _extract_soyo_must_fix_keys, _soyo_log_path, _soyo_record_and_count,
-    and the retry-count logic inside check_soyo."""
+    """
+    Tests for _extract_soyo_must_fix_keys, _soyo_log_path, _soyo_record_and_count,
+    and the retry-count logic inside check_soyo.
+    """
 
     _BLOCKED_OUTPUT = (
         "## Loaded memory entries\n（無相關 entry）\n"
@@ -585,8 +628,7 @@ class TestMain:
         payload = {
             "agent_type": "Tomori",
             "last_assistant_message": (
-                "## Loaded memory entries\n（無相關 entry）\n"
-                ".maigo/plan.md\n## Goal\n## Steps\n"
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)
@@ -600,8 +642,7 @@ class TestMain:
         payload = {
             "agent_type": "planner",
             "last_assistant_message": (
-                "## Loaded memory entries\n（無相關 entry）\n"
-                ".maigo/plan.md\n## Goal\n## Steps\n"
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/plan.md\n## Goal\n## Steps\n"
             ),
         }
         result = run_hook_main(tqc, payload, monkeypatch, capsys)

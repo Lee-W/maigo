@@ -2,15 +2,21 @@
 """
 Single source of truth for `.maigo/` markdown artifact paths (naming + ownership).
 
-背景見 `.maigo/plan-maigo-artifact-collision.md`：`.maigo/` 底下固定檔名的
-產物（`plan.md` / `review-rubric.md` / `review.md` / `triage-rubric.md` /
-`pr-comments.md`）被兩個並行 session 覆寫過一次，因為它們共用同一個檔名，
-語意上卻該有各自一份。
+背景：`.maigo/` 底下固定檔名的產物（`plan.md` / `review-rubric.md` /
+`review.md` / `triage-rubric.md` / `pr-comments.md`）曾被兩個並行 session
+覆寫過一次，因為它們共用同一個檔名，語意上卻該有各自一份；後續使用者選了
+「按 PR/issue 分資料夾」的佈局，同一顆 PR 的 review 報告、rubric、draft、
+pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 
 這個模組有**雙職責**，都是為了讓「拿到路徑就整份覆寫」在 API 層面做不到：
 
-1. **命名**：`<kind>-<id>.md`，`<id>` 走四級來源鏈（`resolve_identifier()`），
-   每一級都必須是事後可重新推導的——不是只要唯一就好。
+1. **命名**：`<kind>` 分兩種形狀——
+   - 巢狀（`review` / `review-rubric` / `review-draft` / `pr-comments` /
+     `triage-rubric`）：`.maigo/<group>/<id>/<stem>[-<attempt>].md`，`<group>`
+     是 `review` 或 `issue`，同一顆 PR/issue 的所有產物收進同一個目錄。
+   - 扁平（`plan`）：`.maigo/plan-<id>[-<attempt>].md`，不動。
+   `<id>` 走四級來源鏈（`resolve_identifier()`），每一級都必須是事後可重新
+   推導的——不是只要唯一就好。
 2. **(c) 歸屬檢查**：`resolve_for_write()` 是唯一對外入口，`topic`
    （呼叫端打算寫進檔案第一行的 H1）是必填參數；同一次呼叫就完成「這個檔名
    目前屬於誰」的比對。沒有申報主題就拿不到路徑；主題不符時它不交出可寫入
@@ -22,7 +28,9 @@ Single source of truth for `.maigo/` markdown artifact paths (naming + ownership
 
 命名層（純函式，不做任何 I/O）：`slugify(text)`、`github_ref(url, home_repo)`
 （重用 `scripts/board_state.py` 既有實作，不重複解析 URL）、
-`artifact_path(kind, identifier)`、`legacy_path(kind)`。
+`artifact_path(kind, identifier, attempt=1)`、`flat_path(kind, identifier)`
+（分目錄前的扁平形，只供讀取退路與遷移）、`legacy_path(kind)`、
+`artifact_path_regex(kinds)`（給讀取端動態組比對用 regex）。
 
 `resolve_identifier()` 與 `resolve_for_write()` 會做 I/O（本地 `git` 子行程、
 讀檔案），不是純函式；`resolve_for_write()` 的 I/O 全部是唯讀，不建立、不
@@ -33,15 +41,20 @@ Single source of truth for `.maigo/` markdown artifact paths (naming + ownership
 ```
 python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" plan \
     --topic "<H1 主題>" [--url URL] [--repo owner/name] [--cwd DIR]
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review-rubric \
+    --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name
 ```
 
 stdout 第 1 行 `status: new|same_topic|conflict`；
-非 conflict 時第 2 行 `path: .maigo/<kind>-<id>.md`；
+非 conflict 時第 2 行 `path: .maigo/plan-<id>.md`（巢狀 kind 則是
+`path: .maigo/review/<id>/rubric.md` 這類）；
 conflict 時第 2 行 `conflict_owner: <既有 H1>`、第 3 行
-`suggest: .maigo/<kind>-<id>-2.md`（候選檔名，須經使用者同意才可以用），
-**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可寫入的
-`path:` 行。舊固定檔名存在時（不論 status）多印一行
-`legacy_exists: .maigo/<kind>.md`（只供讀取退路，不當寫入目標）。
+`suggest: .maigo/plan-<id>-2.md`（候選路徑，第 2 個 attempt，須經使用者同意
+才可以用），**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可
+寫入的 `path:` 行。舊固定檔名存在時（不論 status）多印一行
+`legacy_exists: .maigo/<kind>.md`；巢狀 kind 若存在分目錄前的扁平檔
+（`.maigo/<kind>-<id>.md`）多印一行 `flat_exists: <path>`——兩者都只供讀取
+退路，不當寫入目標。
 """
 
 from __future__ import annotations
@@ -50,19 +63,60 @@ import argparse
 import re
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from board_state import github_ref
 
-_KNOWN_KINDS = ("plan", "review-rubric", "review", "triage-rubric", "pr-comments")
+_KNOWN_KINDS = (
+    "plan",
+    "review-rubric",
+    "review",
+    "review-draft",
+    "triage-rubric",
+    "pr-comments",
+)
+
+# kind → (group 目錄, 檔名 stem)：巢狀佈局 `.maigo/<group>/<id>/<stem>.md`。
+# key 是 `_KNOWN_KINDS` 的子集，恰好不含 "plan"——plan 維持扁平
+# `.maigo/plan-<id>.md`，見 `artifact_path()`。
+_NESTED_LAYOUT: dict[str, tuple[str, str]] = {
+    "review": ("review", "review"),
+    "review-rubric": ("review", "rubric"),
+    "review-draft": ("review", "draft"),
+    "pr-comments": ("review", "pr-comments"),
+    "triage-rubric": ("issue", "rubric"),
+}
+
+_FLAT_NAME_LOOKALIKES = (
+    # 找不到 producer 的孤兒檔名；本次只保證不搬、不擋，型錄列為未登記。
+    "review-batch-state.md",
+    # 舊版 board 檔名，`commands/board.md` 仍會偵測並遷移它——不是 review kind 的產物。
+    "review-board.md",
+)
 
 _SLUG_INVALID_RE = re.compile(r"[^a-z0-9._-]+")
 _SLUG_COLLAPSE_RE = re.compile(r"-{2,}")
 _SLUG_MAX_LEN = 40
 
 _H1_PREFIX = "# "
+
+_IDENTIFIER_INVALID_CHARS = ("/", "\\")
+
+
+def _validate_identifier(identifier: str) -> None:
+    """
+    巢狀佈局下 `<id>` 是目錄名，路徑穿越風險從 kind 擴大到 identifier——
+    含路徑分隔字元、空字串、`.`、`..` 一律拒絕。純函式，不做任何 I/O。
+    """
+    if (
+        not identifier
+        or identifier in (".", "..")
+        or any(char in identifier for char in _IDENTIFIER_INVALID_CHARS)
+    ):
+        raise ValueError(f"invalid identifier: {identifier!r}")
 
 
 def slugify(text: str) -> str | None:
@@ -80,23 +134,79 @@ def slugify(text: str) -> str | None:
     return truncated or None
 
 
-def artifact_path(kind: str, identifier: str) -> str:
+def artifact_path(kind: str, identifier: str, attempt: int = 1) -> str:
     """
-    `(a)` 類命名：`.maigo/<kind>-<identifier>.md`。純函式。
+    正典路徑：巢狀 kind → `.maigo/<group>/<id>/<stem>[-<attempt>].md`；
+    其餘（目前只有 `plan`）→ `.maigo/<kind>-<id>[-<attempt>].md`。純函式。
 
-    驗證 `kind` 屬於 `_KNOWN_KINDS`——CLI 有 `argparse choices` 擋著，但
-    `resolve_for_write()` 這個函式庫入口（例如 `scripts/pr_context_cache.py`
-    直接 import 呼叫）繞過 CLI，此處是兩個入口共同必經點。不驗證的話，帶
-    `../` 的 `kind` 會讓算出來的路徑跳出 `.maigo/`（路徑穿越）。
+    `attempt` 取代舊的 `f"{identifier}-2"` 字串拼接——conflict 後綴要落在
+    檔名層，不能落進巢狀佈局的目錄層（那會另開一個 `review/42-2/` 資料夾，
+    語意上是另一顆 PR，而不是同一份檔案的第 2 版）。
+
+    驗證 `kind` 屬於 `_KNOWN_KINDS`、`identifier` 不構成路徑穿越、
+    `attempt >= 1`——CLI 有 `argparse choices` 擋 kind，但 `resolve_for_write()`
+    這個函式庫入口（例如 `scripts/pr_context_cache.py` 直接 import 呼叫）
+    繞過 CLI，此處是兩個入口共同必經點。
     """
     if kind not in _KNOWN_KINDS:
         raise ValueError(f"unknown kind: {kind!r}; must be one of {_KNOWN_KINDS}")
+    _validate_identifier(identifier)
+    if attempt < 1:
+        raise ValueError(f"attempt must be >= 1: {attempt!r}")
+    suffix = "" if attempt == 1 else f"-{attempt}"
+    if kind in _NESTED_LAYOUT:
+        group, stem = _NESTED_LAYOUT[kind]
+        return f".maigo/{group}/{identifier}/{stem}{suffix}.md"
+    return f".maigo/{kind}-{identifier}{suffix}.md"
+
+
+def flat_path(kind: str, identifier: str) -> str:
+    """
+    分目錄前的扁平形：`.maigo/<kind>-<id>.md`。純函式。
+
+    只供讀取退路（`resolve_for_write()` 的 `Resolution.flat_path`）與遷移
+    腳本使用，不當寫入目標——巢狀 kind 的正典寫入路徑一律是 `artifact_path()`
+    算出的巢狀路徑。
+    """
+    if kind not in _KNOWN_KINDS:
+        raise ValueError(f"unknown kind: {kind!r}; must be one of {_KNOWN_KINDS}")
+    _validate_identifier(identifier)
     return f".maigo/{kind}-{identifier}.md"
 
 
 def legacy_path(kind: str) -> str:
     """本計畫要修掉的舊固定檔名：`.maigo/<kind>.md`。只供讀取退路，不當寫入目標。"""
     return f".maigo/{kind}.md"
+
+
+_IDENTIFIER_CHAR_RE = r"[A-Za-z0-9][\w.-]*"
+
+
+def artifact_path_regex(kinds: Iterable[str]) -> str:
+    """
+    回傳能匹配 *kinds* 的「新佈局 ∪ 扁平 `<kind>-<id>.md` ∪ 舊固定 `<kind>.md`」
+    regex 字串（三種形狀皆可能同時存在於一個 repo，讀取端要能認出全部）。
+
+    `id` 字元集沿用 `hooks/teammate_quality_check.py` 既有的
+    `[A-Za-z0-9][\\w.-]*`，後綴 `(?:-\\d+)?` 對應 `attempt` 產生的 `-2`/`-3`
+    尾碼。給 hook 動態組出比對用的正典 regex，取代硬編清單。純函式。
+    """
+    kinds = list(kinds)
+    kinds_by_len_desc = sorted(kinds, key=len, reverse=True)
+    kind_alt = "|".join(re.escape(kind) for kind in kinds_by_len_desc)
+
+    parts: list[str] = []
+    for kind in kinds_by_len_desc:
+        if kind not in _NESTED_LAYOUT:
+            continue
+        group, stem = _NESTED_LAYOUT[kind]
+        parts.append(
+            rf"\.maigo/{re.escape(group)}/{_IDENTIFIER_CHAR_RE}/"
+            rf"{re.escape(stem)}(?:-\d+)?\.md"
+        )
+    parts.append(rf"\.maigo/(?:{kind_alt})-{_IDENTIFIER_CHAR_RE}(?:-\d+)?\.md")
+    parts.append(rf"\.maigo/(?:{kind_alt})\.md")
+    return "(?:" + "|".join(parts) + ")"
 
 
 def _run_git(args: list[str], cwd: str | Path) -> str | None:
@@ -220,8 +330,9 @@ class Resolution:
     incoming_topic: str
     suggested_path: (
         str | None
-    )  # conflict 時的候選（`<kind>-<id>-2.md`），須經使用者同意才用
+    )  # conflict 時的候選（第 2 attempt 的路徑），須經使用者同意才用
     legacy_path: str | None  # 舊固定檔名存在時填，僅供讀取退路
+    flat_path: str | None = None  # 巢狀 kind 的分目錄前扁平檔存在時填，僅供讀取退路
 
 
 def resolve_for_write(
@@ -248,6 +359,12 @@ def resolve_for_write(
     legacy_exists = (Path(cwd) / legacy_str).exists()
     legacy_result = legacy_str if legacy_exists else None
 
+    flat_result = None
+    if kind in _NESTED_LAYOUT:
+        flat_str = flat_path(kind, identifier)
+        if (Path(cwd) / flat_str).exists():
+            flat_result = flat_str
+
     normalized_incoming = _normalize_topic(topic)
 
     if existing_topic is None:
@@ -258,6 +375,7 @@ def resolve_for_write(
             incoming_topic=normalized_incoming,
             suggested_path=None,
             legacy_path=legacy_result,
+            flat_path=flat_result,
         )
     if existing_topic == normalized_incoming:
         return Resolution(
@@ -267,14 +385,16 @@ def resolve_for_write(
             incoming_topic=normalized_incoming,
             suggested_path=None,
             legacy_path=legacy_result,
+            flat_path=flat_result,
         )
     return Resolution(
         status="conflict",
         path=None,
         existing_topic=existing_topic,
         incoming_topic=normalized_incoming,
-        suggested_path=artifact_path(kind, f"{identifier}-2"),
+        suggested_path=artifact_path(kind, identifier, attempt=2),
         legacy_path=legacy_result,
+        flat_path=flat_result,
     )
 
 
@@ -301,11 +421,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"suggest: {resolution.suggested_path}")
         if resolution.legacy_path:
             print(f"legacy_exists: {resolution.legacy_path}")
+        if resolution.flat_path:
+            print(f"flat_exists: {resolution.flat_path}")
         return 3
 
     print(f"path: {resolution.path}")
     if resolution.legacy_path:
         print(f"legacy_exists: {resolution.legacy_path}")
+    if resolution.flat_path:
+        print(f"flat_exists: {resolution.flat_path}")
     return 0
 
 

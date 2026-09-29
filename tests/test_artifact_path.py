@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -59,7 +60,7 @@ class TestNaming:
         assert ap.legacy_path("plan") == ".maigo/plan.md"
 
     def test_review_artifact_path_format(self):
-        assert ap.artifact_path("review", "x") == ".maigo/review-x.md"
+        assert ap.artifact_path("review", "x") == ".maigo/review/x/review.md"
 
     def test_review_legacy_path_format(self):
         assert ap.legacy_path("review") == ".maigo/review.md"
@@ -75,6 +76,103 @@ class TestNaming:
     def test_unknown_kind_raises_value_error(self, kind):
         with pytest.raises(ValueError):
             ap.artifact_path(kind, "42")
+
+    @pytest.mark.parametrize(
+        "kind, expected",
+        [
+            ("plan", ".maigo/plan-58543.md"),
+            ("review", ".maigo/review/58543/review.md"),
+            ("review-rubric", ".maigo/review/58543/rubric.md"),
+            ("review-draft", ".maigo/review/58543/draft.md"),
+            ("pr-comments", ".maigo/review/58543/pr-comments.md"),
+            ("triage-rubric", ".maigo/issue/58543/rubric.md"),
+        ],
+    )
+    def test_artifact_path_per_kind_nested_or_flat(self, kind, expected):
+        assert ap.artifact_path(kind, "58543") == expected
+
+    def test_attempt_2_suffix_is_on_filename_not_directory(self):
+        assert ap.artifact_path("review-rubric", "58543", attempt=2) == (
+            ".maigo/review/58543/rubric-2.md"
+        )
+
+    def test_plan_attempt_2_suffix(self):
+        assert ap.artifact_path("plan", "58543", attempt=2) == ".maigo/plan-58543-2.md"
+
+    def test_attempt_below_1_raises_value_error(self):
+        with pytest.raises(ValueError):
+            ap.artifact_path("plan", "58543", attempt=0)
+
+    @pytest.mark.parametrize("identifier", ["a/b", "..", "."])
+    def test_invalid_identifier_raises_value_error(self, identifier):
+        with pytest.raises(ValueError):
+            ap.artifact_path("plan", identifier)
+
+    def test_empty_identifier_raises_value_error(self):
+        with pytest.raises(ValueError):
+            ap.artifact_path("plan", "")
+
+    def test_same_pr_review_and_rubric_share_parent_directory(self):
+        review_path = Path(ap.artifact_path("review", "58543"))
+        rubric_path = Path(ap.artifact_path("review-rubric", "58543"))
+        assert review_path.parent == rubric_path.parent == Path(".maigo/review/58543")
+
+    def test_nested_layout_is_subset_of_known_kinds_and_excludes_plan(self):
+        assert set(ap._NESTED_LAYOUT).issubset(set(ap._KNOWN_KINDS))
+        assert "plan" not in ap._NESTED_LAYOUT
+
+
+# ---------------------------------------------------------------------------
+# flat_path() — 分目錄前的扁平形，只供讀取退路與遷移
+# ---------------------------------------------------------------------------
+
+
+class TestFlatPath:
+    def test_flat_path_format(self):
+        assert ap.flat_path("review-rubric", "58543") == ".maigo/review-rubric-58543.md"
+
+    def test_unknown_kind_raises_value_error(self):
+        with pytest.raises(ValueError):
+            ap.flat_path("not-a-kind", "58543")
+
+    @pytest.mark.parametrize("identifier", ["a/b", "..", ""])
+    def test_invalid_identifier_raises_value_error(self, identifier):
+        with pytest.raises(ValueError):
+            ap.flat_path("review-rubric", identifier)
+
+
+# ---------------------------------------------------------------------------
+# artifact_path_regex()
+# ---------------------------------------------------------------------------
+
+
+class TestArtifactPathRegex:
+    _KINDS = ("plan", "review-rubric", "triage-rubric")
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/review/58543/rubric-2.md",
+            ".maigo/issue/12/rubric.md",
+            ".maigo/plan-x.md",
+            ".maigo/review-rubric-42.md",
+            ".maigo/plan.md",
+        ],
+    )
+    def test_matches_new_flat_and_legacy_shapes(self, path):
+        pattern = ap.artifact_path_regex(self._KINDS)
+        assert re.search(pattern, path)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/review/58543/review.md",
+            ".maigo/review/58543/notes.md",
+        ],
+    )
+    def test_does_not_match_other_kinds_or_stems(self, path):
+        pattern = ap.artifact_path_regex(self._KINDS)
+        assert not re.search(pattern, path)
 
 
 # ---------------------------------------------------------------------------
@@ -234,10 +332,102 @@ class TestResolveForWrite:
             cwd=tmp_path,
         )
         assert result.status == "new"
-        assert result.path == ".maigo/review-42.md"
+        assert result.path == ".maigo/review/42/review.md"
         assert result.existing_topic is None
         assert result.suggested_path is None
         assert result.legacy_path is None
+
+    def test_same_repo_review_and_rubric_share_parent_dir(self, tmp_path: Path):
+        review = ap.resolve_for_write(
+            "review",
+            "Review: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        rubric = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert Path(review.path).parent == Path(rubric.path).parent
+        assert Path(review.path).parent == Path(".maigo/review/42")
+
+    def test_cross_repo_review_and_rubric_share_parent_dir(self, tmp_path: Path):
+        cross_repo_url = "https://github.com/apache/airflow/pull/58543"
+        review = ap.resolve_for_write(
+            "review",
+            "Review: something",
+            url=cross_repo_url,
+            home_repo="",
+            cwd=tmp_path,
+        )
+        rubric = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: something",
+            url=cross_repo_url,
+            home_repo="",
+            cwd=tmp_path,
+        )
+        assert Path(review.path).parent == Path(rubric.path).parent
+        assert Path(review.path).parent == Path(".maigo/review/airflow-58543")
+
+    def test_nested_conflict_suggests_attempt_2_in_filename(self, tmp_path: Path):
+        # canary A 的紅燈斷言：把 conflict 候選改回
+        # `artifact_path(kind, f"{identifier}-2")` 會產生
+        # `.maigo/review/42-2/rubric.md`（另開資料夾），必須紅在這裡。
+        target = tmp_path / ".maigo" / "review" / "42" / "rubric.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("# Review rubric: A\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: B",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.status == "conflict"
+        assert result.path is None
+        assert result.suggested_path == ".maigo/review/42/rubric-2.md"
+
+    def test_flat_fallback_when_only_flat_file_exists(self, tmp_path: Path):
+        flat = tmp_path / ".maigo" / "review-rubric-42.md"
+        flat.parent.mkdir(parents=True)
+        flat.write_text("# some other topic\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.status == "new"
+        assert result.path == ".maigo/review/42/rubric.md"
+        assert result.flat_path == ".maigo/review-rubric-42.md"
+
+    def test_flat_path_none_when_absent_for_nested_kind(self, tmp_path: Path):
+        result = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.flat_path is None
+
+    def test_flat_path_always_none_for_plan_kind(self, tmp_path: Path):
+        # plan 不是巢狀 kind——`artifact_path("plan", "42")` 本身就是
+        # `.maigo/plan-42.md`，沒有與正典路徑不同的「扁平」形可退。
+        result = ap.resolve_for_write(
+            "plan",
+            "Plan: fix dag run stall",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.flat_path is None
 
     def test_new_when_existing_file_has_no_h1(self, tmp_path: Path):
         target = tmp_path / ".maigo" / "plan-42.md"
@@ -413,4 +603,31 @@ class TestCli:
             "status: new",
             "path: .maigo/plan-42.md",
             "legacy_exists: .maigo/plan.md",
+        ]
+
+    def test_flat_exists_line_appended_for_nested_kind(self, tmp_path: Path, capsys):
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "review-rubric-42.md").write_text(
+            "# old rubric\n", encoding="utf-8"
+        )
+        exit_code = ap.main(
+            [
+                "review-rubric",
+                "--topic",
+                "Review rubric: fix dag run stall",
+                "--url",
+                _URL,
+                "--repo",
+                _HOME_REPO,
+                "--cwd",
+                str(tmp_path),
+            ]
+        )
+        out = capsys.readouterr().out.splitlines()
+        assert exit_code == 0
+        assert out == [
+            "status: new",
+            "path: .maigo/review/42/rubric.md",
+            "flat_exists: .maigo/review-rubric-42.md",
         ]

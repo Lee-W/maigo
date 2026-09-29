@@ -77,7 +77,7 @@ email、另一個 repo），且含多個區塊（多則回覆草稿、報告、�
 - **maigo 流程自己的草稿**（`/maigo:review` 等命令產生、要貼到 GitHub 的 review
   草稿等）：放 `.maigo/`，命名比照同一次任務的產物（例：
   [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
-  §4.5 的 `.maigo/review-draft-<id>.md`），不要落到目標 repo 自己的 output
+  §4.5 的 `.maigo/review/<id>/draft.md`），不要落到目標 repo 自己的 output
   convention——maigo 的產物本來就集中在 `.maigo/`（review、rubric、board、`i/`
   細節檔），同時把新產物的路徑記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
 - 沒有成文慣例的情境用 scratchpad。

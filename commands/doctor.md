@@ -35,12 +35,19 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 5. **Token usage**（read-only）：讀 `.maigo/token-usage.jsonl`，彙整最近 7 天總量並依角色／model
    分組。只採用 harness 已提供的 foreground subagent metadata；背景 agent、Codex 或舊版 harness
    沒資料時標示 unavailable，不自行估算、不算 error。
-6. **`.maigo/` 頂層型錄**（read-only，只列不刪）：呼叫
-   `scripts/maigo_dir_catalog.py` 掃描 `.maigo/` 頂層 `*.md` 檔，分成四類——
-   已知種類的識別碼命名（`plan-<id>.md` 這類）、已知種類的舊固定檔名
-   （`.maigo/plan.md` 這類，代表升級前留下的孤兒）、已登記的非 artifact 檔
-   （`board.md`）、其餘全部歸為未登記檔案。舊固定檔名與未登記檔案都**只列出來，
-   不自動刪除、不建議刪除哪一個**，由使用者自己決定（見
+6. **`.maigo/` 型錄**（read-only，只列不刪）：呼叫 `scripts/maigo_dir_catalog.py`
+   掃描 `.maigo/` 頂層 `*.md` 檔與 `review/*/*.md`、`issue/*/*.md` 兩層巢狀
+   檔，分成六類——已在巢狀佈局的（`nested`）、非巢狀 kind（`plan`）的識別碼
+   命名（`identifier_named`，`plan-<id>.md` 這類）、巢狀 kind 分目錄前的
+   扁平檔（`flat_identifier`，`review-rubric-<id>.md` 這類，待遷移）、已知
+   種類的舊固定檔名（`legacy_fixed_name`，`.maigo/plan.md` 這類，代表升級前
+   留下的孤兒）、已登記的非 artifact 檔（`registered_non_artifact`，
+   `board.md`／`review-board.md`）、其餘全部歸為未登記檔案
+   （`unregistered`）。`flat_identifier`、`legacy_fixed_name` 與
+   `unregistered` 都**只列出來，不自動刪除、不建議刪除哪一個**，由使用者
+   自己決定；`flat_identifier` 與 `legacy_fixed_name` 可用
+   `scripts/migrate_legacy_artifacts.py`（先 dry-run 看清單，使用者同意後
+   `--apply`）搬進巢狀佈局，見
    [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
    與 [`docs/reference/artifacts.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/artifacts.md)）。
 
@@ -68,7 +75,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 ```
 
 5. **Orchestrator**：跑 `python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/maigo_dir_catalog.py"` 拿到
-   `.maigo/` 頂層四類分類，只回報路徑，不刪除、不建議刪除哪一個。
+   `.maigo/` 六類分類，只回報路徑，不刪除、不建議刪除哪一個；`flat_identifier`／
+   `legacy_fixed_name` 若非空，提醒使用者可跑 `scripts/migrate_legacy_artifacts.py` 搬進巢狀佈局。
 6. **Orchestrator**：
    - 彙整報告。
    - 針對缺失項給予具體的「改進」建議（不使用「優化」）。

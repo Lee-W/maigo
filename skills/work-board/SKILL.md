@@ -169,8 +169,8 @@ docstring），所以不同 owner 的同名 repo（例如 `astronomer/astro` 與
 - **下一步**：`next_action` 為 `null` 時省略整行——狀態沒有對應下一步，見
   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
   的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
-- **舊 `📄 <產物路徑>`**（review-<n>.md / triage 筆記等本地產物）：改寫進 `## 筆記`
-  區裡的一行裸相對路徑連結（例：`review-9301.md`），不佔事實區欄位。
+- **舊 `📄 <產物路徑>`**（`review/<n>/review.md` / triage 筆記等本地產物）：改寫進 `## 筆記`
+  區裡的一行裸相對路徑連結（相對 `.maigo/`，例：`review/9301/review.md`），不佔事實區欄位。
 - **資料缺失時的降級**（與上面三條「刻意省略」不同）：某欄位該有值但當下拿不到
   （例：遷移進來的 👀 項目沒有 `Δ+A/-D`，因為舊格式本來就沒記），就**只寫拿得到的部分**
   ——`- 規模：` 整行只剩作者時退化成 `- 作者：<author>`，不要填 `?` 或 `N/A` 佔位。
@@ -327,7 +327,7 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | merged / closed | `merged` / `closed` | ✅ | P9 |
 | `isDraft == true` | `他人草稿`（未被邀請不主動審） | ⏳ | P8 |
 | 你從未 review（無 prior verdict） | `待 review` → `/maigo:review <n>` | 🎯 | P4 |
-| 有 prior verdict（`_REVIEW_ACTIVE_VERDICTS`）但 `reviews` 裡沒有你送出的 review | `待送出` → `gh pr review <n> --comment --body-file .maigo/review-<n>.md` | 🎯 | P3 |
+| 有 prior verdict（`_REVIEW_ACTIVE_VERDICTS`）但 `reviews` 裡沒有你送出的 review | `待送出` → `gh pr review <n> --comment --body-file .maigo/review/<n>/draft.md` | 🎯 | P3 |
 | 有 prior verdict、`reviews` 裡有你、且你上次 review 後 author 有新 commit/comment | `↩︎ 回你的球` → `/maigo:review <n>`（重審） | 🎯 | P2 |
 | 有 prior verdict、`reviews` 裡有你、且無新 author 活動 | 保留該 verdict：`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE` | ⏳ | P8 |
 
@@ -437,7 +437,7 @@ worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree
    游標停在 `i/<slug>.md` 上 `gf`（Neovim 核心內建，不需 plugin）直接開那份細節檔
    （格式見 §1a）；看完 `<C-o>` 跳回 board.md 原本的位置。
 4. **細節檔內 `gx` 開 GitHub**：真 URL 搬進了細節檔的「連結」那一行，游標移到該行 `gx`
-   直接開瀏覽器到該 issue/PR；「筆記」段落裡的裸相對路徑（例：`review-9301.md`）同樣
+   直接開瀏覽器到該 issue/PR；「筆記」段落裡的裸相對路徑（例：`review/9301/review.md`）同樣
    `gf` 可跳。
 5. **勾 `[x]` 觸發 `--learn`**：把 `- [ ]` 或 `1. [ ]` 改成 `[x]` 存檔即完成（見 §5），
    不需要額外命令；下次 `/maigo:board` 刷新會列出已勾未 `🧠` 的項目。

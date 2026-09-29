@@ -73,7 +73,7 @@ locality rules:
 
 | What | Where it lives | Why |
 |------|----------------|-----|
-| Single-task temporary artifacts (`plan-<id>.md`, `review-rubric-<id>.md`, `review-<id>.md`, `triage-rubric-<id>.md`, `pr-comments-<id>.md`) | The **worktree's own** `.maigo/` | `artifact_path.py`'s `resolve_identifier()` derives the identifier from cwd's current git branch. cwd inside the worktree naturally resolves to the worktree's own branch slug — no code change needed, it just falls out of the existing four-tier identifier chain. |
+| Single-task temporary artifacts (`plan-<id>.md`, `review/<id>/{review,rubric,draft,pr-comments}.md`, `issue/<id>/rubric.md`) | The **worktree's own** `.maigo/` | `artifact_path.py`'s `resolve_identifier()` derives the identifier from cwd's current git branch. cwd inside the worktree naturally resolves to the worktree's own branch slug — no code change needed, it just falls out of the existing four-tier identifier chain. |
 | Work Board (`.maigo/board.md` and `.maigo/i/*.md`) | **Always the main checkout**, never a worktree | The board is a cross-session, cross-task single source of truth — it doesn't make sense duplicated per worktree. |
 
 When a command running inside a worktree needs to read or write the board, it

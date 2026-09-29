@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Single source of truth for Work Board state (`.maigo/board.md`) classification.
+"""
+Single source of truth for Work Board state (`.maigo/board.md`) classification.
 
 Defines the detail-state enum (with rank / section / default next_action),
 the pure `classify()` transition function, `ALLOWED_TRANSITIONS` — the
@@ -33,6 +34,12 @@ stdlib-only；`classify()` 與 `compute_badges()` 皆為純函式——`classify
 完全不碰時間；`compute_badges()` 需要 wall-clock 比較，因此把 `now` 當成
 明確參數傳入，不在函式內部呼叫 `datetime.now()`。`detail_path()` 同樣是純函式，
 只做字串解析，不打任何網路請求。
+
+`待送出`（`UNPOSTED_VERDICT`）的 `next_action` 模板含佔位字
+`_REVIEW_DRAFT_PLACEHOLDER`；`main()` 在 `url` 可解析出識別碼時，用
+function-level import 把它換成 `artifact_path("review-draft", ref)` 算出的
+真實路徑（見 `main()` 內註解說明為何不能在模組頂層 import `artifact_path`）；
+`url` 缺失或無法解析時保留佔位字，不假造路徑。
 """
 
 from __future__ import annotations
@@ -44,6 +51,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
+from pathlib import Path
 
 STALE_DAYS_DEFAULT = 14
 
@@ -126,6 +134,11 @@ class StatusMeta:
     next_action: str | None
 
 
+# 待送出的 next_action 模板佔位字：`main()` 在 url 可解析時，用
+# function-level import 的 `artifact_path("review-draft", ref)` 換掉這段
+# （見 `main()` 內的 circular-import 註解）；url 缺失時保留佔位字，不假造路徑。
+_REVIEW_DRAFT_PLACEHOLDER = "<review-draft>"
+
 _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P0：抓不到
     BoardStatus.UNREACHABLE: StatusMeta(Rank.P0, None),
@@ -140,7 +153,7 @@ _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P3：一步就結束
     BoardStatus.MERGEABLE: StatusMeta(Rank.P3, "gh pr merge <n>"),
     BoardStatus.UNPOSTED_VERDICT: StatusMeta(
-        Rank.P3, "gh pr review <n> --comment --body-file .maigo/review-<n>.md"
+        Rank.P3, f"gh pr review <n> --comment --body-file {_REVIEW_DRAFT_PLACEHOLDER}"
     ),
     # P4：等你審
     BoardStatus.PENDING_REVIEW: StatusMeta(Rank.P4, "/maigo:review <n>"),
@@ -172,7 +185,7 @@ assert set(_STATUS_META) == set(BoardStatus), "每個 BoardStatus 都必須有 r
 
 
 def _section_for_rank(rank: Rank) -> Section:
-    """rank → section：P0–P7 進 🎯、P8 進 ⏳、P9 進 ✅。"""
+    """Rank → section：P0–P7 進 🎯、P8 進 ⏳、P9 進 ✅。"""
     if rank <= Rank.P7:
         return Section.NEXT
     if rank == Rank.P8:
@@ -356,7 +369,8 @@ _GITHUB_ISSUE_OR_PR_URL_RE = re.compile(
 
 
 def github_ref(url: str, home_repo: str = "") -> str | None:
-    """把 issue/PR URL 算成識別碼片段（不含路徑前綴／副檔名）。
+    """
+    把 issue/PR URL 算成識別碼片段（不含路徑前綴／副檔名）。
 
     `home_repo`（cwd repo，`owner/name`）與 URL 所屬 repo 相同時回 `<n>`；
     跨 repo（含 `home_repo` 為空字串——省略時一律當跨 repo）回 `<repo>-<n>`。
@@ -382,7 +396,8 @@ def github_ref(url: str, home_repo: str = "") -> str | None:
 
 
 def detail_path(url: str, home_repo: str = "") -> str | None:
-    """把 issue/PR URL 算成 board 索引行用的細節檔相對路徑（相對 `.maigo/`）。
+    """
+    把 issue/PR URL 算成 board 索引行用的細節檔相對路徑（相對 `.maigo/`）。
 
     薄封裝：實際的 URL 解析在 `github_ref()`，這裡只加 `i/` 前綴與 `.md` 副檔名。
     """
@@ -548,7 +563,8 @@ def classify(
     prior_status: BoardStatus | None,
     you: str = "",
 ) -> ClassifyResult:
-    """純函式：`(item_type, gh_meta, prior_status, you) -> section/status/rank/next_action`。
+    """
+    純函式：`(item_type, gh_meta, prior_status, you) -> section/status/rank/next_action`。
 
     不做任何 I/O；「你 vs 別人最後活動」全部從 `gh_meta` 的 comments/reviews
     author+時間戳算出，不呼叫 `datetime.now()`（那是 `compute_badges()` 的事）。
@@ -631,12 +647,30 @@ def main(argv: list[str] | None = None) -> int:
         prior_status = _parse_prior_status(item.get("prior_status"))
         result = classify(item_type, gh_meta, prior_status, args.you)
         badges = compute_badges(gh_meta, now, args.stale_days)
+
+        next_action = result.next_action
+        if result.status is BoardStatus.UNPOSTED_VERDICT and next_action is not None:
+            ref = github_ref(item.get("url") or "", args.repo)
+            if ref is not None:
+                # Function-level import: `artifact_path.py` imports
+                # `github_ref` from this module at module scope, so this
+                # module importing `artifact_path` back at module scope
+                # would fail (circular import, `artifact_path` not yet
+                # defined). Deferring to call time inside `main()` breaks
+                # the cycle; `classify()` stays a pure function untouched.
+                sys.path.insert(0, str(Path(__file__).resolve().parent))
+                from artifact_path import artifact_path
+
+                next_action = next_action.replace(
+                    _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
+                )
+
         results.append(
             {
                 "section": result.section.value,
                 "rank": int(result.rank),
                 "status": result.status.value,
-                "next_action": result.next_action,
+                "next_action": next_action,
                 "badges": badges,
                 "detail_path": detail_path(item.get("url") or "", args.repo),
             }
