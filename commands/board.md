@@ -64,9 +64,20 @@ rank 升序 ＋ 同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單（`�
 無編號）：
 
 ```bash
-echo '<[{type, gh_meta, prior_status, url}, ...]>' \
-  | python3 scripts/board_state.py --you <login> --repo <owner/name>
+echo '<[{type, gh_meta, prior_status, url, local_verdict_at}, ...]>' \
+  | python3 scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
 ```
+
+**一定要帶 `--maigo-root <repo root>`**（`.maigo/` 所在目錄，通常就是 cwd）：這讓
+`main()` 對 👀 型別項目自動找對應的
+[`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
+`review` kind 產物（`.maigo/review/<id>/review.md`，跨 repo 同樣算得出
+`<repo>-<n>` 形式的 `<id>`）並算出 `local_verdict_at`——不要自己算路徑或轉時間戳，
+那正是「本地已經審完、尚未貼到 GitHub」與「幾個月前貼過舊 review、現在該重審」的
+唯一區分依據，algorithm 出錯（id 算錯、mtime 沒轉對時區）會讓這條判斷失效或誤判。
+`--maigo-root` 省略、或該 PR 沒有對應的 review 產物時，`local_verdict_at` 留空，
+`posted_by_you` 退回舊行為（見 `scripts/board_state.py` 的 `_posted_by_you_since()`）；
+stdin 顯式給的 `local_verdict_at` 優先於自動算出的值。
 
 三張完整球權判定表、排序與 ✅ 保留天數見
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
