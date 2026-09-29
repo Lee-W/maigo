@@ -105,6 +105,13 @@ the reviewer has not clicked Resolve yet. State what changed and what deliberate
 trade-off was made (if any), then stop — whether to accept is the reviewer's
 call, not something the draft narrates.
 
+A draft carried over from an earlier session or round is a claim about the
+diff *as it was then*. Before handing it over again, re-check every universal
+statement in it ("every resolved anchor exists", "no other provider changed",
+"all callers") against the commits landed since: a later commit that widens
+the set turns a verified claim into an overclaim without changing a word of
+the draft. Re-verify it for the new set, or narrow it to what was verified.
+
 **Good:**
 
 > Changed `_serialize_keys` to return a `frozenset` (was `list`). Trade-off:
