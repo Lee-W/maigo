@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 import itertools
 import json
+import os
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -334,6 +336,106 @@ class TestClassifyReviewPr:
             "comments": [],
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE)
+        assert result.status is bs.BoardStatus.APPROVE
+
+
+class TestClassifyReviewPrLocalVerdictAt:
+    """
+    `local_verdict_at`（本地 review 報告產生時間）用來區分「這次本地審完還沒貼」
+    與「幾個月前貼過舊 review、現在該重審」——2026-09-29 board 誤判實例：舊
+    review 蓋掉了「待送出」訊號。
+    """
+
+    def test_stale_review_before_local_verdict_is_unposted(self):
+        """(a) 你送過的唯一一筆 review 早於這次本地 verdict 產生時間 → 待送出。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [
+                {"author": {"login": YOU}, "submittedAt": "2026-01-02T00:00:00Z"}
+            ],
+            "comments": [],
+        }
+        result = bs.classify(
+            bs.ItemType.REVIEW_PR,
+            gh_meta,
+            bs.BoardStatus.APPROVE,
+            you=YOU,
+            local_verdict_at="2026-09-29T00:00:00Z",
+        )
+        assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P3
+
+    def test_review_after_local_verdict_with_no_author_activity_keeps_verdict(self):
+        """(b) review 晚於本地 verdict 產生時間，作者之後無活動 → 保留原 verdict。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [
+                {"author": {"login": YOU}, "submittedAt": "2026-09-29T12:00:00Z"}
+            ],
+            "comments": [],
+        }
+        result = bs.classify(
+            bs.ItemType.REVIEW_PR,
+            gh_meta,
+            bs.BoardStatus.APPROVE,
+            you=YOU,
+            local_verdict_at="2026-09-29T00:00:00Z",
+        )
+        assert result.status is bs.BoardStatus.APPROVE
+        assert result.section is bs.Section.WAITING
+        assert result.rank is bs.Rank.P8
+
+    def test_review_after_local_verdict_with_author_activity_is_ball_back(self):
+        """(c) review 晚於本地 verdict 產生時間，且之後作者有新活動 → 回你的球。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [
+                {"author": {"login": YOU}, "submittedAt": "2026-09-29T12:00:00Z"}
+            ],
+            "comments": [
+                {"author": {"login": "carol"}, "createdAt": "2026-09-29T13:00:00Z"}
+            ],
+        }
+        result = bs.classify(
+            bs.ItemType.REVIEW_PR,
+            gh_meta,
+            bs.BoardStatus.APPROVE,
+            you=YOU,
+            local_verdict_at="2026-09-29T00:00:00Z",
+        )
+        assert result.status is bs.BoardStatus.BALL_BACK
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P2
+
+    def test_missing_local_verdict_at_keeps_legacy_behavior(self):
+        """(d) 欄位缺席（`None`）→ 行為與現行一致：任一貼過的 review 都算已送出。"""
+        gh_meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "author": {"login": "carol"},
+            "createdAt": "2026-01-01T00:00:00Z",
+            "reviews": [
+                {"author": {"login": YOU}, "submittedAt": "2026-01-02T00:00:00Z"}
+            ],
+            "comments": [],
+        }
+        result = bs.classify(
+            bs.ItemType.REVIEW_PR,
+            gh_meta,
+            bs.BoardStatus.APPROVE,
+            you=YOU,
+            local_verdict_at=None,
+        )
         assert result.status is bs.BoardStatus.APPROVE
 
 
@@ -818,3 +920,159 @@ class TestMain:
         assert out[0]["next_action"] == (
             "gh pr review <n> --comment --body-file <review-draft>"
         )
+
+
+# ---------------------------------------------------------------------------
+# `--maigo-root` 自動算 local_verdict_at（end-to-end，走 main()/CLI）
+# ---------------------------------------------------------------------------
+
+
+class TestMainAutoLocalVerdictAt:
+    @staticmethod
+    def _stdin_item(url, submitted_at, prior_status="APPROVE", extra_comments=None):
+        return {
+            "type": "👀",
+            "gh_meta": {
+                "state": "OPEN",
+                "isDraft": False,
+                "author": {"login": "carol"},
+                "createdAt": "2026-01-01T00:00:00Z",
+                "reviews": [{"author": {"login": YOU}, "submittedAt": submitted_at}],
+                "comments": extra_comments or [],
+            },
+            "prior_status": prior_status,
+            "url": url,
+        }
+
+    def _write_review_with_mtime(self, root, ref, epoch_seconds):
+        review_path = root / ".maigo" / "review" / ref / "review.md"
+        review_path.parent.mkdir(parents=True, exist_ok=True)
+        review_path.write_text("# review\n", encoding="utf-8")
+        os.utime(review_path, (epoch_seconds, epoch_seconds))
+        return review_path
+
+    def test_same_repo_auto_detects_stale_review_as_unposted(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """(i) 同 repo：review.md mtime 晚於你送出的唯一一筆 review → 待送出。"""
+        mtime_epoch = datetime(2026, 9, 29, 0, 0, 0, tzinfo=timezone.utc).timestamp()
+        self._write_review_with_mtime(tmp_path, "58543", mtime_epoch)
+
+        item = self._stdin_item(
+            "https://github.com/apache/airflow/pull/58543",
+            submitted_at="2026-01-02T00:00:00Z",  # 遠早於 review.md mtime
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([item])))
+
+        exit_code = bs.main(
+            [
+                "--you",
+                YOU,
+                "--repo",
+                "apache/airflow",
+                "--maigo-root",
+                str(tmp_path),
+            ]
+        )
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["status"] == "待送出"
+
+    def test_cross_repo_auto_detects_review_under_prefixed_dir(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """(ii) 跨 repo：`<id>` 是 `<repo>-<n>`，review.md 要放在對應的前綴目錄。"""
+        mtime_epoch = datetime(2026, 9, 29, 0, 0, 0, tzinfo=timezone.utc).timestamp()
+        self._write_review_with_mtime(tmp_path, "airflow-58543", mtime_epoch)
+
+        item = self._stdin_item(
+            "https://github.com/apache/airflow/pull/58543",
+            submitted_at="2026-01-02T00:00:00Z",
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([item])))
+
+        # 沒帶 --repo（或帶不同 repo）→ 跨 repo，<id> 應為 airflow-58543
+        exit_code = bs.main(["--you", YOU, "--maigo-root", str(tmp_path)])
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["status"] == "待送出"
+
+    def test_explicit_local_verdict_at_overrides_auto_detection(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """(iii) stdin 顯式 `local_verdict_at` 優先於自動算出的值。"""
+        # review.md mtime 早於 review submittedAt → 自動算出的話會判定「已送出」。
+        old_mtime_epoch = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc).timestamp()
+        self._write_review_with_mtime(tmp_path, "58543", old_mtime_epoch)
+
+        item = self._stdin_item(
+            "https://github.com/apache/airflow/pull/58543",
+            submitted_at="2026-01-02T00:00:00Z",
+        )
+        # 顯式欄位晚於 review submittedAt → 應蓋掉自動偵測，強制判「待送出」。
+        item["local_verdict_at"] = "2026-09-29T00:00:00Z"
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([item])))
+
+        exit_code = bs.main(
+            [
+                "--you",
+                YOU,
+                "--repo",
+                "apache/airflow",
+                "--maigo-root",
+                str(tmp_path),
+            ]
+        )
+
+        assert exit_code == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["status"] == "待送出"
+
+    def test_auto_detected_mtime_has_no_timezone_offset(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """
+        (iv) 時區 canary：mtime 對應的真實 UTC 時刻與「若誤用系統本地時區重新解讀該
+        wall-clock、再被當成 UTC」兩種結果相差 8 小時，剛好跨過 review submittedAt
+        這個判斷點——如果實作退化成 naive `datetime.fromtimestamp(mtime)`（沒帶
+        `tz=timezone.utc`），這條測試會因為系統本地時區被設成 Asia/Taipei 而翻盤
+        （偽 UTC 時刻變成 12:00，比 08:00 的 review 還晚，判成「待送出」）；正確實作
+        用 `tz=timezone.utc` 直接換算，不受系統本地時區影響，結果穩定為「已送出」。
+        """
+        original_tz = os.environ.get("TZ")
+        os.environ["TZ"] = "Asia/Taipei"
+        time.tzset()
+        try:
+            true_utc = datetime(2026, 9, 29, 4, 0, 0, tzinfo=timezone.utc)
+            self._write_review_with_mtime(tmp_path, "58543", true_utc.timestamp())
+
+            item = self._stdin_item(
+                "https://github.com/apache/airflow/pull/58543",
+                submitted_at="2026-09-29T08:00:00Z",
+            )
+            monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([item])))
+
+            exit_code = bs.main(
+                [
+                    "--you",
+                    YOU,
+                    "--repo",
+                    "apache/airflow",
+                    "--maigo-root",
+                    str(tmp_path),
+                ]
+            )
+
+            assert exit_code == 0
+            out = json.loads(capsys.readouterr().out)
+            # 正確：local_verdict_at == 2026-09-29T04:00:00+00:00，
+            # submittedAt (08:00Z) >= local_verdict_at → 已送出 → 保留 prior verdict。
+            assert out[0]["status"] == "APPROVE"
+        finally:
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            time.tzset()

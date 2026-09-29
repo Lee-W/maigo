@@ -327,7 +327,7 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | merged / closed | `merged` / `closed` | ✅ | P9 |
 | `isDraft == true` | `他人草稿`（未被邀請不主動審） | ⏳ | P8 |
 | 你從未 review（無 prior verdict） | `待 review` → `/maigo:review <n>` | 🎯 | P4 |
-| 有 prior verdict（`_REVIEW_ACTIVE_VERDICTS`）但 `reviews` 裡沒有你送出的 review | `待送出` → `gh pr review <n> --comment --body-file .maigo/review/<n>/draft.md` | 🎯 | P3 |
+| 有 prior verdict（`_REVIEW_ACTIVE_VERDICTS`）但 `reviews` 裡沒有你在 `local_verdict_at`（`board_state.py` 帶 `--maigo-root` 時自動算，取自本地 review 報告 mtime；省略時視為任何時候）之後送出的 review | `待送出` → `gh pr review <n> --comment --body-file .maigo/review/<n>/draft.md` | 🎯 | P3 |
 | 有 prior verdict、`reviews` 裡有你、且你上次 review 後 author 有新 commit/comment | `↩︎ 回你的球` → `/maigo:review <n>`（重審） | 🎯 | P2 |
 | 有 prior verdict、`reviews` 裡有你、且無新 author 活動 | 保留該 verdict：`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE` | ⏳ | P8 |
 

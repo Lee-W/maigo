@@ -16,10 +16,18 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null, "url
     | python3 scripts/board_state.py --you octocat --repo owner/repo
 ```
 
-stdin：JSON 陣列 `[{type, gh_meta, prior_status, url}]`
+stdin：JSON 陣列 `[{type, gh_meta, prior_status, url, local_verdict_at}]`
 （`type` 是 🐛/🔀/👀；`prior_status` 是上次寫進 board.md 的狀態詞或 `null`；
 未知/過期的狀態詞視為 `null`，向下相容自動正規化；`url` 是 optional 的 GitHub
-issue/PR URL，用來算 `detail_path`）。
+issue/PR URL，用來算 `detail_path`；`local_verdict_at` 是 optional 的 ISO 8601
+時間戳，只對 👀 型別有意義——本地產出這次 review verdict 的時間。顯式給了就
+直接用；省略且帶了 `--maigo-root` 時，`main()` 自動用 `github_ref()` 算出的
+`<id>` 找 `.maigo/review/<id>/review.md`（跨 repo 用 `<repo>-<n>`，見
+`artifact_path.py` 的 `_NESTED_LAYOUT`），存在就取檔案 mtime 換算成帶
+`tzinfo=utc` 的 ISO 8601（`datetime.fromtimestamp(mtime, tz=timezone.utc)`，
+天生不會有時區偏移）；檔案不存在、`url` 解析不出 `<id>`、或未帶
+`--maigo-root` 一律不填，`posted_by_you` 退回舊行為（只看「你有沒有貼過任一
+review」，不比時間）。
 stdout：JSON 陣列 `[{section, rank, status, next_action, badges, detail_path}]`
 （`rank` 是整數，數字越小優先序越高，呼叫端直接用它排序；`detail_path` 無 `url`
 或無法解析時為 `null`）。
@@ -29,6 +37,8 @@ stdout：JSON 陣列 `[{section, rank, status, next_action, badges, detail_path}
 `--stale-days`（預設 14）控制 `💤` badge 的門檻。
 `--repo <owner/name>` 提供 board 綁定的 cwd repo，用來判斷 `detail_path` 是否算
 「同 repo」；省略時視為空字串（一律當跨 repo 處理）。
+`--maigo-root <dir>` 提供 `.maigo/` 所在的 repo root，用來自動算
+`local_verdict_at`（見上）；省略時不自動算，行為與這個選項加入前完全一致。
 
 stdlib-only；`classify()` 與 `compute_badges()` 皆為純函式——`classify()`
 完全不碰時間；`compute_badges()` 需要 wall-clock 比較，因此把 `now` 當成
@@ -449,6 +459,24 @@ def _has_activity_after(
     return any(author == login and _parse_ts(ts) > since for author, ts in events)
 
 
+def _posted_by_you_since(reviews: list[dict], you: str, since: datetime | None) -> bool:
+    """
+    `you` 有沒有貼過 review——`since` 給定時只算 `submittedAt`/`createdAt` ≥
+    `since` 的那些（本地新產出的 verdict 之後才貼的才算數，同 session 裡的舊
+    review 不算「已送出這次的判斷」）；`since` 為 `None`（`local_verdict_at`
+    欄位缺席）時退回舊行為，任一貼過就算。
+    """
+    for review in reviews:
+        if (review.get("author") or {}).get("login") != you:
+            continue
+        if since is None:
+            return True
+        ts = review.get("submittedAt") or review.get("createdAt")
+        if ts and _parse_ts(ts) >= since:
+            return True
+    return False
+
+
 def _has_others_activity_after(
     events: list[tuple[str, str]], you: str, since: datetime
 ) -> bool:
@@ -535,7 +563,10 @@ def _classify_own_pr(gh_meta: dict, you: str) -> BoardStatus:
 
 
 def _classify_review_pr(
-    gh_meta: dict, prior_status: BoardStatus | None, you: str
+    gh_meta: dict,
+    prior_status: BoardStatus | None,
+    you: str,
+    local_verdict_at: str | None = None,
 ) -> BoardStatus:
     if gh_meta.get("state") == "MERGED" or gh_meta.get("mergedAt"):
         return BoardStatus.MERGED
@@ -546,7 +577,8 @@ def _classify_review_pr(
     if prior_status not in _REVIEW_ACTIVE_VERDICTS:
         return BoardStatus.PENDING_REVIEW
     reviews = gh_meta.get("reviews") or []
-    posted_by_you = any((r.get("author") or {}).get("login") == you for r in reviews)
+    since = _parse_ts(local_verdict_at) if local_verdict_at else None
+    posted_by_you = _posted_by_you_since(reviews, you, since)
     if not posted_by_you:
         return BoardStatus.UNPOSTED_VERDICT
     events = _activity_events(gh_meta)
@@ -562,19 +594,22 @@ def classify(
     gh_meta: dict,
     prior_status: BoardStatus | None,
     you: str = "",
+    local_verdict_at: str | None = None,
 ) -> ClassifyResult:
     """
-    純函式：`(item_type, gh_meta, prior_status, you) -> section/status/rank/next_action`。
+    純函式：`(item_type, gh_meta, prior_status, you, local_verdict_at) ->
+    section/status/rank/next_action`。
 
     不做任何 I/O；「你 vs 別人最後活動」全部從 `gh_meta` 的 comments/reviews
     author+時間戳算出，不呼叫 `datetime.now()`（那是 `compute_badges()` 的事）。
+    `local_verdict_at` 只有 `item_type is ItemType.REVIEW_PR` 時有效，其餘型別忽略。
     """
     if item_type is ItemType.ISSUE:
         status = _classify_issue(gh_meta, prior_status, you)
     elif item_type is ItemType.OWN_PR:
         status = _classify_own_pr(gh_meta, you)
     elif item_type is ItemType.REVIEW_PR:
-        status = _classify_review_pr(gh_meta, prior_status, you)
+        status = _classify_review_pr(gh_meta, prior_status, you, local_verdict_at)
     else:  # pragma: no cover - ItemType 是總函式，理論上不會落到這裡
         raise ValueError(f"unknown item_type: {item_type!r}")
     meta = _STATUS_META[status]
@@ -612,6 +647,45 @@ def _parse_prior_status(raw: object) -> BoardStatus | None:
         return None
 
 
+def _import_artifact_path():
+    """
+    Function-level import: `artifact_path.py` imports `github_ref` from this
+    module at module scope, so this module importing `artifact_path` back at
+    module scope would fail (circular import, `artifact_path` not yet
+    defined). Deferring to call time breaks the cycle; `classify()` stays a
+    pure function untouched. Shared by both call sites in `main()` that need
+    `artifact_path()`.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from artifact_path import artifact_path
+
+    return artifact_path
+
+
+def _auto_local_verdict_at(url: str, home_repo: str, maigo_root: str) -> str | None:
+    """
+    自動算 `local_verdict_at`：`url` 解析不出 `<id>`，或
+    `<maigo_root>/.maigo/review/<id>/review.md` 不存在（含 `maigo_root` 為空
+    字串——`--maigo-root` 省略時），一律回 `None`，呼叫端據此退回舊行為。
+
+    mtime 用 `tz=timezone.utc` 明確轉換——這是 POSIX 時間戳轉 aware datetime，
+    天生不會有時區偏移，不需要（也不能）用 naive `fromtimestamp()` 再手動猜
+    系統時區。
+    """
+    if not maigo_root:
+        return None
+    ref = github_ref(url, home_repo)
+    if ref is None:
+        return None
+    artifact_path = _import_artifact_path()
+    review_path = Path(maigo_root) / artifact_path("review", ref)
+    try:
+        mtime = review_path.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--you", default="", help="目前使用者的 GitHub login")
@@ -622,6 +696,11 @@ def main(argv: list[str] | None = None) -> int:
         "--repo",
         default="",
         help="board 綁定的 cwd repo（owner/name），判定 detail_path 同 repo/跨 repo",
+    )
+    parser.add_argument(
+        "--maigo-root",
+        default="",
+        help="`.maigo/` 所在的 repo root；提供時自動算未顯式給值的 local_verdict_at",
     )
     args = parser.parse_args(argv)
 
@@ -645,22 +724,23 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         gh_meta = item.get("gh_meta") or {}
         prior_status = _parse_prior_status(item.get("prior_status"))
-        result = classify(item_type, gh_meta, prior_status, args.you)
+        local_verdict_at = item.get("local_verdict_at")
+        if (
+            local_verdict_at is None
+            and item_type is ItemType.REVIEW_PR
+            and args.maigo_root
+        ):
+            local_verdict_at = _auto_local_verdict_at(
+                item.get("url") or "", args.repo, args.maigo_root
+            )
+        result = classify(item_type, gh_meta, prior_status, args.you, local_verdict_at)
         badges = compute_badges(gh_meta, now, args.stale_days)
 
         next_action = result.next_action
         if result.status is BoardStatus.UNPOSTED_VERDICT and next_action is not None:
             ref = github_ref(item.get("url") or "", args.repo)
             if ref is not None:
-                # Function-level import: `artifact_path.py` imports
-                # `github_ref` from this module at module scope, so this
-                # module importing `artifact_path` back at module scope
-                # would fail (circular import, `artifact_path` not yet
-                # defined). Deferring to call time inside `main()` breaks
-                # the cycle; `classify()` stays a pure function untouched.
-                sys.path.insert(0, str(Path(__file__).resolve().parent))
-                from artifact_path import artifact_path
-
+                artifact_path = _import_artifact_path()
                 next_action = next_action.replace(
                     _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
                 )
