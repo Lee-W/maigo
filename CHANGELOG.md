@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.61.0 (2026-09-29)
+
+### Feat
+
+- **artifacts**: group review and triage artifacts into per-item folders
+
+### Fix
+
+- **board**: keep an unposted local review verdict at 待送出
+
 ## v0.60.3 (2026-09-29)
 
 ### Fix
