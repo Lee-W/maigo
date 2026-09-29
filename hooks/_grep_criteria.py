@@ -27,8 +27,11 @@ _COUNT_ZERO_RE = re.compile(
 )
 # 已經把範圍限縮到「本次改動」的判準不算違規——那是教訓本身給的正解。
 _SCOPED_RE = re.compile(r"git diff|新增行|added lines|本次新增|本次修改|diff 的")
-# 引用這條規則本身（反例、禁令）不該被自己擋下。
-_NEGATION_RE = re.compile(r"不要|不得用|別用|禁止|避免|不可用|反例|wrong example")
+# 引用這條規則本身（反例、禁令）不該被自己擋下。「不寫」是乾淨的否定（明確說
+# 沒有寫成字面 grep 版），收進來；「不用」評估後不收——它同時是「不要用」（該收）
+# 與「不需要」（常接在仍是字面 grep 的敘述前，收了會放過真正該擋的句子）兩種語意，
+# 無法用字面判斷是哪一種，收了風險大於漏掉的誤擋案例。
+_NEGATION_RE = re.compile(r"不要|不得用|別用|禁止|避免|不可用|不寫|反例|wrong example")
 # 驗收段落標記——中文用「驗收」，英文 plan 常見寫法列這幾種（大小寫不敏感）；
 # 同一行內「標記：內容」也算（`Acceptance: \`grep ...\` — 0 matches`）。
 _ACCEPTANCE_MARKER_RE = re.compile(

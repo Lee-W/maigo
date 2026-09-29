@@ -50,6 +50,21 @@ class TestFindLiteralGrepCriteria:
     def test_legitimate_lines_are_not_flagged(self, line: str):
         assert find_literal_grep_criteria(line) == []
 
+    def test_negation_written_form_is_not_flagged(self):
+        # 2026-09-29 誤擋實例：語意型驗收條件用「不寫」明確否定字面 grep 版，
+        # 曾被 _NEGATION_RE 漏收而誤擋。
+        line = (
+            "驗收條件（語意型，不寫「全檔 grep 為零」）："
+            "`uvx ruff@0.16.8 check`／`format --check` 變更檔 exit 0；"
+            "`uv run --project providers/common/ai mypy <變更 src 檔>` exit 0"
+        )
+        assert find_literal_grep_criteria(line) == []
+
+    def test_still_flags_criteria_without_negation_wording(self):
+        # 對照組：既有樣本沒有否定寫法，補完 _NEGATION_RE 後仍要照擋。
+        line = "驗收條件：`grep -rn TODO src/` 應為 0"
+        assert len(find_literal_grep_criteria(line)) == 1
+
     def test_hit_drops_bullet_and_checkbox_markers(self):
         (hit,) = find_literal_grep_criteria("- [ ] `grep -c TODO src/` 必須回 0")
         assert hit.startswith("`grep -c TODO")
