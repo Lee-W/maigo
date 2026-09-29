@@ -597,3 +597,26 @@ run a mutation canary (swap the two production-code values) to confirm the test 
 turns red. When reviewing metric tags, event fields, state-transition fields, or
 source/destination fields, ask first: "are these two values actually different in the
 test?"
+
+---
+
+## After a path-function migration, green does not prove the join logic is tested
+
+When a change touches a function that **joins a base path with a per-cwd part**,
+existing tests can keep stale assumptions from the old layout (for example
+building `cwd = tmp_path / "repo"` for a subdirectory the new layout no longer
+has) and still pass. The cause: joining with an absolute path overrides the left
+side (`Path("/a") / Path("/b/c") == Path("/b/c")`), so a test that monkeypatches
+the base to an **absolute** path makes `cwd` irrelevant to the result. The test
+is green and never exercises the join.
+
+How to apply: after a path migration, green is not enough. Also verify that
+
+1. the monkeypatched base is a **relative** path, so the join is actually
+   computed, and
+2. the test's `cwd` layout matches what the new logic expects (e.g. the state
+   directory sits directly under `cwd`, with no leftover intermediate layer).
+
+A stale-setup test that passes is the same family as "a verifier missed the
+drift, so it passed silently" — ask what would make the test go red, and check
+that the migration's core line is on that path.

@@ -89,7 +89,8 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 
 - **有 subagents 時交由角色執行**，使用當前宿主的派工工具；沒有時依 model-dispatch 的 inline 流程，明示共用 context
 - 每個 agent 完成後給使用者一行 summary（不是貼全文）
-- 不要跳關。即使任務看起來很小，每一步都要走
+- 不要跳關。即使任務看起來很小，每一步都要走（此條管**執行階段**；命令設計階段選精實形狀的例外見
+  [`harness-discipline` 的 delegation-sizing](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md)）
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code
   的 Stop hook 會自行附上一行 token usage；orchestrator 不讀 usage log、不把統計塞回 prompt
 - **呼叫端命令帶了 worktree cwd 時**（`/maigo:go` / `/maigo:take-issue` 的

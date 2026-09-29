@@ -26,6 +26,7 @@ description: This skill should be used when about to declare "N sites need chang
 | 平行程式碼收共用表 | **逐行 diff** 列出候選平行程式碼的**所有**差異 literal（欄位名、type id、yaml key、category 覆寫），列成清單後逐一問「這個能進表嗎？」——能進的全進，不能進的在註解寫明為什麼。判準寫成語意版：「這段邏輯還需要幾個 per-section 分支？」目標 0；不要寫成「reviewer 提的那個欄位收了沒」。**同源提醒**：收完別忘了同步那段解釋「為什麼需要各自的迴圈」的舊註解——理由消失後，留著的舊註解會誤導下一個讀者。 | 只收本輪 review 點名的那一個欄位，等於把同型 drift 留在原地——剩下的差異仍逼著程式碼保留 per-section 分支，下一個 reviewer 或下一個新 section 會再撞一次。 |
 | 共用常數改 tuple arity／欄位數 | 用**常數名**（不是型別名、不是欄位名）`grep -rn` 全 repo（含 tests、含子專案之外），逐一標記「這裡是不是在解包」；改完再 grep 一次複查，確認沒有第 N+1 個站點。 | 解包站點不一定長得像解包：中繼變數（先存起來、下一行才拆）、comprehension 裡的 `for t, _ in ...`、參數化 fixture 的清單，都不會出現在「我以為會有的樣子」裡；tuple arity 錯誤是 runtime 才炸，路徑沒被測到時靜態檢查也不一定攔得下來。 |
 | 同批下游的守衛／欄位對稱性 | 找出這批下游**全部**成員（同一個 base class 的子類、同一組 dispatch table 的 entry），逐一確認守衛/欄位是否存在；補一個就要補同批的全部。 | 不對稱本身即缺陷——只補被點名的那個，其餘成員在下一次同型輸入時仍會炸，且拋出的錯誤型別可能對不上（該是 `ValueError` 的地方變成 `TypeError`）。 |
+| 拆／搬被別處引用的資料檔 | 拆檔前後各 `grep -rn` 一次舊檔名（含內容目錄、模板、測試），把引用清單列出來逐一改完，再 grep 確認零殘留；驗收看**產物**（該出現的區塊數量），不看 build exit code。 | 靜態產生器對「引用目標不存在」常靜默降級（渲染成一則註解、exit 0），build 綠也不代表引用沒壞；只改手邊正在編輯的那幾筆，舊內容的引用會安靜地失效。 |
 
 ## 各 consumer 怎麼套
 
@@ -103,9 +104,10 @@ exit 非 0 讀成「已清空」，就是拿假陰性當範圍封閉的證據。
 
 ## Worked examples
 
-四個實例（apache/airflow PR #70498、#70190）詳見 `references/worked-examples.md`：
+五個實例（前四個為 apache/airflow PR #70498、#70190）詳見 `references/worked-examples.md`：
 
 1. #70498 — provider 搜尋的兩套獨立機制（inline 過濾框 vs 全站 Pagefind 索引）
 2. #70498 — 同一個搜尋缺口的兩個入口共用（DOM 過濾 + build-time 索引產生），reviewer 只點名一個
 3. #70190 — 平行 dict-shaped section 的 drift 被抓兩次（先 class-path 欄位，再 integration 欄位）
 4. #70190 — 共用常數改 tuple arity，計畫列 3 處解包站點，實作重新枚舉後發現實際 5 處
+5. 拆分被引用的資料檔 — 靜態產生器對壞引用靜默降級，build exit 0 但產物少了區塊

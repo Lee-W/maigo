@@ -268,13 +268,19 @@ examples in `references/test-conventions.md`:
 
 ## Design integrity checks (references)
 
-Four cross-cutting patterns that surface on framework/base API work and rebase workflows;
+Cross-cutting patterns that surface on framework/base API work and rebase workflows;
 details and recipes in `references/design-integrity.md`:
 
 - **Base-layer completeness** — base must be complete for all known downstreams before release; defer = must-fix.
 - **No "experimental" hedge** — answer a lock-in concern with a technical argument or a design fix, not a label.
 - **Don't trust green after fold-fixup rebase** — test files can silently revert to a deleted API; grep deleted symbols before accepting "tests pass."
 - **Prefer polymorphism over type-switching in the caller** — an `isinstance` chain or type-flag branch in the caller is a signal to push behavior onto a base-class method instead; don't extend the switch with a new flag.
+- **Fix at the owning layer** — a defect in behavior owned by an upstream module/library gets an upstream option or callback, not a downstream workaround; details in `references/design-integrity.md` Part L.
+- **External tools are optional and runtime-detected** — detect the binary, don't add a hard dependency; fallback must not leave the user with neither path; extension of Part E.
+
+## Frontend device checks (references)
+
+UI / CSS / client interaction diffs: a bug reproducible only on a real device, or only outside Chrome, is a distinct class of failure (`100vh`, WebKit external `<use>`, Firefox / touch acceptance); see `references/frontend-device-checks.md`.
 
 ## Review judgment: when NOT to flag (references)
 

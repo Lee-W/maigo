@@ -1,6 +1,6 @@
 # Worked examples: change-site enumeration
 
-Four real instances backing `skills/change-site-enumeration/SKILL.md`. All four
+Five real instances backing `skills/change-site-enumeration/SKILL.md`. The first four
 are from apache/airflow's `dev/registry` (provider registry site + its build
 pipeline). Reviewer GitHub handles are generalized to "reviewer" — the point
 is the enumeration failure, not who caught it.
@@ -94,3 +94,21 @@ This is the source example for the SKILL.md rule that Anon must re-enumerate
 independently rather than reuse the plan's site list — the plan itself can be
 the thing that's wrong, and only a fresh grep against the constant name (not
 the type name, not the field name) surfaces the sites the plan missed.
+
+## 5. Splitting a referenced data file: build stays green, output silently loses blocks
+
+Splitting one data file that other content references (`foo.yaml` into
+`foo/a.yaml` + `foo/b.yaml`), the author updated only the pages being edited
+and the most recent entries. A static generator treats a missing reference
+target as "render an HTML comment and carry on": the build exited 0, a
+`grep -icE "error|critical|warning"` over the log returned 0, and yet older
+content had lost every embedded block. A human, not a tool,
+eventually spotted it.
+
+Two lessons. First, enumerate by the **old file name** across the whole repo
+in the same commit as the split, and re-grep after editing to confirm zero
+leftovers. Second, verify against the **artifact**, not the exit code: count
+the embedded blocks that should exist (block count: before 0, after N) and
+the placeholder comments that should not (placeholder count: before 1, after 0). If the situation recurs, a
+small check script that resolves every reference (target file exists, id
+found) and exits 1 on a miss turns the silent degradation into a loud one.

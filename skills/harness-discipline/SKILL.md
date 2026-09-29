@@ -52,6 +52,12 @@ triage-rubric / pr-comments 這類）一律呼叫 `scripts/artifact_path.py` 取
 完整規則見
 [`references/artifact-ownership.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)。
 
+## 委派份量
+
+設計新命令時預設走精實委派（小 payload 走 quick 形狀、多筆同類批次一次 spawn），
+不預設套全員 teammate-flow——見
+[`references/delegation-sizing.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md)。
+
 ## 驗證紀律
 
 - 寫的人不驗自己的產出——驗證一律派 fresh-context subagent（沒參與產出過程的）。
@@ -61,8 +67,11 @@ triage-rubric / pr-comments 這類）一律呼叫 `scripts/artifact_path.py` 取
   文件、實跑輸出）；三者都查不到 → 標「未確認」，絕不憑印象編造。
 - **證據必須獨立於嫌疑來源**：斷言資料狀態要先查 git 歷史、判監控工具要取帶外真相、
   分析自產 log 要用結構化欄位而非 substring、定罪某次改動要跑對照組、單點觀測不能
-  當全稱結論（換一個會改變結果的觀測點來隔離）——八個具體案例見
-  [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)。
+  當全稱結論（換一個會改變結果的觀測點來隔離）——具體案例見
+  [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)；接外部資料源前先做有界 PoC 也在該檔（§22）。
+- **shell／工具的沉默失敗**：zsh glob 不加引號會讓命令根本沒跑（不是「查無結果」）、
+  `uv run` 會無聲換掉 editable install——驗的要是實際在跑的那一份，見
+  [`references/shell-and-tool-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/shell-and-tool-gotchas.md)。
 
 ### docs-only 批次的例外
 

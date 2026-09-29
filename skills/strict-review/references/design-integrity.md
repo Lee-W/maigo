@@ -235,6 +235,37 @@ This complements Part D above (polymorphism over caller-side type-switching)
 *making the set of types itself open for extension* via registration rather
 than a hardcoded enumeration.
 
+### Extension: external tools are optional and runtime-detected
+
+Part E covers structure *inside* the codebase. The other half is dependencies
+on *external* tools (a CLI or binary the project can use but doesn't own).
+
+**Rule**: integrate an external tool as an optional capability, detected at
+runtime — `shutil.which("tool")`; present → use it, absent → fall back
+gracefully. Do not add it to hard dependencies, do not bind it to the same
+virtual environment, do not pin its version.
+
+**Why**: a tool distributed as its own standalone uv tool lives in its own
+venv, so `import`ing it from the host project's venv can't work anyway;
+detecting the binary and passing through over a subprocess needs zero Python
+dependency and works with existing installs. It also keeps the two products
+decoupled (independently upgradable) and degrades cleanly on a platform where
+the tool doesn't exist, instead of crashing.
+
+**How to apply during review / design**:
+
+- Flag an `import` of an external tool, or a new entry in dependencies for
+  it, when detection plus subprocess would do.
+- **The fallback must not leave the user with neither path.** If the config
+  selects backend X but X isn't installed, fall back to a backend that still
+  delivers the outcome (e.g. a notification still appears) — not a state
+  where the preferred path is missing and the fallback is silent. This comes
+  from the abstraction layer's availability check plus fallback, not from
+  detection magic.
+- **The switch stays explicit**: one clear config value drives the behavior.
+  "Binary detected, so behavior silently changes" is implicit coupling; reject
+  it.
+
 ---
 
 ## Part F — `None` on an optional parameter always means "use the default"
@@ -473,3 +504,30 @@ propagates — the two assumptions contradicting each other is the bug.
   so the next caller doesn't point it at its own state.
 - Scan the same module for any control-flow exception that this broad catch
   could intercept.
+
+---
+
+## Part L — Fix a defect at the layer that owns the behavior, not downstream
+
+### Rule
+
+When a behavior is wrong, first locate **who owns it**, then fix it there. If
+the gap is in a plugin / CLI / library the same maintainer owns, the right fix
+is an option or callback upstream — not a parallel timer / watcher / wrapper
+written in a downstream config file.
+
+Cost of the downstream workaround: logic scattered in the wrong place; a
+duplicate implementation once upstream adds official support; nothing other
+consumers can reuse; and a downstream config that slowly grows into an
+unmaintained mini-plugin.
+
+### How to apply during review / planning
+
+- In a diff, ask of any new helper in a config or glue file: "does this
+  reimplement a behavior another module owns?" If yes, ask why the owning
+  module wasn't changed.
+- **Treat your own hesitation as the signal.** If the author (or you) has
+  already said "this would be cleaner upstream", that's the cue to change
+  course, not to finish the downstream version anyway.
+- Dead code left behind by an approach that didn't work is removed on the
+  spot, not left in the file for someone else to find.

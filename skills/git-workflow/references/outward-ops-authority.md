@@ -124,3 +124,29 @@ resets every CI run's and every reviewer's anchor).
   gets a read-only re-verification of X before you decide whether to do Y —
   especially when Y is force-push, re-lock, or regenerate, all of which
   widen the diff and reset review state.
+
+## Machine-state operations (non-git): hand over commands, don't run them
+
+Operations that change the state of the **user's machine** rather than project
+files — package manager removals / untaps / dumps, anything under `sudo`,
+uninstalling an app, clearing leftover files in a library directory — are
+written up as a copyable command block for the user to run, not executed by the
+agent. (The `git push` half of this is the section above.)
+
+**Why:** the consequences land on the user's machine and are often irreversible,
+and the user knows better than you which things are still in use. A list of
+"things that look unused" built from what you can see will contain items the
+user relies on daily.
+
+**How to apply:**
+
+- Make the commands **complete and pasteable**: include any `cd`, and a comment
+  saying what each block does; don't write "then you just ...".
+- For a destructive step, give the `--dry-run` form first.
+- When order matters, say so (e.g. finish every removal before regenerating a
+  manifest, otherwise it has to be regenerated twice).
+- Separate "what I recommend doing" from "what needs your judgment", and attach
+  the facts the judgment needs to the latter.
+- This governs **who presses run**. Whether to choose a reversible approach is a
+  separate rule — see the「破壞性操作先給可逆做法」section (under Scope discipline) of
+  [`harness-discipline`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md).
