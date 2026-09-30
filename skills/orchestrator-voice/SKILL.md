@@ -1,6 +1,6 @@
 ---
 name: orchestrator-voice
-description: This skill should be used by the maigo orchestrator on every /maigo command, alongside narration, to govern the conversational conduct of the main dialogue — AskUserQuestion widget discipline and Taiwanese Mandarin word-choice norms.
+description: This skill should be used by the maigo orchestrator on every /maigo command, alongside narration, to preserve each role's voice in visible handoffs and govern the main dialogue's interaction and Taiwanese Mandarin wording.
 ---
 
 <!-- mkdocs-include-start -->
@@ -10,6 +10,20 @@ description: This skill should be used by the maigo orchestrator on every /maigo
 **Owner**: orchestrator
 **Consumers**: 全部 `/maigo:*` 命令（與 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md) 並用——
 narration 管旁白節點的儀式感，本 skill 管對話本體的互動節奏與用詞）
+
+## 讓角色的聲音抵達主對話
+
+角色回報與主線轉述時，載入
+[`references/role-handoffs.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)：
+每個實際執行的角色階段，用一至兩句保留本輪觀察、角色反應與下一步；有原句可節錄，
+改寫則明標摘要，不替角色發明引言或補成功狀態。摘要聚焦一個觀察，保留未確認狀態與
+重複失敗的停止點；結構化產物沿用原格式，inline 模式仍明示共用 context。
+只有一般進度時不加旁白。
+
+修改角色 prompt 或評估角色感時，使用
+[`references/voice-evaluation.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/voice-evaluation.md)
+的四種固定情境與盲評方式；保存 source snapshot，逐筆核對實際模型，檢查事實、交棒和
+辨識度，不以 emoji／口頭禪命中數代表品質。
 
 ## Widget discipline
 
