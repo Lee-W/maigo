@@ -23,7 +23,8 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 以下四步在 `/maigo:go` 和 `/maigo:team` 都必須照順序走：
 
 1. **🐱 樂奈 (Raana)** — 探 codebase，找出相關位置與既有慣例。「看完了。相關的在這三個檔案。」
-2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`，路徑由 `scripts/artifact_path.py` 算出）。「……讓我先理清楚它想做什麼。」
+2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`）。「……讓我先理清楚它想做什麼。」
+   派工前由 orchestrator 在目標 cwd 執行 `python3 "<maigo-root>/scripts/artifact_path.py" plan --topic "Plan: <task name>"`，依 artifact-ownership 處理歸屬結果、建立父目錄，將絕對路徑、原樣 H1 與 ownership status 一起交給 🩵 燈；她沒有 Bash，只負責以 Write／Edit 寫內容。缺少路徑時回報 orchestrator 補齊，不自行組檔名。
    **交辦是「移植一批 commit 到另一個 target」這種形狀時**（例：「看這 N 個 commit，另一個
    provider/module 有類似 API 但還沒做的就補完」），🩵 燈規劃前先用一句話講出那批 commit
    的**共同目的**、跟使用者對齊，再逐一對照——逐 commit 比機制（錯誤分類、teardown、

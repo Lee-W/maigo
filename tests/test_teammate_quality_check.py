@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -346,6 +347,56 @@ class TestCheckSoyo:
         result = self._run("BLOCKED\n[x] done\n[ ] pending\n", capsys)
         assert result["decision"] == "block"
 
+    @pytest.mark.parametrize(
+        ("mode", "required"),
+        [
+            pytest.param("full", set(range(1, 10)), id="full"),
+            pytest.param("quick", {1, 4, 5, 7}, id="quick"),
+            pytest.param("design-preview", {1, 4}, id="design-preview"),
+            pytest.param("compliance-only", {4, 5, 6, 7, 8}, id="compliance-only"),
+            pytest.param("test-only", {1, 2, 3, 4, 6}, id="test-only"),
+            pytest.param("triage", {1, 5, 6, 7, 8, 9}, id="triage"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "skip_required", [False, True], ids=["valid", "missing-required"]
+    )
+    def test_mode_checklists(self, mode, required, skip_required, capsys):
+        rows = CHECKLIST.splitlines()
+        for index in range(1, 10):
+            if index not in required or (skip_required and index == min(required)):
+                rows[index] = (
+                    rows[index].replace("[x]", "[—]") + f" — skipped by mode={mode}"
+                )
+        verdict = "READY" if mode == "triage" else "APPROVED"
+        result = self._run(
+            MEMORY + f"## Verdict\n{verdict}\n" + "\n".join(rows), capsys
+        )
+        assert result.get("decision") == ("block" if skip_required else None)
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            pytest.param("", id="missing-reason"),
+            pytest.param(" — skipped by mode=unknown", id="unknown-mode"),
+            pytest.param(" — skipped by mode=design-preview", id="mixed-modes"),
+        ],
+    )
+    def test_skip_reasons_must_agree(self, reason, capsys):
+        rows = CHECKLIST.splitlines()
+        rows[2] = rows[2].replace("[x]", "[—]") + " — skipped by mode=quick"
+        rows[3] = rows[3].replace("[x]", "[—]") + reason
+        result = self._run(MEMORY + "## Verdict\nAPPROVED\n" + "\n".join(rows), capsys)
+        assert result["decision"] == "block"
+
+    def test_prose_verdict_does_not_override_final_verdict(self, capsys):
+        result = self._run(
+            MEMORY + "Previous report: BLOCKED\n## Verdict\nAPPROVED\n" + CHECKLIST,
+            capsys,
+        )
+        assert result.get("decision") is None
+        assert "(verdict=APPROVED)" in result["reason"]
+
 
 # ---------------------------------------------------------------------------
 # Soyo retry count (must-fix persistence)
@@ -499,6 +550,64 @@ class TestCheckTaki:
         result = self._run(f"PASS\nexit {exit_code}", capsys)
         assert result["decision"] == "block"
 
+    @pytest.mark.parametrize(
+        ("commands", "blocked"),
+        [
+            pytest.param(
+                "- `lint` — exit 1\n- `pytest` — exit 0", True, id="lint-still-failing"
+            ),
+            pytest.param(
+                "- `lint` — exit 0\n- `pytest` — exit 1", True, id="tests-still-failing"
+            ),
+            pytest.param(
+                "- `lint` — exit 1\n- `pytest` — exit 0\n- `lint` — exit 0",
+                False,
+                id="same-check-fixed",
+            ),
+            pytest.param(
+                "- `lint` — exit 0\n- `lint` — exit 1\n- `pytest` — exit 0",
+                True,
+                id="check-regressed",
+            ),
+            pytest.param(
+                "- `lint --strict` — exit 1\n- `lint` — exit 0",
+                True,
+                id="different-check-cannot-clear",
+            ),
+            pytest.param(
+                "- `lint` — exit 0\n- `pytest` — exit 0", False, id="all-pass"
+            ),
+            pytest.param(
+                "- exit 1\n- `pytest` — exit 0", True, id="unattributed-failure"
+            ),
+            pytest.param(
+                "- `lint` — skipped\n- `pytest` — exit 0", True, id="missing-result"
+            ),
+            pytest.param("- ` ` — exit 0", True, id="empty-command"),
+        ],
+    )
+    def test_latest_result_per_command(self, commands, blocked, capsys):
+        result = self._run(f"## Commands\n{commands}\n## Verdict\nPASS\n", capsys)
+        assert result.get("decision") == ("block" if blocked else None)
+
+    def test_previous_attempts_do_not_override_current_results(self, capsys):
+        result = self._run(
+            "## Commands\n- `lint` — exit 0\n## Previous attempts\n- `lint` — exit 1\n## Verdict\nPASS\n",
+            capsys,
+        )
+        assert result.get("decision") is None
+
+    def test_prose_verdict_does_not_override_final_verdict(self, capsys):
+        result = self._run(
+            "Previous report: FAIL\n## Commands\n- `lint` — exit 1\n## Verdict\nPASS\n",
+            capsys,
+        )
+        assert result["decision"] == "block"
+
+    def test_anonymous_results_cannot_clear_a_failure(self, capsys):
+        result = self._run("exit 1\nexit 0\nPASS\n", capsys)
+        assert result["decision"] == "block"
+
 
 # ---------------------------------------------------------------------------
 # check_anon
@@ -598,6 +707,33 @@ class TestMain:
         for agent in (root / "agents").glob("*.md"):
             assert re.fullmatch(matcher, f"maigo:{agent.stem}")
         assert not re.fullmatch(matcher, "other-plugin:Soyo")
+
+    @pytest.mark.parametrize(
+        ("event", "index"),
+        [
+            pytest.param("SessionStart", 0, id="session-start"),
+            pytest.param("PreToolUse", 0, id="delegation"),
+            pytest.param("PreToolUse", 1, id="legacy-path"),
+            pytest.param("PostToolUse", 0, id="token-usage"),
+            pytest.param("SubagentStop", 0, id="subagent-stop"),
+            pytest.param("Stop", 0, id="stop"),
+        ],
+    )
+    def test_hook_commands_support_spaces(self, event, index, tmp_path):
+        root = Path(__file__).resolve().parents[1]
+        plugin = tmp_path / "plugin with spaces"
+        plugin.symlink_to(root, target_is_directory=True)
+        hooks = json.loads((root / "hooks/hooks.json").read_text())["hooks"]
+        command = hooks[event][index]["hooks"][0]["command"]
+        proc = subprocess.run(
+            ["/bin/sh", "-c", command],
+            env={**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin)},
+            input=json.dumps({"cwd": str(tmp_path)}),
+            text=True,
+            capture_output=True,
+            cwd=tmp_path,
+        )
+        assert proc.returncode == 0, proc.stderr
 
     def test_quick_skips_only_optional_items(self, monkeypatch, capsys):
         rows = CHECKLIST.splitlines()

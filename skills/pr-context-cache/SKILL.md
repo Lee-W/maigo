@@ -1,6 +1,6 @@
 ---
 name: pr-context-cache
-description: This skill should be used during /maigo:review when fetching or reusing PR context (title / body / diff / CI status / linked issues), caching the first fetch into the PR's review-rubric artifact so subsequent re-review rounds skip re-fetching.
+description: This skill should be used during /maigo:review to persist current PR context (title / body / diff / CI status / linked issues / discussion) in the rubric. Refresh PR sources on every review; reuse unchanged local branch or range context.
 ---
 
 <!-- mkdocs-include-start -->
@@ -12,10 +12,10 @@ description: This skill should be used during /maigo:review when fetching or reu
 
 ## Why this skill exists
 
-`/maigo:review` 的第一步是 Raana 抓 PR context。「re-review」（同一個 PR 改完再跑一次）
-時這些資料幾乎沒變——重抓只是浪費時間。第一次 fetch 後 cache 到本次的 review rubric
-檔開頭的機讀區段，re-review 偵測同 source 且 diff sha 未變 → 直接還原，跳過全部
-`gh` / `git` 重抓。**rubric 檔路徑不再固定**：省略 `--rubric` 時 script 會依 source
+`/maigo:review` 的第一步是 🐱 Raana 抓 context，保存到本次 review rubric 檔開頭的機讀
+區段，讓後續角色讀同一份資料。PR 的 CI、留言、thread 狀態與 body 可在 diff 沒變時更新，
+因此 **PR 每次重新抓取**；只有本地 branch／range 在同 source 且 diff sha 未變時還原快取。
+**rubric 檔路徑不再固定**：省略 `--rubric` 時 script 會依 source
 呼叫 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
 算出 `.maigo/review/<id>/rubric.md`（分目錄前的扁平 `.maigo/review-rubric-<id>.md`
 只在新路徑沒有 cache 時當唯讀退路，永遠不寫；歸屬規則見
@@ -49,10 +49,13 @@ reviewDecision，漏看某 PR 上一位 reviewer 對 `isinstance`-based type-swi
 
 ## 行為摘要
 
-- **cache hit**（Source 相同且 diff sha256 未變）→ 印出快取區段，不碰網路（除了重算 sha 的那次 diff）
-- **cache miss** → 重抓全部欄位，寫回 rubric 開頭
+- **PR** → 每次抓取並保存目前的全部 context，`cache_hit: false`。以 `gh pr view` 回傳的 canonical URL／number 統一後續 diff、CI 與 threads 的目標；threads 不取目前 cwd 的 repo，diff stat 使用 additions／deletions／changedFiles metadata。每輪只抓一次 PR diff。
+- **本地 cache hit**（branch／range、Source 相同且 diff sha256 未變）→ 印出快取區段。
+- **本地 cache miss** 或 PR 刷新 → 寫回 rubric 開頭
   `<!-- pr-context-cache:start v1 -->` … `<!-- pr-context-cache:end -->` 區段
   （無檔案 → 建立；無區段 → prepend；有舊區段 → 整段取代）
+
+PR 的舊扁平快取不當成即時資料；刷新後寫到新路徑，舊檔保持不變。`Fetched at` 是本次 snapshot 的時間，不能拿前一輪的時間宣稱已刷新。
 
 ## Fallback
 

@@ -14,7 +14,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
 | 1 | Raana | 探索 codebase 找相關位置、慣例 |
-| 2 | Tomori | 寫 `.maigo/plan-<id>.md`（路徑由 `scripts/artifact_path.py` 算出） |
+| 2 | 🩵 Tomori | 寫 orchestrator 已用 `scripts/artifact_path.py` 核對並準備目錄的 `.maigo/plan-<id>.md` |
 | 3 | (user) | 確認 plan、回 open questions |
 | 4 | Anon | 按 plan 實作 |
 | 5 | Soyo | review（依 `strict-review` skill） |
@@ -46,7 +46,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 | Soyo | Taki | 處理 |
 |------|------|------|
 | APPROVED | PASS | 完成 |
-| APPROVED | FAIL | 回 Anon 修 test failure（review 不重跑） |
+| APPROVED | FAIL | 回 🎀 Anon 修 failure；受審內容有變就重跑 🟡 Soyo + 🟣 Taki，僅環境恢復且內容未變時可沿用 review |
 | NEEDS_CHANGES / BLOCKED | PASS | 回 Anon 修 must-fix，修完**重跑 Soyo + Taki** |
 | NEEDS_CHANGES / BLOCKED | FAIL | 兩邊一起修，重跑 |
 

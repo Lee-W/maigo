@@ -246,16 +246,19 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
 | **Tomori** | `.maigo/plan(-<id>).md` 的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
-| **🟡 Soyo** | review verdict：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`；triage：`READY` / `NEEDS_INFO` / `DUP` / `CLOSE` | 「沒下 verdict」 |
-| **🟡 Soyo** | `## Checklist` 段依序保留至少 9 項：`[x]` / `[X]` / `[ ]` / `[—]`；quick 只允許略過 2、3、6、8、9，附 `skipped by mode=quick`；triage 的非 bug 情境可略過 2–4 | 「checklist 不完整或略過必要項目」 |
+| **🟡 Soyo** | `## Verdict` 內的 review verdict：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`；triage：`READY` / `NEEDS_INFO` / `DUP` / `CLOSE` | 「沒下 verdict」 |
+| **🟡 Soyo** | `## Checklist (mode=<name>)` 段依序保留至少 9 項；依 [共用模式資料](https://github.com/Lee-W/maigo/blob/main/hooks/review_modes.json) 核對 full／quick／design-preview／compliance-only／test-only；code-review 的每個略過項附一致的 `skipped by mode=<name>`，triage 非 bug 情境可略過 2–4 | 「checklist 不完整、mode 矛盾或略過必要項目」 |
 | **🟡 Soyo** | `APPROVED` / `READY` 時不可有 `[ ]` | 「尚有未通過項目」 |
 | **🟡 Soyo** | review 非 APPROVED 時：`must-fix` / `改法` / `evidence` / `待補` 之一 | 「擋下卻沒列 must-fix」 |
 | **Soyo** | 同 must-fix key 連續 ≥ 2 次 | block reason 前綴 `⚠️ RETRY LIMIT REACHED (Soyo):` |
 | **Taki** | `exit <number>` 模式 | 「沒貼 exit code」 |
-| **Taki** | `PASS` 或 `FAIL` 之一 | 「沒給最終 verdict」 |
-| **🟣 Taki** | `PASS` 時最後列出的 command exit code 必須是 0 | 「PASS 與 exit code 矛盾」 |
+| **🟣 Taki** | `## Verdict` 內只有一個 `PASS` 或 `FAIL` | 「沒給最終 verdict」 |
+| **🟣 Taki** | `## Commands` 每列為 ``- `command` — exit <code>``；PASS 時每個不同 command 的最新 exit 都必須是 0；歷史結果另列 `## Previous attempts` | 「PASS 與 exit code 矛盾或缺少檢查結果」 |
 | **Taki** | **不能包含** `should work` / `looks good` / `應該可以` / `看起來沒問題` 等 hedge 語 | 「verifier 只能拿 exit code 講話」 |
 | **Anon** | 至少一個 file path reference（regex 抓 `*.py` / `*.md` / `*.yml` / `*.yaml` / `*.json` / `*.toml` / `*.txt` / `*.sh` / `*.cfg`）| 「沒看到檔案路徑 reference」 |
+
+舊報告沒有 `## Verdict` 時仍接受唯一一行獨立 verdict，敘述中提到的詞不算。
+沒有 `## Commands` 的舊驗證報告只接受單一 exit code，避免匿名結果互相抵銷。
 
 ### 🟡 Soyo must-fix 計次
 

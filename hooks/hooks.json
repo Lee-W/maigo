@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/repo_detect.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/repo_detect.py\"",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/delegation_criteria_check.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation_criteria_check.py\"",
             "timeout": 5
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/legacy_artifact_path_check.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/legacy_artifact_path_check.py\"",
             "timeout": 5
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/token_usage.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/token_usage.py\"",
             "timeout": 5
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/teammate_quality_check.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/teammate_quality_check.py\"",
             "timeout": 30
           }
         ]
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/verify_completion.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/verify_completion.py\"",
             "timeout": 120
           }
         ]
