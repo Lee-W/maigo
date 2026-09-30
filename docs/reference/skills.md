@@ -48,7 +48,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`maigo-self-check`](../skills/maigo-self-check.md) | Taki | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:crystallize` | diff 動到 agents/commands/skills/docs/mkdocs.yml 時，以 validate_plugin + mkdocs --strict 取代純 pytest 作為驗證標準 |
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
-| [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話本體的互動節奏與用詞——AskUserQuestion widget discipline、台灣漢語口語選詞 |
+| [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator、五位 agent（交棒 reference） | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話互動、台灣漢語口語選詞、保留角色聲音的交棒摘要；附四情境盲評規則 |
 | [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
 | [`git-workflow`](../skills/git-workflow.md) | — (orchestrator 直跑) | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:address-comments`（commit-assembly 步驟） | Git commit 組裝慣例：明確 stage 檔案（不用 `-A`）、不 `cd`（用絕對路徑 / `git -C`）、unreleased commit 的 polish 用 amend（含 tangled-hunk 例外）、CI 分支上修 CI 失敗、對正確 baseline（merge target）量 diff 大小 |
 | [`work-board`](../skills/work-board.md) | orchestrator | `/maigo:board`、`/maigo:review`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:address-comments`、`/maigo:describe-pr` | `.maigo/board.md` 行文法、球權判定、upsert 回寫合約、舊 review-board 遷移、checkbox → `--learn` 學習閘門 |
@@ -116,11 +116,19 @@ graph LR
     end
 
     airflow_refs["airflow-aware/references/<br/>review-checks.md"]
+    role_handoffs["orchestrator-voice/references/<br/>role-handoffs.md"]
     pr_cache_script["scripts/pr_context_cache.py"]
 
     Commands --> narration_s
     command_router --> narration_s
     narration_s --> orchestrator_voice
+    orchestrator_voice --> role_handoffs
+    teammate_flow --> role_handoffs
+    raana --> role_handoffs
+    tomori --> role_handoffs
+    anon --> role_handoffs
+    soyo --> role_handoffs
+    taki --> role_handoffs
     Commands --> harness_discipline
     harness_discipline --> model_dispatch
     harness_discipline --> teammate_flow
@@ -210,9 +218,9 @@ graph LR
 - **虛線** = 觸發關係（🎀 Anon / 🟡 Soyo 的 `## Memory propose` 輸出觸發 orchestrator
   的 confirm flow；`strict-review` 在 Airflow review 時去讀案例檔；流程末端觸發
   🟣 Taki 驗證）
-- **🟣 Taki 只有入邊、沒有出邊**——立希被 teammate-flow / `/maigo:review` /
-  failure-handling 的流程步驟觸發來驗證，但他自己不載入任何 skill，驗證規格全在
-  [`agents/Taki.md`](https://github.com/Lee-W/maigo/blob/main/agents/Taki.md) 本體
+- **🟣 Taki** 由 teammate-flow / `/maigo:review` / failure-handling 觸發驗證，
+  依情境載入 maigo-self-check，並與其餘四位共用 role-handoffs reference。
+  角色本體與驗證輸出格式仍在 [`agents/Taki.md`](https://github.com/Lee-W/maigo/blob/main/agents/Taki.md)。
 
 ## skill 檔案規格
 

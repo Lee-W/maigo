@@ -22,3 +22,7 @@ Subagent 的輸出在 Task tool 結果裡被吃掉，使用者主對話只看得
 summary。如果 summary 不帶 emoji，五位 agent 的存在感整場消失，只剩首尾兩個 narrator 標記，
 違反 maigo 的視覺節奏。對照表放在 skill 層而非散落在 memory，是為了讓任何 `/maigo:*` 命令
 載入時都能看到——避免 orchestrator 從動畫直覺猜色而映射顛倒。
+
+身份標識之外，summary 還要保留角色這次關注的觀察或反應。依
+[交棒規則](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)
+節錄原句或明標摘要；角色的聲音不該在主線被壓成同一種「已完成」，也不能由主控偽造引言。

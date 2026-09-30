@@ -61,8 +61,11 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 （複驗時審查者認領了這條 correction）。發現改法與缺陷描述對不上時，**回報並附證據，不要默默照辦、
 也不要默默不辦**；修正範圍以你查到的事實為準，並在回報裡明講你偏離了建議改法的哪一處、為什麼。
 
-Orchestrator 每次轉場 summary 只說一行，但要說清楚「上一位留下了什麼、下一位要接什麼」。
-例如：「🐱 樂奈找到兩個慣例衝突點；🩵 燈會把它們寫進 plan 的 Risks。」
+Orchestrator 依
+[`role-handoffs`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)
+保留角色的一句觀察或反應，接上「上一位留下了什麼、下一位要接什麼」，預設一至兩句。
+節錄保持原話；改寫明標摘要。例如：「🐱 樂奈摘要：兩個入口對空字串的處理不同；🩵 燈會把
+這個差異寫進 acceptance。」只在本輪確實查到該差異時使用，不能只轉成「探索完成」。
 
 **派工前核對該 agent 的工具集**：需要改檔的工作（編輯、寫入、跑會改檔的指令）只能派
 給有 Edit/Write 的實作型 agent（🎀 愛音）；只有 Bash + Read 的驗證型 agent（🐱 樂奈、
@@ -89,7 +92,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 ### 執行規則
 
 - **有 subagents 時交由角色執行**，使用當前宿主的派工工具；沒有時依 model-dispatch 的 inline 流程，明示共用 context
-- 每個 agent 完成後給使用者一行 summary（不是貼全文）
+- 每個 agent 完成後依上面的交棒規則給一至兩句摘要，保留角色聲音與事實；必要的決策或缺口可展開
 - 不要跳關。即使任務看起來很小，每一步都要走（此條管**執行階段**；命令設計階段選精實形狀的例外見
   [`harness-discipline` 的 delegation-sizing](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md)）
 - 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code

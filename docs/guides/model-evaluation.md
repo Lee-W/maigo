@@ -63,3 +63,15 @@ JSON 保存實際 argv、source SHA-256、耗時、host exit code／timeout、�
 再解讀模型表現。更換模型時重用案例，改動 prompt 或推論設定時記錄差異，不混成同一組統計。
 
 `tests/test_model_eval.py` 使用 stub host 驗證紀錄與 grader；那些測試不算真實模型評測。
+
+## 角色感的人工評讀
+
+角色 prompt 與主線轉述的品質，另用
+[Voice Evaluation](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/voice-evaluation.md)
+的四張固定輸入卡：第一次失敗、同條第二次失敗、證據不足、成功交棒。
+先在新 session 載入待測 source snapshot，保存原稿，再遮住身份盲評角色反應與節奏；
+揭露身份後核對事實和交棒，最後檢查 orchestrator 轉述是否保留這些差異。
+
+這組是模擬紀錄的人工聲音評讀，尚未接進 `model_eval.py` 的自動 grader。
+現有四個 workflow case 通過、persona quote validator 通過或文件例句寫得像，
+都不能當作角色辨識度已實測；評讀結果需附宿主／模型／snapshot 與逐筆判讀紀錄。
