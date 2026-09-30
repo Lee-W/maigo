@@ -28,6 +28,7 @@ module = [
   "artifact_path",
   "board_state",
   "maigo_dir_catalog",
+  "review_report",
 ]
 ignore_missing_imports = true
 

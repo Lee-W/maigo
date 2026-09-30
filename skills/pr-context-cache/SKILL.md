@@ -35,7 +35,7 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source> \
 - 省略 `--rubric` 是預設用法——script 自動算路徑；只有需要覆寫既有檔案時才傳 `--rubric`
 
 stdout 第一行是 `cache_hit: true|false`，第二行 `rubric: <path>`，其後是 cache 區段全文——
-含 Source / PR number / Title / Body（截 500 行）/ Linked issues / CI status /
+含 Source / PR number / Title / Reviewed head（本次 PR commit SHA）/ Body（截 500 行）/ Linked issues / CI status /
 Diff stat / **Review threads（inline review thread，含 resolve 狀態）/ Review
 summaries（`gh pr view --json reviews`）/ Conversation comments（`gh pr view
 --json comments`）** / Diff sha / Full diff（截 2000 行）。
@@ -56,6 +56,8 @@ reviewDecision，漏看某 PR 上一位 reviewer 對 `isinstance`-based type-swi
   （無檔案 → 建立；無區段 → prepend；有舊區段 → 整段取代）
 
 PR 的舊扁平快取不當成即時資料；刷新後寫到新路徑，舊檔保持不變。`Fetched at` 是本次 snapshot 的時間，不能拿前一輪的時間宣稱已刷新。
+它也不是最後 review 時間；review 完成後由 `review_report.py publish` 另記 `reviewed_at`，
+並把這裡的 `Reviewed head` 寫入 report，供 board 判斷 PR 是否已更新。
 
 ## Fallback
 

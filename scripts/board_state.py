@@ -22,13 +22,13 @@ stdin：JSON 陣列 `[{type, gh_meta, prior_status, url, local_verdict_at}]`
 issue/PR URL，用來算 `detail_path`；`local_verdict_at` 是 optional 的 ISO 8601
 時間戳，只對 👀 型別有意義——本地產出這次 review verdict 的時間。顯式給了就
 直接用；省略且帶了 `--maigo-root` 時，`main()` 自動用 `github_ref()` 算出的
-`<id>` 找 `.maigo/review/<id>/review.md`（跨 repo 用 `<repo>-<n>`，見
-`artifact_path.py` 的 `_NESTED_LAYOUT`），存在就取檔案 mtime 換算成帶
-`tzinfo=utc` 的 ISO 8601（`datetime.fromtimestamp(mtime, tz=timezone.utc)`，
-天生不會有時區偏移）；檔案不存在、`url` 解析不出 `<id>`、或未帶
-`--maigo-root` 一律不填，`posted_by_you` 退回舊行為（只看「你有沒有貼過任一
-review」，不比時間）。
-stdout：JSON 陣列 `[{section, rank, status, next_action, badges, detail_path}]`
+`<id>` 找 `.maigo/review/<id>/review.md`。新版優先取 metadata `reviewed_at`；
+舊檔沒有 metadata 才取 UTC mtime（明確標為推估）。report 的 `head_sha` 用來偵測新 push，
+`acknowledged_at` / `acknowledged_by` 記使用者本地已看完，不表示 GitHub 已送出。
+檔案不存在時退回 GitHub reviews 與 prior_status。
+stdout：JSON 陣列；含 section/rank/status/next_action/badges/detail_path、title/author、
+last_reviewed_at/review_time_source/acknowledged_at、needs_review 與 index_entry。
+`--reviews` 僅輸出待看 PR 並依 rank 排序；不可拿過濾後的結果覆寫整份 board。
 （`rank` 是整數，數字越小優先序越高，呼叫端直接用它排序；`detail_path` 無 `url`
 或無法解析時為 `null`）。
 
@@ -136,6 +136,7 @@ class BoardStatus(str, Enum):
     APPROVE_WITH_NITS = "APPROVE_WITH_NITS"
     APPROVE = "APPROVE"
     UNPOSTED_VERDICT = "待送出"
+    REVIEWED = "已看完"
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,7 @@ _STATUS_META: dict[BoardStatus, StatusMeta] = {
     BoardStatus.NEEDS_CHANGES: StatusMeta(Rank.P8, None),
     BoardStatus.APPROVE_WITH_NITS: StatusMeta(Rank.P8, None),
     BoardStatus.APPROVE: StatusMeta(Rank.P8, None),
+    BoardStatus.REVIEWED: StatusMeta(Rank.P8, None),
     # P9：結案
     BoardStatus.CLOSED: StatusMeta(Rank.P9, None),
     BoardStatus.MERGED: StatusMeta(Rank.P9, None),
@@ -203,15 +205,26 @@ def _section_for_rank(rank: Rank) -> Section:
     return Section.DONE
 
 
-_REVIEW_ACTIVE_VERDICTS = frozenset(
+_REVIEW_VERDICTS = frozenset(
     {
         BoardStatus.BLOCKED,
         BoardStatus.NEEDS_CHANGES,
         BoardStatus.APPROVE_WITH_NITS,
         BoardStatus.APPROVE,
-        BoardStatus.BALL_BACK,
-        BoardStatus.UNPOSTED_VERDICT,
     }
+)
+_REVIEW_ACTIVE_VERDICTS = _REVIEW_VERDICTS | {
+    BoardStatus.BALL_BACK,
+    BoardStatus.UNPOSTED_VERDICT,
+    BoardStatus.REVIEWED,
+}
+# Fresh report/submission evidence may arrive independently of the prior board row.
+_REVIEW_STATES = _REVIEW_ACTIVE_VERDICTS | {
+    BoardStatus.PENDING_REVIEW,
+    BoardStatus.OTHERS_DRAFT,
+}
+_REVIEW_TRANSITIONS = frozenset(
+    _REVIEW_STATES | {BoardStatus.MERGED, BoardStatus.CLOSED}
 )
 
 _OWN_PR_STATES = frozenset(
@@ -266,84 +279,8 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
     BoardStatus.MERGEABLE: _OWN_PR_ALL_TRANSITIONS,
     BoardStatus.CI_PENDING: _OWN_PR_ALL_TRANSITIONS,
     BoardStatus.AWAITING_REVIEW: _OWN_PR_ALL_TRANSITIONS,
-    # 👀 在審的 PR
-    BoardStatus.OTHERS_DRAFT: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.PENDING_REVIEW,
-        }
-    ),
-    # PENDING_REVIEW / BALL_BACK / 四個 active verdict：author 隨時可能把 PR 改回
-    # draft（GitHub 允許已審過的 PR 回到 draft），所以都要能轉去 OTHERS_DRAFT。
-    BoardStatus.PENDING_REVIEW: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.PENDING_REVIEW,
-            BoardStatus.OTHERS_DRAFT,
-        }
-    ),
-    BoardStatus.BALL_BACK: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-    ),
-    BoardStatus.BLOCKED: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.BLOCKED,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-    ),
-    BoardStatus.NEEDS_CHANGES: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.NEEDS_CHANGES,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-    ),
-    BoardStatus.APPROVE_WITH_NITS: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.APPROVE_WITH_NITS,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-    ),
-    BoardStatus.APPROVE: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.APPROVE,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-    ),
-    # P3：本地 verdict 尚未貼上 GitHub——貼上後跟其他 active verdict 一樣可能被 ball back
-    BoardStatus.UNPOSTED_VERDICT: frozenset(
-        {
-            BoardStatus.MERGED,
-            BoardStatus.CLOSED,
-            BoardStatus.UNPOSTED_VERDICT,
-            BoardStatus.BALL_BACK,
-            BoardStatus.OTHERS_DRAFT,
-        }
-    ),
+    # Review transitions are determined by current local/GitHub evidence.
+    **{status: _REVIEW_TRANSITIONS for status in _REVIEW_STATES},
     # 終端狀態：無出邊（只能被 purge），自迴圈代表「刷新時原樣保留」
     BoardStatus.CLOSED: frozenset({BoardStatus.CLOSED}),
     BoardStatus.MERGED: frozenset({BoardStatus.MERGED}),
@@ -351,6 +288,8 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
     # P0：orchestrator 指派；下次抓得到就正常重判，出邊涵蓋所有狀態
     BoardStatus.UNREACHABLE: frozenset(BoardStatus),
 }
+
+ALLOWED_TRANSITIONS[None] |= _REVIEW_TRANSITIONS
 
 assert set(ALLOWED_TRANSITIONS) == set(BoardStatus) | {None}, (
     "ALLOWED_TRANSITIONS 必須涵蓋每個 BoardStatus 加上 None（剛加入、無 prior）"
@@ -467,6 +406,8 @@ def _posted_by_you_since(reviews: list[dict], you: str, since: datetime | None) 
     欄位缺席）時退回舊行為，任一貼過就算。
     """
     for review in reviews:
+        if review.get("state") in {"PENDING", "DISMISSED"}:
+            continue
         if (review.get("author") or {}).get("login") != you:
             continue
         if since is None:
@@ -567,6 +508,7 @@ def _classify_review_pr(
     prior_status: BoardStatus | None,
     you: str,
     local_verdict_at: str | None = None,
+    review: dict | None = None,
 ) -> BoardStatus:
     if gh_meta.get("state") == "MERGED" or gh_meta.get("mergedAt"):
         return BoardStatus.MERGED
@@ -574,19 +516,54 @@ def _classify_review_pr(
         return BoardStatus.CLOSED
     if gh_meta.get("isDraft"):
         return BoardStatus.OTHERS_DRAFT
-    if prior_status not in _REVIEW_ACTIVE_VERDICTS:
-        return BoardStatus.PENDING_REVIEW
+    review = review or {}
+    local_verdict_at = local_verdict_at or review.get("reviewed_at")
     reviews = gh_meta.get("reviews") or []
     since = _parse_ts(local_verdict_at) if local_verdict_at else None
     posted_by_you = _posted_by_you_since(reviews, you, since)
-    if not posted_by_you:
-        return BoardStatus.UNPOSTED_VERDICT
+    acknowledged = (
+        review.get("acknowledged_at")
+        if review.get("acknowledged_by") == you and you
+        else None
+    )
     events = _activity_events(gh_meta)
-    your_last = _last_timestamp_by(events, you)
-    author_login = (gh_meta.get("author") or {}).get("login")
-    if your_last is not None and _has_activity_after(events, author_login, your_last):
+    posted_times = [
+        _parse_ts(r.get("submittedAt") or r["createdAt"])
+        for r in reviews
+        if (r.get("author") or {}).get("login") == you
+        and r.get("state") not in {"PENDING", "DISMISSED"}
+        and (r.get("submittedAt") or r.get("createdAt"))
+    ]
+    seen_times = [
+        t for t in (since, _parse_ts(acknowledged) if acknowledged else None) if t
+    ]
+    seen_times.extend(posted_times)
+    seen_at = max(seen_times) if seen_times else None
+    old_head = review.get("head_sha")
+    new_head = gh_meta.get("headRefOid")
+    if old_head and new_head and old_head != new_head:
         return BoardStatus.BALL_BACK
-    return prior_status
+    if seen_at:
+        author = (gh_meta.get("author") or {}).get("login")
+        commits = gh_meta.get("commits") or []
+        if _has_activity_after(events, author, seen_at) or any(
+            c.get("committedDate") and _parse_ts(c["committedDate"]) > seen_at
+            for c in commits
+        ):
+            return BoardStatus.BALL_BACK
+    if acknowledged and (since is None or _parse_ts(acknowledged) >= since):
+        return BoardStatus.REVIEWED
+    has_local = bool(local_verdict_at) or prior_status in _REVIEW_ACTIVE_VERDICTS
+    if has_local and not posted_by_you:
+        return BoardStatus.UNPOSTED_VERDICT
+    if posted_by_you:
+        verdict = _parse_prior_status(review.get("verdict"))
+        if verdict in _REVIEW_VERDICTS:
+            return verdict
+        if prior_status in _REVIEW_VERDICTS:
+            return prior_status
+        return BoardStatus.REVIEWED
+    return BoardStatus.PENDING_REVIEW
 
 
 def classify(
@@ -595,13 +572,14 @@ def classify(
     prior_status: BoardStatus | None,
     you: str = "",
     local_verdict_at: str | None = None,
+    review: dict | None = None,
 ) -> ClassifyResult:
     """
-    純函式：`(item_type, gh_meta, prior_status, you, local_verdict_at) ->
+    純函式：`(item_type, gh_meta, prior_status, you, local_verdict_at, review) ->
     section/status/rank/next_action`。
 
-    不做任何 I/O；「你 vs 別人最後活動」全部從 `gh_meta` 的 comments/reviews
-    author+時間戳算出，不呼叫 `datetime.now()`（那是 `compute_badges()` 的事）。
+    不做任何 I/O；從 report 的明確時間/head 與 `gh_meta` 的 comments/reviews/commits
+    比較新活動，不呼叫 `datetime.now()`（那是 `compute_badges()` 的事）。
     `local_verdict_at` 只有 `item_type is ItemType.REVIEW_PR` 時有效，其餘型別忽略。
     """
     if item_type is ItemType.ISSUE:
@@ -609,7 +587,9 @@ def classify(
     elif item_type is ItemType.OWN_PR:
         status = _classify_own_pr(gh_meta, you)
     elif item_type is ItemType.REVIEW_PR:
-        status = _classify_review_pr(gh_meta, prior_status, you, local_verdict_at)
+        status = _classify_review_pr(
+            gh_meta, prior_status, you, local_verdict_at, review
+        )
     else:  # pragma: no cover - ItemType 是總函式，理論上不會落到這裡
         raise ValueError(f"unknown item_type: {item_type!r}")
     meta = _STATUS_META[status]
@@ -668,7 +648,8 @@ def _auto_local_verdict_at(url: str, home_repo: str, maigo_root: str) -> str | N
     `<maigo_root>/.maigo/review/<id>/review.md` 不存在（含 `maigo_root` 為空
     字串——`--maigo-root` 省略時），一律回 `None`，呼叫端據此退回舊行為。
 
-    mtime 用 `tz=timezone.utc` 明確轉換——這是 POSIX 時間戳轉 aware datetime，
+    新報告優先使用不受 touch/複製/acknowledge 影響的 `reviewed_at`。
+    舊報告 mtime 用 `tz=timezone.utc` 明確轉換——這是 POSIX 時間戳轉 aware datetime，
     天生不會有時區偏移，不需要（也不能）用 naive `fromtimestamp()` 再手動猜
     系統時區。
     """
@@ -679,11 +660,42 @@ def _auto_local_verdict_at(url: str, home_repo: str, maigo_root: str) -> str | N
         return None
     artifact_path = _import_artifact_path()
     review_path = Path(maigo_root) / artifact_path("review", ref)
+    record = _load_review(url, home_repo, maigo_root)
+    if record.get("reviewed_at"):
+        return record["reviewed_at"]
     try:
         mtime = review_path.stat().st_mtime
     except OSError:
         return None
     return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+
+
+def _load_review(url: str, home_repo: str, maigo_root: str) -> dict:
+    if not maigo_root or not github_ref(url, home_repo):
+        return {}
+    artifact_path = _import_artifact_path()
+    from review_report import metadata
+
+    path = Path(maigo_root) / artifact_path("review", github_ref(url, home_repo))
+    try:
+        record = metadata(path.read_text())
+    except FileNotFoundError:
+        return {}
+    if record and record.get("source") != url.rstrip("/"):
+        raise ValueError(f"Review ownership conflict: {path}")
+    return record
+
+
+def index_entry(
+    item_type: ItemType,
+    status: BoardStatus,
+    detail: str | None,
+    title: str,
+    author: str,
+) -> str:
+    """One-line display text; checkbox, badges and numbering belong to the caller."""
+    contributor = f" @{author}" if author else ""
+    return f"{item_type.value} {status.value}{contributor}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -702,6 +714,7 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="`.maigo/` 所在的 repo root；提供時自動算未顯式給值的 local_verdict_at",
     )
+    parser.add_argument("--reviews", action="store_true", help="只列現在需要你看的 PR")
     args = parser.parse_args(argv)
 
     raw = sys.stdin.read()
@@ -724,7 +737,18 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         gh_meta = item.get("gh_meta") or {}
         prior_status = _parse_prior_status(item.get("prior_status"))
+        review = item.get("review") or {}
+        try:
+            if item_type is ItemType.REVIEW_PR and args.maigo_root:
+                review = _load_review(item.get("url") or "", args.repo, args.maigo_root)
+        except (OSError, ValueError) as error:
+            sys.stderr.write(f"board_state: {error}\n")
+            return 1
         local_verdict_at = item.get("local_verdict_at")
+        review_time_source = "explicit" if local_verdict_at else None
+        if local_verdict_at is None and review.get("reviewed_at"):
+            local_verdict_at = review["reviewed_at"]
+            review_time_source = "report"
         if (
             local_verdict_at is None
             and item_type is ItemType.REVIEW_PR
@@ -733,7 +757,11 @@ def main(argv: list[str] | None = None) -> int:
             local_verdict_at = _auto_local_verdict_at(
                 item.get("url") or "", args.repo, args.maigo_root
             )
-        result = classify(item_type, gh_meta, prior_status, args.you, local_verdict_at)
+            if local_verdict_at:
+                review_time_source = "report" if review.get("reviewed_at") else "mtime"
+        result = classify(
+            item_type, gh_meta, prior_status, args.you, local_verdict_at, review
+        )
         badges = compute_badges(gh_meta, now, args.stale_days)
 
         next_action = result.next_action
@@ -745,6 +773,16 @@ def main(argv: list[str] | None = None) -> int:
                     _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
                 )
 
+        needs_review = item_type is ItemType.REVIEW_PR and result.status in {
+            BoardStatus.PENDING_REVIEW,
+            BoardStatus.BALL_BACK,
+            BoardStatus.UNPOSTED_VERDICT,
+        }
+        if args.reviews and not needs_review:
+            continue
+        title = gh_meta.get("title") or item.get("title") or ""
+        author = (gh_meta.get("author") or {}).get("login") or item.get("author") or ""
+        detail = detail_path(item.get("url") or "", args.repo)
         results.append(
             {
                 "section": result.section.value,
@@ -752,10 +790,21 @@ def main(argv: list[str] | None = None) -> int:
                 "status": result.status.value,
                 "next_action": next_action,
                 "badges": badges,
-                "detail_path": detail_path(item.get("url") or "", args.repo),
+                "detail_path": detail,
+                "title": title,
+                "author": author,
+                "last_reviewed_at": local_verdict_at,
+                "review_time_source": review_time_source,
+                "acknowledged_at": review.get("acknowledged_at"),
+                "needs_review": needs_review,
+                "index_entry": index_entry(
+                    item_type, result.status, detail, title, author
+                ),
             }
         )
 
+    if args.reviews:
+        results.sort(key=lambda row: row["rank"])
     json.dump(results, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
     return 0

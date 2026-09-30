@@ -123,3 +123,7 @@ merged / closed 對應 ✅ 最近結案。
 舊 `.maigo/review-board.md` 的遷移規則、行文法、upsert 合約與 `--learn` checkbox
 學習閘門全部見 `work-board` skill。刷新 / 查看 board 一律用 `/maigo:board`；
 `/maigo:review` 不提供 board-only alias。
+
+Work Board 的 `--reviews` 檢視只列當下待看 PR；使用者讀完最新 report 後可用
+`/maigo:board --reviewed <n>` 標記本地已看完，不等同送出 GitHub。
+每顆 report 都由共同 publisher 產生 TOC 與最後 review 時間；batch roll-up 不覆蓋單顆報告。

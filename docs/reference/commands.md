@@ -210,6 +210,9 @@ checkbox 清單。
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
 /maigo:board                # 刷新全板、只印 🎯 + 計數
 /maigo:board --all          # 印整板
+/maigo:board --reviews      # 現在要看的 PR：標題、貢獻者、最後 review 時間
+/maigo:board --reviewed <n...> # 本地已看完這版（不送 GitHub）
+/maigo:board --unreviewed <n...> # 取消本地已看完
 /maigo:board --learn        # 盤點已勾但未 🧠 的項目
 /maigo:board --check <n...> # 標記為使用者親自處理過
 /maigo:board --uncheck <n...> # 取消處理標記

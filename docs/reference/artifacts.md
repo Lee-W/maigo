@@ -8,7 +8,7 @@
 ## 帶識別碼命名的產物
 
 所有 kind 全部由 `scripts/artifact_path.py` 的 `_KNOWN_KINDS` 單一正典定義，
-`resolve_for_write()` 是唯一對外寫入入口——同一路徑撞到不同主題時回
+`resolve_for_write()` 負責一般產物的歸屬檢查（最終 review 報告用下述 publisher）——同一路徑撞到不同主題時回
 `status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選路徑，
 不擅自覆寫。分兩種形狀：
 
@@ -28,10 +28,18 @@
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | `review-rubric` | `.maigo/review/<id>/rubric.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 對照基準，review 全程比對用；review 結束後留存 |
-| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | 同上 | 最終 review 五段報告的逐字檔案版；長期留存供 `grep` / board 細節檔連結 |
+| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、最後 review 時間、reviewed commit 與本地已看完標記 |
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 永遠指向這個路徑 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
+
+`review_report.py publish` 先原子寫入最新 `review.md`，才清理同目錄 `review-N.md` 與
+`.maigo/review-<id>.md` 中可確認同 source 的舊報告；未知歸屬、較新的 timestamp、
+草稿、rubric、手寫檔與其他 PR 保留。歸屬看 metadata 的 source 或舊 report 明確 PR URL，
+不因為檔名相似就刪。清理結果回傳給 caller，同步修正 board 細節檔的報告連結。
+
+`review_report.py acknowledge` 記「使用者已看完這版」，不送 GitHub、不改最後 review
+時間。新 head／作者留言讓 board 重新排入待看；新 report 清除上一輪確認。
 
 ### 分目錄前的扁平檔（`flat_exists:`，只可讀）
 

@@ -214,7 +214,7 @@ def fetch_context(source: str, kind: str, base: str) -> dict[str, str]:
                 "view",
                 pr_id,
                 "--json",
-                "url,title,body,number,additions,deletions,changedFiles,reviews,comments",
+                "url,title,body,number,headRefOid,additions,deletions,changedFiles,reviews,comments",
             ]
         )
         meta = json.loads(raw_meta)
@@ -253,6 +253,7 @@ def fetch_context(source: str, kind: str, base: str) -> dict[str, str]:
         "source": source,
         "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "pr_number": number,
+        "head_sha": meta["headRefOid"] if kind == "pr" else "n/a",
         "title": title,
         "body": truncate_lines(body, BODY_LINE_LIMIT, "...[truncated]") or "n/a",
         "linked_issues": ", ".join(issues) or "n/a",
@@ -289,6 +290,7 @@ def render_cache(f: dict[str, str]) -> str:
         f"- **Fetched at**: {f['fetched_at']}\n"
         f"- **PR number**: {f['pr_number']}\n"
         f"- **Title**: {f['title']}\n"
+        f"- **Reviewed head**: {f['head_sha']}\n"
         f"- **Body**: {f['body']}\n"
         f"- **Linked issues**: {f['linked_issues']}\n"
         f"- **CI status**: {f['ci_status']}\n"

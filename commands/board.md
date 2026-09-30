@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_index.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_index.py:*), Bash(python3 scripts/review_report.py:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -21,6 +21,9 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新全板、印 🎯
 /maigo:board                # 無參數：刷新全板、印 🎯 + 其他區計數
 /maigo:board --all          # 刷新後印整板
+/maigo:board --reviews      # 只顯示現在需要我看的 PR（標題、貢獻者、最後 review）
+/maigo:board --reviewed <n...> # 本地已看完這版 report，移出待看清單；不送 GitHub
+/maigo:board --unreviewed <n...> # 取消本地已看完標記
 /maigo:board --learn        # 對已勾但未 🧠 的項目跑學習盤點
 /maigo:board --check <n...> # 標記「我親自處理過」，作為 --learn 訊號
 /maigo:board --uncheck <n...> # 取消「我親自處理過」標記
@@ -68,23 +71,23 @@ echo '<[{type, gh_meta, prior_status, url, local_verdict_at}, ...]>' \
   | python3 scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
 ```
 
-**一定要帶 `--maigo-root <repo root>`**（`.maigo/` 所在目錄，通常就是 cwd）：這讓
-`main()` 對 👀 型別項目自動找對應的
-[`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
-`review` kind 產物（`.maigo/review/<id>/review.md`，跨 repo 同樣算得出
-`<repo>-<n>` 形式的 `<id>`）並算出 `local_verdict_at`——不要自己算路徑或轉時間戳，
-那正是「本地已經審完、尚未貼到 GitHub」與「幾個月前貼過舊 review、現在該重審」的
-唯一區分依據，algorithm 出錯（id 算錯、mtime 沒轉對時區）會讓這條判斷失效或誤判。
-`--maigo-root` 省略、或該 PR 沒有對應的 review 產物時，`local_verdict_at` 留空，
-`posted_by_you` 退回舊行為（見 `scripts/board_state.py` 的 `_posted_by_you_since()`）；
-stdin 顯式給的 `local_verdict_at` 優先於自動算出的值。
+**一定要帶 `--maigo-root <repo root>`**（board 與 `.maigo/` 所在的存活 worktree）：
+CLI 讀 report 的 `reviewed_at`、`head_sha`、verdict 與使用者的已看完標記；只有舊報告
+沒有 metadata 時才退回 mtime，輸出註明舊檔時間推估，不冒充精確 review 時間。
+stdin 顯式 `local_verdict_at` 優先；source 歸屬不符會失敗，不能讀錯同名 repo 的報告。
+GitHub metadata 必須含 `title`、`author`、`headRefOid`、`commits`、`reviews`、`comments`，
+否則純 push 沒有留言時會漏掉重審。抓取欄位完整清單見 work-board skill。
+
+JSON 額外回傳 `title` / `author` / `last_reviewed_at` / `acknowledged_at` /
+`needs_review` / `review_time_source` / `index_entry`。索引行以 `index_entry` 為內容，加原 checkbox、badge、編號；
+貢獻者緊接狀態詞，title 完整保留。細節檔事實區加最後 review 與已看完時間。
 
 三張完整球權判定表、排序與 ✅ 保留天數見
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
 `classify()` 是判定邏輯的唯一正典，本命令不再自行複述規則。
 
 **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
-`.maigo/i/<slug>.md`——refresh 只重寫事實區（標題行 ＋ 連結/規模/下一步三條 metadata），
+`.maigo/i/<slug>.md`——refresh 只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
 `## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格、欄位省略規則見
 [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
 刷新完成後比對 `.maigo/i/*.md` 與 board 索引行，多出來的孤兒檔案列出來給使用者確認後刪，
@@ -92,7 +95,9 @@ stdin 顯式給的 `local_verdict_at` 優先於自動算出的值。
 
 ### 4. 輸出
 
-無參數與 `<targets...>` 預設只印 🎯「下一件」的前幾行 ＋ 其他區計數 ＋ board.md 路徑——
+無參數與 `<targets...>` 先印「現在要看的 PR」：從完整分類結果取 `needs_review=true`，
+列出 PR 標題、貢獻者、狀態、最後 review 時間；沒有就明說目前沒有待看的 PR。
+再印 🎯「下一件」的前幾行 ＋ 其他區計數 ＋ board.md 路徑——
 對話裡的輸出是拋棄式的，真相在檔案裡，沿用 [`/maigo:doctor`](https://github.com/Lee-W/maigo/blob/main/commands/doctor.md)
 的 emoji 分段慣例。`--all` 印完整 board。
 
@@ -101,6 +106,27 @@ stdin 顯式給的 `local_verdict_at` 優先於自動算出的值。
 ```
 🧠 有 N 項你勾了還沒盤點 → /maigo:board --learn
 ```
+
+**`--reviews`**：完整刷新與寫回仍使用未過濾的結果；對話只顯示待看 PR。
+可另以 `board_state.py --reviews` 取得依 rank 排序的檢視結果，**不可用過濾後結果覆寫
+整份 board**。包含 `待 review`、`↩︎ 回你的球`、`待送出`；已看完、等人、草稿與結案不列入。
+
+### 4a. `--reviewed` / `--unreviewed`
+
+這是使用者說「我已看完這版，不需留在待看清單」的明確操作；與 `--check` 學習閘門分開。
+只處理 👀 PR；先抓 canonical URL、最新 head 與 `gh api user` 的 login，再逐項呼叫：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/review_report.py" acknowledge \
+  --cwd <board-repo-root> --repo <owner/name> --source <canonical-pr-url> \
+  --head <current-full-head-sha> --you <login>
+```
+
+`--unreviewed` 使用同一呼叫加 `--undo`。helper 記錄／移除本地 acknowledgement，
+不改最後 review 時間、不送 GitHub。需要已有新版 report，且 `--reviewed` 的 head 必須
+與報告一致；舊報告先重新 review，head 已變則請先重審。成功後依步驟 3 的完整分類結果
+用 Edit 更新 board 與細節檔；保留 checkbox / 🧠 / 手寫筆記。
+錯誤逐項列出，不把失敗項目標成已看完；重複標記只更新本地確認時間。
 
 ### 5. `--learn`
 

@@ -48,9 +48,10 @@ whose ball an item is — verify with:
 gh api repos/<owner>/<repo>/pulls/<n>/reviews --jq '.[] | select(.user.login=="<you>")'
 ```
 
-If empty, the ball is still yours to *post*; note it as "待
-review（本地分析從未貼上 GitHub）" rather than treating the local verdict as
-done. Distinguish a maintainer's own official verdict (someone else's
+If empty and the user has not explicitly marked this report read, keep it at
+`待送出`. An explicit `--reviewed` acknowledgement may move it to `已看完` locally;
+it is never evidence of GitHub submission. Refresh from the report metadata and
+current PR head, not only the old board status. Distinguish a maintainer's own official verdict (someone else's
 `CHANGES_REQUESTED`, which genuinely is posted) from your own unposted
 draft — only the latter needs this check.
 

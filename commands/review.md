@@ -140,7 +140,7 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 **gate 不 block report、不改 verdict**——report 出完後純收集意願，不影響 Soyo 的 APPROVE / REQUEST_CHANGES / BLOCKED 結論。
 使用者沉默 / 全採納（外部 PR 為全「放進 review」，仍照常起草） / Soyo 無任何 finding（must-fix 與 nit 皆空，即 APPROVED 且無 suggest）→ 無聲略過整個裁決 gate（不問使用者選項），
 但仍照上面同一支 `artifact_path.py review-draft` 呼叫寫一份**最小 draft**（approve 用的短 body，例如「LGTM，見 review 報告」）——
-`board_state.py` 的 `待送出` next_action 永遠指向這個路徑，這步驟讓它永遠存在，不因為零 finding 而跳過；APPROVED 但有 nit 仍觸發完整 gate（nit 非空）。
+`board_state.py` 的 `待送出` 發送草稿動作指向這個路徑，這步驟讓它永遠存在，不因為零 finding 而跳過；APPROVED 但有 nit 仍觸發完整 gate（nit 非空）。
 
 **無次數驅動收斂**：orchestrator 不追蹤「某條 finding 被駁回幾次」、不自動 soften；
 依 [`docs/skills/strict-review`](https://github.com/Lee-W/maigo/blob/main/docs/skills/strict-review.md) 的「user previously accepted X is not evidence」——純駁回記錄不影響下次 review 標準。
@@ -180,31 +180,44 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal rule 再接英文 detail。
 三種版型的完整骨架見
 [`skills/strict-review/references/review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)「輸出」——
-這份骨架同時是要逐字寫入的檔案內容，兩者不分開維護。
+正文套用這份骨架；publisher 補上共用檔頭／TOC 後，讀回檔案呈現，不另外維護對話版。
 
-印出五段報告之前，orchestrator 先呼叫：
+報告正文先寫到 scratchpad（只含 H2/H3，雙語快結也從 H2 開始）。記下本次實際審查的
+commit：PR 用 context cache 的 `Reviewed head`；本地 branch / range 用 reviewed tip 的
+完整 SHA。完成驗證後重新讀 PR 的 `headRefOid`；若已改變，報告明示只涵蓋舊 head，
+board 判為需要重審，不把新 head 冒充已審。
 
+由 orchestrator 呼叫共同 publisher，再讀回產物呈現給使用者：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/review_report.py" publish \
+  --cwd <repo-root> --repo <owner/name> --source <canonical-PR-url-or-branch-or-range> \
+  --head <reviewed-full-commit-sha> --title <title> --verdict <verdict> \
+  --body-file <scratchpad/report-body.md>
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review \
-    --topic "Review: <PR title / branch / range>" --url <PR url> --repo <owner/name>
-```
 
-（`--repo` 用 `gh repo view --json nameWithOwner -q .nameWithOwner`——與
-`pr_context_cache.repo_slug()` 相同取法；本地 branch / commit range 沒有 PR url，省略
-`--url`/`--repo`）取得落檔路徑（歸屬規則見
-[`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）：
+`verdict` 使用 `APPROVE` / `APPROVE_WITH_NITS` / `NEEDS_CHANGES` / `BLOCKED`；
+🟡 爽世的 `REQUEST_CHANGES` 對應 `NEEDS_CHANGES`，`APPROVED` 對應 `APPROVE`。PR URL 用 `gh pr view --json url`
+的 canonical 值，`--repo` 是 board 所在 repo；跨 repo 不拿目標 repo 冒充 home repo。
 
-- `status: conflict`（exit 3）→ 依 artifact-ownership 規則 3，把 `conflict_owner:` 與
-  `suggest:` 呈現給使用者，不擅自覆寫既有檔案，等使用者決定要不要採用 `suggest:` 路徑
-- 其餘 status → 把完整的五段（或 `--bilingual` 版、或 batch roll-up 版）報告內容
-  **逐字寫入**該路徑的檔案，再照舊在對話裡印一份——檔案是真相、對話是即時可讀，
-  兩者都要，不是二選一
+[`scripts/review_report.py`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
+重用 artifact_path 的命名，生成 `.maigo/review/<id>/review.md`，並統一提供：
 
-**多 PR batch**：每顆 PR 各自呼叫一次 `artifact_path.py review --topic "Review: <該 PR 的
-title>" --url <該 PR url> --repo <owner/name>`（H1 各自不同），各自落一份
-`.maigo/review/<id>/review.md`——GitHub PR 有 `--url` 天然走 `resolve_identifier()`
-第 1 級，identifier 各自不同，落在各自的 `review/<id>/` 資料夾，不會互相覆寫，不需要
-額外機制。
+- H1、來源、**最後 review 時間（含時區）**、實際 reviewed commit、verdict。
+- **TOC**：所有 H2/H3 的可跳轉目錄，不把 fenced code 範例誤當章節。
+- 同 source 重審直接換成最新完整報告；PR 改標題仍是同一個 source。
+- 新版原子寫入成功後，刪除同目錄 `review-N.md` 與舊扁平 `review-<id>.md` 中
+  能確認同 source 的過期報告；草稿、rubric、手寫筆記、別顆 PR、無法確認歸屬的檔案保留。
+  stdout 列出 `removed` / `retained`；清除不依賴 mtime 猜「同一份」。
+- 新報告清除上一輪「已看完」標記；要由使用者看完這一版再標記。
+
+source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保留舊檔；不要直接 Write 繞過。
+此 publisher 是 `review` kind 的寫入入口，其餘 kind 繼續使用 artifact_path 的 ownership
+合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
+
+若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
+成最新 `review/<id>/review.md`，保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+時間，以及 `/maigo:board --reviewed <n>` 和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
 
@@ -212,14 +225,18 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- 本地 verdict 尚未送 GitHub（`reviews` 裡沒有你送出的 review）→ 👀 行留在 🎯 下一件，
+- 本地 report 剛完成 → 先讀 report metadata 再跑 `board_state.py --maigo-root <repo-root>`。
+  同步標題、`@貢獻者`、最後 review 時間與 report 路徑。
+- 本地 verdict 尚未送 GitHub、且使用者尚未標「已看完」→ 👀 行留在 🎯 下一件，
   狀態詞寫 `待送出`——不再寫成 `BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` /
   `APPROVE` 之一硬留 🎯；這修掉一個既知的漂移：舊寫法在下次刷新會被 `classify()`
   判成 ⏳，本地 verdict 就此靜靜沉底
 - 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
   （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
 - merged / closed → 👀 行進 ✅ 最近結案
-- 上面「## 輸出」段呼叫 `artifact_path.py review` 拿到的 `path:`（即
+- 使用者以 `/maigo:board --reviewed <n>` 標記本地已看完 → ⏳；不代表已送 GitHub。
+  新 head 或作者新留言會回 🎯 `↩︎ 回你的球`。
+- 上面 publisher 回傳的 `path`（即
   `review/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
   的 `## 筆記` 區，一行裸相對路徑連結（相對 `.maigo/`，例如 `review/9301/review.md`）——

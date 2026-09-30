@@ -24,7 +24,7 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    `same_topic` 就不成立，續跑會被誤判成 `conflict`。pr-comments 的權威模板在
    [`skills/github-reply-draft/references/comment-fetch-and-triage.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md)。
 
-2. **取路徑一律呼叫**
+2. **一般產物取路徑呼叫**
    [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)，
    帶上 `--topic "<你打算寫的 H1>"`：
 
@@ -71,6 +71,14 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    也會提醒既有舊檔可用
    [`scripts/migrate_legacy_artifacts.py`](https://github.com/Lee-W/maigo/blob/main/scripts/migrate_legacy_artifacts.py)
    搬過去。
+
+**最終 review 報告的專用入口**：
+[`scripts/review_report.py publish`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
+重用 artifact_path 命名，以 canonical source 身分判斷同一份報告，允許同 PR 改標題後
+更新最新 `review.md`，不再為每輪 review 累積 `review-2.md`。新檔成功後僅回收已確認
+同 source 的舊 report，細則見
+[`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)。
+歸屬衝突仍明確失敗；不適用這個 publisher 的其他 kind 繼續遵守上述 H1 合約。
 
 `pr-comments` 另外還有
 [`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
