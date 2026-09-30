@@ -5,6 +5,18 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.62.0 (2026-09-30)
+
+### Feat
+
+- **review**: track the latest report and actionable PRs
+- **eval**: verify Claude Code and Codex tool traces
+- **persona**: preserve distinct role voices in handoffs
+
+### Fix
+
+- enforce current review and verification results
+
 ## v0.61.0 (2026-09-29)
 
 ### Feat
