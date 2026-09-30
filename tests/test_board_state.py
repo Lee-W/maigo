@@ -443,6 +443,139 @@ class TestClassifyReviewPrLocalVerdictAt:
 # Transition property test: classify() 輸出必須 ∈ ALLOWED_TRANSITIONS[prior]
 # ---------------------------------------------------------------------------
 
+
+@pytest.mark.parametrize(
+    "change,expected",
+    [
+        ({}, bs.BoardStatus.REVIEWED),
+        ({"headRefOid": "new-head"}, bs.BoardStatus.BALL_BACK),
+        (
+            {
+                "comments": [
+                    {"author": {"login": "carol"}, "createdAt": "2026-01-04T00:00:00Z"}
+                ]
+            },
+            bs.BoardStatus.BALL_BACK,
+        ),
+        (
+            {"commits": [{"committedDate": "2026-01-04T00:00:00Z"}]},
+            bs.BoardStatus.BALL_BACK,
+        ),
+        (
+            {
+                "comments": [
+                    {"author": {"login": YOU}, "createdAt": "2026-01-04T00:00:00Z"}
+                ]
+            },
+            bs.BoardStatus.REVIEWED,
+        ),
+        ({"isDraft": True}, bs.BoardStatus.OTHERS_DRAFT),
+        ({"state": "CLOSED"}, bs.BoardStatus.CLOSED),
+        ({"state": "MERGED"}, bs.BoardStatus.MERGED),
+    ],
+)
+def test_local_read_marker_waits_until_new_author_activity(change, expected):
+    gh_meta = {
+        "state": "OPEN",
+        "headRefOid": "same-head",
+        "author": {"login": "carol"},
+        **change,
+    }
+    review = {
+        "reviewed_at": "2026-01-02T00:00:00Z",
+        "head_sha": "same-head",
+        "acknowledged_at": "2026-01-03T00:00:00Z",
+        "acknowledged_by": YOU,
+    }
+    result = bs.classify(
+        bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.REVIEWED, YOU, review=review
+    )
+    assert result.status is expected
+
+
+def test_someone_elses_acknowledgement_does_not_complete_your_review():
+    review = {
+        "reviewed_at": "2026-01-02T00:00:00Z",
+        "acknowledged_at": "2026-01-03T00:00:00Z",
+        "acknowledged_by": "someone-else",
+    }
+    result = bs.classify(
+        bs.ItemType.REVIEW_PR, {"state": "OPEN"}, None, YOU, review=review
+    )
+    assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
+
+
+@pytest.mark.parametrize(
+    "prior", [bs.BoardStatus.UNPOSTED_VERDICT, bs.BoardStatus.BALL_BACK, None]
+)
+def test_submitted_review_no_longer_sticks_in_action_queue(prior):
+    gh_meta = {
+        "reviews": [
+            {
+                "author": {"login": YOU},
+                "state": "APPROVED",
+                "submittedAt": "2026-01-03T00:00:00Z",
+            }
+        ]
+    }
+    result = bs.classify(bs.ItemType.REVIEW_PR, gh_meta, prior, YOU)
+    assert result.section is bs.Section.WAITING
+
+
+@pytest.mark.parametrize("state", ["PENDING", "DISMISSED"])
+def test_unsubmitted_or_dismissed_review_does_not_count_as_posted(state):
+    gh_meta = {
+        "reviews": [
+            {
+                "author": {"login": YOU},
+                "state": state,
+                "submittedAt": "2026-01-03T00:00:00Z",
+            }
+        ]
+    }
+    result = bs.classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE, YOU)
+    assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
+
+
+def test_review_view_filters_and_orders_mixed_board_without_losing_metadata(
+    monkeypatch, capsys
+):
+    items = [
+        {
+            "type": "👀",
+            "gh_meta": {"title": "First review", "author": {"login": "alice"}},
+        },
+        {"type": "🔀", "gh_meta": {"title": "My PR", "isDraft": True}},
+        {"type": "👀", "gh_meta": {"title": "Closed", "state": "CLOSED"}},
+        {"type": "👀", "gh_meta": {"title": "Draft", "isDraft": True}},
+        {
+            "type": "👀",
+            "gh_meta": {"title": "Report ready"},
+            "review": {"reviewed_at": "2026-01-01T00:00:00Z"},
+        },
+        {
+            "type": "👀",
+            "gh_meta": {"title": "New push", "headRefOid": "new"},
+            "review": {"head_sha": "old"},
+        },
+    ]
+    payload = json.dumps(items)
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert bs.main(["--you", YOU, "--reviews"]) == 0
+    filtered = json.loads(capsys.readouterr().out)
+    assert [row["title"] for row in filtered] == [
+        "New push",
+        "Report ready",
+        "First review",
+    ]
+    assert filtered[1]["last_reviewed_at"] == "2026-01-01T00:00:00Z"
+    assert filtered[1]["review_time_source"] == "report"
+    assert filtered[2]["author"] == "alice"
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert bs.main(["--you", YOU]) == 0
+    assert len(json.loads(capsys.readouterr().out)) == len(items)
+
+
 _ISSUE_GH_META_SCENARIOS = [
     {"state": "CLOSED"},
     {"state": "OPEN", "assignees": []},
@@ -589,6 +722,7 @@ _REVIEW_PR_PRIOR_CANDIDATES = [
     bs.BoardStatus.APPROVE,
     bs.BoardStatus.UNREACHABLE,
     bs.BoardStatus.UNPOSTED_VERDICT,
+    bs.BoardStatus.REVIEWED,
 ]
 
 _TYPE_FIXTURES = [
@@ -805,6 +939,13 @@ class TestMain:
                 "next_action": "/maigo:triage-issue <n>",
                 "badges": [],
                 "detail_path": None,
+                "title": "",
+                "author": "",
+                "last_reviewed_at": None,
+                "review_time_source": None,
+                "acknowledged_at": None,
+                "needs_review": False,
+                "index_entry": "🐛 待 triage —",
             }
         ]
 

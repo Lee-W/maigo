@@ -53,6 +53,7 @@ def _fields(diff: str = "diff content", source: str = "my-branch") -> dict[str, 
         "source": source,
         "fetched_at": "2026-06-10T00:00:00+00:00",
         "pr_number": "n/a",
+        "head_sha": "n/a",
         "title": "n/a",
         "body": "n/a",
         "linked_issues": "n/a",
@@ -570,6 +571,7 @@ def test_pr_context_uses_canonical_target_and_supported_stats(source, url, monke
         "body": "Closes #73",
         "number": 42,
         "changedFiles": 3,
+        "headRefOid": "a" * 40,
         "additions": 8,
         "deletions": 2,
         "reviews": [
@@ -600,6 +602,8 @@ def test_pr_context_uses_canonical_target_and_supported_stats(source, url, monke
     fields = pcc.fetch_context(source, "pr", "main")
     host, owner, name = url.split("/")[2:5]
     assert threads.mock_calls == [mock.call(owner, name, "42", hostname=host)]
+    assert fields["head_sha"] == "a" * 40
+    assert "**Reviewed head**: " + "a" * 40 in pcc.render_cache(fields)
     assert fields["diff_stat"] == "3 files changed, 8 insertions(+), 2 deletions(-)"
     assert fields["reviews"] == "- reviewer **CHANGES_REQUESTED**: fix boundary"
     assert fields["comments"] == "- author: working on it"
@@ -611,7 +615,7 @@ def test_pr_context_uses_canonical_target_and_supported_stats(source, url, monke
                 "view",
                 source.lstrip("#"),
                 "--json",
-                "url,title,body,number,additions,deletions,changedFiles,reviews,comments",
+                "url,title,body,number,headRefOid,additions,deletions,changedFiles,reviews,comments",
             ]
         ),
         mock.call(["gh", "pr", "diff", url]),

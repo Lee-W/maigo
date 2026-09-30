@@ -164,6 +164,12 @@ APPROVED | NEEDS_CHANGES | BLOCKED
 - <rubric 的哪條 Decision / acceptance> — 實查 `path:line` 後推翻，因為 <證據>
 ```
 
+`/maigo:review` 的持久報告另依
+[`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)
+產生共用 TOC、最後 review 時間與 reviewed commit；只保留同 source 最新完整報告。
+本地「已看完」與 GitHub 已送出分開記錄，不改變審查 verdict。
+
+
 ## Re-review (when implementer comes back)
 
 Walk through the previous round's must-fix and evidence-pending **one by one**.
