@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 import scripts.pr_context_cache as pcc
@@ -114,6 +115,56 @@ class TestWriteCache:
 
 
 class TestMainCacheFlow:
+    @pytest.mark.parametrize(
+        "source",
+        [
+            pytest.param("https://github.com/o/r/pull/42", id="url"),
+            pytest.param("42", id="number"),
+            pytest.param("#42", id="hash-number"),
+        ],
+    )
+    @pytest.mark.parametrize("legacy", [False, True], ids=["current", "flat-fallback"])
+    def test_pr_refreshes_metadata_with_unchanged_diff(
+        self, source, legacy, tmp_path, monkeypatch, capsys
+    ):
+        rubric = tmp_path / "review" / "42" / "rubric.md"
+        old_path = tmp_path / "review-rubric-42.md" if legacy else rubric
+        old_path.parent.mkdir(parents=True, exist_ok=True)
+        old = (
+            pcc.render_cache(_fields(source=source)) + "\n\n# Review rubric: original\n"
+        )
+        old_path.write_text(old)
+        fresh = {
+            **_fields(source=source),
+            "ci_status": "tests failed",
+            "body": "Closes #73",
+            "linked_issues": "#73",
+            "review_threads": "[RESOLVED] a.py:2",
+            "reviews": "CHANGES_REQUESTED: missing boundary",
+            "comments": "new maintainer feedback",
+        }
+        fetch = mock.Mock(return_value=fresh)
+        monkeypatch.setattr(pcc, "fetch_context", fetch)
+        monkeypatch.setattr(pcc, "current_diff_sha", lambda *a: fresh["diff_sha"])
+        monkeypatch.setattr(
+            pcc,
+            "_resolve_rubric_path",
+            lambda *a: (rubric, old_path if legacy else None),
+        )
+
+        assert pcc.main([source]) == 0
+        expected_section = pcc.render_cache(fresh)
+        assert pcc.find_cache_section(rubric.read_text()) == expected_section
+        assert (
+            capsys.readouterr().out
+            == f"cache_hit: false\nrubric: {rubric}\n{expected_section}\n"
+        )
+        assert fetch.mock_calls == [mock.call(source, "pr", "main")]
+        if legacy:
+            assert old_path.read_text() == old
+        else:
+            assert rubric.read_text().endswith("# Review rubric: original\n")
+
     def test_cache_hit_skips_fetch(
         self,
         tmp_path: Path,
@@ -449,7 +500,8 @@ class TestFetchReviewThreads:
         assert pcc.fetch_review_threads("", "repo", "1") == "n/a"
         assert pcc.fetch_review_threads("owner", "", "1") == "n/a"
 
-    def test_parses_graphql_response(self, monkeypatch: pytest.MonkeyPatch):
+    @pytest.mark.parametrize("hostname", ["github.com", "github.example"])
+    def test_parses_graphql_response(self, hostname, monkeypatch: pytest.MonkeyPatch):
         graphql_response = json.dumps(
             {
                 "data": {
@@ -477,10 +529,94 @@ class TestFetchReviewThreads:
                 }
             }
         )
-        monkeypatch.setattr(pcc, "run", lambda *a, **kw: graphql_response)
-        rendered = pcc.fetch_review_threads("owner", "repo", "42")
+        run = mock.Mock(return_value=graphql_response)
+        monkeypatch.setattr(pcc, "run", run)
+        rendered = pcc.fetch_review_threads("owner", "repo", "42", hostname=hostname)
         assert "[OPEN]" in rendered
         assert "a.py:5" in rendered
+        command = run.call_args.args[0]
+        assert command[:2] == ["gh", "api"]
+        assert command[command.index("--hostname") + 1] == hostname
+        assert "owner=owner" in command
+        assert "name=repo" in command
+        assert "number=42" in command
+
+
+@pytest.mark.parametrize(
+    ("source", "url"),
+    [
+        pytest.param(
+            "https://github.com/remote/project/pull/42",
+            "https://github.com/remote/project/pull/42",
+            id="cross-repo",
+        ),
+        pytest.param(
+            "42", "https://github.com/local/workspace/pull/42", id="local-number"
+        ),
+        pytest.param(
+            "#42", "https://github.com/local/workspace/pull/42", id="local-hash-number"
+        ),
+        pytest.param(
+            "https://github.example/remote/project/pull/42",
+            "https://github.example/remote/project/pull/42",
+            id="enterprise-host",
+        ),
+    ],
+)
+def test_pr_context_uses_canonical_target_and_supported_stats(source, url, monkeypatch):
+    metadata = {
+        "url": url,
+        "title": "Fix ranges",
+        "body": "Closes #73",
+        "number": 42,
+        "changedFiles": 3,
+        "additions": 8,
+        "deletions": 2,
+        "reviews": [
+            {
+                "author": {"login": "reviewer"},
+                "state": "CHANGES_REQUESTED",
+                "body": "fix boundary",
+            }
+        ],
+        "comments": [{"author": {"login": "author"}, "body": "working on it"}],
+    }
+
+    def command_output(command, check=True):
+        if command[:3] == ["gh", "repo", "view"]:
+            return "local/workspace"
+        if command[:3] == ["gh", "pr", "view"]:
+            return json.dumps(metadata)
+        if command[:3] == ["gh", "pr", "checks"]:
+            return "tests pending"
+        if command[:3] == ["gh", "pr", "diff"]:
+            return "" if "--stat" in command else "full diff"
+        raise AssertionError(command)
+
+    run = mock.Mock(side_effect=command_output)
+    threads = mock.Mock(return_value="[OPEN] ranges.py:2")
+    monkeypatch.setattr(pcc, "run", run)
+    monkeypatch.setattr(pcc, "fetch_review_threads", threads)
+    fields = pcc.fetch_context(source, "pr", "main")
+    host, owner, name = url.split("/")[2:5]
+    assert threads.mock_calls == [mock.call(owner, name, "42", hostname=host)]
+    assert fields["diff_stat"] == "3 files changed, 8 insertions(+), 2 deletions(-)"
+    assert fields["reviews"] == "- reviewer **CHANGES_REQUESTED**: fix boundary"
+    assert fields["comments"] == "- author: working on it"
+    assert run.mock_calls == [
+        mock.call(
+            [
+                "gh",
+                "pr",
+                "view",
+                source.lstrip("#"),
+                "--json",
+                "url,title,body,number,additions,deletions,changedFiles,reviews,comments",
+            ]
+        ),
+        mock.call(["gh", "pr", "diff", url]),
+        mock.call(["gh", "pr", "checks", url], check=False),
+    ]
 
 
 class TestRunFailure:

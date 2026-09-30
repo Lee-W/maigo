@@ -19,6 +19,9 @@ from _hook_io import emit_stop as emit
 from _retry_log import RetryScope, record_and_count
 
 SOYO_RETRY_LIMIT = 2
+REVIEW_MODE_ITEMS = json.loads(
+    Path(__file__).with_name("review_modes.json").read_text(encoding="utf-8")
+)
 _RETRY_LOG_BASE = Path(".maigo")
 _MUST_FIX_FILE_RE = re.compile(r"`([\w./-]+\.\w+)(?::\d+)?`")
 _MUST_FIX_LINE_RE = re.compile(
@@ -192,18 +195,37 @@ def check_tomori(out: str) -> None:
     emit("approve", "燈 (Tomori) 輸出結構齊全")
 
 
+def _report_section(out: str, heading: str) -> str | None:
+    match = re.search(
+        rf"^##\s+{re.escape(heading)}\b[^\n]*\n(.*?)(?=^##\s|\Z)",
+        out,
+        re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    return match.group(1) if match else None
+
+
+def _report_verdict(out: str, choices: str) -> str | None:
+    """Read the verdict section; accept one standalone legacy verdict otherwise."""
+    section = _report_section(out, "Verdict")
+    matches = re.findall(
+        rf"^\s*(?:\*\*)?({choices})(?:\*\*)?\s*$",
+        section if section is not None else out,
+        re.MULTILINE,
+    )
+    return matches[0] if len(matches) == 1 else None
+
+
 def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
     require_memory_header(out, "爽世 (Soyo)")
-    verdict_match = re.search(
-        r"\b(APPROVED|NEEDS_CHANGES|BLOCKED|READY|NEEDS_INFO|DUP|CLOSE)\b", out
+    verdict = _report_verdict(
+        out, "APPROVED|NEEDS_CHANGES|BLOCKED|READY|NEEDS_INFO|DUP|CLOSE"
     )
-    if not verdict_match:
+    if verdict is None:
         emit(
             "block",
             "爽世 (Soyo) 的輸出沒看到 review verdict（APPROVED / NEEDS_CHANGES / BLOCKED）或 triage verdict（READY / NEEDS_INFO / DUP / CLOSE）。",
         )
         return
-    verdict = verdict_match.group(1)
 
     checklist = re.search(
         r"^##\s+Checklist\b[^\n]*\n(.*?)(?=^##\s|\Z)",
@@ -213,7 +235,7 @@ def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
     if checklist is None:
         emit("block", "爽世 (Soyo) 的輸出缺少 ## Checklist 段。")
         return
-    rows = re.findall(r"^.*\[([xX —-])\].*$", checklist.group(1), re.MULTILINE)
+    rows = re.findall(r"^.*\[([xX —-])\](.*)$", checklist.group(1), re.MULTILINE)
     if len(rows) < 9:
         emit(
             "block",
@@ -221,17 +243,24 @@ def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
         )
 
     triage = verdict in {"READY", "NEEDS_INFO", "DUP", "CLOSE"}
-    skipped = {index for index, mark in enumerate(rows, 1) if mark in {"—", "-"}}
-    allowed_skips = {2, 3, 4} if triage else {2, 3, 6, 8, 9}
-    if skipped and (
-        not skipped <= allowed_skips
-        or (not triage and "skipped by mode=quick" not in checklist.group(1))
+    modes = set(re.findall(r"\bmode=([\w-]+)", checklist.group(0)))
+    mode = next(iter(modes)) if len(modes) == 1 else ("triage" if triage else "full")
+    if len(modes) > 1 or mode not in REVIEW_MODE_ITEMS or (mode == "triage") != triage:
+        emit(
+            "block",
+            "爽世 (Soyo) 的 checklist mode 不明、互相矛盾，或與 verdict 類型不符。",
+        )
+    skipped = {index for index, (mark, _) in enumerate(rows, 1) if mark in {"—", "-"}}
+    allowed_skips = set(range(1, 10)) - set(REVIEW_MODE_ITEMS[mode])
+    if not skipped <= allowed_skips or any(
+        not triage and f"skipped by mode={mode}" not in rows[index - 1][1]
+        for index in skipped
     ):
         emit(
             "block",
-            "爽世 (Soyo) 的 checklist 略過了必要項目，或缺少 skipped by mode=quick 原因。",
+            f"爽世 (Soyo) 的 checklist 略過了 mode={mode} 的必要項目，或略過項缺少 skipped by mode={mode} 原因。",
         )
-    if verdict in {"APPROVED", "READY"} and " " in rows:
+    if verdict in {"APPROVED", "READY"} and any(mark == " " for mark, _ in rows):
         emit("block", f"爽世 (Soyo) 的 checklist 仍有 [ ]，不能給 {verdict}。")
 
     if not triage and verdict != "APPROVED":
@@ -400,16 +429,41 @@ def check_taki(out: str) -> None:
             "立希 (Taki) 沒看到 exit code。要拿真的 command 跑過，不是憑感覺說 PASS / FAIL。",
         )
 
-    verdict_match = re.search(r"\b(PASS|FAIL)\b", out)
-    if not verdict_match:
+    verdict = _report_verdict(out, "PASS|FAIL")
+    if verdict is None:
         emit("block", "立希 (Taki) 沒給最終 verdict（PASS / FAIL）。")
         return
-    verdict = verdict_match.group(1)
-    if verdict == "PASS" and int(exit_codes[-1]) != 0:
-        emit(
-            "block",
-            "立希 (Taki) 宣告 PASS，但最後列出的 command exit code 非 0。請分開列出失敗與修正後的驗證結果。",
-        )
+    if verdict == "PASS":
+        commands = _report_section(out, "Commands")
+        results: dict[str, int] = {}
+        if commands is None:
+            # A single legacy result is unambiguous; multiple anonymous results
+            # cannot establish which failed check was rerun.
+            if len(exit_codes) != 1:
+                emit(
+                    "block",
+                    "立希 (Taki) 請在 ## Commands 逐項列出 `command` — exit <code>，不能用匿名 exit code 抵銷失敗。",
+                )
+            results["legacy command"] = int(exit_codes[0])
+        else:
+            for line in commands.splitlines():
+                if not line.strip():
+                    continue
+                match = re.fullmatch(
+                    r"\s*[-*]\s+`([^`]+)`\s*[—-]\s*exit\s+(-?[0-9]+)\b.*", line
+                )
+                if match is None or not match.group(1).strip():
+                    emit(
+                        "block",
+                        "立希 (Taki) 的 ## Commands 每列必須是 `command` — exit <code>；略過或缺少結果不能 PASS。",
+                    )
+                    return
+                results[match.group(1).strip()] = int(match.group(2))
+        if not results or any(code != 0 for code in results.values()):
+            emit(
+                "block",
+                "立希 (Taki) 宣告 PASS，但仍有 command 最新 exit code 非 0，或沒有檢查結果。請重跑失敗的檢查；其他 command 成功不能抵銷失敗。",
+            )
 
     hedge_patterns = [
         r"should\s+work",

@@ -36,6 +36,11 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    **不要自己組檔名，也不要自己記得比對 H1**——命名的四級識別碼鏈與歸屬比對
    全部在這支 script 裡，有測試把關；散文只負責提醒你呼叫它。
 
+   **寫手沒有 Bash 時由 orchestrator 代跑**：在目標 cwd 呼叫 helper、處理 ownership
+   結果並建立父目錄後，交付絕對路徑、原樣 H1 與 status，寫手只用 Write／Edit 寫內容。
+   🩵 燈的 plan、review rubric 與 triage rubric 都適用；缺交付資料時回報 orchestrator，
+   不靠手算或改工具權限繞過。
+
 3. **`status: conflict`（exit 3）時，停下來問使用者**，把 stdout 的
    `conflict_owner:`（現有檔案屬於誰）與 `suggest:`（候選新檔名）一起呈現給
    使用者，不要自作主張換名或覆寫。`status: same_topic` 才是安全續寫；
@@ -48,8 +53,8 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    `review/<id>/rubric-2.md` 這類，不是另開一個 `review/<id>-2/` 資料夾。
    如果同一個 identifier 底下已經有 `-2`、`-3` 甚至更多份不同主題的產物
    （常發生在同一個 branch/PR 上跑過多輪 `/maigo:go`、`/maigo:quick` 之
-   後），`suggest:` 給的路徑可能撞到其中一份。使用 `suggest:` 之前，自己
-   （或無 Bash 的 subagent 手動推算後）`ls` 對應資料夾（非巢狀 kind 是
+   後），`suggest:` 給的路徑可能撞到其中一份。使用 `suggest:` 之前，由有 Bash
+   的寫手或代辦的 orchestrator `ls` 對應資料夾（非巢狀 kind 是
    `.maigo/`；巢狀 kind 是 `.maigo/review/<id>/` 或 `.maigo/issue/<id>/`）
    加讀 H1 核對，確認候選路徑真的沒被佔用，必要時往下遞增到 `-3`、`-4`；
    不要對 `suggest:` 的路徑照單全收。

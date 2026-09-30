@@ -390,7 +390,7 @@ class TestCheckHookScripts:
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": f"python3 ${{CLAUDE_PLUGIN_ROOT}}/{script_path}",
+                                "command": f'python3 "${{CLAUDE_PLUGIN_ROOT}}/{script_path}"',
                             }
                         ]
                     }
@@ -421,15 +421,33 @@ class TestCheckHookScripts:
         assert not result.passed
         assert any("語法錯" in e for e in result.errors)
 
-    def test_valid_script_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    @pytest.mark.parametrize("filename", ["good.py", "with space.py"])
+    def test_valid_script_passes(
+        self, filename, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         hooks_dir = tmp_path / "hooks"
         hooks_dir.mkdir(exist_ok=True)
-        good_py = hooks_dir / "good.py"
+        good_py = hooks_dir / filename
         good_py.write_text("print('hello')\n", encoding="utf-8")
-        self._make_hooks_json(tmp_path, "hooks/good.py")
+        self._make_hooks_json(tmp_path, f"hooks/{filename}")
         monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
         result = validate_plugin.check_hook_scripts()
         assert result.passed
+
+    def test_unclosed_quote_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._make_hooks_json(tmp_path, "hooks/good.py")
+        path = tmp_path / "hooks/hooks.json"
+        data = json.loads(path.read_text())
+        data["hooks"]["Stop"][0]["hooks"][0]["command"] = (
+            'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/good.py'
+        )
+        path.write_text(json.dumps(data))
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_hook_scripts()
+        assert not result.passed
+        assert any("command 無法解析" in error for error in result.errors)
 
 
 # ---------------------------------------------------------------------------

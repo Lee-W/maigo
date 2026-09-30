@@ -29,8 +29,9 @@ description: This skill should be used when handling failures in go-class comman
 ### 立希驗證紅
 
 1. 把 failure 完整貼給愛音 (Anon)（command + exit code + output）
-2. 愛音修完後立希 (Taki) 重跑——**不接受愛音口頭說「修好了」**
-3. 修到全綠才算過
+2. 🎀 愛音修完後，若程式碼、測試或其他受審內容有變，先送回 🟡 爽世複審，再讓 🟣 立希重跑；team 可依原本規則並行兩者。**不接受口頭說「修好了」，也不沿用修改前的 APPROVED。**
+3. 只有修復環境且受審內容完全沒變，才能沿用 review、只重跑驗證。
+4. 🟡 爽世 APPROVED 與 🟣 立希 PASS 必須對應同一份變更快照才算過。交辦與回報保留 HEAD、tracked diff 與 untracked 檔內容的識別／雜湊；僅 HEAD 相同不足以證明內容未變。修復改了內容，舊 review 與驗證結果都失效。
 
 ### 環境造成的假紅
 

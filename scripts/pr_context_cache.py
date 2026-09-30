@@ -8,7 +8,8 @@ comments) and caches it into a machine-readable section at the top of the
 per-source rubric file — `.maigo/review/<id>/rubric.md`, resolved via
 `scripts/artifact_path.py` (single source of truth for `.maigo/` artifact
 naming + ownership) unless `--rubric` overrides it. Re-runs with the same
-source and an unchanged diff restore the cache instead of re-fetching. A
+local source and an unchanged diff restore the cache instead of re-fetching.
+PR sources always refresh: CI and discussion can change without a new diff. A
 pre-nested-layout flat file (`.maigo/review-rubric-<id>.md`) is read as a
 fallback when the new path has no cache yet, but is never written to.
 
@@ -42,6 +43,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from artifact_path import resolve_for_write
@@ -99,7 +101,9 @@ def repo_slug() -> str:
     )
 
 
-def fetch_review_threads(owner: str, name: str, number: str) -> str:
+def fetch_review_threads(
+    owner: str, name: str, number: str, *, hostname: str = "github.com"
+) -> str:
     """Fetch inline review threads (resolution state + comments) via GraphQL."""
     if not owner or not name:
         return "n/a"
@@ -113,6 +117,8 @@ def fetch_review_threads(owner: str, name: str, number: str) -> str:
         [
             "gh",
             "api",
+            "--hostname",
+            hostname,
             "graphql",
             "-f",
             f"query={query}",
@@ -201,26 +207,37 @@ def fetch_context(source: str, kind: str, base: str) -> dict[str, str]:
     """Fetch full context for *source*. Returns the field dict for render_cache."""
     pr_id = source.lstrip("#")
     if kind == "pr":
-        meta = json.loads(
-            run(["gh", "pr", "view", pr_id, "--json", "title,body,number"])
+        raw_meta = run(
+            [
+                "gh",
+                "pr",
+                "view",
+                pr_id,
+                "--json",
+                "url,title,body,number,additions,deletions,changedFiles,reviews,comments",
+            ]
         )
-        diff = run(["gh", "pr", "diff", pr_id])
+        meta = json.loads(raw_meta)
+        pr_url = meta["url"]
+        parsed_url = urlsplit(pr_url)
+        owner, name = parsed_url.path.strip("/").split("/")[:2]
+        diff = run(["gh", "pr", "diff", pr_url])
         # gh pr checks exits nonzero while checks are pending / failing —
         # the output is still the summary we want.
-        ci = run(["gh", "pr", "checks", pr_id], check=False) or "n/a"
+        ci = run(["gh", "pr", "checks", pr_url], check=False) or "n/a"
         title = meta.get("title") or "n/a"
         body = meta.get("body") or ""
-        number = str(meta.get("number") or "n/a")
+        number = str(meta["number"])
         log = ""
-        diff_stat = run(["gh", "pr", "diff", pr_id, "--stat"], check=False)
-        owner, _, name = repo_slug().partition("/")
-        review_threads = fetch_review_threads(owner, name, number)
-        reviews = render_reviews(
-            run(["gh", "pr", "view", pr_id, "--json", "reviews"], check=False)
+        diff_stat = (
+            f"{meta['changedFiles']} files changed, "
+            f"{meta['additions']} insertions(+), {meta['deletions']} deletions(-)"
         )
-        comments = render_comments(
-            run(["gh", "pr", "view", pr_id, "--json", "comments"], check=False)
+        review_threads = fetch_review_threads(
+            owner, name, number, hostname=parsed_url.netloc
         )
+        reviews = render_reviews(raw_meta)
+        comments = render_comments(raw_meta)
     else:
         spec = source if kind == "range" else f"{base}...{source}"
         diff = run(["git", "diff", spec])
@@ -419,7 +436,10 @@ def main(argv: list[str] | None = None) -> int:
         cached = find_cache_section(flat_fallback.read_text(encoding="utf-8"))
         read_from_flat_fallback = True
 
-    if cached and parse_cached_field(cached, "Source") == args.source:
+    # Diff identity cannot establish freshness of PR metadata. Refresh the full
+    # PR snapshot every time, fetching its diff only once. Local sources retain
+    # their existing diff cache and read-only flat-path fallback.
+    if kind != "pr" and cached and parse_cached_field(cached, "Source") == args.source:
         sha_now = current_diff_sha(args.source, kind, args.base)
         if parse_cached_field(cached, "Diff sha") == sha_now:
             if read_from_flat_fallback:

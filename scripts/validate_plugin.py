@@ -21,6 +21,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shlex
 import sys
 import tomllib
 from pathlib import Path
@@ -294,16 +295,27 @@ def check_hook_scripts() -> CheckResult:
         r.fail("hooks.json JSON 壞掉，跳過子檢查")
         return r
 
-    placeholder_re = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+)")
+    prefix = "${CLAUDE_PLUGIN_ROOT}/"
 
     for event, configs in (data.get("hooks") or {}).items():
         for cfg in configs:
             for hook in cfg.get("hooks") or []:
                 cmd_str = hook.get("command", "")
-                m = placeholder_re.search(cmd_str)
-                if not m:
+                try:
+                    args = shlex.split(cmd_str)
+                except ValueError as exc:
+                    r.fail(f"{event}: command 無法解析 ({exc})")
                     continue
-                rel = m.group(1)
+                rel = next(
+                    (
+                        arg.removeprefix(prefix)
+                        for arg in args
+                        if arg.startswith(prefix)
+                    ),
+                    None,
+                )
+                if rel is None:
+                    continue
                 script = ROOT / rel
                 if not script.is_file():
                     r.fail(f"{event}: 指向 `{rel}` 但檔案不存在")

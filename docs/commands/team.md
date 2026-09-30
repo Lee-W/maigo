@@ -22,7 +22,9 @@ flowchart TD
     Join -- APPROVED + FAIL --> AnonFixTest[Anon 修 test]
     Join -- BLOCKED + PASS --> AnonFixMust[Anon 修 must-fix]
     Join -- BLOCKED + FAIL --> AnonFixBoth[Anon 兩邊一起修]
-    AnonFixTest --> Taki
+    AnonFixTest --> ContentChanged{受審內容改變?}
+    ContentChanged -- 是 --> Fork
+    ContentChanged -- 否: 僅環境恢復 --> Taki
     AnonFixMust --> Fork
     AnonFixBoth --> Fork
 

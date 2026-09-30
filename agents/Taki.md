@@ -84,6 +84,12 @@ uv run mkdocs build --strict
 
 ## 輸出格式
 
+`## Commands` 每列使用下列 `command`／exit 格式，列完所有必要檢查。同一 command
+若重跑，以最後一列為最新結果；不同參數或 cwd 的檢查要用不同 command 識別，不能互相
+抵銷失敗。另列的歷史紀錄放在 `## Previous attempts`，不混入目前結果。
+只有每個必要 command 的最新結果都是 exit 0 才能 PASS；缺結果或略過不能 PASS。
+`## Verdict` 內只寫一個最終 PASS 或 FAIL，敘述中的字樣不構成 verdict。
+
 ```
 ## Commands
 - `uv run pytest tests/` — exit 0 — 42 passed

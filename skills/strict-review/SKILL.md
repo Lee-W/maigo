@@ -213,12 +213,18 @@ classmethod 與 instance method 是不同的 callable，patch 一個攔不到另
 
 ## Adapting per context
 
+模式與必要項目的共用資料是
+[`hooks/review_modes.json`](https://github.com/Lee-W/maigo/blob/main/hooks/review_modes.json)，
+hook 與執行角色都以它為準；下表是用途摘要。輸出 `## Checklist (mode=<name>)`，
+每個略過的 code-review 項目都附 `skipped by mode=<name>`，同份報告不可混用模式。
+純測試變更用 `test-only`；沒有指定時用 `full`。`triage` 是 issue 分類檢查，非 code review。
+
 | Context | Adaptation |
 |---------|-----------|
 | Internal code (you own it) | Give specific改法 with exact code |
 | External PR (someone else's code) | Give direction + reason; exact code is the author's call |
 | Hotfix under deadline | Still run full checklist; document any deliberate skips in plan |
-| Test-only change | Skip items 5/7/8/9; keep 1/2/3/4/6 |
+| Test-only change | Use `mode=test-only`; skip 5/7/8/9 with reason `skipped by mode=test-only`; keep 1/2/3/4/6 |
 | `/maigo:review --mode=design-preview` | Run items 1 + 4 only; mark 2/3/5/6/7/8/9 as `[—]` with reason `skipped by mode=design-preview` |
 | `/maigo:review --mode=compliance-only` | Run items 4/5/6/7/8; mark 1/2/3/9 as `[—]` with reason `skipped by mode=compliance-only` |
 | `/maigo:quick` (quick mode) | Run items 1/4/5/7; mark 2/3/6/8/9 as `[—]` with reason `skipped by mode=quick` |

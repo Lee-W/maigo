@@ -58,7 +58,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
-**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source>`——第一次 fetch 後 cache 到本次 review rubric 檔（stdout 的 `rubric:` 那行給的路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段，後續 re-review 同 source 且 diff sha 未變 → 直接還原，跳過 `gh pr view / gh pr diff / gh pr checks` 重抓。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。
+**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。
 
 - **取 diff**：
   - GitHub PR → `gh pr view <num/url> --json title,body,additions,deletions`、`gh pr diff <num/url>`
@@ -69,11 +69,11 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ### 2. 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
 
-用 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時呼叫
-`scripts/artifact_path.py review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name>` 自己算，
+派 🩵 燈前，**orchestrator** 取 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時由 orchestrator 呼叫
+`python3 "<maigo-root>/scripts/artifact_path.py" review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name>` 並處理 ownership 結果，
 `--repo` 取值見「## 輸出」段的 `pr_context_cache.repo_slug()`；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo` 即可），
 歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
-（目錄不存在請先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`——巢狀佈局下父目錄是 `.maigo/review/<id>/`）
+（目錄不存在由 orchestrator 先建立該路徑的父目錄），再把絕對路徑、原樣 H1 與 ownership status 交給 🩵 燈。她沒有 Bash，不執行 helper 或 `mkdir`。
 
 **派燈之前，先給她一份可讀的 diff 檔**：燈沒有 Bash，跑不了 `git diff` / `git show`，只靠
 樂奈的摘要加讀現檔分不出一行是不是這個 commit 新增的。orchestrator 把 diff 存成

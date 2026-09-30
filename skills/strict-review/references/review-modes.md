@@ -10,6 +10,10 @@ output trigger + Taiwanese Mandarin prose rules. Read this file when parsing `--
 
 ## Mode 對照表
 
+必要項目的共用資料見
+[`hooks/review_modes.json`](https://github.com/Lee-W/maigo/blob/main/hooks/review_modes.json)；
+此表保留 command 的 stage 與用途說明。
+
 | Mode | Soyo checklist | Taki 跑驗證？ | 適用場景 |
 |------|----------------|---------------|----------|
 | `full`（預設） | 9 項全跑 | ✅ | 一般 PR review |
@@ -23,7 +27,7 @@ output trigger + Taiwanese Mandarin prose rules. Read this file when parsing `--
 
 Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode` 與 `--bilingual`：
 - 把 mode 名稱寫進 review rubric 檔（`.maigo/review/<id>/rubric.md`）開頭 `<!-- mode: <mode-name> -->` 註解，讓 Soyo / Taki 啟動時讀得到
-- Soyo 收到 prompt 時被明確告知 checklist subset（mirror `skills/strict-review/SKILL.md` 「Adapting per context」表的寫法——standard 9 項保持，只是把不在 subset 的項在輸出表標 `[—]` 而非 `[x]` / `[ ]`，附 reason「skipped by mode=<name>」）
+- 🟡 Soyo 收到 prompt 時被明確告知 checklist subset，依共用 mode 資料保留完整 9 項，使用 `## Checklist (mode=<name>)`；不在 subset 的項標 `[—]` 且逐項附 `skipped by mode=<name>`。
 - mode = `design-preview` → 不啟動 Taki stage；最終報告 Verification 段註記「Skipped (mode=design-preview)」
 - mode = `compliance-only` → 正常啟動 Taki stage（與 full mode 相同）
 - `--bilingual` 旗標**或** repo-detect 回報 `apache/airflow` → orchestrator 在最終 report 前面加一段 Taiwanese Mandarin 快結（見「## 雙語輸出」）；不影響 Soyo / Taki 行為
