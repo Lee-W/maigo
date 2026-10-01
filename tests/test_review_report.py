@@ -283,3 +283,103 @@ def test_cli_failure_is_actionable_and_does_not_write(tmp_path, capsys):
     )
     assert "full commit hash" in capsys.readouterr().err
     assert not (tmp_path / ".maigo").exists()
+
+
+def test_pr_source_report_has_author_line_after_source(tmp_path):
+    text = Path(publish(tmp_path, author="contributor")["path"]).read_text()
+    assert "**Author:** @contributor\n" in text
+    assert text.index("**Source:**") < text.index("**Author:**")
+    assert text.index("**Author:**") < text.index("**最後 review：**")
+    assert report.metadata(text)["author"] == "contributor"
+    assert report.metadata(text)["version"] == 1
+
+
+def test_local_source_author_is_not_prefixed_with_at(tmp_path):
+    result = report.publish(
+        tmp_path,
+        "feature/x",
+        "",
+        "Local",
+        BODY,
+        HEAD,
+        "APPROVE",
+        author="Ann, Bob",
+    )
+    assert "**Author:** Ann, Bob\n" in Path(result["path"]).read_text()
+
+
+def test_report_without_author_has_no_author_line(tmp_path):
+    text = Path(publish(tmp_path)["path"]).read_text()
+    assert "**Author:**" not in text
+    assert "author" not in report.metadata(text)
+
+
+def test_acknowledge_preserves_author(tmp_path):
+    path = Path(publish(tmp_path, author="contributor")["path"])
+    report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer")
+    text = path.read_text()
+    assert report.metadata(text)["author"] == "contributor"
+    assert "**Author:** @contributor" in text
+
+
+@pytest.mark.parametrize("bad", ["", "  ", 5, None, ["a"]])
+def test_metadata_rejects_empty_or_non_string_author(bad):
+    record = {
+        "version": 1,
+        "source": URL,
+        "head_sha": HEAD,
+        "verdict": "APPROVE",
+        "reviewed_at": "2026-01-01T00:00:00+00:00",
+        "author": bad,
+    }
+    with pytest.raises(ValueError, match="author"):
+        report.metadata(f"<!-- maigo-review: {json.dumps(record)} -->")
+
+
+def test_publish_rejects_blank_author(tmp_path):
+    with pytest.raises(ValueError, match="author"):
+        publish(tmp_path, author=" ")
+
+
+def test_legacy_report_without_author_still_parses():
+    record = {
+        "version": 1,
+        "source": URL,
+        "head_sha": HEAD,
+        "verdict": "APPROVE",
+        "reviewed_at": "2026-01-01T00:00:00+00:00",
+    }
+    assert report.metadata(f"<!-- maigo-review: {json.dumps(record)} -->") == record
+
+
+def test_cli_author_only_valid_for_publish(tmp_path, capsys):
+    body = tmp_path / "body.md"
+    body.write_text(BODY)
+    common = ["--cwd", str(tmp_path), "--source", URL, "--repo", "owner/project"]
+    assert (
+        report.main(
+            [
+                "publish",
+                *common,
+                "--head",
+                HEAD,
+                "--title",
+                "T",
+                "--body-file",
+                str(body),
+                "--verdict",
+                "APPROVE",
+                "--author",
+                "dev",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert (
+        report.main(
+            ["acknowledge", *common, "--head", HEAD, "--you", "me", "--author", "dev"]
+        )
+        == 1
+    )
+    assert "--author" in capsys.readouterr().err

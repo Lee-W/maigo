@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_index.py:*), Bash(python3 scripts/review_report.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_sync.py:*), Bash(python3 scripts/board_index.py:*), Bash(python3 scripts/review_report.py:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -19,15 +19,15 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新全板、印 🎯
-/maigo:board                # 無參數：刷新全板、印 🎯 + 其他區計數
+/maigo:board                # 無參數：對帳 .maigo/ 產物＋discovery 該 repo 指名你審的 PR，刷新全板、印 🎯 + 其他區計數
 /maigo:board --all          # 刷新後印整板
 /maigo:board --reviews      # 只顯示現在需要我看的 PR（標題、貢獻者、最後 review）
-/maigo:board --reviewed <n...> # 本地已看完這版 report，移出待看清單；不送 GitHub
-/maigo:board --unreviewed <n...> # 取消本地已看完標記
-/maigo:board --learn        # 對已勾但未 🧠 的項目跑學習盤點
-/maigo:board --check <n...> # 標記「我親自處理過」，作為 --learn 訊號
-/maigo:board --uncheck <n...> # 取消「我親自處理過」標記
-/maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄，7 天後跟其他結案行一起清）
+/maigo:board --reviewed <n...> # 等同在 board 勾 [x]：本地 ack 這版 report、勾上、加 🔖；不送 GitHub
+/maigo:board --unreviewed <n...> # 等同取消勾：撤銷本地 ack、改回 [ ]
+/maigo:board --learn        # 對「已勾 [x] 或 🔖、但沒有 🧠」的項目跑學習盤點
+/maigo:board --check <n...> # 只翻 [ ]→[x]（等同 nvim 手勾），下次刷新才判斷是否 ack
+/maigo:board --uncheck <n...> # 只翻 [x]→[ ]
+/maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄，之後刷新不再補回
 /maigo:board --cross-repo   # 本地刷新照舊，額外產出跨 repo 總索引
 ```
 
@@ -56,52 +56,105 @@ checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不
 - 抓不到就標狀態詞 `抓不到`（rank P0，併進 🎯 最上面），附錯誤末行
 
 加入時以 `#<n>` 或 `owner/repo#<n>` 為 key upsert；既有 checkbox 與 `🧠` 狀態必須保留。
+使用者明確加入的 target 要**先**呼叫 `python3 scripts/board_sync.py revive --reason manual <url...>`
+（只對目前被排除的項目寫 revive 事件，回 `revived` / `not_excluded`），否則曾被 `dd` / `--drop` 的項目
+會因排除紀錄而不重新分類。
 
 ### 3. 刷新分區
 
-除 `--learn` 外，每次都刷新 board 上所有抓得到的項目：把每項的 `type` / `gh_meta` /
-`prior_status`（讀自現有 board 行）/ `url` 組成 JSON 陣列，餵給
-[`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
-的 `classify()` 分類，取回 `section` / `rank` / `status` / `next_action` / `detail_path`，依
-rank 升序 ＋ 同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單（`⏳`/`✅` 依 `updatedAt` 降序、
-無編號）：
+除 `--learn` 外，每次都做完整刷新。解析、對帳、discovery、排除紀錄、勾選轉換都在
+[`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py)；
+orchestrator 只負責呼叫順序、`gh pr view` 抓料與 `Edit` 寫回。**script 絕不寫 `board.md` 與
+`.maigo/i/*.md`**。以下 `<root>` 是 `.maigo/` 所在的存活 worktree：
 
-```bash
-echo '<[{type, gh_meta, prior_status, url, local_verdict_at}, ...]>' \
-  | python3 scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
-```
+1. **規劃**——讀現檔 board、`i/*.md` 的 `- 連結：`、snapshot、排除紀錄與 `.maigo/` 產物型錄，
+   再用 `gh search` 找出該 repo 指名你審或你審過的 PR。`--dry-run` 不寫任何檔：
 
-**一定要帶 `--maigo-root <repo root>`**（board 與 `.maigo/` 所在的存活 worktree）：
-CLI 讀 report 的 `reviewed_at`、`head_sha`、verdict 與使用者的已看完標記；只有舊報告
-沒有 metadata 時才退回 mtime，輸出註明舊檔時間推估，不冒充精確 review 時間。
-stdin 顯式 `local_verdict_at` 優先；source 歸屬不符會失敗，不能讀錯同名 repo 的報告。
-GitHub metadata 必須含 `title`、`author`、`headRefOid`、`commits`、`reviews`、`comments`，
-否則純 push 沒有留言時會漏掉重審。抓取欄位完整清單見 work-board skill。
+   ```bash
+   python3 scripts/board_sync.py plan --maigo-root <root> --repo <owner/name> --you <login> \
+     [--dry-run] [--max-new 50] [--no-discovery]
+   ```
 
-JSON 額外回傳 `title` / `author` / `last_reviewed_at` / `acknowledged_at` /
-`needs_review` / `review_time_source` / `index_entry`。索引行以 `index_entry` 為內容，加原 checkbox、badge、編號；
-貢獻者緊接狀態詞，title 完整保留。細節檔事實區加最後 review 與已看完時間。
+   輸出 JSON：`lines`（每行的 `url` / `checked` / `checkbox_change` / `inferred` / `excluded`）、
+   `removed`（偵測到被 `dd` 的項目，已寫進排除紀錄）、`revived`（重新被指名而復活）、
+   `additions` / `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`errors`。
+   board 仍是舊版格式時 `plan` 直接失敗：先依 §1 整檔正規化再重跑。
+2. **抓料與分類**——對每一行（`excluded: true` 的行**不重新分類**，原樣保留，`已放棄` 才不會被
+   洗回 `待 review`）與每一筆 `additions` 做型別偵測並跑 `gh pr view` / `gh issue view`，
+   沿用 §2 的流程。
+3. **ack**——把 `checkbox_change` 非 null 的 👀 行組成 JSON 餵給 `ack`，逐項取回結果
+   （`acked` / `already_acked` / `no_report` / `head_changed` / `unacked` / `locked` / `error`）：
 
-三張完整球權判定表、排序與 ✅ 保留天數見
-[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
-`classify()` 是判定邏輯的唯一正典，本命令不再自行複述規則。
+   ```bash
+   echo '[{"url": "<url>", "head": "<full head sha>", "change": "checked", "inferred": false}]' \
+     | python3 scripts/board_sync.py ack --maigo-root <root> --repo <owner/name> --you <login>
+   ```
 
-**同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
-`.maigo/i/<slug>.md`——refresh 只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
-`## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格、欄位省略規則見
-[`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
-刷新完成後比對 `.maigo/i/*.md` 與 board 索引行，多出來的孤兒檔案列出來給使用者確認後刪，
-不自動刪。
+   `change` 與 `inferred` 直接取自 `plan` 的對應行。`[ ]→[x]` 是使用者明確操作，一律重打 ack；
+   `inferred`（沒有 snapshot、由已勾推斷）且同 head 已 ack 則回 `already_acked`，不重打。
+4. **分類**——把每項的 `type` / `gh_meta` / `prior_status`（讀自現有 board 行）/ `url`，加上
+   `checked` / `checkbox_change` / `prior_badges`（該行現有 badge），餵給
+   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)：
+
+   ```bash
+   echo '<[{type, gh_meta, prior_status, url, local_verdict_at, checked, checkbox_change, prior_badges}, ...]>' \
+     | python3 scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
+   ```
+
+   **一定要帶 `--maigo-root <repo root>`**：CLI 讀 report 的 `reviewed_at`、`head_sha`、verdict 與你的
+   已看完標記；source 歸屬不符會失敗。GitHub metadata 必須含 `title`、`author`、`headRefOid`、
+   `commits`、`reviews`、`comments`，否則純 push 沒有留言時會漏掉重審（欄位完整清單見 work-board skill）。
+   回傳除既有欄位外，另有最終 `checked`（`null` ＝不要動 checkbox）、`learn_pending`、`acked_current`。
+   三張球權判定表、排序與 ✅ 保留天數見
+   [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
+   `classify()` 是判定邏輯的唯一正典。
+5. **寫回**——用 `Edit`（不整份 `Write`）：依 rank 升序 ＋ 同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單
+   （`⏳`/`✅` 依 `updatedAt` 降序、無編號）；行內容用 `index_entry`，加最終 checkbox、badge、編號。
+   - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）。checkbox 一律以 `board_state` 回傳
+     的 `checked` 為準：👀 勾了卻回 `no_report` 或 `head_changed`，若分類結果仍是待看
+     （`needs_review`），該行自動取消勾，並在對話警告「#n 沒有本版 report／head 已變，未標記已看完；
+     請先 `/maigo:review <n>`」；但 GitHub 已送出你的 review、又沒有 report 時，該行不在待看清單，
+     使用者自己勾的 `[x]` 保留。
+   - **已知限制**：`acknowledged_at` 記的是刷新當下，不是勾選當下；第一次跑（沒有 snapshot）時，
+     已勾的 👀 行以推斷模式補 ack（同 head 已 ack 則不重打）。
+   - 由 artifact 對帳補進來、但分類結果是 `merged` / `closed` 的項目**不寫入 board**，改呼叫
+     `board_sync.py drop --reason closed <url...>`，否則 `review/<id>/review.md` 還在時每次刷新都會補回。
+   - ✅ 區超過 7 天老化清掉的行，清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
+   - **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
+     `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
+     `## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格見
+     [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
+   - **孤兒 `i/` 檔就是 dd 訊號**：使用者在 nvim 用 `dd` 刪行後，細節檔還留著，`plan` 會把它判成 dd
+     並寫進排除紀錄（剛寫好的檔有 10 分鐘寬限，列在 `pending_orphans`，本輪不判）。只有
+     `excluded_detail_files`（排除項目殘留的細節檔）要列出來，**等使用者確認後才刪**，不自動刪。
+6. **快照**——全部寫回後呼叫 `snapshot`，它會重讀最終的 board 寫入 `.maigo/_internal/board/snapshot.json`
+   （下次刷新據此偵測 `dd` 與勾選變化）：
+
+   ```bash
+   python3 scripts/board_sync.py snapshot --maigo-root <root> --repo <owner/name> --you <login>
+   ```
+
+`board_sync.py drop --reason {drop,dd,aged,closed} <url...>` 單獨使用時只 append 排除紀錄。
+`board_sync.py revive --reason manual <url...>` 則對目前被排除的項目 append `revive` 事件（§2 明確加入 target 時用）。
+`.maigo/_internal/` 底下的檔案只由 script 寫入，orchestrator 不要用 `Write` / `Edit` 碰。
 
 ### 4. 輸出
 
 無參數與 `<targets...>` 先印「現在要看的 PR」：從完整分類結果取 `needs_review=true`，
 列出 PR 標題、貢獻者、狀態、最後 review 時間；沒有就明說目前沒有待看的 PR。
-再印 🎯「下一件」的前幾行 ＋ 其他區計數 ＋ board.md 路徑——
-對話裡的輸出是拋棄式的，真相在檔案裡，沿用 [`/maigo:doctor`](https://github.com/Lee-W/maigo/blob/main/commands/doctor.md)
+再印 🎯「下一件」的前幾行 ＋ 其他區計數 ＋ board.md 路徑；另外**只在有內容時**列出以下摘要
+（對話是拋棄式的，真相仍在 board.md，不另造閱讀層）：
+
+- `overflow`：超過 `--max-new` 沒補進來的項目（編號、標題、作者），下次刷新接著補；
+- `unattributed`：未歸屬產物（`plan-*`、舊固定檔名、沒有可靠 PR 對應的本地 review 等），依類別計數＋檔名；
+- ack 警告（`no_report` / `head_changed` / `locked` / `error`）與 `errors` 原文；
+- `pending_orphans`（寬限期內，本輪未判）、`removed`（本輪判為 dd 的項目）、`excluded_detail_files`
+  （等你確認是否刪除）。
+
+輸出沿用 [`/maigo:doctor`](https://github.com/Lee-W/maigo/blob/main/commands/doctor.md)
 的 emoji 分段慣例。`--all` 印完整 board。
 
-若刷新後有「已勾 `[x]` 但沒有 `🧠`」的項目，結尾加：
+若刷新後有「(`[x]` 或 `🔖`) 且沒有 `🧠`」的項目，結尾加：
 
 ```
 🧠 有 N 項你勾了還沒盤點 → /maigo:board --learn
@@ -113,27 +166,22 @@ JSON 額外回傳 `title` / `author` / `last_reviewed_at` / `acknowledged_at` /
 
 ### 4a. `--reviewed` / `--unreviewed`
 
-這是使用者說「我已看完這版，不需留在待看清單」的明確操作；與 `--check` 學習閘門分開。
-只處理 👀 PR；先抓 canonical URL、最新 head 與 `gh api user` 的 login，再逐項呼叫：
-
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/review_report.py" acknowledge \
-  --cwd <board-repo-root> --repo <owner/name> --source <canonical-pr-url> \
-  --head <current-full-head-sha> --you <login>
-```
-
-`--unreviewed` 使用同一呼叫加 `--undo`。helper 記錄／移除本地 acknowledgement，
-不改最後 review 時間、不送 GitHub。需要已有新版 report，且 `--reviewed` 的 head 必須
-與報告一致；舊報告先重新 review，head 已變則請先重審。成功後依步驟 3 的完整分類結果
-用 Edit 更新 board 與細節檔；保留 checkbox / 🧠 / 手寫筆記。
-錯誤逐項列出，不把失敗項目標成已看完；重複標記只更新本地確認時間。
+這是使用者說「我已看完這版，不需留在待看清單」的明確操作，**等同在 nvim 勾 `[x]`**：
+`--reviewed` ＝ 把該行勾上（ack ＋ `[x]` ＋ `🔖`），`--unreviewed` ＝ 取消勾（undo ＋ `[ ]`）。
+只處理 👀 PR；兩者都走完整刷新（§3），不是只改單行，結束時寫 snapshot。做法：先把目標行的
+checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`），再跑 §3 的規劃——
+`plan` 依 snapshot 偵測到 `[ ]→[x]`（或 `[x]→[ ]`），經 `board_sync.py ack` 呼叫
+`review_report.py acknowledge`（`--unreviewed` 對應 `--undo`），不改最後 review 時間、不送 GitHub。
+需要已有新版 report，且 head 必須與報告一致；舊報告先重新 review，head 已變則請先重審
+（回 `no_report` / `head_changed`，待看的行取消勾並警告）。錯誤逐項列出，不把失敗項目標成已看完。
 
 ### 5. `--learn`
 
-`--learn` 不刷新其他項目，只處理 `.maigo/board.md` 裡已勾 `[x]` 且沒有 `🧠` 的行。
+`--learn` 不刷新其他項目，只處理 `.maigo/board.md` 裡「(`[x]` 或 `🔖`) 且沒有 `🧠`」的行
+（`🔖` 是學習訊號的持久化：👀 行被勾過之後即使自動取消勾，訊號也還在）。
 orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條候選知識，接
 [`memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md)
-讓使用者確認；處理完（含沒有候選）就在該行加 `🧠`。
+讓使用者確認；處理完（含沒有候選）就在該行加 `🧠`、移除 `🔖`。
 
 學習閘門只負責進料，不取代 `/maigo:crystallize`。
 
@@ -142,7 +190,9 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 `--check <n...>` 把對應行的 `[ ]` 改為 `[x]`，表示「這項是使用者親自處理的」；
 `--uncheck <n...>` 改回 `[ ]`。兩者都可接裸編號或 `owner/repo#n`，且：
 
-- 只改 checkbox，保留 section、整行內容與 `🧠`
+- 只改 checkbox，保留 section、整行內容與 `🧠` / `🔖`
+- **不寫 snapshot、不呼叫 `ack`**：效果等同在 nvim 裡手勾，下次完整刷新才依 snapshot 判斷這次翻轉
+  （對 👀 行而言，`--check` 就是「看完」，下次刷新會 ack）
 - 已是目標狀態時視為成功（idempotent）
 - 找不到的 target 列出錯誤，其他 target 照常處理
 - `--check` 完成後若該行沒有 `🧠`，照常提示可跑 `/maigo:board --learn`
@@ -151,13 +201,15 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 
 `--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後，狀態詞改為
 `已放棄`，整行移進 `✅ 最近結案`——跟其他結案行共用同一條 7 天老化規則，不再有獨立的
-留痕區。保留原 checkbox 與 `🧠` 狀態；對應細節檔不動，等 7 天老化清除時跟索引行一起刪
+留痕區。保留原 checkbox 與 `🧠` 狀態；**並呼叫 `board_sync.py drop --reason drop <url...>`
+寫入排除紀錄**，之後的 discovery 與 artifact 對帳都不再補回，刷新也不會把 `已放棄` 洗回 `待 review`
+（該行 `excluded: true`）。對應細節檔不動，等 7 天老化清除時跟索引行一起刪
 （見 [`skills/work-board` §3 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 
 ### 8. `--cross-repo`
 
 opt-in，預設不開——跨 13 個 repo 掃描比本地刷新慢得多，不該預設每次都跑。
-先照舊完成本地 `.maigo/board.md` 刷新（步驟 1–4），flag 有帶時追加呼叫：
+先照舊完成本地 `.maigo/board.md` 刷新（§1–§4），flag 有帶時追加呼叫：
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config/maigo/repos.txt]
@@ -189,4 +241,6 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config
   依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
   的硬規則原樣保留，沒有例外。
 - **`--learn` 必須確認**：候選知識要經 `memory-propose-confirm`，不可靜默寫入 memory。
+- **script 不寫 `board.md` / `i/*.md`**：`board_sync.py` 只輸出 JSON 變更清單，寫回一律由
+  orchestrator 用 `Edit`；`.maigo/_internal/` 只由 script 寫入，不要用 `Write` / `Edit` 碰。
 - **不寫 GitHub**：board 只讀 GitHub metadata，不回覆、不 label、不 close、不 push。

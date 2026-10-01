@@ -33,6 +33,9 @@ import _KNOWN_KINDS`，這是唯一正典來源；平行維護第二份清單正
 一律先試最長的 kind，避免 `review-rubric-42.md` 被 `review` 錯誤搶先吃掉
 （吃成 kind="review", id="rubric-42"）。
 
+`_internal/` 不屬於六類中的任何一類：那是只給機器讀的狀態目錄（例：
+`_internal/board/dropped.jsonl`），型錄永遠不列。
+
 純函式：`categorize(names)`、`split_flat_name(name)` 不做任何 I/O。
 `scan(maigo_dir)` 做唯讀 I/O（列出目錄內容，含 `review/*/*.md` 與
 `issue/*/*.md` 兩層遞迴，不進 `i/` 或更深），不建立、不覆寫、不刪除任何檔案。
@@ -56,6 +59,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from artifact_path import _FLAT_NAME_LOOKALIKES, _KNOWN_KINDS, _NESTED_LAYOUT
 
 _REGISTERED_NON_ARTIFACT_FILES = ("board.md", "review-board.md")
+
+# 內部機器狀態目錄，型錄永遠不列。
+INTERNAL_DIR = "_internal"
 
 # 比對時先試最長的 kind，避免短 kind（如 "review"）搶先吃掉長 kind 的檔名
 # （如 "review-rubric-42.md"）。
@@ -114,6 +120,8 @@ def categorize(names: list[str]) -> Catalog:
     """
     catalog = Catalog()
     for name in sorted(names):
+        if name.startswith(f"{INTERNAL_DIR}/"):
+            continue
         if "/" in name:
             _categorize_nested_relpath(name, catalog)
             continue

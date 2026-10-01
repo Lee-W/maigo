@@ -82,3 +82,19 @@ are simply gone, and `.maigo/` is gitignored so there is no version to recover.
 The same applies to `.maigo/i/<slug>.md`: its fact section is rewritten
 wholesale on every refresh, so re-read immediately before rewriting to avoid
 clobbering a concurrent update to the hand-written `## 判斷` / `## 筆記`.
+
+### Machine state under `.maigo/_internal/board/`
+
+`dropped.jsonl` (the exclusion ledger) and `snapshot.json` (last refresh's board
+rows and checkbox state) are owned by `scripts/board_sync.py` and nobody else:
+the ledger is **append-only** (one line per event, never rewritten) and the
+snapshot is written **atomically** (tempfile + replace). Do not `Write` or `Edit`
+anything under `_internal/`; `board_sync.py` never writes `board.md` or
+`i/*.md` itself, it only reports changes for you to apply with `Edit`.
+
+A detail file with no board row that references it means the user deleted the
+row (`dd`), so the script records a drop. But a delegate command writes the
+detail file *before* it `Edit`s the row in, so a plan that lands between the two
+steps would misread a fresh file as a deletion. That is why orphans younger than
+10 minutes are only reported as `pending_orphans` and not judged until a later
+refresh. See `skills/work-board` §3a.

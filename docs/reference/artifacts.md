@@ -28,7 +28,7 @@
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | `review-rubric` | `.maigo/review/<id>/rubric.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 對照基準，review 全程比對用；review 結束後留存 |
-| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、最後 review 時間、reviewed commit 與本地已看完標記 |
+| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記 |
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 永遠指向這個路徑 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
@@ -39,7 +39,8 @@
 不因為檔名相似就刪。清理結果回傳給 caller，同步修正 board 細節檔的報告連結。
 
 `review_report.py acknowledge` 記「使用者已看完這版」，不送 GitHub、不改最後 review
-時間。新 head／作者留言讓 board 重新排入待看；新 report 清除上一輪確認。
+時間；使用者在 board 把 👀 行勾成 `[x]`，下次 `/maigo:board` 刷新就會呼叫它（`--reviewed` 等同勾上）。
+新 head／作者留言讓 board 重新排入待看（👀 行自動取消勾）；新 report 清除上一輪確認。
 
 ### 分目錄前的扁平檔（`flat_exists:`，只可讀）
 
@@ -58,11 +59,23 @@
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | Work Board 索引 | `.maigo/board.md` | orchestrator（`/maigo:board` / `/maigo:review`） | `scripts/board_state.py` + [work-board skill](../skills/work-board.md) | 跨 session 常駐，不隨單次任務結束而收檔 |
-| Work Board 細節檔 | `.maigo/i/<slug>.md` | 同上 | 同上 | 跟著對應 issue/PR 的追蹤狀態走；孤兒偵測見 `/maigo:board` 既有邏輯 |
+| Work Board 細節檔 | `.maigo/i/<slug>.md` | 同上 | 同上 | 跟著對應 issue/PR 的追蹤狀態走；沒有索引行引用的孤兒細節檔視為 `dd`（使用者刪了那一行），見 [work-board skill](../skills/work-board.md) §3a |
 
 board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`）、skill 鏡射
 人讀版本（`work-board`）、test 守一致（`tests/test_board_state.py`），三方鎖住，
-本頁不重寫它的行文法，只在型錄裡佔一個位置。
+本頁不重寫它的行文法，只在型錄裡佔一個位置。board 的內部狀態（排除紀錄、快照）放在
+`.maigo/_internal/board/`，對帳、discovery 與排除規則見 [work-board skill](../skills/work-board.md) §3a。
+
+### `_internal/`：只給機器讀
+
+`.maigo/_internal/` 底下的所有內容都只給機器讀，使用者在 `.maigo/` 根目錄只會看到給人讀的檔案。
+型錄（`maigo_dir_catalog`）與 `/maigo:doctor` 永遠不列這個目錄。目前只有 board 使用，
+由 [`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py) 自行建立與寫入：
+
+| 檔案 | 用途 |
+|------|------|
+| `_internal/board/dropped.jsonl` | 排除紀錄：每行一個 `drop` / `revive` 事件，只 append；`dd` 掉的項目之後不會被 discovery 補回，除非重新被指名 |
+| `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目與勾選狀態，用來偵測 `dd` 與 `[x]` 變化 |
 
 ## 非 markdown 機器狀態檔
 
@@ -71,7 +84,7 @@ HEAD SHA）、`token-usage.jsonl`（token usage metadata）、
 `test-failures.jsonl` / `soyo-must-fix.jsonl`（retry / failure log）、
 `__titles.json`（內部快取）、`migrate-legacy-artifacts.manifest.json`
 （`scripts/migrate_legacy_artifacts.py --apply` 的搬移對應表，只在一次 apply
-沒跑完時留存，重跑時照它續跑，跑完即刪）。
+沒跑完時留存，重跑時照它續跑，跑完即刪）。這些檔日後可能搬進 `_internal/`。
 
 ## 舊固定檔名與未登記檔案
 

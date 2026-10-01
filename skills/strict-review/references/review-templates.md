@@ -41,6 +41,7 @@ file when writing the rubric or assembling the final report.
 # Review: <title>
 
 **Source:** <canonical PR URL / branch / range>
+**Author:** <@login / git author>
 **最後 review：** <ISO 8601，含時區>
 **Reviewed commit:** <full SHA>
 **Verdict:** <verdict>

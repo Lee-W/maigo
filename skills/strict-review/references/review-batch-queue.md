@@ -125,5 +125,5 @@ merged / closed 對應 ✅ 最近結案。
 `/maigo:review` 不提供 board-only alias。
 
 Work Board 的 `--reviews` 檢視只列當下待看 PR；使用者讀完最新 report 後可用
-`/maigo:board --reviewed <n>` 標記本地已看完，不等同送出 GitHub。
+`/maigo:board --reviewed <n>` 或在 board 勾 `[x]` 標記本地已看完，不等同送出 GitHub。
 每顆 report 都由共同 publisher 產生 TOC 與最後 review 時間；batch roll-up 不覆蓋單顆報告。

@@ -1217,3 +1217,117 @@ class TestMainAutoLocalVerdictAt:
             else:
                 os.environ["TZ"] = original_tz
             time.tzset()
+
+
+class TestCheckboxAfterRefresh:
+    @pytest.mark.parametrize(
+        "item_type", [bs.ItemType.ISSUE, bs.ItemType.OWN_PR, bs.ItemType.REVIEW_PR]
+    )
+    @pytest.mark.parametrize(
+        "checked_now,acked,needs_review",
+        list(itertools.product([False, True], repeat=3)),
+    )
+    def test_truth_table(self, item_type, checked_now, acked, needs_review):
+        expected = (
+            (acked or checked_now) and not needs_review
+            if item_type is bs.ItemType.REVIEW_PR
+            else checked_now
+        )
+        assert (
+            bs.checkbox_after_refresh(item_type, checked_now, acked, needs_review)
+            is expected
+        )
+
+    def test_ball_back_unchecks_review_even_if_checked(self):
+        assert not bs.checkbox_after_refresh(bs.ItemType.REVIEW_PR, True, False, True)
+
+    def test_reviewed_is_always_checked(self):
+        assert bs.checkbox_after_refresh(bs.ItemType.REVIEW_PR, False, True, False)
+
+
+class TestMainCheckboxFields:
+    URL = "https://github.com/o/r/pull/7"
+    HEAD = "a" * 40
+
+    def _write_report(self, root, **extra):
+        record = {
+            "version": 1,
+            "source": self.URL,
+            "head_sha": self.HEAD,
+            "verdict": "APPROVE",
+            "reviewed_at": "2026-01-02T00:00:00+00:00",
+            **extra,
+        }
+        path = root / ".maigo" / "review" / "7" / "review.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(f"<!-- maigo-review: {json.dumps(record)} -->\n")
+
+    def _run(self, monkeypatch, capsys, root, head=None, **fields):
+        item = {
+            "type": "👀",
+            "url": self.URL,
+            "prior_status": None,
+            "gh_meta": {
+                "state": "OPEN",
+                "author": {"login": "carol"},
+                "createdAt": "2026-01-01T00:00:00Z",
+                "headRefOid": head or self.HEAD,
+            },
+            **fields,
+        }
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([item])))
+        args = ["--you", YOU, "--repo", "o/r", "--maigo-root", str(root)]
+        assert bs.main(args) == 0
+        return json.loads(capsys.readouterr().out)[0]
+
+    def test_ball_back_auto_unchecks(self, tmp_path, monkeypatch, capsys):
+        self._write_report(tmp_path)
+        row = self._run(monkeypatch, capsys, tmp_path, head="b" * 40, checked=True)
+        assert row["status"] == "↩︎ 回你的球"
+        assert row["checked"] is False
+
+    def test_acked_current_requires_matching_head(self, tmp_path, monkeypatch, capsys):
+        self._write_report(
+            tmp_path,
+            acknowledged_by=YOU,
+            acknowledged_at="2026-01-03T00:00:00+00:00",
+        )
+        same = self._run(monkeypatch, capsys, tmp_path, checked=False)
+        assert same["acked_current"] is True and same["checked"] is True
+        moved = self._run(monkeypatch, capsys, tmp_path, head="b" * 40, checked=False)
+        assert moved["acked_current"] is False and moved["checked"] is False
+
+    def test_learn_pending_skips_items_already_learned(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        self._write_report(tmp_path)
+        fresh = self._run(
+            monkeypatch,
+            capsys,
+            tmp_path,
+            checked=True,
+            checkbox_change="checked",
+            prior_badges=[],
+        )
+        learned = self._run(
+            monkeypatch,
+            capsys,
+            tmp_path,
+            checked=True,
+            checkbox_change="checked",
+            prior_badges=["🧠"],
+        )
+        assert fresh["learn_pending"] is True
+        assert learned["learn_pending"] is False
+
+    def test_old_call_shape_has_no_new_fields(self, tmp_path, monkeypatch, capsys):
+        self._write_report(tmp_path)
+        row = self._run(monkeypatch, capsys, tmp_path)
+        assert not {"checked", "learn_pending", "acked_current"} & row.keys()
+
+    def test_checked_is_null_when_not_supplied_but_other_field_is(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        self._write_report(tmp_path)
+        row = self._run(monkeypatch, capsys, tmp_path, prior_badges=[])
+        assert row["checked"] is None

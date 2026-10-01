@@ -193,8 +193,12 @@ board 判為需要重審，不把新 head 冒充已審。
 python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/review_report.py" publish \
   --cwd <repo-root> --repo <owner/name> --source <canonical-PR-url-or-branch-or-range> \
   --head <reviewed-full-commit-sha> --title <title> --verdict <verdict> \
-  --body-file <scratchpad/report-body.md>
+  --author <login-or-git-author> --body-file <scratchpad/report-body.md>
 ```
+
+`--author` 是被審對象的原作者，檔頭會顯示 `**Author:**`：GitHub PR 用
+`gh pr view <n> --json author --jq .author.login`（檔頭自動加 `@`）；本地 branch / range 用
+`git log --format=%an <range>` 去重後以 `, ` 串接。
 
 `verdict` 使用 `APPROVE` / `APPROVE_WITH_NITS` / `NEEDS_CHANGES` / `BLOCKED`；
 🟡 爽世的 `REQUEST_CHANGES` 對應 `NEEDS_CHANGES`，`APPROVED` 對應 `APPROVE`。PR URL 用 `gh pr view --json url`
@@ -203,7 +207,7 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/review_report.py" publish \
 [`scripts/review_report.py`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
 重用 artifact_path 的命名，生成 `.maigo/review/<id>/review.md`，並統一提供：
 
-- H1、來源、**最後 review 時間（含時區）**、實際 reviewed commit、verdict。
+- H1、來源、原作者（`**Author:**`）、**最後 review 時間（含時區）**、實際 reviewed commit、verdict。
 - **TOC**：所有 H2/H3 的可跳轉目錄，不把 fenced code 範例誤當章節。
 - 同 source 重審直接換成最新完整報告；PR 改標題仍是同一個 source。
 - 新版原子寫入成功後，刪除同目錄 `review-N.md` 與舊扁平 `review-<id>.md` 中
@@ -217,7 +221,7 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
 成最新 `review/<id>/review.md`，保留其餘手寫內容。最後回覆附最新報告連結、最後 review
-時間，以及 `/maigo:board --reviewed <n>` 和 `/maigo:board --reviews`，讓使用者知道下一步。
+時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
 
@@ -234,7 +238,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 已在 GitHub 回覆 / approve，且之後無新活動 → 👀 行進 ⏳ 等別人，狀態詞寫實際 verdict
   （`BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE`）
 - merged / closed → 👀 行進 ✅ 最近結案
-- 使用者以 `/maigo:board --reviewed <n>` 標記本地已看完 → ⏳；不代表已送 GitHub。
+- 使用者以 `/maigo:board --reviewed <n>` 或在 board 勾 `[x]` 標記本地已看完 → ⏳；不代表已送 GitHub。
   新 head 或作者新留言會回 🎯 `↩︎ 回你的球`。
 - 上面 publisher 回傳的 `path`（即
   `review/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
@@ -242,7 +246,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
   的 `## 筆記` 區，一行裸相對路徑連結（相對 `.maigo/`，例如 `review/9301/review.md`）——
   不再寫進索引行
 
-回寫時必須保留原 checkbox 與 `🧠` 標記。刷新 / 查看 board 用 `/maigo:board`；
+回寫時必須保留原 checkbox 與 `🧠` / `🔖` 標記。刷新 / 查看 board 用 `/maigo:board`；
 `/maigo:review` 不提供 board-only alias。
 
 ## 與 `/maigo:go` 的差異

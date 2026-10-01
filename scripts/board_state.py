@@ -26,6 +26,10 @@ issue/PR URL，用來算 `detail_path`；`local_verdict_at` 是 optional 的 ISO
 舊檔沒有 metadata 才取 UTC mtime（明確標為推估）。report 的 `head_sha` 用來偵測新 push，
 `acknowledged_at` / `acknowledged_by` 記使用者本地已看完，不表示 GitHub 已送出。
 檔案不存在時退回 GitHub reviews 與 prior_status。
+optional `checked`（bool，現檔勾選）、`checkbox_change`（`checked`/`unchecked`/null，
+來自 `board_sync.py plan`）、`prior_badges`（list）：（任一出現才輸出）多三個欄位——`checked`（最終勾選，
+沒帶 `checked` 時為 `null`＝不要動 checkbox）、`learn_pending`（👀 剛被勾、且沒有 🧠）、
+`acked_current`（report 已由你在目前 head 之後 ack）。規則見 `checkbox_after_refresh()`。
 stdout：JSON 陣列；含 section/rank/status/next_action/badges/detail_path、title/author、
 last_reviewed_at/review_time_source/acknowledged_at、needs_review 與 index_entry。
 `--reviews` 僅輸出待看 PR 並依 rank 排序；不可拿過濾後的結果覆寫整份 board。
@@ -686,6 +690,36 @@ def _load_review(url: str, home_repo: str, maigo_root: str) -> dict:
     return record
 
 
+def acked_current(review: dict, you: str, head: str | None) -> bool:
+    """You acknowledged this report at the current head, after it was written."""
+    acknowledged = review.get("acknowledged_at")
+    reviewed = review.get("reviewed_at")
+    return bool(
+        you
+        and acknowledged
+        and review.get("acknowledged_by") == you
+        and head
+        and review.get("head_sha") == head
+        and (not reviewed or _parse_ts(acknowledged) >= _parse_ts(reviewed))
+    )
+
+
+def checkbox_after_refresh(
+    item_type: ItemType,
+    checked_now: bool,
+    acked_current: bool,
+    needs_review: bool,
+) -> bool:
+    """
+    刷新後的最終 checkbox。👀：`(acked_current or checked_now) and not needs_review`
+    （回你的球／待 review 自動取消勾，`--reviewed` 之後一定是勾）；🐛/🔀 是純學習訊號，
+    原樣保留。
+    """
+    if item_type is ItemType.REVIEW_PR:
+        return (acked_current or checked_now) and not needs_review
+    return checked_now
+
+
 def index_entry(
     item_type: ItemType,
     status: BoardStatus,
@@ -780,11 +814,34 @@ def main(argv: list[str] | None = None) -> int:
         }
         if args.reviews and not needs_review:
             continue
+        current_ack = item_type is ItemType.REVIEW_PR and acked_current(
+            review, args.you, gh_meta.get("headRefOid")
+        )
+        checked = (
+            checkbox_after_refresh(
+                item_type, bool(item["checked"]), current_ack, needs_review
+            )
+            if "checked" in item
+            else None
+        )
+        learn_pending = (
+            item_type is ItemType.REVIEW_PR
+            and item.get("checkbox_change") == "checked"
+            and "🧠" not in (item.get("prior_badges") or [])
+        )
         title = gh_meta.get("title") or item.get("title") or ""
         author = (gh_meta.get("author") or {}).get("login") or item.get("author") or ""
         detail = detail_path(item.get("url") or "", args.repo)
+        extra: dict = {}
+        if {"checked", "checkbox_change", "prior_badges"} & item.keys():
+            extra = {
+                "checked": checked,
+                "learn_pending": learn_pending,
+                "acked_current": current_ack,
+            }
         results.append(
             {
+                **extra,
                 "section": result.section.value,
                 "rank": int(result.rank),
                 "status": result.status.value,

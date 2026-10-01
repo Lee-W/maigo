@@ -208,16 +208,24 @@ checkbox 清單。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
-/maigo:board                # 刷新全板、只印 🎯 + 計數
+/maigo:board                # 對帳 .maigo/ 產物、discovery 指名你審的 PR，刷新全板、只印 🎯 + 計數
 /maigo:board --all          # 印整板
 /maigo:board --reviews      # 現在要看的 PR：標題、貢獻者、最後 review 時間
-/maigo:board --reviewed <n...> # 本地已看完這版（不送 GitHub）
-/maigo:board --unreviewed <n...> # 取消本地已看完
-/maigo:board --learn        # 盤點已勾但未 🧠 的項目
-/maigo:board --check <n...> # 標記為使用者親自處理過
-/maigo:board --uncheck <n...> # 取消處理標記
-/maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄）
+/maigo:board --reviewed <n...> # 等同勾 [x]：本地 ack 這版（不送 GitHub）、加 🔖
+/maigo:board --unreviewed <n...> # 等同取消勾：撤銷 ack
+/maigo:board --learn        # 盤點「(已勾 [x] 或 🔖) 且沒有 🧠」的項目
+/maigo:board --check <n...> # 只翻 [x]，效果等同在 nvim 手勾
+/maigo:board --uncheck <n...> # 只翻回 [ ]
+/maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄
 ```
+
+刷新會做三件事（解析與對帳都在 `scripts/board_sync.py`，它不寫 `board.md`，只回報變更清單）：
+
+- **對帳與 discovery**：把 `.maigo/` 裡可靠對應到 PR 的 review 產物，以及該 repo 指名你審／你審過的
+  open PR 補進 board；單次最多補 50 項，超過的列出、下次接著補；對應不上的產物列為「未歸屬」。
+- **`[x]`**：在 nvim 把 👀 行勾成 `[x]` 就算看完這份報告，下次刷新會 ack；有新 commit 或作者留言時自動
+  取消勾，學習訊號由 `🔖` 保留。
+- **`dd`**：刪掉的行寫進排除紀錄（`.maigo/_internal/board/`），之後不會再冒回來，除非你被重新指名；你明確用 `/maigo:board <targets>` 重新加入時會先解除排除。
 
 board 只決定「下一步誰該動」；實際 review、triage、take issue、address comments
 仍交給各自命令。行文法、球權判定、回寫合約與舊 `.maigo/review-board.md` 遷移規則見

@@ -35,6 +35,10 @@ def metadata(text: str) -> dict:
         raise ValueError("Review metadata requires source, head_sha and reviewed_at")
     if value.get("verdict") not in VERDICTS:
         raise ValueError("Unknown review verdict")
+    if "author" in value and not (
+        isinstance(value["author"], str) and value["author"].strip()
+    ):
+        raise ValueError("Review author must be a non-empty string")
     for key in ("reviewed_at", "acknowledged_at"):
         if key in value:
             timestamp = value[key]
@@ -143,10 +147,15 @@ def render_report(title: str, body: str, record: dict) -> str:
         lines.append(line)
     if fence is not None or not toc:
         raise ValueError("Review body needs headings and closed code fences")
+    author = record.get("author")
+    if author and record["source"].startswith("https://github.com/"):
+        author = f"@{author.lstrip('@')}"
+    author_line = f"**Author:** {author}\n\n" if author else ""
     return (
         f"# Review: {' '.join(title.split())}\n\n"
         f"<!-- maigo-review: {json.dumps(record, ensure_ascii=False)} -->\n\n"
         f"**Source:** {record['source']}\n\n"
+        f"{author_line}"
         f"**最後 review：** {record['reviewed_at']}\n\n"
         f"**Reviewed commit:** `{record['head_sha']}`\n\n"
         f"**Verdict:** {record['verdict']}\n\n"
@@ -163,6 +172,7 @@ def publish(
     body: str,
     head_sha: str,
     verdict: str,
+    author: str | None = None,
 ) -> dict:
     path = report_path(root, source, home_repo)
     record: dict = {
@@ -172,6 +182,10 @@ def publish(
         "verdict": verdict,
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if author is not None:
+        if not author.strip():
+            raise ValueError("Review author must be a non-empty string")
+        record["author"] = author.strip()
     text = render_report(title, body, record)
     removed = []
     retained = []
@@ -279,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--title")
     parser.add_argument("--body-file", type=Path)
     parser.add_argument("--verdict", choices=VERDICTS)
+    parser.add_argument("--author", help="Original author (publish only)")
     parser.add_argument("--you")
     parser.add_argument("--undo", action="store_true")
     args = parser.parse_args(argv)
@@ -297,8 +312,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.body_file.read_text(),
                 args.head,
                 args.verdict,
+                args.author,
             )
         else:
+            if args.author is not None:
+                raise ValueError("--author is only valid with publish")
             if not args.you:
                 raise ValueError("acknowledge requires --you")
             result = acknowledge(

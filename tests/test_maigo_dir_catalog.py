@@ -213,3 +213,33 @@ class TestCli:
         assert "legacy_fixed_name:" in captured.out
         assert "registered_non_artifact:" in captured.out
         assert "unregistered:" in captured.out
+
+
+class TestInternalDir:
+    def test_scan_never_lists_internal_files(self, tmp_path: Path):
+        internal = tmp_path / "_internal"
+        (internal / "board").mkdir(parents=True)
+        (internal / "board" / "snapshot.json").write_text("{}")
+        (internal / "x.md").write_text("x")
+        (internal / "board" / "y.md").write_text("y")
+        catalog = mdc.scan(tmp_path)
+        everything = [
+            name
+            for field in (
+                catalog.identifier_named,
+                catalog.flat_identifier,
+                catalog.nested,
+                catalog.legacy_fixed_name,
+                catalog.registered_non_artifact,
+                catalog.unregistered,
+            )
+            for name in field
+        ]
+        assert not [name for name in everything if "_internal" in name]
+
+    def test_categorize_skips_internal_paths(self):
+        catalog = mdc.categorize(["_internal/board/dropped.jsonl", "_internal/x.md"])
+        assert catalog == mdc.Catalog()
+
+    def test_other_non_markdown_files_stay_unregistered(self):
+        assert mdc.categorize(["x.json"]).unregistered == ["x.json"]
