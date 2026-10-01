@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.63.0 (2026-10-01)
+
+### Feat
+
+- **board**: reconcile .maigo and discover review PRs on refresh
+
 ## v0.62.0 (2026-09-30)
 
 ### Feat
