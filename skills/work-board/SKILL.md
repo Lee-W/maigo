@@ -158,8 +158,8 @@ address-comments）各自的 upsert，沒有例外可以整份覆蓋掉細節檔
 
 **撞號限制與後果**：`detail_path()` 的 `<repo>` 只取 repo 名、不含 owner（見
 [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
-docstring），所以不同 owner 的同名 repo（例如 `astronomer/astro` 與另一個 owner 的
-`astro`）在跨 repo 情境會共用同一個 `i/<repo>-<n>.md`——兩項的事實區與 `## 判斷` /
+docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另一個 owner 的
+`maigo`）在跨 repo 情境會共用同一個 `i/<repo>-<n>.md`——兩項的事實區與 `## 判斷` /
 `## 筆記` 會互相覆蓋。這是刻意的取捨（路徑短優先），目前**不自動處理**；真的撞號時
 手動把其中一份細節檔改名（並同步索引行的細節檔路徑）即可繞開。
 
