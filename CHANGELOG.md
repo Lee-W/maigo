@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.64.0 (2026-10-02)
+
+### Feat
+
+- **board**: refresh the Work Board from the shell without Claude
+
+### Fix
+
+- run plugin scripts from any repo via ${CLAUDE_PLUGIN_ROOT}
+
 ## v0.63.0 (2026-10-01)
 
 ### Feat
