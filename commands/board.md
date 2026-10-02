@@ -48,6 +48,11 @@ checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不
 
 ### 2. 加入 targets（有參數時）
 
+targets 直接交給 script：`refresh --apply --add <targets>`（§3）。型別偵測（URL 解析、裸編號查
+`gh api …/issues/<n>`、PR 作者比對、抓不到標 `抓不到`）、`revive --reason manual` 都由 script 處理，
+revive 事件在 CAS 通過、寫回成功之後才寫。`--add` 的項目只在那一輪不受 7 天老化影響；下一輪它已是
+board 上的一般行，結案超過 7 天就會照常被清掉。以下是 script 無法執行時的手動流程（§3 的 fallback）要照做的規則。
+
 每個 target 先做型別偵測：
 
 - URL 直接解析 owner / repo / issue-or-PR / number
@@ -62,10 +67,29 @@ checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不
 
 ### 3. 刷新分區
 
-除 `--learn` 外，每次都做完整刷新。解析、對帳、discovery、排除紀錄、勾選轉換都在
-[`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py)；
-orchestrator 只負責呼叫順序、`gh pr view` 抓料與 `Edit` 寫回。**script 絕不寫 `board.md` 與
-`.maigo/i/*.md`**。以下 `<root>` 是 `.maigo/` 所在的存活 worktree：
+除 `--learn` 外，每次都做完整刷新。解析、對帳、discovery、排除紀錄、勾選轉換、抓料、分類、渲染與寫回
+都在 [`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py) 的
+`refresh` 子命令（實作在 `scripts/board_refresh.py`）；它用 compare-and-swap 保護寫回（規則見
+[`skills/work-board` §3(b)](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）：
+
+1. 跑 `python3 scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery]`
+   （在 board 所在 repo 的任一 worktree 內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷）。
+2. 依 exit code 分流：
+   - **exit 0** → 依輸出的 JSON（`pending_reviews`、`top`、`counts`、`warnings`、`errors`、`removed`、
+     `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`learn_pending`）做 §4。
+   - **exit 2**（CAS 衝突：board.md 或細節檔在刷新期間被改過；除了 review.md 的 ack 標記外未寫任何檔）→ 直接重跑一次；再撞到就停下，
+     告訴使用者 board 正被別的 session 寫。**不要**改用 `Write`。
+   - **exit 1**（前置條件拒絕）→ 依訊息分流：舊格式或 `review-board.md` → 走下面的「手動流程 fallback」
+     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷` → 回報原文。
+   - **exit 3**（寫入階段失敗）→ 回報備份路徑與錯誤，不 fallback。`--json` 的 `exit_reason` 是 `write_failed`
+     ＝已從備份還原；是 `post_write_failed` ＝board 已是新版、只有 ledger／snapshot 沒寫成，把輸出列出的
+     未寫事件回報給使用者，說明重跑是安全的。
+
+#### 手動流程 fallback（只在 script 無法執行或拒絕時用）
+
+解析、對帳、discovery、排除紀錄、勾選轉換由 `board_sync.py` 的 `plan` / `ack` / `drop` / `revive` /
+`snapshot` 子命令做；這些子命令**不寫** `board.md` 與 `.maigo/i/*.md`，orchestrator 負責呼叫順序、
+`gh pr view` 抓料與 `Edit` 寫回。以下 `<root>` 是 `.maigo/` 所在的存活 worktree：
 
 1. **規劃**——讀現檔 board、`i/*.md` 的 `- 連結：`、snapshot、排除紀錄與 `.maigo/` 產物型錄，
    再用 `gh search` 找出該 repo 指名你審或你審過的 PR。`--dry-run` 不寫任何檔：
@@ -136,7 +160,32 @@ orchestrator 只負責呼叫順序、`gh pr view` 抓料與 `Edit` 寫回。**sc
 
 `board_sync.py drop --reason {drop,dd,aged,closed} <url...>` 單獨使用時只 append 排除紀錄。
 `board_sync.py revive --reason manual <url...>` 則對目前被排除的項目 append `revive` 事件（§2 明確加入 target 時用）。
-`.maigo/_internal/` 底下的檔案只由 script 寫入，orchestrator 不要用 `Write` / `Edit` 碰。
+`.maigo/_internal/`（含 `backup/`）底下的檔案只由 script 寫入，orchestrator 不要用 `Write` / `Edit` 碰。
+
+### 3a. 從 shell 刷新（零 token）
+
+不經過 Claude，直接從 shell（或 nvim 的 `:!`）刷新 board，不花 token：
+
+```bash
+python3 "$MAIGO_HOME/scripts/board_sync.py" refresh           # 預覽：印 diff，不寫任何檔、不 ack
+python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply   # 寫回
+```
+
+`$MAIGO_HOME` 是 maigo 的 checkout 或 plugin 安裝目錄（由你在 dotfiles 裡指向）。cwd 在 board 所在 repo
+的任一 worktree 內都可以，script 會用 `git worktree list` 自動找到唯一一份 `.maigo/board.md`
+（找不到或有多份就拒絕，用 `--maigo-root` 指定）；`--repo` 預設取 board 第一行 header，`--you` 預設取
+`gh api user`。可用旗標：`--add <url|n>...`、`--max-new`、`--no-discovery`、`--stale-days`、`--jobs`、`--json`。
+
+在 nvim 裡開著 board 時：先 `:w`，再 `:!python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply`，最後
+`:e` 重新載入。script 讀的是磁碟，refresh 之後沒 `:e` 就存檔會用舊 buffer 蓋掉刷新結果（nvim 會先跳
+W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。
+
+| exit code | 意思 |
+|-----------|------|
+| 0 | 成功（含沒有變動）；預覽模式永遠 0 |
+| 1 | 前置條件拒絕：舊格式、`review-board.md`、壞行或未知狀態詞、細節檔缺 `## 判斷`、找不到／多份 board |
+| 2 | CAS 衝突：刷新期間 board.md 或細節檔被改過；除了 review.md 的 ack 標記外未寫任何檔，直接重跑 |
+| 3 | 寫入階段失敗（抓料失敗的列恢復時從細節檔 H1 取回舊狀態詞，同輪手改狀態詞不保留）：`write_failed` ＝已從 `.maigo/_internal/board/backup/` 還原（或列出未還原的檔）；`post_write_failed` ＝board 已是新版，只有 ledger／snapshot 沒寫成，重跑安全 |
 
 ### 4. 輸出
 
@@ -169,8 +218,8 @@ orchestrator 只負責呼叫順序、`gh pr view` 抓料與 `Edit` 寫回。**sc
 這是使用者說「我已看完這版，不需留在待看清單」的明確操作，**等同在 nvim 勾 `[x]`**：
 `--reviewed` ＝ 把該行勾上（ack ＋ `[x]` ＋ `🔖`），`--unreviewed` ＝ 取消勾（undo ＋ `[ ]`）。
 只處理 👀 PR；兩者都走完整刷新（§3），不是只改單行，結束時寫 snapshot。做法：先把目標行的
-checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`），再跑 §3 的規劃——
-`plan` 依 snapshot 偵測到 `[ ]→[x]`（或 `[x]→[ ]`），經 `board_sync.py ack` 呼叫
+checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`，用 `Edit`），再跑
+`refresh --apply`（取代再跑 §3 的規劃）——它依 snapshot 偵測到 `[ ]→[x]`（或 `[x]→[ ]`），經 `ack` 呼叫
 `review_report.py acknowledge`（`--unreviewed` 對應 `--undo`），不改最後 review 時間、不送 GitHub。
 需要已有新版 report，且 head 必須與報告一致；舊報告先重新 review，head 已變則請先重審
 （回 `no_report` / `head_changed`，待看的行取消勾並警告）。錯誤逐項列出，不把失敗項目標成已看完。
@@ -241,6 +290,7 @@ python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config
   依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
   的硬規則原樣保留，沒有例外。
 - **`--learn` 必須確認**：候選知識要經 `memory-propose-confirm`，不可靜默寫入 memory。
-- **script 不寫 `board.md` / `i/*.md`**：`board_sync.py` 只輸出 JSON 變更清單，寫回一律由
-  orchestrator 用 `Edit`；`.maigo/_internal/` 只由 script 寫入，不要用 `Write` / `Edit` 碰。
+- **`refresh --apply` 是唯一會整檔寫 board 的寫入者**，靠 CAS 防覆蓋；`plan` / `ack` / `drop` /
+  `revive` / `snapshot` 不寫 `board.md` / `i/*.md`。Claude 自己仍只用 `Edit`，`Write` 只用在建立骨架；
+  `.maigo/_internal/`（含 `backup/`）只由 script 寫入，不要用 `Write` / `Edit` 碰。
 - **不寫 GitHub**：board 只讀 GitHub metadata，不回覆、不 label、不 close、不 push。

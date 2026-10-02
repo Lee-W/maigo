@@ -3,15 +3,18 @@
 `/maigo:board` 的對帳層：解析 board.md、對帳 `.maigo/` 產物、discovery review PR、
 dd 排除紀錄、`[x]` 勾選轉換。stdlib-only CLI，用 `python3` 直接執行。
 
-**它絕不寫 `board.md` 與 `.maigo/i/*.md`**——只輸出 JSON 變更清單，由 orchestrator
-用 `Edit` 寫回（Edit-only 併發規則見 `skills/work-board/SKILL.md` §3）。它只寫兩個
-自己擁有的機器狀態檔，都在 `.maigo/_internal/board/`（寫入前自行建立目錄；
-`plan --dry-run` 不寫任何檔、不建目錄）：
+`plan` / `ack` / `drop` / `revive` / `snapshot` **不寫 `board.md` 與 `.maigo/i/*.md`**——只輸出 JSON
+變更清單，由 orchestrator 用 `Edit` 寫回（併發規則見 `skills/work-board/SKILL.md` §3(a)）。
+`refresh --apply`（實作在 `scripts/board_refresh.py`）會整檔寫 `board.md` 與 `i/*.md`，改以
+compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見 §3(b)）。它只寫自己擁有的機器狀態檔，
+都在 `.maigo/_internal/board/`（寫入前自行建立目錄；`plan --dry-run` 與 `refresh` 預覽不寫任何檔、
+不建目錄）：
 
 - `dropped.jsonl`：排除紀錄，每行一個事件 `{"url","event":"drop"|"revive","reason","at"}`，
   只 append；讀取時依序 fold，最後一筆事件決定狀態。
 - `snapshot.json`：`{"version":1,"written_at","items":{<url>:{"checked","detail"}}}`，
   上次刷新結束時 board 上有哪些項目與勾選狀態；原子寫入。
+- `backup/<UTC ts>/`：`refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份。
 
 另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記。
 
@@ -25,6 +28,19 @@ python3 scripts/board_sync.py revive --reason manual <url...> ...
 python3 scripts/board_sync.py snapshot ...
 ```
 
+零 token 完整刷新（`refresh`，不需要 `--maigo-root` / `--repo` / `--you`，預設自動判斷）：
+
+```
+python3 scripts/board_sync.py refresh [--apply] [--add <url|n>...] [--max-new 50]
+        [--no-discovery] [--stale-days 14] [--jobs 8] [--json]
+        [--maigo-root <path>] [--repo <owner/name>] [--you <login>]
+```
+
+不帶 `--apply` 是預覽（印 unified diff，不寫檔、不 ack）。exit code：0 成功（含無變動）／預覽；
+1 前置條件拒絕；2 CAS 衝突（除了 review.md 的 ack 標記外未寫任何檔，重跑即可）；
+3 寫入階段失敗——寫 board／細節檔時失敗已從備份還原（`exit_reason: write_failed`）；board 已寫成功、
+之後 ledger／snapshot 失敗則 **不還原**，board 已是新版（`exit_reason: post_write_failed`，重跑安全）。
+
 canonical key：`ref_key(url)` = `(owner.lower(), repo.lower(), number)`，`pull` 與 `issues`
 視為同一項；比對一律用 key，儲存時保留原 URL。
 
@@ -35,6 +51,7 @@ monkeypatch 注入。
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import re
 import subprocess
@@ -539,12 +556,23 @@ def _state_dir(maigo_root: Path) -> Path:
     return maigo_root / ".maigo" / INTERNAL_BOARD_DIR
 
 
-def _read_board(maigo_root: Path) -> dict:
-    board = maigo_root / ".maigo" / "board.md"
-    try:
-        text = board.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        text = ""
+_HEADER_RE = re.compile(r"^# Work Board — (\S+)$")
+
+
+def parse_header(text: str) -> dict:
+    """First line of board.md: `{"repo": owner/name or None, "raw": <first line>}`."""
+    raw = text.splitlines()[0] if text.strip() else ""
+    match = _HEADER_RE.match(raw)
+    return {"repo": match[1] if match else None, "raw": raw}
+
+
+def _read_board(maigo_root: Path, text: str | None = None) -> dict:
+    if text is None:
+        board = maigo_root / ".maigo" / "board.md"
+        try:
+            text = board.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            text = ""
     parsed = parse_board(text)
     if parsed["legacy"]:
         raise BoardLegacyError("board.md 是舊版格式；請先跑整檔正規化再執行 plan")
@@ -571,13 +599,14 @@ def plan_refresh(
     max_new: int = MAX_NEW_DEFAULT,
     discovery: bool = True,
     dry_run: bool = False,
+    board_text: str | None = None,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
     at = now.isoformat()
     maigo_dir = maigo_root / ".maigo"
     state_dir = _state_dir(maigo_root)
     ledger = state_dir / LEDGER_NAME
-    parsed = _read_board(maigo_root)
+    parsed = _read_board(maigo_root, board_text)
     errors = list(parsed["errors"]) + _resolve_lines(parsed, maigo_dir, repo)
     lines = parsed["lines"]
 
@@ -613,6 +642,7 @@ def plan_refresh(
     for entry in removed:
         # The deletion happened between the last snapshot and now.
         drop_at = snapshot_at if entry["source"] == "snapshot" and snapshot_at else at
+        entry["at"] = drop_at
         if not dry_run:
             append_event(ledger, entry["url"], "drop", "dd", drop_at)
         exclusions[entry["key"]] = {
@@ -645,7 +675,7 @@ def plan_refresh(
                 if not dry_run:
                     append_event(ledger, candidate["url"], "revive", "re-requested", at)
                 state["excluded"] = False
-                revived.append({"url": candidate["url"]})
+                revived.append({"url": candidate["url"], "at": at})
             if key not in board_keys:
                 pool.append(
                     {
@@ -698,7 +728,13 @@ def plan_refresh(
         "first_run": snapshot is None,
         "lines": out_lines,
         "removed": [
-            {"url": e["url"], "source": e["source"], "reason": "dd"} for e in removed
+            {
+                "url": e["url"],
+                "source": e["source"],
+                "reason": "dd",
+                "at": e["at"],
+            }
+            for e in removed
         ],
         "revived": revived,
         "additions": additions,
@@ -717,7 +753,18 @@ def plan_refresh(
 # --- ack / drop / snapshot -------------------------------------------------
 
 
-def ack_items(maigo_root: Path, repo: str, you: str, items: list[dict]) -> list[dict]:
+def ack_items(
+    maigo_root: Path,
+    repo: str,
+    you: str,
+    items: list[dict],
+    *,
+    dry_run: bool = False,
+    now: datetime | None = None,
+) -> list[dict]:
+    """Ack each item; `dry_run` takes the same branches but writes nothing and
+    returns `simulated_review` (the record as it would look afterwards)."""
+    at = (now or datetime.now(timezone.utc)).isoformat()
     results = []
     for item in items:
         url = (item.get("url") or "").rstrip("/")
@@ -742,7 +789,16 @@ def ack_items(maigo_root: Path, repo: str, you: str, items: list[dict]) -> list[
                     else url
                 )
                 if change == "unchecked":
-                    review_report.acknowledge(maigo_root, source, repo, head, you, True)
+                    if dry_run:
+                        result["simulated_review"] = {
+                            k: v
+                            for k, v in record.items()
+                            if k not in ("acknowledged_at", "acknowledged_by")
+                        }
+                    else:
+                        review_report.acknowledge(
+                            maigo_root, source, repo, head, you, True
+                        )
                     result["result"] = "unacked"
                 elif record["head_sha"] != head:
                     result["result"] = "head_changed"
@@ -751,7 +807,14 @@ def ack_items(maigo_root: Path, repo: str, you: str, items: list[dict]) -> list[
                 ):
                     result["result"] = "already_acked"
                 else:
-                    review_report.acknowledge(maigo_root, source, repo, head, you)
+                    if dry_run:
+                        result["simulated_review"] = {
+                            **record,
+                            "acknowledged_at": at,
+                            "acknowledged_by": you,
+                        }
+                    else:
+                        review_report.acknowledge(maigo_root, source, repo, head, you)
                     result["result"] = "acked"
         except (OSError, ValueError, KeyError) as error:
             locked = "being updated" in str(error)
@@ -802,8 +865,16 @@ def revive_urls(
     return results
 
 
-def write_snapshot(maigo_root: Path, repo: str, now: datetime | None = None) -> dict:
-    """Re-read the current board.md (not the plan-time copy) and persist it."""
+def write_snapshot(
+    maigo_root: Path,
+    repo: str,
+    now: datetime | None = None,
+    checked_overrides: dict[str, bool | None] | None = None,
+) -> dict:
+    """Re-read the current board.md (not the plan-time copy) and persist it.
+
+    `checked_overrides[url]` records a different `checked` (or `None` = leave the
+    URL out) so a checkbox change refresh could not process is seen again next round."""
     maigo_dir = maigo_root / ".maigo"
     parsed = _read_board(maigo_root)
     errors = list(parsed["errors"]) + _resolve_lines(parsed, maigo_dir, repo)
@@ -812,6 +883,13 @@ def write_snapshot(maigo_root: Path, repo: str, now: datetime | None = None) -> 
         for line in parsed["lines"]
         if line["url"]
     }
+    for override_url, value in (checked_overrides or {}).items():
+        if override_url not in items:
+            continue
+        if value is None:
+            del items[override_url]
+        else:
+            items[override_url]["checked"] = value
     state_dir = _state_dir(maigo_root)
     state_dir.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -827,6 +905,19 @@ def write_snapshot(maigo_root: Path, repo: str, now: datetime | None = None) -> 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    refresh_parser = sub.add_parser(
+        "refresh", help="零 token 完整刷新（預設預覽；--apply 才寫回）"
+    )
+    # function-level import: board_refresh imports this module back. A broken
+    # refresh module must not take plan/ack/... (used by the delegate commands) down.
+    try:
+        board_refresh = importlib.import_module(
+            f"{__package__}.board_refresh" if __package__ else "board_refresh"
+        )
+        board_refresh.add_arguments(refresh_parser)
+    except ImportError as error:
+        board_refresh = None
+        refresh_parser.set_defaults(import_error=str(error))
     for name in ("plan", "ack", "drop", "revive", "snapshot"):
         p = sub.add_parser(name)
         p.add_argument("--maigo-root", type=Path, required=True)
@@ -843,6 +934,11 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--reason", choices=("manual",), required=True)
             p.add_argument("urls", nargs="+")
     args = parser.parse_args(argv)
+    if args.command == "refresh":
+        if board_refresh is None:
+            print(f"board_sync: refresh 無法載入：{args.import_error}", file=sys.stderr)
+            return 1
+        return board_refresh.cli(args)
     root = args.maigo_root.resolve()
     try:
         if args.command == "plan":

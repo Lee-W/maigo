@@ -219,7 +219,7 @@ checkbox 清單。
 /maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄
 ```
 
-刷新會做三件事（解析與對帳都在 `scripts/board_sync.py`，它不寫 `board.md`，只回報變更清單）：
+刷新會做三件事（解析、對帳與渲染都在 `scripts/board_sync.py` / `scripts/board_refresh.py`；`refresh --apply` 會用 CAS 原子寫回 board 與細節檔，衝突時不寫；也可以從 shell 直接跑，零 token，見 `/maigo:board`）：
 
 - **對帳與 discovery**：把 `.maigo/` 裡可靠對應到 PR 的 review 產物，以及該 repo 指名你審／你審過的
   open PR 補進 board；單次最多補 50 項，超過的列出、下次接著補；對應不上的產物列為「未歸屬」。

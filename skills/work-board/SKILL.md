@@ -91,6 +91,8 @@ description: This skill should be used when reading, writing, or migrating `.mai
 不再為 60 欄限制隱藏貢獻者；URL、規模、完整下一步與判斷句仍放細節檔。
 `board_state.py` 回傳 `index_entry` 是可重用的行內容；orchestrator 加原 checkbox、badges
 與編號，既有缺作者的行在刷新取得 GitHub author 後補上，不臆造作者。
+完整刷新的行與整檔由 `scripts/board_refresh.py` 的 `render_line` / `render_board` 渲染——這兩個函式是
+本節文法的程式鏡像，由 `tests/test_board_refresh.py` 的 round-trip 測試守著；改文法時兩邊一起改。
 
 ```text
 🎯 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）][ @<contributor>][ <badges>] <細節檔路徑> — <title>
@@ -104,7 +106,8 @@ description: This skill should be used when reading, writing, or migrating `.mai
 - **旁註**（沿用 review board 慣例，optional）：branch 名、closed 理由、linked PR、DRAFT、
   他人 review decision 這類「per-item 事實」寫在狀態詞後面的括弧裡
   （例：`IN_PROGRESS（分支 fix/xxx）`）——旁註記事實，判斷句記決定，兩者不是同一件事；
-  判斷句本身已搬進細節檔（§1a）。
+  判斷句本身已搬進細節檔（§1a）。`（gh 失敗：…）` 開頭的旁註是 `refresh` 專用的抓料錯誤標記，恢復時
+  會被清掉；手寫旁註請勿用這個開頭。
 - **貢獻者**：從 GitHub `author.login` 取得，包含自己的 PR；放狀態詞／旁註後、badges 前。
   舊行沒有作者仍可讀；下次刷新補回。
 - **badges**（`🧠`/`💤`/`🔖`，optional）：緊接在貢獻者（缺值時為旁註）之後、細節檔路徑之前，用一個空格分隔；
@@ -237,19 +240,23 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 讀到舊版任何 section 標題（球權三分區時代的四個舊標題）時同樣吃得進來：取 checkbox /
 `🧠` / 狀態詞後，整檔以新骨架（三個 section）重寫，不做逐行 in-place 遷移。
 
-**但整檔重寫與 §3 的「禁止整份 `Write`」會直接對撞——併發安全優先。** 舊格式遷移必然是
+**但整檔重寫與 §3(a) 的「禁止整份 `Write`」會直接對撞——併發安全優先。** 舊格式遷移必然是
 整檔重寫，而 board 是跨 session 共用、不帶任務識別碼、且 `.maigo/` 被 gitignore（輾掉沒有
-版本可救）。所以誰能做整檔正規化是分工，不是隨手做的事：
+版本可救）。所以誰能做整檔寫入是分工，不是隨手做的事：
 
-- **`/maigo:board` 的完整刷新**才做整檔正規化——它本來就要重算每一行，是唯一有理由持有整檔的
-  寫入者。
+- **整檔重寫只有 `board_sync.py refresh --apply` 會做**，由 CAS（讀檔雜湊、寫前重讀比對、不一致就
+  中止，見 §3(b)）取代 `ListAgents` 確認：別人動過檔案，這次寫入就以 exit 2 中止、不寫任何檔。
+  refresh 遇到舊格式（舊 section 標題）或 `review-board.md` 會直接拒絕（exit 1），不遷移。
+- **舊格式正規化**仍由 Claude 的 `/maigo:board` 完整刷新做——它本來就要重算每一行，是唯一有理由
+  持有整檔的 Claude 寫入者；因為 script 看不到 `🔍 本批佇列` 的重判，也看不到其他 session。
 - **五個 delegate 命令的收尾 upsert**（review / triage-issue / take-issue / describe-pr /
   address-comments）遇到舊格式時，**只 `Edit` 自己那一行，並沿用該檔當下的舊行文法**，把正規化
   留給下一次 `/maigo:board`。**不要把一行新格式混進舊格式檔**——那會讓檔案同時有兩種文法，比
   整檔仍是舊格式更難解析。寫完在回覆裡告訴使用者「board 仍是舊格式，正規化留給
   `/maigo:board`」，不要靜默略過。
-- 整檔重寫前先確認沒有其他 session 正在寫（`ListAgents`；同一台機器多個 worktree 各跑一個
-  session 時，它們共用這一份 board）。不確定就當作有。
+- Claude 做舊格式整檔重寫前先確認沒有其他 session 正在寫（`ListAgents`；同一台機器多個 worktree
+  各跑一個 session 時，它們共用這一份 board）。不確定就當作有。`refresh --apply` 不需要這一步，
+  CAS 會在衝突時自己中止。
 
 實例（2026-09-19）：一次 `address-comments` 收尾對舊格式 board 只 `Edit` 了自己那一行；同一份
 board 在那之後又被別的 session 加了一項、改了另一項、計數從 🎯 7 變 8——若當時照「整檔重寫」
@@ -263,6 +270,8 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 - ⏳ / ✅ 區：`updatedAt` 降序（這兩區是查閱，不是待辦）。
 - ✅ 區超過 7 天的行在刷新時自動清掉，清掉時同時寫入排除紀錄（`reason: aged`，§3a）
   （唯一例外：待盤點未完成的行〔(`[x]` 或 `🔖`) 且沒有 `🧠`〕不清，學完才走）。
+  老化基準時間（`refresh` 實作）依序取 `mergedAt` → `closedAt` →（排除項目）排除紀錄的 `last_drop_at`
+  → `updatedAt`。
   `/maigo:board --drop` 的落點也是這裡（狀態詞改 `已放棄`），跟其他結案行共用同一條
   老化規則，不再有獨立的 tombstone 區。
 
@@ -360,7 +369,10 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 `.maigo/i/` 整個目錄不存在。此時只更新索引行，不要為單一項目憑空生一份細節檔（那會讓同一份
 board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔正規化時一次建齊，見 §2 向下相容段。
 
-**併發寫回（board 是跨 session 共用的單一檔，不帶任務識別碼，所以要靠寫法自保）**：
+**併發寫回（board 是跨 session 共用的單一檔，不帶任務識別碼，所以要靠寫法自保）**。
+共同目的：別人動過就吵，不安靜覆蓋。寫入者有兩種：
+
+**(a) Claude（五個 delegate 命令的收尾 upsert，以及 `/maigo:board` 的 fallback 手動流程）**：
 
 1. **既有 board 一律用 `Edit`，禁止整份 `Write`。** `Edit` 的 `old_string` 就是天然的樂觀鎖：
    別的 session 動過那一行時 `Edit` 會失敗——**會吵**；`Write` 則會安靜輾過對方的寫入。
@@ -368,15 +380,26 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
 2. **寫入前立即重讀。** 不可拿幾輪之前讀到的內容當現況——中間可能已經有別的 session 寫過。
 3. **`Edit` 失敗 → 重讀、重算那一行、再試；不要改用 `Write` 硬寫。** 失敗是訊號不是障礙。
 
+**(b) `board_sync.py refresh --apply`（script，整檔寫回）**：以 compare-and-swap 取代 `Edit` 的樂觀鎖——
+讀 board.md 時記下內容雜湊，寫入前（ack 之前與實際寫檔之前各一次）重讀比對，不一致就以 **exit 2** 中止
+（每個要改／刪的細節檔同樣比對，要新建的細節檔必須仍不存在）。第一次比對在 ack 之前、什麼都沒寫；
+第二次比對在 ack 之後，所以 exit 2 時**除了 review.md 的 ack 標記外**不會寫任何檔。通過後先備份到
+`.maigo/_internal/board/backup/<UTC ts>/`（§3a），再用同目錄 tmp＋rename 原子寫入；寫 board／細節檔失敗
+從備份還原並 exit 3；board 已寫成功後 ledger／snapshot 才失敗也是 exit 3，但此時**不還原**、board 已是
+新版（重跑安全，漏寫的事件會列在輸出裡）。
+
+已知限制：某列抓料失敗時狀態詞會變 `抓不到`，恢復時 `refresh` 從該列細節檔的 H1 取回舊狀態詞；
+若同一輪你手改了索引行的狀態詞、又剛好抓料失敗，恢復後會回到細節檔 H1 的舊狀態，手改的狀態詞不會保留。exit 2 的處理方式是**直接重跑**，不要改用 `Write`。
+
 `.maigo/i/<slug>.md` 的「整份重寫事實區、保留手寫 `## 判斷` / `## 筆記`」同樣要求
-**重寫前立即重讀**，理由相同。
+**重寫前立即重讀**（script 則是上面的 CAS），理由相同。
 
 ### 細節檔生命週期
 
 - **建立**：項目首次進 board → 建細節檔（§1a）。
 - **更新**：refresh 或任何寫回 → 重寫事實區，`## 判斷` / `## 筆記` 原樣保留（§1a 硬規則）。
 - **回收**：項目離開 board（✅ 區 7 天老化清除、`--drop` 後也走同一條老化規則）→
-  連細節檔一起刪，不留孤兒檔。
+  連細節檔一起刪，不留孤兒檔。`refresh --apply` 刪除前會先把該細節檔備份到 `_internal/board/backup/`。
 - **孤兒偵測（dd 語意）**：`/maigo:board` 刷新時比對 `.maigo/i/*.md` 與 board 索引行；沒有任何
   索引行引用的細節檔，代表使用者用 `dd` 刪了那一行——`board_sync.py plan` 把它判成 dd 並寫進排除
   紀錄（§3a）。剛寫好的細節檔有 10 分鐘寬限（delegate 命令先寫細節檔、後 `Edit` 加行，plan 若
@@ -409,16 +432,20 @@ worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree
 ## 3a. 對帳、discovery 與排除紀錄
 
 正典是 [`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py)
-（stdlib-only CLI：`plan` / `ack` / `drop` / `snapshot`）。**它絕不寫 `board.md` 與 `i/*.md`**，
-只輸出 JSON 變更清單，由 orchestrator 用 `Edit` 寫回（§3 Edit-only 規則不變）。
+（stdlib-only CLI：`plan` / `ack` / `drop` / `revive` / `snapshot` / `refresh`）。`plan` / `ack` / `drop` /
+`revive` / `snapshot` 不寫 `board.md` 與 `i/*.md`，只輸出 JSON 變更清單，由 orchestrator 用 `Edit` 寫回
+（§3(a) 規則不變）；`refresh --apply` 會整檔寫 `board.md` 與 `i/*.md`，規則見 §3(b)（CAS ＋ 備份 ＋ 原子寫入）。
+`refresh` 不帶 `--apply` 是預覽：只印 unified diff，不寫任何檔、不 ack。從 shell 跑它即是零 token 刷新，
+用法見 [`commands/board.md`](https://github.com/Lee-W/maigo/blob/main/commands/board.md)。
 
 **機器狀態檔**——只有 script 寫，都在 `.maigo/_internal/board/`（script 自行建立目錄；
-`plan --dry-run` 不建目錄、不寫檔；型錄與 doctor 永遠不列 `_internal/`）：
+`plan --dry-run` 與 `refresh` 預覽不建目錄、不寫檔；型錄與 doctor 永遠不列 `_internal/`）：
 
 | 檔案 | 格式 | 寫法 | 用途 |
 |---|---|---|---|
 | `dropped.jsonl` | 每行 `{"url","event":"drop"\|"revive","reason","at"}` | 單次 append 一行，只增不改 | 持久排除紀錄；以 canonical URL（`(owner, repo, number)` 小寫，`pull`/`issues` 同一項）為 key，依事件順序 fold，最後一筆決定狀態 |
 | `snapshot.json` | `{"version":1,"written_at","items":{<url>:{"checked","detail"}}}` | tempfile ＋ replace 原子寫入 | 上次刷新結束時 board 上有哪些項目與勾選狀態，用來偵測 `dd` 與勾選變化 |
+| `backup/<UTC ts>/` | 與 board.md 相同的目錄結構（`board.md`、`i/*.md`） | `refresh --apply` 寫回前複製要改／刪的檔，只留最新 10 份 | 寫入失敗時還原；也是誤刪細節檔後的救援來源 |
 
 **`dd` → 排除**：`removed = (snapshot 的 URL ∪ 孤兒 i/ 檔的 URL) − board 現有行 − 已排除`，成立就
 append `{"event":"drop","reason":"dd"}`。第一次跑（沒有 snapshot）時既有的孤兒 i/ 檔一律視為 `dd`，

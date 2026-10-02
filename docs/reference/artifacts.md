@@ -76,6 +76,7 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 |------|------|
 | `_internal/board/dropped.jsonl` | 排除紀錄：每行一個 `drop` / `revive` 事件，只 append；`dd` 掉的項目之後不會被 discovery 補回，除非重新被指名 |
 | `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目與勾選狀態，用來偵測 `dd` 與 `[x]` 變化 |
+| `_internal/board/backup/<UTC ts>/` | `refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份；寫入失敗時用來還原 |
 
 ## 非 markdown 機器狀態檔
 

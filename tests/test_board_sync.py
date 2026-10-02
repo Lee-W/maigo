@@ -795,3 +795,60 @@ def test_dd_is_dated_at_snapshot_so_a_request_before_refresh_revives(tmp_path, g
     assert [r["url"] for r in result["removed"]] == [url(2)]
     assert [r["url"] for r in result["revived"]] == [url(2)]
     assert [a["url"] for a in result["additions"]] == [url(2)]
+
+
+class TestBoardTextAndTimes:
+    def test_board_text_takes_precedence_over_disk(self, tmp_path, gh):
+        make_board(tmp_path, row(1), details=(1,))
+        override = board_text(row(2))
+        put_detail(tmp_path, 2)
+        result = plan(tmp_path, discovery=False, board_text=override)
+        assert [line["url"] for line in result["lines"]] == [url(2)]
+
+    def test_parse_header_extracts_repo(self):
+        assert sync.parse_header(board_text(row(1)))["repo"] == REPO
+        assert sync.parse_header("# Work Board\n")["repo"] is None
+        assert sync.parse_header("")["raw"] == ""
+
+    def test_removed_carries_the_snapshot_time_and_revived_carries_now(
+        self, tmp_path, gh
+    ):
+        make_board(tmp_path, row(1), row(2), details=(1, 2))
+        written = NOW - timedelta(hours=2)
+        sync.write_snapshot(tmp_path, REPO, written)
+        make_board(tmp_path, row(1))
+        gh.requested = [pr(2)]
+        gh.timeline = {
+            2: [TestIsRerequested.event(YOU, (NOW - timedelta(hours=1)).isoformat())]
+        }
+        result = plan(tmp_path)
+        assert result["removed"][0]["at"] == written.isoformat()
+        assert result["revived"][0]["at"] == NOW.isoformat()
+
+
+class TestAckDryRun:
+    def item(self, change="checked"):
+        return {"url": url(1), "head": HEAD, "change": change, "inferred": False}
+
+    def test_dry_run_leaves_report_bytes_and_simulates_the_ack(self, tmp_path):
+        path = Path(publish_report(tmp_path, 1)["path"])
+        before = path.read_bytes()
+        [result] = sync.ack_items(
+            tmp_path, REPO, YOU, [self.item()], dry_run=True, now=NOW
+        )
+        assert path.read_bytes() == before
+        assert result["result"] == "acked"
+        simulated = result["simulated_review"]
+        assert simulated["acknowledged_by"] == YOU
+        assert simulated["acknowledged_at"] == NOW.isoformat()
+
+    def test_dry_run_unack_simulates_removal(self, tmp_path):
+        path = Path(publish_report(tmp_path, 1)["path"])
+        sync.ack_items(tmp_path, REPO, YOU, [self.item()])
+        before = path.read_bytes()
+        [result] = sync.ack_items(
+            tmp_path, REPO, YOU, [self.item("unchecked")], dry_run=True
+        )
+        assert path.read_bytes() == before
+        assert result["result"] == "unacked"
+        assert "acknowledged_at" not in result["simulated_review"]

@@ -732,6 +732,120 @@ def index_entry(
     return f"{item_type.value} {status.value}{contributor}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
 
 
+def evaluate_items(
+    items: list[dict],
+    *,
+    you: str,
+    repo: str,
+    maigo_root: str,
+    now: datetime,
+    stale_days: int = STALE_DAYS_DEFAULT,
+    reviews_only: bool = False,
+    review_overrides: dict[str, dict] | None = None,
+) -> list[dict]:
+    """
+    `main()` 的逐項分類迴圈。項目錯誤一律 raise `ValueError`（訊息即 stderr 內容）。
+
+    `review_overrides[url]` 有值時取代 `_load_review` 的結果——給 refresh 預覽
+    模擬 ack 用（不寫 review.md 也能讓 `acked_current` 反映 ack 後的狀態）。
+    `reviews_only` 時略過非 `needs_review` 的項目；排序留給呼叫端。
+    """
+    overrides = review_overrides or {}
+    results: list[dict] = []
+    for index, item in enumerate(items):
+        try:
+            item_type = ItemType(item["type"])
+        except (KeyError, ValueError, TypeError) as error:
+            raise ValueError(f"第 {index} 項 `type` 無效：{error}") from error
+        gh_meta = item.get("gh_meta") or {}
+        prior_status = _parse_prior_status(item.get("prior_status"))
+        review = item.get("review") or {}
+        item_url = item.get("url") or ""
+        try:
+            if item_type is ItemType.REVIEW_PR and item_url in overrides:
+                review = overrides[item_url]
+            elif item_type is ItemType.REVIEW_PR and maigo_root:
+                review = _load_review(item_url, repo, maigo_root)
+        except OSError as error:
+            raise ValueError(str(error)) from error
+        local_verdict_at = item.get("local_verdict_at")
+        review_time_source = "explicit" if local_verdict_at else None
+        if local_verdict_at is None and review.get("reviewed_at"):
+            local_verdict_at = review["reviewed_at"]
+            review_time_source = "report"
+        if local_verdict_at is None and item_type is ItemType.REVIEW_PR and maigo_root:
+            local_verdict_at = _auto_local_verdict_at(item_url, repo, maigo_root)
+            if local_verdict_at:
+                review_time_source = "report" if review.get("reviewed_at") else "mtime"
+        result = classify(
+            item_type, gh_meta, prior_status, you, local_verdict_at, review
+        )
+        badges = compute_badges(gh_meta, now, stale_days)
+
+        next_action = result.next_action
+        if result.status is BoardStatus.UNPOSTED_VERDICT and next_action is not None:
+            ref = github_ref(item_url, repo)
+            if ref is not None:
+                artifact_path = _import_artifact_path()
+                next_action = next_action.replace(
+                    _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
+                )
+
+        needs_review = item_type is ItemType.REVIEW_PR and result.status in {
+            BoardStatus.PENDING_REVIEW,
+            BoardStatus.BALL_BACK,
+            BoardStatus.UNPOSTED_VERDICT,
+        }
+        if reviews_only and not needs_review:
+            continue
+        current_ack = item_type is ItemType.REVIEW_PR and acked_current(
+            review, you, gh_meta.get("headRefOid")
+        )
+        checked = (
+            checkbox_after_refresh(
+                item_type, bool(item["checked"]), current_ack, needs_review
+            )
+            if "checked" in item
+            else None
+        )
+        learn_pending = (
+            item_type is ItemType.REVIEW_PR
+            and item.get("checkbox_change") == "checked"
+            and "🧠" not in (item.get("prior_badges") or [])
+        )
+        title = gh_meta.get("title") or item.get("title") or ""
+        author = (gh_meta.get("author") or {}).get("login") or item.get("author") or ""
+        detail = detail_path(item_url, repo)
+        extra: dict = {}
+        if {"checked", "checkbox_change", "prior_badges"} & item.keys():
+            extra = {
+                "checked": checked,
+                "learn_pending": learn_pending,
+                "acked_current": current_ack,
+            }
+        results.append(
+            {
+                **extra,
+                "section": result.section.value,
+                "rank": int(result.rank),
+                "status": result.status.value,
+                "next_action": next_action,
+                "badges": badges,
+                "detail_path": detail,
+                "title": title,
+                "author": author,
+                "last_reviewed_at": local_verdict_at,
+                "review_time_source": review_time_source,
+                "acknowledged_at": review.get("acknowledged_at"),
+                "needs_review": needs_review,
+                "index_entry": index_entry(
+                    item_type, result.status, detail, title, author
+                ),
+            }
+        )
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--you", default="", help="目前使用者的 GitHub login")
@@ -761,104 +875,19 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("board_state: stdin JSON 必須是陣列\n")
         return 1
 
-    now = datetime.now(timezone.utc)
-    results: list[dict] = []
-    for index, item in enumerate(items):
-        try:
-            item_type = ItemType(item["type"])
-        except (KeyError, ValueError, TypeError) as error:
-            sys.stderr.write(f"board_state: 第 {index} 項 `type` 無效：{error}\n")
-            return 1
-        gh_meta = item.get("gh_meta") or {}
-        prior_status = _parse_prior_status(item.get("prior_status"))
-        review = item.get("review") or {}
-        try:
-            if item_type is ItemType.REVIEW_PR and args.maigo_root:
-                review = _load_review(item.get("url") or "", args.repo, args.maigo_root)
-        except (OSError, ValueError) as error:
-            sys.stderr.write(f"board_state: {error}\n")
-            return 1
-        local_verdict_at = item.get("local_verdict_at")
-        review_time_source = "explicit" if local_verdict_at else None
-        if local_verdict_at is None and review.get("reviewed_at"):
-            local_verdict_at = review["reviewed_at"]
-            review_time_source = "report"
-        if (
-            local_verdict_at is None
-            and item_type is ItemType.REVIEW_PR
-            and args.maigo_root
-        ):
-            local_verdict_at = _auto_local_verdict_at(
-                item.get("url") or "", args.repo, args.maigo_root
-            )
-            if local_verdict_at:
-                review_time_source = "report" if review.get("reviewed_at") else "mtime"
-        result = classify(
-            item_type, gh_meta, prior_status, args.you, local_verdict_at, review
+    try:
+        results = evaluate_items(
+            items,
+            you=args.you,
+            repo=args.repo,
+            maigo_root=args.maigo_root,
+            now=datetime.now(timezone.utc),
+            stale_days=args.stale_days,
+            reviews_only=args.reviews,
         )
-        badges = compute_badges(gh_meta, now, args.stale_days)
-
-        next_action = result.next_action
-        if result.status is BoardStatus.UNPOSTED_VERDICT and next_action is not None:
-            ref = github_ref(item.get("url") or "", args.repo)
-            if ref is not None:
-                artifact_path = _import_artifact_path()
-                next_action = next_action.replace(
-                    _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
-                )
-
-        needs_review = item_type is ItemType.REVIEW_PR and result.status in {
-            BoardStatus.PENDING_REVIEW,
-            BoardStatus.BALL_BACK,
-            BoardStatus.UNPOSTED_VERDICT,
-        }
-        if args.reviews and not needs_review:
-            continue
-        current_ack = item_type is ItemType.REVIEW_PR and acked_current(
-            review, args.you, gh_meta.get("headRefOid")
-        )
-        checked = (
-            checkbox_after_refresh(
-                item_type, bool(item["checked"]), current_ack, needs_review
-            )
-            if "checked" in item
-            else None
-        )
-        learn_pending = (
-            item_type is ItemType.REVIEW_PR
-            and item.get("checkbox_change") == "checked"
-            and "🧠" not in (item.get("prior_badges") or [])
-        )
-        title = gh_meta.get("title") or item.get("title") or ""
-        author = (gh_meta.get("author") or {}).get("login") or item.get("author") or ""
-        detail = detail_path(item.get("url") or "", args.repo)
-        extra: dict = {}
-        if {"checked", "checkbox_change", "prior_badges"} & item.keys():
-            extra = {
-                "checked": checked,
-                "learn_pending": learn_pending,
-                "acked_current": current_ack,
-            }
-        results.append(
-            {
-                **extra,
-                "section": result.section.value,
-                "rank": int(result.rank),
-                "status": result.status.value,
-                "next_action": next_action,
-                "badges": badges,
-                "detail_path": detail,
-                "title": title,
-                "author": author,
-                "last_reviewed_at": local_verdict_at,
-                "review_time_source": review_time_source,
-                "acknowledged_at": review.get("acknowledged_at"),
-                "needs_review": needs_review,
-                "index_entry": index_entry(
-                    item_type, result.status, detail, title, author
-                ),
-            }
-        )
+    except ValueError as error:
+        sys.stderr.write(f"board_state: {error}\n")
+        return 1
 
     if args.reviews:
         results.sort(key=lambda row: row["rank"])
