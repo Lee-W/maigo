@@ -43,7 +43,7 @@ import _KNOWN_KINDS`，這是唯一正典來源；平行維護第二份清單正
 跑（CLI）：
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/maigo_dir_catalog.py" [--dir .maigo]
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_dir_catalog.py" [--dir .maigo]
 ```
 """
 

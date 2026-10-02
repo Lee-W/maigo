@@ -303,7 +303,7 @@ gh pr view <n> --repo <r> --json title,state,isDraft,mergedAt,mergeable,reviewDe
 
 ```bash
 echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
-  | python3 scripts/board_state.py --you <login>
+  | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py" --you <login>
 ```
 
 `mergeable` 欄位可能回 `CONFLICTING` / `MERGEABLE` / `UNKNOWN`（GitHub 尚在計算）；

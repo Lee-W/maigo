@@ -26,7 +26,7 @@ description: This skill should be used during /maigo:review to persist current P
 機械流程由 script 代勞（cache 偵測 / 驗證 / fetch / truncate / 寫檔一條龍）：
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/pr_context_cache.py" <source> \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source> \
     [--rubric PATH] [--base main]
 ```
 

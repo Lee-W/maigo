@@ -34,7 +34,7 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 
 **describe-pr 模式：** 依 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 操作，輸出 `## Suggested PR title` + `## Suggested PR description`；不寫檔。
 
-**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric。orchestrator 先執行 `scripts/artifact_path.py triage-rubric`、處理歸屬與父目錄，再交付每條 issue 各自的路徑與原樣 H1；🩵 燈只寫入該路徑（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），結構：
+**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric。orchestrator 先執行 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" triage-rubric`、處理歸屬與父目錄，再交付每條 issue 各自的路徑與原樣 H1；🩵 燈只寫入該路徑（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），結構：
 
 ```markdown
 # Triage rubric: <issue title> (#<N>)

@@ -8,7 +8,9 @@ from __future__ import annotations
 import importlib
 import io
 import json
+import re
 import sys
+from pathlib import Path
 
 import hooks.legacy_artifact_path_check as lac
 import pytest
@@ -29,6 +31,19 @@ def run_silent_hook(
 
 def _write_payload(file_path: str, tool_name: str = "Write") -> dict:
     return {"tool_name": tool_name, "tool_input": {"file_path": file_path}}
+
+
+def _assert_script_paths_absolute_and_exist(reason: str) -> None:
+    """Every `<...>/scripts/<name>.py` in the message is absolute and a real file."""
+    paths = re.findall(
+        r"""(?:"|`)?([^"`\n]*?scripts/(?:artifact_path|migrate_legacy_artifacts)\.py)""",
+        reason,
+    )
+    assert paths
+    for raw in paths:
+        path = Path(raw.strip("`\"'"))
+        assert path.is_absolute(), raw
+        assert path.is_file(), raw
 
 
 class TestIsLegacyArtifactPath:
@@ -110,7 +125,8 @@ class TestLegacyArtifactPathHook:
             ).strip()
         )
         assert result["decision"] == "block"
-        assert "scripts/artifact_path.py plan" in result["reason"]
+        assert re.search(r"artifact_path\.py\"? plan ", result["reason"])
+        _assert_script_paths_absolute_and_exist(result["reason"])
 
     @pytest.mark.parametrize(
         "path",
@@ -175,6 +191,7 @@ class TestLegacyArtifactPathHook:
         )
         assert result["decision"] == "block"
         assert "migrate_legacy_artifacts.py" in result["reason"]
+        _assert_script_paths_absolute_and_exist(result["reason"])
 
     @pytest.mark.parametrize(
         "path",

@@ -48,7 +48,9 @@ from typing import NoReturn
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+# Absolute so the hint works from any target repo (and Codex), not just cwd=maigo.
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+sys.path.insert(0, str(_SCRIPTS_DIR))
 try:
     from artifact_path import _FLAT_NAME_LOOKALIKES, _KNOWN_KINDS, _NESTED_LAYOUT
 except Exception:
@@ -115,7 +117,7 @@ def _block_reason(kind: str, file_path: str) -> str:
         "只可讀、不可當寫入目標（跨 13 個裝了 maigo 的 repo 實測，這套舊寫法的"
         "採用率仍是多數——散文擋不住，所以這裡改用程式碼擋）。\n"
         "改用：\n"
-        f'  python3 scripts/artifact_path.py {kind} --topic "<H1 主題>"\n'
+        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" {kind} --topic "<H1 主題>"\n'
         "取得帶識別碼的新路徑（`path:` 那行），寫到那裡。\n"
         "見 skills/harness-discipline/references/artifact-ownership.md 規則 4："
         "舊固定檔名（`legacy_exists:` 那行指的檔案）只可讀、不可當寫入目標。"
@@ -128,10 +130,10 @@ def _flat_pre_nested_block_reason(kind: str, file_path: str) -> str:
         "只可讀、不可當寫入目標——新路徑收進 `.maigo/review/<id>/` 或 "
         "`.maigo/issue/<id>/` 底下的資料夾。\n"
         "改用：\n"
-        f'  python3 scripts/artifact_path.py {kind} --topic "<H1 主題>" '
+        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" {kind} --topic "<H1 主題>" '
         "[--url <url> --repo <owner/name>]\n"
         "取得巢狀新路徑（`path:` 那行），寫到那裡；既有舊檔可用 "
-        "`scripts/migrate_legacy_artifacts.py` 搬過去，不必手動搬。\n"
+        f"`{_SCRIPTS_DIR / 'migrate_legacy_artifacts.py'}` 搬過去，不必手動搬。\n"
         "見 skills/harness-discipline/references/artifact-ownership.md 規則 4："
         "分目錄前的扁平檔（`flat_exists:` 那行指的檔案）只可讀、不可當寫入目標。"
     )

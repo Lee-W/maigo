@@ -43,7 +43,7 @@ memory，不能只靠 delegate 給 Raana/Tomori/Soyo 時才觸發這個 skill—
 
 遇到問題**不 abort**，繼續使用該 entry（lenient），但在 `## Loaded memory entries` 段該行末尾加 `[schema warn: <缺什麼或 type 不合法>]`。
 
-完整檢查可手動跑 [`python3 scripts/validate_memory.py`](https://github.com/Lee-W/maigo/blob/main/scripts/validate_memory.py)。
+完整檢查可手動跑 [`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/validate_memory.py"`](https://github.com/Lee-W/maigo/blob/main/scripts/validate_memory.py)。
 
 ## Fallback 規則（不報錯、不抱怨、繼續做事）
 

@@ -39,9 +39,9 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 跑（CLI，給 markdown 寫手用）：
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" plan \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" plan \
     --topic "<H1 主題>" [--url URL] [--repo owner/name] [--cwd DIR]
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" review-rubric \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric \
     --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name
 ```
 

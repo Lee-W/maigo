@@ -28,7 +28,7 @@
 跑（CLI）：
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config/maigo/repos.txt]
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py" [--repo-list ~/.config/maigo/repos.txt]
 ```
 
 核心邏輯 `parse_board_text()` / `build_index()` 是純函式，只吃字串、只吐字串，
