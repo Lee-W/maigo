@@ -5,7 +5,8 @@ upsert habits**: keeping the header's "最後刷新" date honest even on a
 single-item upsert, treating the board upsert as its own independent step
 outside the four-teammate pipeline, not confusing a board verdict label
 with proof the review actually reached GitHub, and never rewriting an existing
-board with a whole-file `Write`.
+board without a lock (Claude: `Edit`, never `Write`; the refresh script:
+compare-and-swap).
 
 ---
 
@@ -57,7 +58,7 @@ draft — only the latter needs this check.
 
 ---
 
-## Never rewrite an existing board with a whole-file `Write`
+## Never rewrite an existing board without a lock
 
 `.maigo/board.md` is deliberately **one file shared across every session** —
 it has no task identifier in its name, because a per-task board would defeat
@@ -68,7 +69,10 @@ A whole-file `Write` rebuilt from a snapshot you read some turns ago silently
 discards everything another session wrote in between. Nothing errors; the rows
 are simply gone, and `.maigo/` is gitignored so there is no version to recover.
 
-**How to apply:**
+**How to apply — two kinds of writer, same goal (a concurrent change must be
+loud, never silently overwritten):**
+
+*Claude* (the delegate commands' upsert and `/maigo:board`'s manual fallback):
 
 - **`Edit`, never `Write`, on a board that already exists.** `Edit`'s
   `old_string` acts as an optimistic lock: if another session changed that
@@ -79,6 +83,18 @@ are simply gone, and `.maigo/` is gitignored so there is no version to recover.
 - **On `Edit` failure: re-read, recompute that row, retry.** Do not fall back
   to `Write` to force it through — the failure is the mechanism working.
 
+*The refresh script* (`board_sync.py refresh --apply`) does rewrite the whole
+file, so it takes a compare-and-swap instead of `Edit`'s `old_string`: it hashes
+what it read, re-checks the hash before acking and again right before writing,
+backs up to `.maigo/_internal/board/backup/`, then writes atomically (tmp +
+rename). If the board (or a detail file it is about to change) moved underneath
+it, it stops with **exit 2** and writes no board or detail file (the only thing
+that may already be written is the `review.md` ack mark, because the ack happens
+between the two hash checks). The fix for exit 2 is to **re-run**, not to fall
+back to `Write`. Exit 3 means a write failed: before the board was written it is
+rolled back from the backup; if only the ledger or snapshot failed afterwards,
+nothing is rolled back and the board is already the new version.
+
 The same applies to `.maigo/i/<slug>.md`: its fact section is rewritten
 wholesale on every refresh, so re-read immediately before rewriting to avoid
 clobbering a concurrent update to the hand-written `## 判斷` / `## 筆記`.
@@ -88,9 +104,12 @@ clobbering a concurrent update to the hand-written `## 判斷` / `## 筆記`.
 `dropped.jsonl` (the exclusion ledger) and `snapshot.json` (last refresh's board
 rows and checkbox state) are owned by `scripts/board_sync.py` and nobody else:
 the ledger is **append-only** (one line per event, never rewritten) and the
-snapshot is written **atomically** (tempfile + replace). Do not `Write` or `Edit`
-anything under `_internal/`; `board_sync.py` never writes `board.md` or
-`i/*.md` itself, it only reports changes for you to apply with `Edit`.
+snapshot is written **atomically** (tempfile + replace). `backup/` holds the
+copies `refresh --apply` takes before it writes. Do not `Write` or `Edit`
+anything under `_internal/`. `plan` / `ack` / `drop` / `revive` / `snapshot`
+never write `board.md` or `i/*.md`; they only report changes for you to apply
+with `Edit`. Only `refresh --apply` writes them, under the compare-and-swap
+above.
 
 A detail file with no board row that references it means the user deleted the
 row (`dd`), so the script records a drop. But a delegate command writes the

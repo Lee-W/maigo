@@ -1331,3 +1331,61 @@ class TestMainCheckboxFields:
         self._write_report(tmp_path)
         row = self._run(monkeypatch, capsys, tmp_path, prior_badges=[])
         assert row["checked"] is None
+
+
+class TestEvaluateItemsReviewOverrides:
+    URL = "https://github.com/o/r/pull/7"
+    HEAD = "a" * 40
+
+    def _item(self):
+        return {
+            "type": "👀",
+            "url": self.URL,
+            "prior_status": None,
+            "checked": False,
+            "gh_meta": {
+                "state": "OPEN",
+                "author": {"login": "carol"},
+                "createdAt": "2026-01-01T00:00:00Z",
+                "headRefOid": self.HEAD,
+            },
+        }
+
+    def _record(self, **extra):
+        return {
+            "version": 1,
+            "source": self.URL,
+            "head_sha": self.HEAD,
+            "verdict": "APPROVE",
+            "reviewed_at": "2026-01-02T00:00:00+00:00",
+            **extra,
+        }
+
+    def test_override_replaces_the_report_read_from_disk(self, tmp_path):
+        now = datetime(2026, 2, 1, tzinfo=timezone.utc)
+        kwargs = {"you": YOU, "repo": "o/r", "maigo_root": str(tmp_path), "now": now}
+        # No report on disk: without an override the item is not acked.
+        plain = bs.evaluate_items([self._item()], **kwargs)[0]
+        assert plain["acked_current"] is False
+        acked = self._record(
+            acknowledged_by=YOU, acknowledged_at="2026-01-03T00:00:00+00:00"
+        )
+        item = {**self._item(), "prior_badges": []}
+        result = bs.evaluate_items(
+            [item], review_overrides={self.URL: acked}, **kwargs
+        )[0]
+        assert result["acked_current"] is True and result["checked"] is True
+        unacked = bs.evaluate_items(
+            [item], review_overrides={self.URL: self._record()}, **kwargs
+        )[0]
+        assert unacked["acked_current"] is False and unacked["checked"] is False
+
+    def test_invalid_type_raises_value_error(self, tmp_path):
+        with pytest.raises(ValueError, match="第 0 項"):
+            bs.evaluate_items(
+                [{"type": "?"}],
+                you=YOU,
+                repo="o/r",
+                maigo_root="",
+                now=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            )
