@@ -28,7 +28,7 @@ allowed-tools: Bash(gh issue view:*), Read
 git fetch <remote>
 root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 git -C "$root" check-ignore -q .worktrees/probe || echo "not ignored — see pre-flight check below"
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --topic "<issue 標題>" --cwd "$root"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" --topic "<issue 標題>" --cwd "$root"
 git worktree add -b <branch> <path> <remote>/<default-branch>
 ```
 
@@ -51,7 +51,7 @@ gh issue view <n> --json title,body,labels,comments
 ```
 
 若曾跑過 `/maigo:triage-issue`，`.maigo/` 底下可能有這條 issue 的 triage 產物：呼叫
-`python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <title> (#<n>)"`
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <title> (#<n>)"`
 取得這條 issue 的候選路徑，依序退路讀取：`path:`（`.maigo/issue/<id>/rubric.md`，巢狀正典路徑）
 那行指的檔案存在就讀；不存在則退到 `flat_exists:`（`.maigo/triage-rubric-<id>.md`，分目錄前扁平
 檔，只可讀）；再不存在才退到 `legacy_exists:`（`.maigo/triage-rubric.md`，舊固定檔名，只可讀）。

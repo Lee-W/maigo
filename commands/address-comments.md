@@ -120,7 +120,7 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 ### 4. 寫 triage + 提路由計畫，確認
 
-呼叫 `scripts/artifact_path.py pr-comments --url <PR url> --repo <owner/name> --topic "PR comments: <PR title> (#<number>)"`
+呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" pr-comments --url <PR url> --repo <owner/name> --topic "PR comments: <PR title> (#<number>)"`
 取得路徑（`.maigo/review/<id>/pr-comments.md`；`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
 目錄不存在先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`），把被選中的意見寫進去，並擬路由計畫。
 

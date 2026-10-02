@@ -22,7 +22,7 @@ branch 名就是 `<topic>` 本身（不加前綴、不加 issue number）。
 跑（CLI）：
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" \
     --topic "<自由文字>" [--cwd DIR]
 ```
 

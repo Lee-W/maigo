@@ -29,7 +29,7 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    帶上 `--topic "<你打算寫的 H1>"`：
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/artifact_path.py" <kind> --topic "<H1 主題>" \
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" <kind> --topic "<H1 主題>" \
        [--url <issue/PR URL>] [--repo <owner/name>]
    ```
 

@@ -19,7 +19,7 @@ orchestrator itself (not a delegated agent) runs:
 git fetch <remote>
 root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 git -C "$root" check-ignore -q .worktrees/probe || echo "not ignored — see pre-flight check below"
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/worktree_path.py" --topic "<任務描述或 issue 標題>" --cwd "$root"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" --topic "<任務描述或 issue 標題>" --cwd "$root"
 git worktree add -b <branch> <path> <remote>/<default-branch>
 ```
 

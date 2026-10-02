@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 scripts/board_state.py:*), Bash(python3 scripts/board_sync.py:*), Bash(python3 scripts/board_index.py:*), Bash(python3 scripts/review_report.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -8,6 +8,8 @@ allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(g
 # /maigo:board
 
 > 🌙 Doloris：「先看清楚球在誰手上，再決定下一步要往哪裡走。」
+
+> 本檔的 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/…` 刻意不加引號：為了讓 `allowed-tools` 的前綴放行與替換後的命令字串字面一致；plugin 安裝路徑含空白時不支援。
 
 Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR、正在 review 的 PR
 全都放進 `.maigo/board.md`，依單一優先序排名（下一件事排最上面）分成三個 section。
@@ -61,7 +63,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 - 抓不到就標狀態詞 `抓不到`（rank P0，併進 🎯 最上面），附錯誤末行
 
 加入時以 `#<n>` 或 `owner/repo#<n>` 為 key upsert；既有 checkbox 與 `🧠` 狀態必須保留。
-使用者明確加入的 target 要**先**呼叫 `python3 scripts/board_sync.py revive --reason manual <url...>`
+使用者明確加入的 target 要**先**呼叫 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py revive --reason manual <url...>`
 （只對目前被排除的項目寫 revive 事件，回 `revived` / `not_excluded`），否則曾被 `dd` / `--drop` 的項目
 會因排除紀錄而不重新分類。
 
@@ -72,7 +74,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 `refresh` 子命令（實作在 `scripts/board_refresh.py`）；它用 compare-and-swap 保護寫回（規則見
 [`skills/work-board` §3(b)](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）：
 
-1. 跑 `python3 scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery]`
+1. 跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery]`
    （在 board 所在 repo 的任一 worktree 內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷）。
 2. 依 exit code 分流：
    - **exit 0** → 依輸出的 JSON（`pending_reviews`、`top`、`counts`、`warnings`、`errors`、`removed`、
@@ -95,7 +97,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
    再用 `gh search` 找出該 repo 指名你審或你審過的 PR。`--dry-run` 不寫任何檔：
 
    ```bash
-   python3 scripts/board_sync.py plan --maigo-root <root> --repo <owner/name> --you <login> \
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py plan --maigo-root <root> --repo <owner/name> --you <login> \
      [--dry-run] [--max-new 50] [--no-discovery]
    ```
 
@@ -111,7 +113,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 
    ```bash
    echo '[{"url": "<url>", "head": "<full head sha>", "change": "checked", "inferred": false}]' \
-     | python3 scripts/board_sync.py ack --maigo-root <root> --repo <owner/name> --you <login>
+     | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py ack --maigo-root <root> --repo <owner/name> --you <login>
    ```
 
    `change` 與 `inferred` 直接取自 `plan` 的對應行。`[ ]→[x]` 是使用者明確操作，一律重打 ack；
@@ -122,7 +124,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 
    ```bash
    echo '<[{type, gh_meta, prior_status, url, local_verdict_at, checked, checkbox_change, prior_badges}, ...]>' \
-     | python3 scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
+     | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py --you <login> --repo <owner/name> --maigo-root <repo root>
    ```
 
    **一定要帶 `--maigo-root <repo root>`**：CLI 讀 report 的 `reviewed_at`、`head_sha`、verdict 與你的
@@ -155,7 +157,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
    （下次刷新據此偵測 `dd` 與勾選變化）：
 
    ```bash
-   python3 scripts/board_sync.py snapshot --maigo-root <root> --repo <owner/name> --you <login>
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py snapshot --maigo-root <root> --repo <owner/name> --you <login>
    ```
 
 `board_sync.py drop --reason {drop,dd,aged,closed} <url...>` 單獨使用時只 append 排除紀錄。
@@ -261,7 +263,7 @@ opt-in，預設不開——跨 13 個 repo 掃描比本地刷新慢得多，不�
 先照舊完成本地 `.maigo/board.md` 刷新（§1–§4），flag 有帶時追加呼叫：
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/board_index.py" [--repo-list ~/.config/maigo/repos.txt]
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maigo/repos.txt]
 ```
 
 印出輸出檔 `~/.config/maigo/board-index.md` 的路徑。**不影響本地 `board.md`

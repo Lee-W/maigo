@@ -35,7 +35,7 @@ description: This skill should be used when the maigo orchestrator, running in t
 任務預估超過 **10 輪工具呼叫**，或涉及多個交付物，適用以下流程：
 
 1. 動工前把目標／驗收條件（逐條可勾）／明確不做的事寫進 plan 檔——呼叫
-   `scripts/artifact_path.py plan --topic "Plan: <任務名>"` 取得路徑（歸屬規則見
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" plan --topic "Plan: <任務名>"` 取得路徑（歸屬規則見
    [`references/artifact-ownership.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 2. 每完成一項立刻存檔、立刻更新該項的勾選狀態——存檔的就是全部，沒存的等於沒做。
 3. 察覺 context 被壓縮過（開頭出現 summary）時，**用同一支 script 帶同樣的 `--topic`

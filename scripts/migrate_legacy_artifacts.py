@@ -83,7 +83,7 @@ manifest 的 repo，印 `(nothing to migrate)`，重跑不出錯、不重複改�
 跑（CLI）：
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT:-.}/scripts/migrate_legacy_artifacts.py" \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/migrate_legacy_artifacts.py" \
     [--repo-list ~/.config/maigo/repos.txt] [--home-repo-name NAME] [--apply] \
     [<repo>...]
 ```
