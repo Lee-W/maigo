@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.65.1 (2026-10-07)
+
+### Fix
+
+- **board**: accept bot authors containing a slash in board lines
+
 ## v0.65.0 (2026-10-07)
 
 ### Feat
