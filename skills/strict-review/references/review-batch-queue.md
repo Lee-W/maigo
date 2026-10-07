@@ -104,6 +104,13 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   `~/airflow`）；根因與其他症狀見
   [`airflow-aware` 的「Every worktree shares one sqlite test DB」一節](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)。
 
+- 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到具名 ref**（例如
+  `git fetch <remote> pull/<N>/head:review-pr-<N>`），或直接用裸 SHA，交辦 prompt 裡要寫明
+  「不要用 `FETCH_HEAD`」。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
+  讀到的可能是別隻 agent 的 PR。實例（2026-10-01）：一隻探索 agent 拿 `git diff main FETCH_HEAD`
+  看到另一顆 PR 的 snowflake 改動，就誤判成「main 在 session 中途被 fast-forward」；查 `git reflog`
+  才確認 main 根本沒動。
+
 ## 持久 Work Board（跨 session 追蹤）
 
 上面的 queue 是 **per-run、跑完即棄**。跨 session 追蹤已併入單一
