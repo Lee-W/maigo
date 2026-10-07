@@ -975,6 +975,40 @@ directive to expose a provider-specific concept.
    enforcement alongside that fix. Source: apache/airflow #71104 (kaxil,
    potiuk).
 
+## 10.31 `# use next version` on a cross-provider floor is a documented convention, not an anomaly *(judgment gate — avoid a false-positive must-fix)*
+
+**Scope gate**: applies when a diff adds or keeps a cross-provider dependency
+line in a provider's `pyproject.toml` with a trailing `# use next version`
+comment (e.g. `"apache-airflow-providers-common-compat>=1.12.0",  # use next version`).
+
+- **It is the documented mechanism, not an undeclared hack.**
+  `dev/README_RELEASE_PROVIDERS.md` ("Update versions of dependent providers
+  to the next version") says contributors add the comment when they need the
+  next release of a dependent provider, and
+  `breeze release-management update-providers-next-version` (also run by the
+  `prepare-providers-documentation` skill) rewrites the floor to that next
+  version and removes the comment at release prep.
+- **Zero hits in the current `pyproject.toml` files is not evidence of "no
+  precedent".** The last release prep already replaced every marker, so a
+  grep over today's tree finds none. Don't call it an orphan, and don't
+  demand the author drop it on that basis.
+- **The real question is whether the marker is needed.** List the dependent
+  provider's APIs the diff actually uses, then check each against the latest
+  released tag (`git tag --list 'providers-<name>/*' | sort -V | tail -3`,
+  then `git show <tag>:<path>`):
+  - Something used is **not in any released tag** → the marker is correct;
+    the written floor may be stale, and that's fine because release prep
+    rewrites it.
+  - Everything used is **already released** → the marker is unnecessary.
+    Ask for an explicit floor at the earliest released version that has all
+    of it, and drop the comment (the `hook=` parameter of
+    `get_async_connection`, added in common-compat 1.17.0, is the 2026-10-01
+    example on apache/airflow #73967).
+
+Source: 2026-10-01 batch review. Reviewers called the marker "zero precedent,
+wrong" on #73967 and #73532; the second one was even a must-fix. The
+orchestrator overturned both from this README section.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,
