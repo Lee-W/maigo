@@ -90,6 +90,29 @@ mid-response`）。差別很重要：過載該退避重試，睡眠退避無效�
 3. 續跑指令要求**先盤點再續作**：讀既有報告檔 ＋ `git status` ＋ 檢視目標檔，逐項判斷做到哪，**只補缺的**
 4. 明確告知「哪幾項已確認完成、不用重做」——orchestrator 自己先盤點過，能省掉一整輪
 
+**第二個成因：單一前景指令長時間無輸出。** 睡眠之外，`stalled` 也常停在一個逼近 Bash
+10 分鐘上限、期間不吐任何輸出的前景指令上（整包 pytest、`pnpm install`、mkdocs build）。
+這是相關性觀察加合理機制（watchdog 只看得到「600 秒沒進度」），不是已證明的因果；但緩解
+成本低，所以**交辦文一律附防停滯條款**——這也不是「拆小 prompt」，任務範圍不變：
+
+> 任何可能超過 2 分鐘的指令一律背景執行、輸出導檔，用 `tail` 短指令輪詢；每條指令加
+> `timeout`；每完成一步就把結論追加進 progress 檔。
+
+續跑的上限與接手：
+
+- 同一個 agent 經 `SendMessage` 續跑後**再次** `stalled` → 不要第三次續跑同一個
+  transcript。改開新 agent，輸入＝progress 檔＋既有 scratchpad 產物＋完整失敗軌跡
+  （原交辦文、兩次停在哪個指令）；要不要換模型依
+  [`model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
+  「模型選擇與重試」（只換已授權的替代模型，換了也計入兩輪重試預算）。這不違反上面
+  第 2 點：新 agent 是接手續作，不是從頭重做。
+- 被切斷的 agent 若正在做**變異驗證**，worktree 可能殘留被改壞的檔案——續跑或接手的
+  第一件事是 `git status --short` 加 sha 對帳並還原，再做別的。
+
+> 案例（2026-10）：兩個 sonnet review agent 各 `stalled` 兩次，每次都停在整包 pytest 的變異驗證或
+> `pnpm install` 上，其中一個 worktree 殘留了 M5 變異，靠接手者先對帳才發現；之後約 14 個
+> 交辦加上防停滯條款，含 35 分鐘、165 次工具呼叫的審查，零次 `stalled`。
+
 ### Subagent 中途撞 usage / session limit
 
 與 529 不同：529 是啟動失敗，這是**跑到一半被切斷**——subagent 可能已完成部分工作（working tree 留有半成品），回傳卻只有一句 limit 訊息（含重置時間）。

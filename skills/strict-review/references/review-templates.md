@@ -83,6 +83,26 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 <一句話總結>
 ```
 
+### Head moved after this review
+
+發佈前一律再查一次 `gh pr view <n> --json headRefOid`。值與審查時不同，就在正文最末
+附這個 H2，並以 publisher 的 `--head <審查的那個完整 commit hash>` 發佈（publisher 要求完整 hash，
+短 SHA 會被拒）——不是現在的 head：
+
+```markdown
+## Head moved after this review
+
+This report covers head `<reviewed short SHA>` only. At publish time the head is
+`<current short SHA>` (<force-push / new commit `<sha>` "<subject>">, touching <files or scope>).
+The new head has not been reviewed — re-check before submitting.
+```
+
+**為什麼**：用新 head 發佈，board 會把未審的 commit 當成已審；用審查的 SHA 發佈，board 才會
+判為 `↩︎ 回你的球`，提醒重審。
+
+> 案例（2026-10 batch）：7 顆 PR 在審查後、發佈前被推新 head（force-push 或追加 commit），
+> 都以此 H2 ＋舊 SHA 發佈，交由 board 判為 `↩︎ 回你的球`。
+
 ### 多 PR batch 最終 roll-up
 
 batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行改成 roll-up：
