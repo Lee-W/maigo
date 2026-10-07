@@ -379,7 +379,7 @@ isolated `AIRFLOW_HOME` recipe below (§ "Every worktree shares one sqlite
 test DB") prevents — apply it proactively rather than diagnosing after the
 fact.
 
-### `providers/common/ai`'s sandbox tests are stuck at 12 reds on macOS, unrelated to branch content
+### `providers/common/ai`'s sandbox tests fail on macOS, unrelated to branch content
 
 Running `uv run --project providers/common/ai pytest
 providers/common/ai/tests` on macOS locally gets a stable **12 failed / 1380
@@ -400,6 +400,15 @@ This is not a regression: confirmed by diffing the branch against `main` —
 suspected (unconfirmed) root cause is a macOS `/tmp` → `/private/var`
 realpath mismatch defeating the sandbox's path allowlist check — that's a
 guess, not something read through the comparison logic yet.
+
+The count is not fixed. A later run (2026-10-07, whole
+`providers/common/ai/tests/unit`) saw **38 failed / 3096 passed**, all
+still under `sandbox/` (`test_base.py` 34, `test_sbx.py` 4), with a second
+failure shape: `find: -printf: unknown primary or operator` — BSD `find` on
+macOS has no `-printf` — plus a few regex mismatches. That branch did not
+touch `sandbox/`, but this run was not compared against a HEAD checkout, so
+treat "pre-existing" as an inference. Judge by location and failure shape,
+not by matching a remembered number.
 
 How to apply: when verifying a `providers/common/ai` hook change in this
 repo, scope both `.claude/test-command` and manual verification to
@@ -819,3 +828,30 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    `breeze-ci-image-unbuildable-arm64` entry below). Don't read "the CI
    image is unbuildable on this machine" as "skip the docs build check" —
    confirm the specific image involved before drawing that conclusion.
+
+7. **A page containing a `.. mermaid::` diagram needs its own render check
+   before a screenshot is evidence of anything.** This theme renders mermaid
+   client-side via `mermaid.run()`, and diagrams starting outside the
+   viewport are deferred until an `IntersectionObserver` fires — a headless
+   screenshot taken before that fire either shows no `<svg>` yet or an `<svg>`
+   mid-layout. Poll before capturing:
+
+   ```js
+   document.querySelectorAll('pre.mermaid').length ===
+     document.querySelectorAll('pre.mermaid svg').length
+   ```
+
+   Scrolling a diagram into view to trigger that render has its own trap:
+   setting `scrollTop` or calling `window.scrollTo` without an explicit
+   `behavior: 'instant'` can pick up a smooth-scroll animation from the
+   page's CSS, so a screenshot taken ~300-400ms later lands mid-scroll —
+   the capture shows the fixed header overlapping content that should
+   already have scrolled past it. Force instant scroll on all of
+   `document.documentElement.scrollTop`, `document.body.scrollTop`, **and**
+   `window.scrollTo({top, left: 0, behavior: 'instant'})` together, then
+   re-read `window.scrollY` to confirm it actually reached the target before
+   capturing. The simplest reliable capture is a full-page screenshot with no
+   `clip` at all (`Page.captureScreenshot` with no `clip`/`captureBeyondViewport`)
+   — a clipped capture computed from a pre-scroll bounding box, or taken
+   right after programmatic scroll, has repeatedly produced a blank or
+   wrongly-offset image even though the diagram itself rendered correctly.

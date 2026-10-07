@@ -442,6 +442,7 @@ sub-check states. The file covers:
 - **10.28** A schema-validated new field needs an authoring-schema cross-check (Request changes, scope-gated to new schema-validated fields such as a `provider.yaml` sub-key)
 - **10.29** Template-field value-path check: coercion belongs at the top of `execute()`, every entry point sharing the coercion, native and rendered-string paths must accept the same values (Request changes, scope-gated to operators with a template field)
 - **10.30** Two checks before touching a provider metadata schema: a single-provider concept stays out of the shared schema/directive; only the authoring schema (`provider.yaml.schema.json`) may be tightened, never the runtime one (`provider_info.schema.json`) (Request changes, scope-gated to those two schema files)
+- **10.31** `# use next version` on a cross-provider floor is the documented release-prep mechanism; zero hits in today's `pyproject.toml` files is not "no precedent". Only ask whether every API used is already released (judgment gate, scope-gated to cross-provider floors carrying the marker)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -552,7 +553,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.30, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.31, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 
