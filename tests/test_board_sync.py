@@ -727,6 +727,92 @@ class TestCli:
         assert json.loads(capsys.readouterr().out)["count"] == 1
 
 
+class TestArchive:
+    def put_review(self, root: Path, n: int) -> Path:
+        path = root / ".maigo" / "review" / str(n)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "rubric.md").write_text("# Review rubric: x\n")
+        return path
+
+    def test_moves_review_dir_and_detail_file_under_archive(self, tmp_path):
+        self.put_review(tmp_path, 7)
+        put_detail(tmp_path, 7)
+        result = sync.archive_urls(tmp_path, [url(7)], REPO)
+        assert result == [
+            {
+                "url": url(7),
+                "id": "7",
+                "moved": ["review/7", "i/7.md"],
+                "skipped": [],
+                "missing": [],
+            }
+        ]
+        archive = tmp_path / ".maigo" / "_archive"
+        assert (
+            archive / "review" / "7" / "rubric.md"
+        ).read_text() == "# Review rubric: x\n"
+        assert (archive / "i" / "7.md").is_file()
+        assert not (tmp_path / ".maigo" / "review" / "7").exists()
+        assert not (tmp_path / ".maigo" / "i" / "7.md").exists()
+
+    def test_existing_destination_is_never_overwritten(self, tmp_path):
+        self.put_review(tmp_path, 7)
+        put_detail(tmp_path, 7)
+        kept = tmp_path / ".maigo" / "_archive" / "i" / "7.md"
+        kept.parent.mkdir(parents=True)
+        kept.write_text("older archive\n")
+        result = sync.archive_urls(tmp_path, [url(7)], REPO)[0]
+        assert result["moved"] == ["review/7"]
+        assert result["skipped"] == [{"path": "i/7.md", "reason": "destination exists"}]
+        assert kept.read_text() == "older archive\n"
+        assert (tmp_path / ".maigo" / "i" / "7.md").is_file()
+
+    def test_missing_sources_and_bad_urls_are_reported(self, tmp_path):
+        foreign = "https://github.com/x/y/pull/3"
+        result = sync.archive_urls(tmp_path, [url(8), "not-a-url", foreign], REPO)
+        assert result[0] == {
+            "url": url(8),
+            "id": "8",
+            "moved": [],
+            "skipped": [],
+            "missing": ["review/8", "i/8.md"],
+        }
+        assert result[1] == {
+            "url": "not-a-url",
+            "result": "error",
+            "message": "不是 issue/PR URL",
+        }
+        assert result[2]["id"] == "y-3"
+        assert not (tmp_path / ".maigo" / "_archive").exists()
+
+    def test_internal_dir_is_untouched(self, tmp_path):
+        internal = tmp_path / ".maigo" / "_internal" / "board"
+        internal.mkdir(parents=True)
+        (internal / "snapshot.json").write_text("{}")
+        put_detail(tmp_path, 7)
+        before = {k: v for k, v in tree_hash(tmp_path).items() if "_internal" in k}
+        sync.archive_urls(tmp_path, [url(7)], REPO)
+        after = {k: v for k, v in tree_hash(tmp_path).items() if "_internal" in k}
+        assert before == after
+
+    def test_plan_ignores_archived_items(self, tmp_path, gh):
+        make_board(tmp_path, row(1), details=(1,))
+        self.put_review(tmp_path, 9)
+        put_detail(tmp_path, 9)
+        before = plan(tmp_path, discovery=False, dry_run=True)
+        assert [r["url"] for r in before["removed"]] == [url(9)]
+        sync.archive_urls(tmp_path, [url(9)], REPO)
+        after = plan(tmp_path, discovery=False, dry_run=True)
+        assert after["removed"] == [] and after["errors"] == []
+        assert url(9) not in [a["url"] for a in after["additions"]]
+
+    def test_cli(self, tmp_path, capsys):
+        put_detail(tmp_path, 7)
+        args = ["archive", "--maigo-root", str(tmp_path), *TestCli.common, url(7)]
+        assert sync.main(args) == 0
+        assert json.loads(capsys.readouterr().out)[0]["moved"] == ["i/7.md"]
+
+
 class TestFailClosedDeletion:
     @pytest.mark.parametrize(
         "mangled",

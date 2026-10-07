@@ -16,7 +16,9 @@ compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見
   上次刷新結束時 board 上有哪些項目與勾選狀態；原子寫入。
 - `backup/<UTC ts>/`：`refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份。
 
-另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記。
+另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記；`archive` 子命令
+把已結案項目的 `review/<id>/` 與 `i/<id>.md` 搬進 `.maigo/_archive/` 同名路徑（目的地已存在就跳過，
+絕不覆蓋；不改 `board.md`，索引行仍由 orchestrator 處理）。
 
 子命令（都要 `--maigo-root <repo root> --repo <owner/name> --you <login>`）：
 
@@ -25,6 +27,7 @@ python3 scripts/board_sync.py plan [--dry-run] [--max-new 50] [--no-discovery] .
 echo '[{"url","head","change","inferred"}]' | python3 scripts/board_sync.py ack ...
 python3 scripts/board_sync.py drop --reason {drop,dd,aged,closed} <url...> ...
 python3 scripts/board_sync.py revive --reason manual <url...> ...
+python3 scripts/board_sync.py archive <url...> ...
 python3 scripts/board_sync.py snapshot ...
 ```
 
@@ -65,6 +68,7 @@ import maigo_dir_catalog  # noqa: E402
 import review_report  # noqa: E402
 
 INTERNAL_BOARD_DIR = Path("_internal") / "board"
+ARCHIVE_DIR = "_archive"
 LEDGER_NAME = "dropped.jsonl"
 SNAPSHOT_NAME = "snapshot.json"
 ORPHAN_GRACE = timedelta(minutes=10)
@@ -841,6 +845,42 @@ def drop_urls(
     return results
 
 
+def archive_urls(maigo_root: Path, urls: list[str], repo: str) -> list[dict]:
+    """Move each URL's `review/<id>/` and `i/<id>.md` under `_archive/`; never overwrite.
+
+    No GitHub call: the orchestrator decides which URLs are settled (same as `drop`)."""
+    maigo_dir = maigo_root / ".maigo"
+    archive_dir = maigo_dir / ARCHIVE_DIR
+    results = []
+    for url in urls:
+        url = url.strip()
+        identifier = board_state.github_ref(url, repo) if ref_key(url) else None
+        if identifier is None:
+            results.append(
+                {"url": url, "result": "error", "message": "不是 issue/PR URL"}
+            )
+            continue
+        result: dict = {
+            "url": url,
+            "id": identifier,
+            "moved": [],
+            "skipped": [],
+            "missing": [],
+        }
+        for rel in (f"review/{identifier}", f"i/{identifier}.md"):
+            source, destination = maigo_dir / rel, archive_dir / rel
+            if not source.exists():
+                result["missing"].append(rel)
+            elif destination.exists():
+                result["skipped"].append({"path": rel, "reason": "destination exists"})
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                source.rename(destination)
+                result["moved"].append(rel)
+        results.append(result)
+    return results
+
+
 def revive_urls(
     maigo_root: Path, urls: list[str], reason: str, now: datetime | None = None
 ) -> list[dict]:
@@ -918,7 +958,7 @@ def main(argv: list[str] | None = None) -> int:
     except ImportError as error:
         board_refresh = None
         refresh_parser.set_defaults(import_error=str(error))
-    for name in ("plan", "ack", "drop", "revive", "snapshot"):
+    for name in ("plan", "ack", "drop", "revive", "archive", "snapshot"):
         p = sub.add_parser(name)
         p.add_argument("--maigo-root", type=Path, required=True)
         p.add_argument("--repo", required=True)
@@ -932,6 +972,8 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("urls", nargs="+")
         if name == "revive":
             p.add_argument("--reason", choices=("manual",), required=True)
+            p.add_argument("urls", nargs="+")
+        if name == "archive":
             p.add_argument("urls", nargs="+")
     args = parser.parse_args(argv)
     if args.command == "refresh":
@@ -957,6 +999,8 @@ def main(argv: list[str] | None = None) -> int:
             result = drop_urls(root, args.urls, args.reason)
         elif args.command == "revive":
             result = revive_urls(root, args.urls, args.reason)
+        elif args.command == "archive":
+            result = archive_urls(root, args.urls, args.repo)
         else:
             result = write_snapshot(root, args.repo)
     except (BoardLegacyError, OSError, ValueError) as error:
