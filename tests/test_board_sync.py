@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import board_refresh as refresh
 from scripts import board_sync as sync
 from scripts import review_report as report
 
@@ -156,6 +157,49 @@ class TestParseBoard:
         line = sync.parse_board(text)["lines"][0]
         assert line["note"] == "（分支 x）" and line["author"] == "me"
         assert line["badges"] == ["🧠"] and line["detail"] == "i/4.md"
+
+    @pytest.mark.parametrize(
+        "author", ["app/github-actions", "app/dependabot", "me", "bot[bot]"]
+    )
+    def test_author_handle_is_preserved_whole(self, author):
+        text = (
+            f"## 🎯 下一件\n- [ ] 👀 已看完 @{author} i/73822.md — [main] Upgrade CI\n"
+        )
+        parsed = sync.parse_board(text)
+        assert parsed["errors"] == []
+        line = parsed["lines"][0]
+        assert line["author"] == author and line["detail"] == "i/73822.md"
+        assert line["title"] == "[main] Upgrade CI"
+
+    @pytest.mark.parametrize("author", ["app/github-actions", "me"])
+    def test_render_parse_render_round_trip_is_stable(self, author):
+        def render(line):
+            return refresh.render_line(
+                number=None,
+                checked=line["checked"],
+                type="👀",
+                status=line["status"],
+                note=line["note"],
+                author=line["author"],
+                badges=line["badges"],
+                detail=line["detail"],
+                title=line["title"],
+            )
+
+        first = render(
+            {
+                "checked": False,
+                "status": "已看完",
+                "note": None,
+                "author": author,
+                "badges": [],
+                "detail": "i/73822.md",
+                "title": "Upgrade CI",
+            }
+        )
+        parsed = sync.parse_board(f"## 🎯 下一件\n{first}\n")
+        assert parsed["errors"] == []
+        assert render(parsed["lines"][0]) == first
 
     @pytest.mark.parametrize(
         "bad,needle",

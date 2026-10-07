@@ -87,7 +87,7 @@ _URL_RE = re.compile(
 _ITEM_RE = re.compile(r"^(?:(?P<number>\d+)\.|-) \[(?P<mark>[ xX])\] (?P<rest>.*)$")
 _BODY_RE = re.compile(
     r"\s*(?P<note>（[^）]*）)?"
-    r"\s*(?:@(?P<author>[A-Za-z0-9_-]+(?:\[bot\])?))?"
+    r"\s*(?:@(?P<author>[A-Za-z0-9_/-]+(?:\[bot\])?))?"
     r"\s*(?P<badges>(?:[🧠💤🔖]\s*)*)"
     r"(?P<detail>i/\S+?\.md)?"
     r"\s*—\s?(?P<title>.*)$"
