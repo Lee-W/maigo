@@ -1062,6 +1062,38 @@ class TestMain:
             "gh pr review <n> --comment --body-file <review-draft>"
         )
 
+    def _run_with_root(self, monkeypatch, capsys, root):
+        stdin_payload = json.dumps(
+            [
+                self._unposted_verdict_item(
+                    "https://github.com/apache/airflow/pull/58543"
+                )
+            ]
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_payload))
+        args = ["--you", YOU, "--repo", "apache/airflow", "--maigo-root", str(root)]
+        assert bs.main(args) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out[0]["status"] == "待送出"
+        return out[0]["next_action"]
+
+    def test_unposted_verdict_with_existing_draft_gives_gh_command(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        draft = tmp_path / ".maigo" / "review" / "58543" / "draft.md"
+        draft.parent.mkdir(parents=True)
+        draft.write_text("body\n")
+        assert self._run_with_root(monkeypatch, capsys, tmp_path) == (
+            "gh pr review <n> --comment --body-file .maigo/review/58543/draft.md"
+        )
+
+    def test_unposted_verdict_without_draft_asks_to_draft_first(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        assert self._run_with_root(monkeypatch, capsys, tmp_path) == (
+            "尚無草稿：先起草 `.maigo/review/58543/draft.md`（`/maigo:review` §4.5 裁決 gate）"
+        )
+
 
 # ---------------------------------------------------------------------------
 # `--maigo-root` 自動算 local_verdict_at（end-to-end，走 main()/CLI）

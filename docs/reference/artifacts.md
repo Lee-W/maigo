@@ -29,7 +29,7 @@
 |------|----------|--------|----------|----------|
 | `review-rubric` | `.maigo/review/<id>/rubric.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 對照基準，review 全程比對用；review 結束後留存 |
 | `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記 |
-| `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 永遠指向這個路徑 |
+| `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
 
@@ -60,6 +60,7 @@
 |------|----------|--------|----------|----------|
 | Work Board 索引 | `.maigo/board.md` | orchestrator（`/maigo:board` / `/maigo:review`） | `scripts/board_state.py` + [work-board skill](../skills/work-board.md) | 跨 session 常駐，不隨單次任務結束而收檔 |
 | Work Board 細節檔 | `.maigo/i/<slug>.md` | 同上 | 同上 | 跟著對應 issue/PR 的追蹤狀態走；沒有索引行引用的孤兒細節檔視為 `dd`（使用者刪了那一行），見 [work-board skill](../skills/work-board.md) §3a |
+| 已結案封存 | `.maigo/_archive/review/<id>/`、`.maigo/_archive/i/<id>.md` | orchestrator（`board_sync.py archive`） | `scripts/board_sync.py` + [work-board skill](../skills/work-board.md) §3「細節檔生命週期」 | merged／closed／老化項目的 review 目錄與細節檔從 `review/`、`i/` 搬來這裡留存；不覆蓋既有封存，不被 board 對帳讀取 |
 
 board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`）、skill 鏡射
 人讀版本（`work-board`）、test 守一致（`tests/test_board_state.py`），三方鎖住，

@@ -350,6 +350,9 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | 沒有本地 report 或已送出 review | `待 review` → `/maigo:review <n>` | 🎯 | P4 |
 
 `board_state.py --maigo-root <repo-root>` 讀 report 的明確時間與 head；舊報告才退回 mtime。
+`待送出` 的下一步：`.maigo/review/<id>/draft.md` 存在才給 `gh pr review --body-file` 指令，不存在時
+改為「尚無草稿：先起草 …（§4.5 裁決 gate）」——否則使用者照 board 跑指令會因檔案不存在而失敗
+（2026-10 batch 有 5 顆 `待送出` 指向沒起草的 draft.md）。沒給 `--maigo-root` 時無從判斷，維持給指令。
 `PENDING` / `DISMISSED` 的 GitHub review 不算已送出。`--reviews` 檢視只列 `needs_review`
 為 true 的項目：待 review、回你的球、待送出，依 rank 排序；**這個過濾結果不得拿去重寫
 完整 board**。索引顯示標題與貢獻者；最後 review／已看完時間在細節與對話待看清單中顯示。
@@ -399,7 +402,20 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
 - **建立**：項目首次進 board → 建細節檔（§1a）。
 - **更新**：refresh 或任何寫回 → 重寫事實區，`## 判斷` / `## 筆記` 原樣保留（§1a 硬規則）。
 - **回收**：項目離開 board（✅ 區 7 天老化清除、`--drop` 後也走同一條老化規則）→
-  連細節檔一起刪，不留孤兒檔。`refresh --apply` 刪除前會先把該細節檔備份到 `_internal/board/backup/`。
+  產物**封存而非刪除**，不留孤兒檔：orchestrator 在 `drop --reason closed|aged` 之後，對同一批
+  URL 跑 `board_sync.py archive <url...>`，把 `.maigo/review/<id>/`（整個目錄）搬到
+  `.maigo/_archive/review/<id>/`、`.maigo/i/<id>.md` 搬到 `.maigo/_archive/i/<id>.md`。它不查
+  GitHub、不判斷 PR 狀態（哪些已結案由 orchestrator 決定，同 `drop`），目的地已存在就跳過不覆蓋，
+  逐 URL 回報 moved／skipped／missing；`_internal/` 不碰。**順序不能顛倒**：只對已經 `drop` 掉、
+  board 上已無索引行的項目跑 `archive`；索引行還在就先搬走 `i/<id>.md`，下次 `plan` 會讀不到細節檔，
+  `review/<id>/review.md` 一消失，artifact 對帳也可能把項目當新項目補回——`archive` 本身沒有這層防呆。
+  `refresh --apply` 目前仍直接刪老化的細節檔
+  （刪前備份到 `_internal/board/backup/`），對它輸出的 `aged` URL 再跑 `archive`，`review/<id>/`
+  照樣封存、`i/` 回 missing 屬正常。
+  **為什麼**：已結案的 review 留在 `review/` 會混進「目前在審」的產物清單；直接刪又丟掉日後要翻的
+  審查紀錄。封存後 `review/` 與 `i/` 只剩進行中的項目，`plan` 的孤兒偵測與 artifact 對帳也不再看到它們。
+  案例：一次 40 顆 PR 的 batch 結束後手動封存了 25 個 review 目錄、10 個細節檔——使用者早已在自己的
+  repo 用同一個 `_archive/` 佈局手動執行，規格卻從未寫過。
 - **孤兒偵測（dd 語意）**：`/maigo:board` 刷新時比對 `.maigo/i/*.md` 與 board 索引行；沒有任何
   索引行引用的細節檔，代表使用者用 `dd` 刪了那一行——`board_sync.py plan` 把它判成 dd 並寫進排除
   紀錄（§3a）。剛寫好的細節檔有 10 分鐘寬限（delegate 命令先寫細節檔、後 `Edit` 加行，plan 若

@@ -53,7 +53,8 @@ stdlib-only；`classify()` 與 `compute_badges()` 皆為純函式——`classify
 `_REVIEW_DRAFT_PLACEHOLDER`；`main()` 在 `url` 可解析出識別碼時，用
 function-level import 把它換成 `artifact_path("review-draft", ref)` 算出的
 真實路徑（見 `main()` 內註解說明為何不能在模組頂層 import `artifact_path`）；
-`url` 缺失或無法解析時保留佔位字，不假造路徑。
+`url` 缺失或無法解析時保留佔位字，不假造路徑。有給 `--maigo-root` 而該草稿檔不存在時，
+`next_action` 改為「尚無草稿：先起草 …」提示，不給一條照跑會失敗的 `gh pr review` 指令。
 """
 
 from __future__ import annotations
@@ -153,6 +154,12 @@ class StatusMeta:
 # function-level import 的 `artifact_path("review-draft", ref)` 換掉這段
 # （見 `main()` 內的 circular-import 註解）；url 缺失時保留佔位字，不假造路徑。
 _REVIEW_DRAFT_PLACEHOLDER = "<review-draft>"
+
+
+def _missing_draft_action(draft: str) -> str:
+    """`待送出` hint when `--maigo-root` shows the draft was never written."""
+    return f"尚無草稿：先起草 `{draft}`（`/maigo:review` §4.5 裁決 gate）"
+
 
 _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P0：抓不到
@@ -787,9 +794,11 @@ def evaluate_items(
             ref = github_ref(item_url, repo)
             if ref is not None:
                 artifact_path = _import_artifact_path()
-                next_action = next_action.replace(
-                    _REVIEW_DRAFT_PLACEHOLDER, artifact_path("review-draft", ref)
-                )
+                draft = artifact_path("review-draft", ref)
+                if maigo_root and not (Path(maigo_root) / draft).is_file():
+                    next_action = _missing_draft_action(draft)
+                else:
+                    next_action = next_action.replace(_REVIEW_DRAFT_PLACEHOLDER, draft)
 
         needs_review = item_type is ItemType.REVIEW_PR and result.status in {
             BoardStatus.PENDING_REVIEW,
