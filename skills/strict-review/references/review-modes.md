@@ -128,3 +128,7 @@ obviously belong to a different, unrelated PR
 (`gh api compare/<old>...<new> --jq '.commits[].commit.message'`). If so,
 it's a rebase — use the current `gh pr diff <n>` (against `main`) instead to
 see the PR's actual delta.
+
+**Stacked PR whose upstream already squash-merged**: `gh pr diff` and the PR's size
+include the upstream's pre-squash commits — find the real delta and report the needed
+`rebase --onto` per [`review-agent-handoff.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-agent-handoff.md).

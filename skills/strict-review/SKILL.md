@@ -184,6 +184,11 @@ than reviewing from scratch — the two-step ancestor+date check, the
 rebase-range pitfall, and `isResolved` reliability (see below) are in
 `references/review-modes.md` and `references/review-judgment.md`.
 
+When the whole review (or a delta re-review) is handed to a single subagent —
+minimum delegation clauses, text hand-back instead of a report file, which
+claims the orchestrator re-checks, stacked PRs whose upstream already merged —
+see `references/review-agent-handoff.md`.
+
 **Mutation test 作為修法驗證證據**：光看「新增的斷言轉綠」不夠——測試可能本來就不會失敗，
 或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
 （證明測試真的在守這條修法）→ 復原修法 → 測試轉綠。復原動作依上方「共用 working tree 上的
