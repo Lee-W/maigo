@@ -216,6 +216,10 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
 - 新報告清除上一輪「已看完」標記；要由使用者看完這一版再標記。
 
 source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保留舊檔；不要直接 Write 繞過。
+舊版（沒有 metadata 的）報告只有在含 `# Review:` 標題**且**有一行 `**PR:** <canonical-url>` 時，
+才會被認成同一個 source。標題寫成 `# Review: <owner/repo>#<n> — …`、卻少了 `**PR:**` 那一行的舊報告，
+會被判成 `Review ownership conflict`。先確認該檔確實是同一顆 PR 的舊報告，在 H1 下方補一行
+`**PR:** <canonical-url>`，再重新 publish；不要改用 Write 覆寫。
 此 publisher 是 `review` kind 的寫入入口，其餘 kind 繼續使用 artifact_path 的 ownership
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 

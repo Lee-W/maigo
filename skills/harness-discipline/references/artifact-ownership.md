@@ -57,7 +57,9 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    的寫手或代辦的 orchestrator `ls` 對應資料夾（非巢狀 kind 是
    `.maigo/`；巢狀 kind 是 `.maigo/review/<id>/` 或 `.maigo/issue/<id>/`）
    加讀 H1 核對，確認候選路徑真的沒被佔用，必要時往下遞增到 `-3`、`-4`；
-   不要對 `suggest:` 的路徑照單全收。
+   不要對 `suggest:` 的路徑照單全收。**這一步要有 Bash 才做得到**——沒有
+   Bash 的 agent（🩵 Tomori）永遠不會走到這裡：conflict 一律由 orchestrator
+   在 spawn 她之前處理掉，處理結果連同最終路徑才交給她。
 
 4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）與分目錄前扁平檔
    （`flat_exists:` 那行指的檔案，只有巢狀 kind 才可能有）都只可讀、不可當
