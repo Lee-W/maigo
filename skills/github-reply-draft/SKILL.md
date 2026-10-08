@@ -156,3 +156,7 @@ reviewer's *suggested* fix (not just their cited example) before applying it
 literally, and checking PR review threads before a "unify / clean up" sweep
 touches a line you didn't write — it may be a reviewer-directed change
 already landed via `fixup!`.
+
+Draft-shape rules (GitHub `suggestion` blocks for concrete fixes, one bullet per reviewer point,
+a draft for every listed thread, design replies that pitch differentiation) live in
+[`references/draft-shape.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/draft-shape.md).

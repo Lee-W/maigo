@@ -383,6 +383,33 @@ Tests live in `dev/registry/tests/`:
 `cd dev/registry && uv run --group dev pytest tests/ -v`,
 `.github/workflows/registry-tests.yml:64`).
 
+## Registry cards use concepts that hold for any provider, not one provider's vocabulary
+
+The registry (`registry/src/provider-version.njk`) is shared by every provider. When adding a card,
+the title and concept must hold for a second provider: for example one **External services** card
+whose rows each name their source type (Connection / Toolset), rather than a card for a concept
+only one provider has (Toolsets, declared only by common.ai at the time). On apache/airflow #72940
+a maintainer asked for "a more generalized solution", and the fix merged the Toolsets card and the
+per-connection external-services sub-table into one generic External services card.
+
+---
+
+## Before rendering a `provider.yaml` field in the registry or docs, confirm schema and real data
+
+Check two things first: (1) `airflow-core/src/airflow/provider.yaml.schema.json` defines the field
+— many sections are `additionalProperties: false`, so an undefined field cannot be filled in and is
+rejected by `check-provider-yaml-valid`; (2) at least one real `provider.yaml` fills it in.
+Screenshots made by injecting fake data into the gitignored generated JSON only prove that the
+template can render, not that a real build will show anything; mark in the PR description and
+screenshots which parts are fake data.
+
+Case (apache/airflow #72940): the extractor read `toolsets[].external-services`, but the schema's
+`toolsets[]` only had `integration-name` / `python-modules` with `additionalProperties: false`, and
+no `provider.yaml` filled it — so the Toolsets card would never render in a real build, while the
+PR screenshot (a provider "with toolset") used fake data. The field and data came from #72939.
+
+---
+
 ## Registry frontend has zero automated verification — verify by hand instead
 
 `registry/`'s front-end (`src/js/*.js`, `*.njk`, `src/css/*.css`) has **no

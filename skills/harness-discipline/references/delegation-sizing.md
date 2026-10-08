@@ -33,3 +33,13 @@ Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Le
   選定的流程每一步都要走。
 
 「精實」是在設計時選對形狀，不是執行時把已選定的步驟臨時跳過。
+
+## 派驗證 agent 跑大型 pytest：分開跑、導檔、加 timeout
+
+派驗證 agent（Taki）跑 Airflow 路由這類大型 pytest 時，**不要把多個長跑 pytest 串在同一個任務**。
+曾因串多個長跑測試、600 秒無進度被系統中止（agent 狀態 failed）；改成分開跑後穩定完成（約
+130 秒內全綠）。被中止的 pytest 也可能是獨立 DB 被弄壞的原因之一，但這是推測，未證實。
+
+**怎麼套用**：交辦文寫明——每個 pytest 分開跑、一次一條；輸出導到 scratchpad 檔
+（`> log 2>&1; echo EXIT=$?`）；用 `timeout 480` 包住；只 tail 結果；逐條回報逾時的是哪一步，
+不要空等。

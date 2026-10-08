@@ -208,3 +208,71 @@ How to apply, in order:
 The same check applies mid-conflict-resolution, not just after `--continue`:
 a hunk in a non-conflicting region that "is already correct" is often
 upstream having done it first, not your hunk having applied cleanly.
+
+## Rebase conflict resolution can replace an earlier commit's changelog note
+
+A conflict resolution can **replace** instead of **append**. When several commits each add a
+`.. note::` to the same provider changelog section, a hand-resolved rebase conflict easily writes
+the later commit's note as a replacement of the earlier one: the earlier note vanishes, the diff
+reads like a rewording, and tests and prek stay green — no signal at all. Case (apache/airflow
+#72149): one commit added a note that a deferred timeout now raises `OpenAIBatchTimeout`; the next
+commit's conflict resolution swapped it for a "deferred timeout cancels the batch" note. A reviewer
+caught it a round later, and the dropped text was the most compatibility-breaking part
+(`OpenAIBatchTimeout` is not a subclass of `OpenAIBatchJobException`).
+
+How to apply: after any rebase with conflicts, run `git show <c> -- <changelog>` for each commit
+that touched the changelog and confirm each diff is pure additions (`+`), not a previous commit's
+`+` lines turned into `-`. Also check placement: if that version has already been cut as an rc,
+the note belongs above the version heading (precedent: `providers/keycloak/docs/changelog.rst`).
+
+## A conflict-free cherry-pick onto a branch that changed the same logic still needs a test run
+
+When moving a follow-up commit onto a branch that later changed the same logic, `git merge-tree`
+exiting 0 only proves the **text** doesn't conflict, not that the semantics are compatible. Case:
+a test fixture title from commit C2 stopped being accepted once W1 added a `$` anchor to the
+matching pattern; `merge-tree` was clean and the cherry-picked test went red. Run the full test
+suite after the move before saying it can be merged; until then the most you may claim is "no
+textual conflict".
+
+## Prove a rebase lost nothing with a delta-of-deltas
+
+To claim after a rebase that "no hunk was lost or altered", the only strong evidence is comparing
+the two deltas (old base → old tip vs. new base → new tip):
+
+```sh
+OLD_BASE=$(git merge-base <old tip> <new base>)
+git diff $OLD_BASE <old tip> -- <dirs this branch touched> > before.diff
+git diff <new base> <new tip> -- <same dirs>              > after.diff
+diff <(grep -vE "^(index |@@)" before.diff) <(grep -vE "^(index |@@)" after.diff)
+```
+
+Expected: only context lines around the insertion points differ (where conflict resolution changed
+what our hunk attaches to). Lines we added or removed must be byte-identical.
+
+Three traps:
+
+1. **Don't compute the base with `~N`.** `<old tip>~13` walks first-parent into unrelated upstream
+   history and unrelated files appear in the diff. Always use `git merge-base <old tip> <new
+   base>`.
+2. **"Old tip" is the tip right before the rebase**, not the tip at the start of your session.
+   Using the session-start SHA makes the "differences" the commits added since — a wasted round.
+3. **Limit to the directories the branch actually touched.** The rebase target usually carries
+   many upstream commits that would drown the signal.
+
+Not evidence: "tests are green" (a dropped hunk may be uncovered); "same test count" (first check
+whether the upstream commits touched test files at all — `git show --stat <new base>` only shows
+the last one, read the whole range); "`git status` is clean / rebase succeeded" (conflict markers
+that were committed leave status clean too — grep for leftover markers over **the same scope you
+claim**, not a narrower one). Related: a dropped hunk makes the commit message stale (see the
+section above); this section is how to prove whether any hunk was dropped.
+
+## Stacking on someone else's unmerged PR: state commit ownership in the options up front
+
+Before stacking a branch on another contributor's unmerged PR (e.g. to use an API it adds), put
+the consequence into the options you give the user: their branch and PR will **carry the other
+PR's commits** until it merges, and any rebase by its author must be followed. List the
+alternative: split out the part that doesn't depend on it and base that directly on `main`, and
+stack the dependent part after the other PR merges. Don't just report "stacked on #N's head" after
+the fact. Case (2026-09-30): Snowflake Cortex work was stacked on apache/airflow #73532; the user
+asked "why aren't the first two commits mine?" and it was split — auth + model hook based on
+`main`, the managed-agent part waiting for #73532 to merge.

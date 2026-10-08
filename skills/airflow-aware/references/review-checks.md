@@ -98,11 +98,13 @@ If the diff modifies code under `airflow-core/`, `chart/`, or `dev/mypy/` and is
 user-visible (feature / bugfix / breaking change / doc change with user impact),
 look for a matching
 `<distribution>/newsfragments/{PR_NUMBER}.{bugfix|feature|improvement|doc|misc|significant}.rst`
-file in the diff. Missing → flag as **Request changes** (not Block).
+file in the diff. Missing → flag as **Request changes** (not Block) — this is the
+author-side rule, for your own diff; for someone else's PR see the last bullet below
+and strict-review `review-judgment.md` §32.
 **Do not** require newsfragments for changes under `providers/` or `airflow-ctl/`
 — their release managers regenerate the changelog from `git log`.
 
-Three related sub-judgments for unreleased-version work:
+Four related sub-judgments for unreleased-version work:
 
 - **`Guard:` not `Regression:` for a bug caught during the same unreleased feature's own
   development.** A test or comment describing a bug found and fixed while a feature is
@@ -136,6 +138,16 @@ Three related sub-judgments for unreleased-version work:
   tier **did**. Conclusion for this shape (additive optional field + UI
   prefill): don't add one, let a reviewer request it if they disagree — this
   is a convention-conformance input, not a waiver on the checklist item.
+- **When reviewing someone else's PR, a missing newsfragment or provider
+  changelog entry is not a must-fix and does not by itself justify Request
+  changes.** Mention it at most as one optional sentence in the review body.
+  Evidence: maintainers approved #73959 (core bug fix, no newsfragment) with no
+  comment on it, and #73957 (common.ai retry-behaviour change, no changelog) with
+  only a naming inline; `AGENTS.md` itself defaults to *not* adding a newsfragment.
+  Downgrade it to a nit or suggestion and keep it out of the verdict. If the PR
+  itself admits a breaking change (e.g. its migration path lists removed APIs) it
+  may be raised in the body, but leave whether to block to the maintainer. A
+  newsfragment whose *content* misleads users is a separate defect — see 10.11.
 
 ## 10.7 Provider changelog: breaking/important behavior changes must be hand-edited into `docs/changelog.rst` *(Request changes)*
 
@@ -1003,11 +1015,45 @@ comment (e.g. `"apache-airflow-providers-common-compat>=1.12.0",  # use next ver
     Ask for an explicit floor at the earliest released version that has all
     of it, and drop the comment (the `hook=` parameter of
     `get_async_connection`, added in common-compat 1.17.0, is the 2026-10-01
-    example on apache/airflow #73967).
+    example on apache/airflow #73967). How to choose that floor: see 10.33.
 
 Source: 2026-10-01 batch review. Reviewers called the marker "zero precedent,
 wrong" on #73967 and #73532; the second one was even a must-fix. The
 orchestrator overturned both from this README section.
+
+## 10.32 A zero-argument method that returns derived state should be a `@property` *(nit)*
+
+When the diff adds a method that takes only `self`, has no side effects, and just returns a value
+derived from instance attributes, suggest `@property` (with a ```` ```suggestion ```` block).
+Maintainers hand-posted exactly this on apache/airflow #73984 (`_declared_capabilities`) and #73990
+("maybe making it a property?") — both were misses our review had not caught. When mechanically
+listing new `def`s for the naming check (strict-review item 4), also judge each one: is it a
+zero-arg derived-value getter? Methods that do I/O, mutate state, or compute expensively are not
+candidates. This does not conflict with the action-verb rule for callables: once it becomes a
+property, a noun name is correct.
+
+## 10.33 Setting a cross-provider optional-extra floor: check every API used against released tags *(Request changes)*
+
+**Scope gate**: applies when a diff adds or changes a cross-provider optional-extra dependency
+floor in a provider's `pyproject.toml`. For the `# use next version` marker itself and the "is
+everything already released?" question, see 10.31 — this section covers how to *choose* the floor.
+
+Don't copy a sibling provider's floor. (1) List each API the code actually uses — constructor
+parameters, overridden methods, imported symbols. (2) For each candidate version run
+`git show providers-<dist>/<ver>:<path>` to confirm they all exist. (3) Take the lowest
+**released** version where all exist (a real tag, not an rc, with a changelog section for it).
+(4) Check the transitive lower bounds that version brings in are enough — install it and verify
+(e.g. a version that raises `pydantic-ai-slim` to a floor that really ships the class needed).
+
+Case: a vendor provider's `common.ai` extra was set to `>=0.9.0` by copying another provider's
+line in apache/airflow #73532, but the model hook called `super().__init__(llm_conn_id, model_id,
+fallback_conn_ids, **kwargs)` and `fallback_conn_ids` is absent from the 0.9.0 tag (added in
+0.10.0, #72156) — a `TypeError` on 0.9.0. A sibling's floor reflects only the APIs it uses. Put
+the evidence (tag:path:line) in the PR description; once the floor is a released version, drop the
+`# use next version` marker. In-workspace dev-group dependencies carry no version and need no
+floor.
+
+Source: 2026-09-29 vendor-provider extra-floor fix (apache/airflow #73532 sibling floor).
 
 ## Don't proliferate example Dags — fold into an existing one
 

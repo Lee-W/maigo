@@ -111,3 +111,8 @@ exit 非 0 讀成「已清空」，就是拿假陰性當範圍封閉的證據。
 3. #70190 — 平行 dict-shaped section 的 drift 被抓兩次（先 class-path 欄位，再 integration 欄位）
 4. #70190 — 共用常數改 tuple arity，計畫列 3 處解包站點，實作重新枚舉後發現實際 5 處
 5. 拆分被引用的資料檔 — 靜態產生器對壞引用靜默降級，build exit 0 但產物少了區塊
+
+## 動手前的五個補充形狀
+
+抽共用邏輯、加子類 override、加 swallow-and-log wrapper、移植機制、蓋新抽象——五種「改一處」形狀各自的
+枚舉要點在 `references/enumeration-patterns.md`。

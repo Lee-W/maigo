@@ -330,6 +330,17 @@ When the author proposes an alternative naming/design, evaluate it on its
 merits and switch to it plainly if it's better than the original suggestion
 — don't restate the original just to defend having said it first.
 
+**Exception — the name is fixed by a base class or sibling provider**: before
+suggesting a rename, find the base-class call sites. If the base invokes the
+method by that name (a hook the framework calls, an abstract property) or
+sibling providers use the same shape (S3/GCS-style `except BaseException`),
+the name is a contract and the action-verb rule above does not apply. In
+apache/airflow #68625 a reviewer suggested renaming `shared_stream_key`; the
+author pointed out it is the method `BaseEventTrigger` exposes and the
+triggerer calls — the reviewer conceded it was a bad suggestion. #73374's
+abstract property and its sibling-matching `except BaseException` are the
+same shape.
+
 ---
 
 ## 15. Verify a hard-limit claim before asserting "impossible" or "breaking"
@@ -847,6 +858,87 @@ Across all four: the common discipline is the same as §23 — a GitHub-surface
 status field (a check list, a decision field, a compare range, a job
 conclusion) answers a narrower question than it appears to, and the actual
 head SHA / actual job log is the only thing that answers the real one.
+
+## §32. Reviewing someone else's PR: evidence-backed must-fix is Request changes; nits need evidence
+
+When the reviewer is not the PR author, the verdict gate in
+[`/maigo:review` §4.5](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
+decides what goes into the submitted review. Default ordering for the
+recommended option:
+
+1. **A must-fix with evidence is submitted as Request changes — even if
+   someone has already approved.** An approval pinned to a commit that no
+   longer exists, or posted before the concern was raised, does not lower the
+   bar.
+2. **A nit goes in only with run or read-the-code evidence.** Skip points
+   that another reviewer already marked "acceptable / non-blocking / pure
+   suggestion" and that carry no evidence of their own.
+
+Why: in an apache/airflow batch review (#74272, #74334, #74355, #74296,
+#68517) the maintainer picked this default for every gate option — all
+must-fix into the review, evidence-only nits, and Request changes kept even
+where an approval existed (#68517's approval was on a commit that was gone;
+#74334's approval came after the offload concern).
+
+How to apply: when listing the gate's options, mark this as Recommended
+first; collapse a PR with many nits (e.g. 14 on #68517) to the few with
+evidence. This coexists with "a missing changelog/newsfragment is not a
+blocker" (airflow-aware `review-checks.md` 10.6): the missing file alone is
+not a blocker, but a newsfragment whose *content* would mislead users can
+still be a must-fix.
+
+---
+
+## §33. A reviewer's performance claim: measure what it actually buys before applying it
+
+When a suggestion carries a performance rationale ("filtering these out cuts
+most of the cost"), measure before/after on **the metric the claim names**
+(time), not the proxy mentioned in passing (file count, bytes). A correct
+diagnosis does not make the cost model right; reviewers usually read diff
+fragments without running anything.
+
+Case (apache/airflow #71477): a reviewer noted `read_guide_docs` spawns one
+`git show` per `.rst` (102 files, 1.45s for one release tag; `changelog.rst`
+alone 140KB) and suggested filtering `_`-prefixed dirs and
+`changelog.rst`/`commits.rst`. Measured: 102 → **98** files (~4%), time
+1.852s → **1.898s** — unchanged. The cost was the fixed per-file subprocess
+overhead, not bytes; with 242 tags `--all-versions` multiplies that 242×. The
+real fix is batching (`git cat-file --batch`).
+
+How to apply: if the change fixes a *different* real defect (here: the two
+readers saw different file sets), keep it, but say plainly in the commit
+message and reply "this is not a performance fix" with the numbers, and
+leave batching as a follow-up. Do not copy the unverified rationale into the
+commit message — that fossilizes a cost model nobody checked. For any "this
+saves X" suggestion ask: which quantity, and did I measure it? If no
+difference shows, say so.
+
+---
+
+## §34. At APPROVE, ask the reviewer what they did not verify independently
+
+An APPROVE does not mean every piece of evidence was re-run. Under time
+pressure a reviewer accepts some items on the implementer's word —
+performance numbers, mutation results, external-data counts — which are
+exactly the items that most need independent confirmation.
+
+How to apply: when asking for re-verification or receiving an APPROVE, ask
+for one more line beyond the verdict: "Over these rounds, which parts of this
+diff did you **not** verify independently and only accept from the
+implementer's report?" Use that list as the brief for a fresh-context
+verifier. It also gives the follow-up a clear completion criterion (check the
+listed items one by one) instead of repeating the same-scope review.
+
+Case (apache/airflow #71477): after three rounds the reviewer APPROVED, and
+when asked listed three: the perf-comparison numbers and dict equivalence
+(read the output file, never re-ran the script), one mutation result
+(reasoned it was unrelated to protocol parsing), and a claimed 111/107 file
+count (only reconciled two existing sources, was not a third). The verifier
+confirmed all three — and found a precision problem: the mutation's two
+assertions would each fail, but one pytest run only shows the first
+(`assert` aborts), so the write-up must not say "both assertions go red".
+
+---
 
 ## See also: parallel batch review safety
 

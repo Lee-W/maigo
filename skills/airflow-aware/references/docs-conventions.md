@@ -499,6 +499,79 @@ consolidating it.
 
 ---
 
+## Cross-provider contributing docs must not present one provider's hand-built setup as built-in behaviour
+
+`contributing-docs/` is the authoritative guide for **every** provider author. When describing
+where a `provider.yaml` field "shows up", the test is not "is this true for my provider" but "is
+it true for a second provider that hasn't done anything yet".
+
+Case (apache/airflow #72939): while adding a `toolsets.external-services` field, the section went
+through three drafts, each blocked in review for claiming more than was true:
+
+1. "intended to be surfaced as a table on the registry's provider version page" — the registry
+   side had no wiring (`ProviderContract` has no toolsets field; the connection-type wiring lives
+   in `dev/registry/extract_metadata.py` and `extract_versions.py`, toolsets has no counterpart).
+2. "is **not yet** surfaced" — in English "not yet" promises it is coming; with no issue or
+   schedule that is an invented commitment. Same family: `today`, `currently`, `for now`.
+3. "Both lists are rendered as tables on the provider's own Sphinx docs page" — true for one
+   provider only: that page was that provider's hand-written `supported_services.rst`, and
+   `providers_extensions.py` merely registers a directive in `setup()`; nothing scans
+   `provider.yaml` to generate pages.
+
+Verify before asserting "this field is shown in X" — run each separately (not one merged
+alternation):
+
+- `grep -rn "<directive name>" --include='*.rst' .` — how many providers actually use it? One
+  means it is not built-in behaviour.
+- `find providers -name provider.yaml -exec grep -l "<field name>" {} \;` — how many fill it in?
+- Read the generating code: is it **passively registered** (the provider must add the directive)
+  or **actively scanning** (pages auto-generated)?
+
+If only one provider uses it, present it as an **example**, not as behaviour: "a provider that
+wants to show it must add its own docs page with the `provider-toolset-services` directive, the
+way common.ai does in `<path>`". This is the same overgeneralization family as writing a
+one-datapoint observation as a universal claim, but applied to repo documents that later
+authors will copy.
+
+---
+
+## Shipped code and docs must not cite anything under the gitignored `files/` directory
+
+The repo's `CLAUDE.md` tells agents to put generated artifacts (reviews, reports, scratch output)
+under `files/`, and `/files` is gitignored — so those files never enter any commit or PR.
+Parking a load-bearing argument there and pointing at it from a shipped file means the argument
+is not written. It reads fine on the author's machine, so self-checks never notice; a reviewer who
+clones finds the target missing and cannot check the claim.
+
+Case (apache/airflow #72939): a test module's docstring and a helper's docstring each said
+`see files/<topic>/label-sources.md (planning artefact, not shipped)` as the derivation for four
+constants and for why a gateway is not excluded. `git log --all --diff-filter=A --
+'*label-sources*'` returned nothing — it was never committed. Marking it "(not shipped)" does
+not exempt it; honesty doesn't give the reader the file.
+
+How to apply: before pointing from shipped code / a docstring / docs at any file, run
+`git ls-files <path>`; empty output means a dead link. Inline the load-bearing facts next to the
+thing they explain (comment above the constant, the function's docstring) instead of pointing out.
+In that case the four constants already carried their derivation and guarding test names, so the
+docstring only needed to point at "the comment above each constant". When inventorying leftover
+references, grep each directory separately rather than one `-r` from the root. Writing a
+deliverable to a file is still right — it is for people to read, not a source shipped files may
+cite.
+
+---
+
+## Behaviour explanations keep one full version in the how-to; docstring and changelog carry a summary
+
+Don't write the same behaviour explanation (e.g. a budget across attempts) in the docstring, the
+how-to `.rst`, and the changelog. Keep the full version in the how-to with a dedicated anchor; the
+docstring gets a 3–5 line summary plus a `:ref:`; the changelog note keeps only the behaviour
+change and migration, about 8–12 lines. When trimming, inventory sentence by sentence first: a fact
+that appears in only one place must not be cut, and qualifiers (e.g. "on every Airflow version")
+stay. (apache/airflow #73706, where a maintainer wrote "Lot of repetition across files … Let's trim
+it down.")
+
+---
+
 ## `.rst` docs spell-check rejects coined nouns — literals are exempt, autoapi-generated pages count too
 
 Airflow runs a spell-check lint over `.rst` docs that rejects words not in

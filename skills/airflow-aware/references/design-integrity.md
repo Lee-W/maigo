@@ -196,3 +196,45 @@ both directions is not a tripwire. (2026-09-17, `common.ai` `external-services`:
 `snowflake` landed in pydantic-ai 2.27.0 and `crusoe` in 2.28.0, while the
 provider supports `pydantic-ai-slim` from 2.23.0 upward and CI exercises that
 floor.)
+
+---
+
+## Normalize partial data at its source, not at each caller
+
+When a helper returns a partial structure on a failure path (`{}`, `None`, a dict missing keys),
+complete the shape **inside the helper** rather than letting every caller `.get(key, default)`.
+Scattered defaults drift apart: the caller that forgets one is the bug, and because its neighbours
+did supply defaults it looks deliberate rather than missed.
+
+Case (apache/airflow #72786): `_resolve_agent_ref()` returned `{}` on failure; four callers handled
+it — three with `.get(k, default)`, one with a bare `.get(k)`. That one printed the failover
+warning `Managed agent None on None failed; failing over to None` — exactly the line the docs tell
+operators to read to find the broken member. The fix normalized in the helper on **both** success
+and failure paths, and the four callers now index directly.
+
+Two traps:
+
+- **Fixing only the failure branch is not enough.** If just the `except` returns a sentinel and the
+  success path is passed through unchanged, a "didn't raise but returned a dict missing keys" hole
+  stays open — and deleting the callers' defaults then becomes a `KeyError`, worse than the
+  original bug. Normalize both paths or keep the caller defaults; never half of each.
+- **Normalizing is not swallowing.** In `ref = _normalize(obj.attr)` the argument is evaluated
+  before the call, so a raise propagates unchanged. Surfacing what is deliberately broken while
+  degrading what someone else broke can coexist.
+
+---
+
+## common.ai wraps vendor agent SDKs as adapters, not operators
+
+When common.ai integrates a vendor agent SDK that brings its own loop, the shape is the adapter
+family (`tools/strands.py`, `adk.py`, the anthropic adapter in #73962, `claude_agent_sdk`): the
+loop stays with the Dag author; common.ai owns only the tool layer and its guarantees — secret
+masker, correctable errors → `is_error`, any other failure → task failure, the
+`common_ai.tool_calls` metric. Do not build an Airflow-maintained cross-vendor runtime abstraction
+or an operator: that is what pydantic-ai already provides to `AgentOperator`.
+
+Why: in apache/airflow #74026 a `HarnessOperator` / `HarnessBackend` design was challenged by a
+maintainer and reshaped into an `AirflowTools` adapter.
+
+How to apply: for a new vendor SDK, compare against the existing adapters' shape and guarantee
+list; before proposing an operator, answer "what does it give that `AgentOperator` cannot?"

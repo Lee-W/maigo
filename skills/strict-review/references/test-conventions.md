@@ -437,6 +437,16 @@ How to apply:
   state change, a return value, a side-effect on a model). The exception is
   operator-visibility — diagnostic logs that have no other observable
   channel.
+- **When the test uses structlog `caplog`, assertions must use the full event
+  string, not a prefix.** `StructlogCapture.__contains__`
+  (`devel-common/src/tests_common/test_utils/logs.py`) compares strings with
+  `e["event"] == target` — exact match. So `"only the prefix" not in caplog`
+  is always true and the assertion is decorative (apache/airflow #71072: a
+  reviewer caught three of these). Extract the full log message into one
+  module-level constant and reuse it in every `in` / `not in` /
+  `e.get("event") ==` check. Before writing or reviewing any
+  `not in caplog`, confirm the string is the whole event, then run one
+  mutation (make the log actually fire) to confirm the assertion turns red.
 
 ---
 
@@ -620,3 +630,112 @@ How to apply: after a path migration, green is not enough. Also verify that
 A stale-setup test that passes is the same family as "a verifier missed the
 drift, so it passed silently" — ask what would make the test go red, and check
 that the migration's core line is on that path.
+
+---
+
+## Parity tests need a one-sided mutation, not just "break both"
+
+When a test's property is "two paths agree" (two readers, SDK vs core, old vs new API, cache vs
+raw query), a mutation canary that breaks the shared logic makes **both sides drift together**:
+the assertion can stay green, or go red for a reason other than parity. A parity test is most
+often vacuous because each side asserts against the same hard-coded constant
+(`assert a == {"x"} and b == {"x"}`), which never reacts when both sides move together.
+
+How to apply: mutate **each side alone** and confirm the test goes red *because the two sides are
+unequal*. In apache/airflow #71477, `test_readers_agree_on_which_pages_are_guides` (working-tree
+reader vs git-tag reader) was only shown to discriminate by two one-sided mutations: dropping the
+filter on the `extract_parameters` side only (worktree gains 3 keys, tag side unchanged), then on
+the `extract_versions` side only. The "shared predicate always returns `True`" mutation only proves
+the predicate is used. When two tests cover one bug, also name which assertion turns red for each
+(see the mutation-canary rule above).
+
+---
+
+## Assert contract fields on the model, not on a validator's returned payload
+
+A common validation wrapper looks like:
+
+```python
+def _validate(model_type: type[BaseModel], payload: dict) -> dict:
+    model_type.model_validate(payload)
+    return payload  # the input dict itself, never passed through the model
+```
+
+Field assertions on its return value check "the key I just put in is still there", not model
+behaviour: `assert "field" not in validated[...]` is **always true** (changing the model default
+never turns it red), and `assert validated[...]["field"] == value` only discriminates on whether
+`model_validate` raises (e.g. `extra="forbid"` rejecting an undeclared field). A test named
+`round_trips` / `preserves` on top of that is mislabeled.
+
+How to apply: assert on the model class so the value really goes through parsing —
+`Model.model_validate(payload).field is None` / `== value`. Do **not** "fix" the test by making the
+wrapper return `model_dump()`: that injects every default (`False`, `None`) into each output and
+changes behaviour for all downstream generated files; returning the input payload is usually
+deliberate. Whenever you see a `validate_*(payload)["..."]` chain, check what the function returns
+first. A file with one such assertion usually has more, including older ones. In apache/airflow
+#71477 the first round only renamed the sibling test without changing its assertion — a reviewer
+flagged it as the same defect in a new coat.
+
+---
+
+## Wire-contract tests keep string literals
+
+When producer and consumer share a string contract across a serialization boundary (metadata DB,
+queue, HTTP payload) and you introduce a shared `Enum` / `Literal`, change the production code to
+use the type but **leave the tests on bare literals**. The tests assert the value that actually
+crosses the boundary; rewriting `== "timeout"` to `== Reason.TIMEOUT` makes the assertion
+tautological (green whatever `TIMEOUT`'s value becomes) and loses the free guard that pins the
+enum's `.value`. A `git diff --name-only` that shows test files means the change went wrong.
+
+State the protection boundary honestly: the type only catches typos in **member references**
+(`Reason.TIMOEUT` is an `attr-defined` error). If the payload value type is `Any`, a bare
+`"timoeut"` still type-checks. Run the canary in both directions (misspelled member → red;
+misspelled bare string → expected green) before concluding.
+
+Python details (verified, not inferred):
+
+- For `class X(str, Enum)`, `hash(member) == hash(value)`, so `{X.A: v}.get("a")` hits and dict
+  annotations can stay `dict[str, ...]`.
+- Airflow's serde (`task-sdk/src/airflow/sdk/serde/__init__.py`) takes `.value` explicitly, so the
+  DB stores a plain string and reads back a plain `str`; existing tests keep passing.
+- Don't add `__str__` just because a sibling enum has one: without an override `str(X.A)` is
+  `"X.A"`, but only add it if a caller needs it — otherwise it is untested dead code.
+
+(apache/airflow #72149, `TerminationReason` in the openai provider.)
+
+---
+
+## A key that decides resource sharing needs one test per component
+
+When a key decides whether a resource is shared (stream, connection, cache), every component field
+of the key needs a test that differs from the baseline in **only that field**. If dropping a field
+from the key leaves the suite green, that is a coverage gap. Example: in apache/airflow #68625 the
+shared stream key could lose `kafka_config_id` with all tests still green; the fix was
+`test_shared_stream_key_separates_topics_and_connections`. (Single-PR evidence so far — treat as a
+cheap checklist item, not a settled pattern.)
+
+---
+
+## Tests for "old behaviour removed" must use the real value from the previous release
+
+When testing that an old name / value / behaviour is gone in the new release, take the old value
+from the previous release tag (`git show <tag-of-previous-release>:<path>`), never from memory. A
+value that never existed fails "now" in every version and proves nothing. When delegating the
+check, require the verifier to confirm the old value against the tag. Example: a test Dag used
+`pydantic-ai-azure` as the "old conn_type", but the previous release's `provider.yaml` actually
+said `pydanticai-azure`; the negative half returned `Unknown hook type` on every version and even
+passed one fresh-context verification round before being caught.
+
+---
+
+## Paired fetch + count queries share one predicate helper, with a decoy test per predicate
+
+When a fetch query and a backlog-count query each hand-write their `WHERE`, the count drifts and
+drops conditions. Example (apache/airflow #71072): the scheduler's partitioned-asset count omitted
+`is_paused` / `is_draining`, so paused Dags inflated the backlog and raised false alarms.
+
+How to apply: extract one verb-named helper that returns the predicate tuple (e.g.
+`_build_pending_partitioned_apdr_filters`) and use `.where(*...)` in both queries. Then write one
+**decoy test per predicate**: create the data, then flip a single flag. Mind DB constraints when
+flipping — `is_paused` and `is_draining` cannot both be set (`CHECK NOT (is_paused AND
+is_draining)`). Apply whenever you add or change a fetch-then-count query pair.

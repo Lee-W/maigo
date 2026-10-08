@@ -152,7 +152,42 @@ private helper introduced deep inside a larger diff is the easiest place
 for a noun-only name to slip past review; don't grant private names a free
 pass just because they're private.
 
+### Provider module names don't repeat the provider prefix (AIP-21)
+
+AIP-21 dropped the provider prefix from module names inside a provider package:
+`providers/snowflake/.../hooks/cortex_model.py`, not `snowflake_cortex_model.py`. Name new modules
+this way from the start. If the module is still unreleased, a plain `git mv` fixes it (carry the
+rename through `provider.yaml`, `get_provider_info.py`, and test imports / `mock.patch` paths);
+once released, the rename needs a deprecation cycle. (apache/airflow #73932, where the maintainer
+cited the same review given on `snowflake_cortex_agent.py` in #73815.)
+
+### A new helper module that isn't public gets a `_` prefix
+
+A new module that only the same provider imports (e.g. `utils/_rest_auth.py`) is named `_xxx.py`
+so it is neither public interface nor a compatibility commitment. Precedent:
+`elasticsearch/_compat.py`, `common/compat/_retry_policy.py`; its test file is `test__xxx.py`.
+
+Once private, change other docstrings that point at it from `:class:` to a literal
+``` ``ClassName`` ```: sphinx-autoapi without `private-members` generates no page for a
+`_`-prefixed module, so `:class:` becomes an unresolvable reference (docs are not nitpicky, so
+nothing errors — the link just silently isn't there). (apache/airflow #73932.)
+
 ## Provider hooks
+
+### A hook must not fetch credentials while building a model
+
+`PydanticAIHook.get_conn()` (common.ai) eagerly builds a model for every fallback in
+`_resolve_fallback_models`. If a subclass's `_get_provider_kwargs` does network token fetching, a
+broken token endpoint on a *fallback* fails the task before the healthy primary is even called; on
+the *primary* the failure lands outside `FallbackModel`'s `ModelAPIError` path, so the fallback
+chain cannot catch it.
+
+How to apply: when the provider constructor needs a non-empty token, pass a placeholder and put
+the real token in per-request auth (e.g. overriding `Authorization` in an httpx
+`Auth.auth_flow`); prove credential validity by overriding `test_connection` (call `super()`, then
+fetch a token once). For lazily initialised cached attributes, build them in locals and assign all
+of them only after every one succeeded — otherwise a half-initialised state is reused by the next
+call. (apache/airflow #73932, `PydanticAISnowflakeHook`.)
 
 ### Keep only connection-backed calls on the hook
 
@@ -257,6 +292,27 @@ usage guide from "ignores" to "rejects" at the same time — leaving even one
 of the two in the old wording gives the next review round the same thing to
 re-raise. A documentation-only mitigation is a weak fix whenever an existing
 validation shape can reject the input outright instead.
+
+### Impossible or partially-given state raises — never warn-and-continue or fall through
+
+For a state that "cannot happen", or one where only part of the required input was given, raise.
+Don't warn and return, and don't fall through into a different behaviour that silently changes
+identity or target. Evidence: apache/airflow #68625 changed a "can't happen" branch (consumer is
+`None`) from a warning to `RuntimeError`; #73374 flagged Azure credentials where only some fields
+were supplied silently switching to a different auth chain. Same family as "Raise at construction"
+above. Same deprecation exception applies: for unreleased code or internal state raise
+directly; for an already-released behaviour, go through the deprecation path described there.
+
+### Direction flags, `except` breadth, and constructor parameters
+
+1. A parameter that uses an int as a direction flag (`sign=±1`) becomes explicitly named
+   functions; if upstream has a public API, use it (`add_request_usage(sign=...)` →
+   `subtract_request_usage` plus `RunUsage.incr`).
+2. Narrow a broad `except`, but align it with the matching catch layering **upstream** so behaviour
+   does not change; where upstream already warns, don't warn a second time.
+3. Class constructor parameters default to keyword-only.
+
+(apache/airflow #73706, `durable/replay_usage.py`.)
 
 ### Once a check enforces an invariant, drop the comment that manually enumerates it
 

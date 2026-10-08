@@ -542,3 +542,92 @@ so the reader could no longer tell that the divergence point was "after the
 setting is applied," which was the entire point of the passage. The same
 round also caught a backward reference the split introduced (the antecedent
 didn't appear until the following sentence).
+
+## Widening a sentence's subject adopts the consequence clause that follows it
+
+When you widen a subject from one concrete thing to "either / both / any of these" to cover an
+omission, the consequence clause you did not retype is now part of your change. It was precise
+for the old subject and is often wrong — even opposite — for the new one. The diff shows only the
+wider subject; the false sentence lives in the unchanged tail, so a reviewer who reads only `+`
+lines misses it. This is the mirror of "splitting a coordinated clause drops a fact" above:
+splitting loses facts, merging manufactures false ones, and in both the faulty text is not in the
+diff.
+
+Case (apache/airflow #72936): "Ask for **an allowlist** against an open host policy and it
+refuses rather than **granting nothing quietly**." "Granting nothing" is accurate for an
+allowlist layered over an open policy. When a network-block option was added, the subject became
+"Ask for **either**" with the tail untouched — but silently ignoring the block option means the
+network is fully open, i.e. granting *everything*. The implementer's first pass classified the
+sentence as "existing text, protected by the plan" and never read it.
+
+How to apply: after widening a subject, quantifier or list, read the complete sentence once per
+old and new member ("Ask for allow list → consequence", "Ask for block option → consequence");
+every reading must hold. If not, rewrite the consequence to be neutral for both members (here:
+"rather than silently leaving the sandbox less restricted than the spec asked for") instead of
+splitting into two half-explained sentences. Pay special attention to consequence clauses, reason
+clauses, and the contrast after "rather than / instead of / not".
+
+## The replacement for an absolute claim is itself a new absolute claim
+
+After a reviewer removes an overgeneralization, the rewrite often expresses its bound as a
+**comparison against an unenumerated set** — `unlike … on the other toolsets`, `as the rest of
+<library>`, `every other route here`. The fix becomes a fresh overgeneralization, and because it
+reads modest (it has an "unlike", a contrast), the author rarely notices. Attention at that moment
+is on the deleted sentence, not the new one.
+
+Case (apache/airflow #72936): rewriting "It has no tool-level allow-list at all" produced two new
+claims in the same sentence: (a) "unlike `allowed_methods` on the other toolsets" — after reading
+all nine toolset files, only one provider-wide mechanism is required, named and non-empty; the
+closest other one is *optional* (opposite of the implied contrast), and the rest have no analogue;
+(b) "as the rest of PydanticAI" — every toolset in this provider inherits the same base, so the
+baseline made a shared trait look unique to one class.
+
+How to apply: any sentence with `the other …s`, `the rest of …`, `every …`, or `unlike …` — fix
+or not — needs its set enumerated *before* it is written; an unqualified plural is the signal.
+After writing a replacement, circle each collective word, list its members, and judge each one
+(not by grepping a symbol name: equivalent mechanisms often have different names or opposite
+polarity). If it does not hold, narrow the comparison to one **named, concrete** object instead
+of softening with "in most cases". See also "Removing an exclusivity word" above.
+
+## "Keep this verbatim" does not exempt a defect found later
+
+A plan or acceptance criterion that says "sentence X must stay verbatim" protects something that
+was **known to be true when it was written** (typically a predicate's correctness) — not the
+characters. When review later finds a factual error in that very sentence, reading the clause as
+a freeze makes people knowingly leave a false sentence and file it as a follow-up.
+
+Case (apache/airflow #72936): the plan protected one bullet's predicate in
+`choosing_a_toolset.rst` verbatim (so a correct truthiness predicate would not be broken). The
+bullet's *consequence clause* was later found false. The reviewer's first round deferred it as
+"plan says protected"; the orchestrator overrode that scope call, and on re-verification the
+reviewer produced a sharper argument and agreed.
+
+How to apply: ask "if the person who wrote the protection had known this defect, would they want
+it kept?" If no, the protection does not apply, and usually only the small defective span needs
+to change while the protected property is untouched. Also: when the same sentence has two copies,
+fix both — fixing one recreates the very divergence a "wording must match" criterion exists to
+prevent, and the next reviewer will re-raise the unfixed copy. Don't let the implementer decide
+the scope (they will be conservative): the orchestrator overrides explicitly and sends the **scope
+decision itself** back to the same reviewer for re-verification.
+
+## Docs avoid counts that the paragraph itself invalidates
+
+Before writing a concrete count into public docs (AGENTS.md, README, contributing guides), ask:
+does the behaviour this paragraph encourages make the number stale immediately? The test is not
+"will the number change" (all numbers do) but whether the paragraph and the number **contradict
+each other** — the doc tells readers to do something that, once done, makes the same paragraph's
+figures wrong. That is worse than no number: the next reader reasons from it as current fact.
+
+Case (apache/airflow #71477): a reviewer asked for one sentence in `registry/AGENTS.md`: to get a
+Guide link for another provider, change that provider's section heading, not the extractor. The
+first draft stated "17 sections / 19 names in one provider, 3 in another, 1 in a third" plus "As
+of this HEAD". The reviewer blocked it: the paragraph exists to make people edit headings, which
+invalidates the counts, and "As of this HEAD" names no commit. The accepted text has no counts:
+"`common/ai` follows the convention most thoroughly; a couple of other providers use the same
+title shape for a config option name or a single decorator rather than a class."
+
+How to apply: replace such counts with qualitative wording. Avoid unanchored time words (`As of
+this HEAD`, `currently`) — name a version or write it timelessly. Before adding an example to a
+section, look at what the section already exemplifies; repeating one is padding, so name the
+differing shape generically. Put verified numbers in the PR review reply (the reviewer needs them
+to judge), not in the document.
