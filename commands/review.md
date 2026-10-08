@@ -266,7 +266,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
-- **不能跳過燈**——沒有 rubric 的 review 就是憑感覺
+- **不能跳過燈**——沒有 rubric 的 review 就是憑感覺（唯一例外：[rebase-only 重審](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-modes.md)，PR 自己的 patch 逐字相同時可壓縮成樂奈＋立希，報告必須明講）
 - **不能跳過樂奈**——脫離 context 的 review 會把「不熟悉」誤判成「有問題」
 - 爽世的 verdict 不因為「author 是大佬」放水
 - 立希拒絕「CI 已綠就不跑」，本地至少要重跑 lint/type

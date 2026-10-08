@@ -129,6 +129,29 @@ obviously belong to a different, unrelated PR
 it's a rebase — use the current `gh pr diff <n>` (against `main`) instead to
 see the PR's actual delta.
 
+### Rebase-only delta: the pipeline may be compressed
+
+If the delta check shows the PR's **own** patches are unchanged since the stored
+report — compare each of the PR's commits against the stored head's commits with
+`gh api repos/<owner>/<repo>/commits/<sha>` and find the per-file patches
+byte-identical, or differing only in `@@` line offsets — the code under review is
+the same code. Skip 🩵 Tomori and 🟡 Soyo and run only 🐱 Raana (what changed in the
+base, prior finding status, new CI failures and threads) and 🟣 Taki (re-run what
+went red, and prove the fix when it is mechanical). Guards:
+
+- **Say so in the report.** State at the top of `## Context` that the pipeline was
+  compressed and why; the prior findings are inherited from the stored report, not
+  re-derived.
+- **Any new finding needs a Taki run.** Anything only read from CI logs goes under
+  unverified, not into a finding.
+- **A non-offset patch difference, or a new commit that touches code or tests, means the
+  full pipeline.** Do not compress when in doubt.
+- **The verdict can still move.** A rebase brings in new `main` content, so the PR's own
+  guards can start failing without the author touching a line (for example PR #74296:
+  the rebase pulled in four new zh-TW strings with a plain `{{count}}` and the PR's
+  own counter-format guard test went red, which turned APPROVE_WITH_NITS into
+  NEEDS_CHANGES).
+
 **Stacked PR whose upstream already squash-merged**: `gh pr diff` and the PR's size
 include the upstream's pre-squash commits — find the real delta and report the needed
 `rebase --onto` per [`review-agent-handoff.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-agent-handoff.md).
