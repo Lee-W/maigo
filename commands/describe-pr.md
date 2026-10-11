@@ -15,6 +15,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 這條命令是**燈一個人的舞台**：orchestrator 先把 git 那些料抓齊（燈沒有 Bash），
 交給燈把它寫成一份 reviewer 讀得懂的 PR narrative。
+一律派燈，diff 再小也不自己寫——自己寫會跳過燈的記憶載入與 skill 套用。
 
 ## 使用
 
@@ -47,7 +48,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 4. **偵測 PR template**：
    - 依序找：`.github/PULL_REQUEST_TEMPLATE.md` → `.github/pull_request_template.md` → `.github/PULL_REQUEST_TEMPLATE/` 目錄內第一個 `.md` 檔
-   - 找到 → 讀取 template 內容，作為描述框架傳給燈（取代預設 Why / What / Test Plan 結構）
+   - 找到 → 讀取 template 內容，作為描述框架傳給燈（template 其餘區塊照用，但 `## Why` / `## What` 標題仍須保留，見 skill 的「若 repo 有 PR template」）
    - 找不到 → 用 skill 預設結構
 
 把 1–4 的結果整理成一份 bundle，連同「不 hallucinate」守則一起寫進啟動燈的 Task prompt。

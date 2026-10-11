@@ -37,7 +37,7 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
    有明文禁用 CC 的慣例 → 跟 repo 走自由格式；皆無訊號 → 預設 Conventional Commits）。
    **這只影響 commit message 風格參考；PR title 本身永不套 `type:` prefix。**
 6. **PR template（若存在）**：caller 在 `.github/PULL_REQUEST_TEMPLATE.md`（含大小寫變體與 `.github/PULL_REQUEST_TEMPLATE/` 目錄）找到的 template 內容。
-   - 找到 → 以 template 結構作為描述框架，填入從 commits / diff 萃取的內容，取代預設的 Why / What / Test Plan 結構
+   - 找到 → 以 template 結構作為描述框架，填入從 commits / diff 萃取的內容；`## Why` / `## What` 標題照樣保留（見「若 repo 有 PR template」）
    - 找不到 → 用本 skill 預設結構
 
 ## Title 規則（user-impact 句子）
@@ -122,9 +122,9 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 **若 repo 有 PR template**（Inputs 第 6 條）：
 - 以 template 的 section 結構作為描述框架
 - 用 commits / diff 萃取的內容填入對應 section
-- template 內原有的 checklist / 說明文字保留在適當位置
+- template 內原有的 checklist / 說明文字保留在適當位置（template 開頭的 HTML 註解可省）
 - 不要增加 template 沒有的 section；不要刪掉 template 要求的 section
-- **Why / What 必須保留**：即使 template 沒有明確的 `## Why` / `## What` section，也要把這兩段作為 prose 加在 template 開頭的自由描述區（通常在第一條 `---` 分隔線之前）。Why/What 是 reviewer 理解改動的最低資訊，不能因 template 不含它們就省略。
+- **Why / What 必須保留，且必須帶 `## Why` / `## What` 標題**：即使 template 沒有這兩個 section，也要把它們加在 template 開頭的自由描述區（通常在第一條 `---` 分隔線之前），不能寫成無標題散文。Why/What 是 reviewer 理解改動的最低資訊，不能因 template 不含它們就省略。這是上一條「不要增加 template 沒有的 section」的明確例外；`## Test Plan` 同樣加在那一區（template 已有等價的測試說明 section 時，用 template 的）。
 
 ## 怎麼從 commits / diff 萃取這四段
 
