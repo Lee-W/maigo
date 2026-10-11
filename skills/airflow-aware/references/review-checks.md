@@ -491,8 +491,22 @@ How to apply: when a capped, row-locked query needs this distinction, drop
 the `+1`. Only when the capped fetch comes back full, issue a **separate,
 lock-free** `select(func.count())` with the same predicates (no
 `with_row_locks` — counting is a read, not a claim) to get the real backlog
-size. Row-locking reads should only ever touch rows this tick's process
-actually claims and processes.
+size (an estimate for reporting; it is not a drained signal). Row-locking reads
+should only ever touch rows this tick's process actually claims and processes.
+Resetting an episode flag is a different decision: there the empty-fetch path
+needs the count too (see the next paragraph).
+
+Episode / edge-trigger flags on such a query: neither an empty fetch nor a short
+fetch proves the backlog drained, because under HA another scheduler can hold the
+locks on every remaining row. Run the unlocked count **before** resetting the flag on
+every path, including the empty-fetch path, and reset only when `count <= cap`; run
+that count only while the flag is set. HA test: patch `with_row_locks` with
+`mock.patch(..., side_effect=lambda query, **kw: query.limit(0))` (works on SQLite,
+which drops `FOR UPDATE`, so a second session cannot simulate it), assert the flag stays
+`True` and the next normal tick logs only at debug level and writes no new audit row,
+then mutation-check by restoring the unconditional clear on the empty branch (the test
+must go red). General rule:
+[claims and evidence checks](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md).
 
 ## 10.18 `providers/common/ai` hook capability additions: check three parity axes *(Request changes)*
 

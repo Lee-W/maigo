@@ -228,6 +228,20 @@ need touching every doc, just the handful using `` :any: ``.
 
 ---
 
+## `.rst` pages need full-path `:meth:` / `:class:` / `:attr:` references
+
+On a `docs/**/*.rst` page (outside an autodoc class context), write the full dotted
+path, e.g. `` :meth:`~airflow.providers.common.ai.tools.claude_agent_sdk.AirflowTools.run` ``.
+A bare `` :meth:`run` `` or a `~` plus a partial path does not resolve: Sphinx renders
+plain unlinked text and the build does not necessarily warn. Short forms are fine inside
+a docstring, where the class context resolves them.
+
+How to apply: after editing, build the docs and count the rendered `<a>` links in the
+HTML for each reference, using a known-good reference as the positive control; grepping
+the `.rst` source is not verification.
+
+---
+
 ## Provider docs' source links are version-pinned — a pre-release 404 is expected
 
 Provider docs link back to GitHub source using

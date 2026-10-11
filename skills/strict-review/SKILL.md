@@ -295,6 +295,13 @@ details and recipes in `references/design-integrity.md`:
 - **Fix at the owning layer** — a defect in behavior owned by an upstream module/library gets an upstream option or callback, not a downstream workaround; details in `references/design-integrity.md` Part L.
 - **External tools are optional and runtime-detected** — detect the binary, don't add a hard dependency; fallback must not leave the user with neither path; extension of Part E.
 
+## Claims and evidence checks (references)
+
+Does the evidence support the claim? Concurrency "drained" signals, error-message advice,
+deprecation-warning migrated values, log/audit wording, docs sample output, and docs
+re-sync after behaviour changes; details in
+[`references/claims-and-evidence-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md).
+
 ## Frontend device checks (references)
 
 UI / CSS / client interaction diffs: a bug reproducible only on a real device, or only outside Chrome, is a distinct class of failure (`100vh`, WebKit external `<use>`, Firefox / touch acceptance); see `references/frontend-device-checks.md`.
