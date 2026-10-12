@@ -271,8 +271,8 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
 
 ## Test conventions (references)
 
-Seven test-writing / test-review patterns for mock assertions, sequence
-coverage, boundary pairing, and forced-churn discipline; details and worked
+Ten test-writing / test-review patterns for mock assertions, sequence
+coverage, boundary pairing, drift guards, and forced-churn discipline; details and worked
 examples in `references/test-conventions.md`:
 
 - **Mock assertions** — prefer `m.method.mock_calls == [mock.call(...)]` over `assert_called_once_with`.
@@ -281,6 +281,9 @@ examples in `references/test-conventions.md`:
 - **No thin test helpers** — assert only the field the function under test decides; skip one-use wrapper helpers.
 - **Minimize forced test churn** — keep an existing test's diff to the forced minimum; add a new test for new behavior.
 - **Build the fixture, don't defer** — a missing example fixture is not "can't test"; build the smallest purpose-built one.
+- **Drift guard green in its own commit** — the commit that adds an "every X needs an entry" test must add the existing entries and doc rows too, or it fails when checked out alone.
+- **Private SDK path: fail, don't skip** — a test that depends on a third-party SDK's private module `pytest.fail`s when the path is missing; a skip hides the gap behind a green CI.
+- **Tripwire tests: prove which assertion fails, name the component** — mutate one deny-list entry and name the assertion that turns red; a test name must not credit a rejection that only a downstream function performs.
 - **Log assertion when the log IS the observable** — Airflow's "no caplog" rule is about scraping vs. checking logic, not a ban on asserting an operator-visibility log call via a mocked logger.
 
 ## Design integrity checks (references)
@@ -338,6 +341,8 @@ and how much change a comment warrants; details in
 - **A reviewer's diagnosis being right doesn't make their proposed wording right** — verify the defect and the reviewer's replacement separately; rebuild the replacement from source before adopting it.
 - **A reviewer's stated success criterion outranks nit severity** — a finding pointing at an unmet criterion the reviewer explicitly stated ("byte-identical", "no behaviour change") is must-fix even if the practical impact looks small.
 - **When a must-fix asks for a test, derive the expected value from the contract, not the current output** — read the docstring/docs/changelog for what the behavior *should* be; if the contract and the implementation disagree, flag the disagreement itself as a finding instead of pinning current output as the test's expected value.
+- **Check fallback paths before an absolute claim in a comment** — "never / can ever reach" gets refuted by a `TypeError` or env-var fallback on the call chain; trace it before writing or approving the claim. Details: `references/recurring-patterns.md`.
+- **No repo-external note names in code comments** — a docstring or comment cites only facts verifiable in the repo and what breaks; a reference to an assistant memory entry reads as invented. Details: `references/recurring-patterns.md`.
 
 Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 

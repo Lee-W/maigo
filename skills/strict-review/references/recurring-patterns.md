@@ -631,3 +631,32 @@ this HEAD`, `currently`) — name a version or write it timelessly. Before addin
 section, look at what the section already exemplifies; repeating one is padding, so name the
 differing shape generically. Put verified numbers in the PR review reply (the reviewer needs them
 to judge), not in the document.
+
+## Verify the fallback paths before writing an absolute claim in a comment
+
+Before writing (or approving) an absolute exclusion such as "never" or "can ever reach" in a
+comment or docstring, trace the call chain for a bypass: a `TypeError` fallback, an env-var
+fallback, a default that kicks in when the primary path fails. A reviewer will refute the claim with
+exactly that bypass.
+
+Case: a hook falls back to default provider inference after a `TypeError`, so "credentials from the
+connection can never reach provider X" was false. The accurate statement was that connection-configured
+credentials cannot reach it, and only ambient credentials can.
+
+How to apply: for each absolute word in the diff, name the fallback you checked; if you cannot, narrow the claim
+to what the traced path guarantees. See also "The replacement for an absolute claim is itself a new
+absolute claim".
+
+## Code comments cite only facts verifiable in the repo
+
+A docstring or comment states what can be verified in the repo and what breaks if the code is
+wrong. It must not cite an assistant memory-entry name or any note kept outside the repo; a reviewer
+cannot open those and will read the citation as made up.
+
+Case: a test docstring pointed at a note name that did not exist in the repo; the reviewer asked
+for the actual consequence instead (for example "older versions render from the stored version
+data, so a missing key leaves the card on non-latest pages empty").
+
+How to apply: grep new comments for note-style identifiers (snake_case names with a `reference_` or
+`feedback_` prefix, or any pointer to a memory entry) and replace each with the concrete
+consequence.

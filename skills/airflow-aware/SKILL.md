@@ -446,6 +446,7 @@ sub-check states. The file covers:
 - **10.32** A zero-argument method that returns derived state should be a `@property` (nit)
 - **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
 - **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON (Request changes, scope-gated to provider hook connection-field parsing)
+- **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"` (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -513,7 +514,12 @@ beats per-endpoint pedantic accuracy.
   new term. A newly added plural `*_one` key says the literal `1`, not
   `{{count}}` (that branch only renders when the count is 1); existing `_one`
   keys that still interpolate are left alone, so don't retro-fix them in a
-  "fill missing translations" change.
+  "fill missing translations" change. When delegating an i18n fill-in to a
+  subagent, paste these rules into the prompt one by one (it cannot read this
+  skill, and "follow the existing pattern" can point at the wrong convention
+  in the same file) and add a matching acceptance check, e.g. new `_one` keys
+  say the literal `1`. See
+  [`delegation-sizing`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md).
 
 #### Partitioned / scheduling-range API granularity
 
@@ -559,7 +565,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.34, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.35, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

@@ -174,6 +174,12 @@ rename through `provider.yaml`, `get_provider_info.py`, and test imports / `mock
 once released, the rename needs a deprecation cycle. (apache/airflow #73932, where the maintainer
 cited the same review given on `snowflake_cortex_agent.py` in #73815.)
 
+The same sweep applies when you delete, rename, or stop importing any module-level name: before
+removing it, grep the whole of `providers/` for a `mock.patch("<dotted.path>.<name>")` that targets
+it (`grep -rn '<name>\b' providers --include='*.py'`, glob quoted). Tests in a *different* provider
+often patch it, and running only the owning provider's tests will not show it; the failure
+(`AttributeError` on patch) surfaces only in the Non-DB providers and LowestDeps CI jobs.
+
 ### A new helper module that isn't public gets a `_` prefix
 
 A new module that only the same provider imports (e.g. `utils/_rest_auth.py`) is named `_xxx.py`

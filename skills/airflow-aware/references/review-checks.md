@@ -1091,6 +1091,21 @@ How to apply: for (1) ask "what identity does this connection authenticate as af
 fallback?"; for (2) feed the hook an empty form value and the documented JSON string and see
 both parse.
 
+## 10.35 Scheduler-written audit `Log(...)` rows must set the owner *(Request changes)*
+
+**Scope gate**: applies only when a diff adds or changes a `Log(...)` row written from the
+scheduler side (background work in `jobs/scheduler_job_runner.py` and its helpers), not API or CLI
+audit rows.
+
+A row the scheduler writes on its own has no request user, so without an explicit owner the audit
+log shows an empty one. Set `owner="scheduler"` and `owner_display_name="Scheduler"`, copying the
+existing precedent (the drain-completed row), and assert both fields in the test.
+
+How to apply: `grep -n 'owner="scheduler"' airflow-core/src/airflow/jobs/scheduler_job_runner.py`
+for the precedent. If the row is committed through a separate session (so it survives an outer
+rollback), the test must also use the `clear_audit_log_rows` fixture, otherwise the row leaks into
+other tests.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,

@@ -758,3 +758,51 @@ the insertion point and confirm every pre-existing decorator is still attached t
 class it was written for; give each new class its own `skipif` where it needs one.
 Don't rely on the local run — it can't reproduce this when the local environment is
 newer than the compat matrix.
+
+---
+
+## A drift-guard test must be green in the commit that introduces it
+
+When a multi-commit PR adds a "every X must have an entry" drift-guard test, the commit that
+introduces the test must also add every data entry and doc row that already exists at that point.
+Otherwise that commit fails when checked out alone (bisect, cherry-pick, per-commit CI), and the
+reviewer will ask for the entries to be folded into the earlier commit.
+
+Case: a provider-list guard test landed in one commit while the data entry and the doc row for one
+provider were added in the next commit.
+
+How to apply: for each commit that adds a guard test, run the guard against that commit's tree, not
+only against the branch tip.
+
+---
+
+## A test that depends on a third-party SDK's private module must fail, not skip, when the path is gone
+
+When a test needs a private path of a third-party SDK (for example to reach a real server because
+two major versions of a dependency differ), a failed import or a missing attribute must
+`pytest.fail`, not `pytest.skip`. A skip turns the whole group into silently skipped tests the day
+the SDK renames the path, CI stays green, and nobody sees the coverage gap.
+
+How to apply: in the test helper, separate "SDK not installed" (the existing optional-import
+handling) from "installed but the private path is missing". Only the second case fails, and the
+message states what was not found and where to update it. Add a comment in the test saying why it
+touches a private path at all.
+
+---
+
+## A tripwire test must fail for the drift it claims to catch, and its name must describe the component
+
+Two checks for drift-tripwire tests, both found on one SQL validator's tripwire matrix.
+
+1. **Ask where the assertion actually fails.** An assertion that fails at import time, whose alias
+   still resolves, or that is short-circuited by an upstream guard (for example a top-level type
+   check) has no power to detect the drift it names. In the reviewed case most of the write
+   statements in the matrix were rejected by the top-level type check before reaching the
+   deny-list under test, and a deny-list entry only mattered under an option the matrix never
+   enabled. How to apply: remove one deny-list entry (a mutation) and name which assertion turns
+   red; keep only tests where one does.
+2. **Name the test after the component's own behavior.** A name or docstring must not credit the
+   component with a rejection that only a downstream function performs. If the validator accepts a
+   construct and only a later reference-collection step flags it, a name like `..._rejected` is
+   false; name it for the real condition (`..._flagged_only_when_<option>_is_set`) and pin the real
+   acceptance with an explicit assertion.
