@@ -76,6 +76,13 @@ git diff <baseRefName>...HEAD
 
 現有 title/body 仍準確反映現狀時，不用特別聲張——簡短一句「PR #`<number>` title/description 仍符合現狀」即可，不需要展開對照細節。
 
+**但「相符」這個結論的證據門檻不能低**：下結論前必須已讀完 body **全文**，並逐句對照步驟 2 抓到的整條
+branch 改動（`git diff <baseRefName>...HEAD`，不是只看本輪新增的 commit）。對 body 或 diff 跑關鍵字
+grep、「沒搜到某個詞」都不構成相符的證據——它只證明已知的脫鉤形狀不存在，抓不到漏寫的新行為，也抓不到
+沒被想到的敘述錯誤；步驟 2 的反面描述詞回掃只是輔助找出敘述錯誤，不能代替逐句對照。
+（實例：某 address-comments 收尾只 grep 了幾個關鍵字就回報「描述不需要更新」，使用者追問後才完整讀全文
+對照 branch diff；結論剛好相同，但第一次下結論時證據並不成立。）
+
 ## What this skill does NOT cover
 
 - 開 PR 本身（`gh pr create`）——那是 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 的 Inputs 前提，不是本 skill 的事。
