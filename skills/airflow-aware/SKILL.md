@@ -445,6 +445,7 @@ sub-check states. The file covers:
 - **10.31** `# use next version` on a cross-provider floor is the documented release-prep mechanism; zero hits in today's `pyproject.toml` files is not "no precedent". Only ask whether every API used is already released (judgment gate, scope-gated to cross-provider floors carrying the marker)
 - **10.32** A zero-argument method that returns derived state should be a `@property` (nit)
 - **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
+- **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON (Request changes, scope-gated to provider hook connection-field parsing)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -509,7 +510,10 @@ beats per-endpoint pedantic accuracy.
   Chinese" — this applies to commit messages, PR text, docs, and comments
   produced for this repo. When translating a UI string, check the repo's
   existing zh-TW translations for established terminology before coining a
-  new term.
+  new term. A newly added plural `*_one` key says the literal `1`, not
+  `{{count}}` (that branch only renders when the count is 1); existing `_one`
+  keys that still interpolate are left alone, so don't retro-fix them in a
+  "fill missing translations" change.
 
 #### Partitioned / scheduling-range API granularity
 
@@ -555,7 +559,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.33, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.34, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

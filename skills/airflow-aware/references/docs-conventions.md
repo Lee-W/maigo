@@ -627,3 +627,27 @@ with codespell's dictionary" entry in
 Tests section — that one is about `codespell` flagging a *deliberate*
 misspelling in a `.py` test value, not a coined-but-intentional word in
 `.rst` prose.
+
+## Mermaid diagrams in Airflow docs: split message flow from branches, keep subgraph titles to one line, confirm the folder is Sphinx-built
+
+Three rules for `.. mermaid::` diagrams in `.rst` docs. For checking that a diagram actually
+rendered before a screenshot counts as evidence, see
+[`verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)
+§7 item 7.
+
+- **A sequence diagram draws message exchange only.** A single diagram that carries a `loop`
+  plus two or more `alt`/`else` arms for mutually exclusive terminal outcomes reads as more
+  complicated than the prose it replaces. "Who said what to whom" and "how many ways can this
+  end" are different information: keep the sequence diagram for the former and express the
+  termination branches as a separate flowchart with decision nodes. (A first draft of a
+  human-in-the-loop page that combined them was reported back as "the workflow looks more
+  complicated now"; splitting fixed it and a later page reused the split shape.)
+- **A flowchart `subgraph` title stays on one line.** The subgraph box is sized by its inner
+  nodes, not by its title; a title broken with `<br/>` has its extra lines covered or clipped
+  by the nodes. Shorten the title, or move the explanation into the prose outside the
+  subgraph. This never fails the build, so only a rendered screenshot can show it — an exit
+  code 0 from the docs build proves nothing here.
+- **Confirm the doc folder is actually Sphinx-built before adding the directive.**
+  `contributing-docs/*.rst` is rendered by GitHub natively and is not built by Sphinx, so a
+  Sphinx directive (mermaid included) doesn't apply — check for a `conf.py` and whether the
+  folder is in the `breeze build-docs` list first.

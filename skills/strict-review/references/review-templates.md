@@ -103,6 +103,22 @@ The new head has not been reviewed — re-check before submitting.
 > 案例（2026-10 batch）：7 顆 PR 在審查後、發佈前被推新 head（force-push 或追加 commit），
 > 都以此 H2 ＋舊 SHA 發佈，交由 board 判為 `↩︎ 回你的球`。
 
+### Refreshing a draft against the PR's current thread state
+
+When trimming a review draft (body items or per-thread replies) against what the PR
+already has, an item stays in the draft until **the user** has responded on that thread.
+An author reply only proves the other side moved; it doesn't mean the user's concern was
+handled, so it is not a reason to drop the item. Drop an item only when the thread is
+resolved or its last comment is the user's own.
+
+How to apply: fetch threads via GraphQL `reviewThreads` (REST has no `isResolved`) and read,
+per thread, whether it is resolved and who wrote the last comment. Also list what the
+user's pending (unsubmitted) review already contains, so inline comments aren't queued
+twice. The Work Board's possession rules (a submitted review, approve included, with no
+new activity afterwards parks the PR in ⏳; new author activity flips it back to 🎯) are in
+[`work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) §2 and
+already cover the board side — this note covers only what a *draft* should keep.
+
 ### 多 PR batch 最終 roll-up
 
 batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行改成 roll-up：

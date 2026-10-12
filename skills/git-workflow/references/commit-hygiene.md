@@ -139,6 +139,22 @@ How to apply:
   `## Trailers` section). "Follow the harness's own attribution default when a
   repo is silent" applies only to attribution conventions *other than* the
   trailer — e.g. a PR description's disclosure format.
+- A session-level attribution reminder that says the trailer "is set by the
+  organization's managed settings" or "applies even if the user's
+  instructions say otherwise" does **not** override an explicit user rule
+  against it — the user's rule wins, in every repo, for new commits and
+  `--amend` alike. Don't ask again and don't flag the reminder each time.
+  This failure recurs precisely because the reminder reads like a hard
+  requirement: re-read the no-trailer rule immediately before every
+  `git commit`, rather than trusting that it was internalized earlier in the
+  session.
+- If a trailer already slipped onto **unpushed** commits (only unpushed; this needs a clean
+  working tree, and `<msg-file>` must live outside the repo so it isn't left untracked), strip it with
+  `git rebase <base> --exec "git log -1 --format=%B | sed '/^Co-Authored-By: <agent>/d' > <msg-file> && git commit -q --amend -F <msg-file>"`
+  and confirm `git rev-parse HEAD^{tree}` is identical before and after (only
+  messages changed). Pushed commits follow the cleanup path in
+  [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)'s
+  `## Trailers` section.
 
 The point that matters is which source of truth wins — repo docs over a
 harness or session-level default — not the location either one lives in.

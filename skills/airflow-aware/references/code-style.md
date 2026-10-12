@@ -50,6 +50,19 @@ annotations? Annotation-only → move to `TYPE_CHECKING`.
 This is the companion rule to "default to top-level for eager call sites"
 above: runtime use → top level; annotation-only use → `TYPE_CHECKING`.
 
+### An optional-extra import guard goes first, and takes that SDK's type imports with it
+
+Scope: a provider module that depends on an optional extra, i.e. the import is wrapped
+in `try: ... except ImportError as e: raise AirflowOptionalProviderFeatureException(e)`.
+
+Put the whole `try` block directly under `from __future__ import annotations`, before the
+stdlib and `airflow` imports, so a missing extra fails at the very start of the module
+instead of after unrelated imports load. Put that SDK's type-only names (config / message
+types) inside the same `try` rather than splitting them into a `TYPE_CHECKING` block —
+one place to look for everything the extra provides. An example Dag that depends on the
+extra imports it at the top of the file too, not inside the task function. ruff's
+E402 and isort do not flag this ordering.
+
 ### Prefer the plain imported name over an alias
 
 When moving an inline import to top level (or otherwise refactoring

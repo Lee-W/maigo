@@ -1069,6 +1069,28 @@ floor.
 
 Source: 2026-09-29 vendor-provider extra-floor fix (apache/airflow #73532 sibling floor).
 
+## 10.34 A provider hook's connection-field parsing: rejected credentials fail closed, nullable form strings accept `null` and JSON *(Request changes)*
+
+**Scope gate**: applies when a diff touches how a provider hook reads or validates connection
+fields — a credentials path that a provider class can reject, or an `extra` field that
+`provider.yaml` declares as a nullable string.
+
+1. **Rejected credentials fail closed.** When the provider class rejects the connection's
+   credentials, raise a named `ValueError` (connection id, provider, the ignored field *names*,
+   never the values). Don't silently fall back to environment-variable auth: that authenticates as
+   a different identity than the one the connection names. Delete any state that existed only to
+   report the old fallback, so no always-empty dead state is left behind. Surfaced in the
+   apache/airflow #74451 review (`PydanticAIHook`'s provider factory).
+2. **A nullable string `extra` field must tolerate `null` and a JSON string.** The connection form
+   stores an empty field as `null`, and users may type a JSON array string as the field help
+   suggests. The hook should treat `null` as empty and parse a string that starts with `[` as JSON
+   (bad JSON, or a non-string item, raises with a named error) — not just type-check the value.
+   Same review (`MCPHook` stdio `args`).
+
+How to apply: for (1) ask "what identity does this connection authenticate as after the
+fallback?"; for (2) feed the hook an empty form value and the documented JSON string and see
+both parse.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,
@@ -1480,3 +1502,21 @@ was silently dropping its first partition day — 9 runs instead of 10 — caugh
 because reviewer phanikumv flagged it. When a diff touches partition/backfill
 tz-boundary tests specifically, ask "what does the production path actually feed?"
 and check the test input matches that shape.
+
+### `skip_locked` short fetch is not "backlog drained" — the edge-flag reset case
+
+Scope gate: applies when a diff touches code that fetches with `skip_locked` /
+`with_row_locks` and infers "everything handled" from the fetched row count. It is the
+sibling of 10.17 (same HA, row-locked family).
+
+Under `skip_locked`, getting fewer rows than `limit` does not mean the backlog is empty:
+under HA, replica A can lock 500 rows and replica B get only 100. If B resets an
+edge-triggered flag on that short fetch, the next tick repeats the warning and audit row for
+the same episode (apache/airflow #71072 review).
+
+- Reset the flag only when the fetch is empty, or when an **unlocked** count is `<= cap`.
+- A short fetch while the flag is True still has to run the count; while the flag is False it
+  may skip the count.
+- SQLite doesn't lock rows, so an HA test can't rely on real locks: mock the module's
+  `with_row_locks` (for example a side effect that makes the query apply `.limit(1)`) to
+  simulate another replica holding rows.

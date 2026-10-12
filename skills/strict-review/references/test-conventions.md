@@ -739,3 +739,22 @@ How to apply: extract one verb-named helper that returns the predicate tuple (e.
 **decoy test per predicate**: create the data, then flip a single flag. Mind DB constraints when
 flipping — `is_paused` and `is_draining` cannot both be set (`CHECK NOT (is_paused AND
 is_draining)`). Apply whenever you add or change a fetch-then-count query pair.
+
+---
+
+## Inserting a new test class between a decorator and its class steals the decorator
+
+When a diff adds a test class at a point that sits between an existing class's
+`@pytest.mark.skipif(...)` (or other class-level marker) and its `class` line, the
+decorator silently re-attaches to the **new** class and the original class loses its
+guard. The failure is invisible wherever the environment is newer than the guard's
+threshold: example (apache/airflow #74396) — new classes were inserted between a
+`skipif(not AIRFLOW_V_3_1_PLUS)` and the class it guarded; the local run (Airflow 3.3+)
+was fully green, and only the old-version compat jobs went red
+(`module 'airflow' has no attribute 'sdk'`), 18 tests across two jobs.
+
+How to apply: when a diff adds a test class, read the lines directly above and below
+the insertion point and confirm every pre-existing decorator is still attached to the
+class it was written for; give each new class its own `skipif` where it needs one.
+Don't rely on the local run — it can't reproduce this when the local environment is
+newer than the compat matrix.

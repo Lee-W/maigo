@@ -657,6 +657,39 @@ uv run ...` (a single command, with `env` doing the prefixing) —
 under `shlex.split` + `subprocess.run`, the same mechanism as that rule's
 `ENV=val cmd` example; it only works under an actual shell.
 
+### A new worktree needs a scoped test command, a fresh `AIRFLOW_HOME` per verifier run, and a few env fix-ups
+
+Differences from the entries above that bite on every new worktree (state them in the
+delegation prompt, not just in your own head):
+
+- **Write a scoped `.claude/test-command` at the start, and run it once.** The repo root has no
+  runnable pytest entry point, so the Stop hook's default `uv run pytest -x` dies with
+  `ERROR collecting` — a collection error, not a test failure, with no suite run at all. Narrow it
+  to the package and directories this change touches (`uv run --project <pkg> pytest <dirs>`) and
+  confirm it exits 0 rather than swapping one false signal for another. Prefer this to
+  `.claude/skip-test-verification`, which turns verification off entirely. When a test is renamed,
+  grep the command for the old id (`ERROR: not found:` means the suite never ran), and list only
+  files this change touched so an old task's leftover paths don't bring unrelated reds in.
+- **Reusing one on-disk `AIRFLOW_HOME` accumulates residue.** One fixed directory reused by the
+  Stop hook, subagents and manual reruns accumulates state: the same suite was observed going
+  green twice on a fresh dir yet red intermittently (`FOREIGN KEY constraint failed`, a
+  different test each time) on the reused one. So have each verifier run use a new empty
+  `AIRFLOW_HOME`, sequentially rather than in parallel, and before treating a red as evidence,
+  rerun once against a fresh dir.
+- **`ModuleNotFoundError: No module named 'airflow_shared'` at fixture setup** (structlog
+  `caplog` / `cap_structlog`): a fresh worktree's `.venv` lacks the editable `.pth` for
+  `shared/*/src`, so the whole batch errors rather than fails. Add those `src` directories to
+  `PYTHONPATH` in the same shell call. It doesn't hit every package, so report the original
+  result and the patched-env result separately.
+- **Don't borrow another checkout's `node_modules` by symlink.** A mismatched dependency
+  version there made dozens of UI test files fail to load (`tableFeatures is not a function`);
+  that run is void. Install inside the worktree (see the pnpm entry above).
+- **When `breeze run pytest` is stuck rebuilding the CI image** (over an hour from source), stop
+  rather than retry the same command. A fallback is mounting the worktree into the prebuilt CI
+  image from the registry and running `uv run --project <pkg> pytest` inside it. It is not
+  breeze and not the CI environment, so say so in the report; and tests that need Linux skip
+  wholesale on macOS, so a macOS green doesn't verify them.
+
 ## 5. Repo-scoped commands need a pinned working directory across worktrees
 
 When multiple git worktrees of the same repo exist side by side, the Bash
@@ -855,3 +888,17 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    — a clipped capture computed from a pre-scroll bounding box, or taken
    right after programmatic scroll, has repeatedly produced a blank or
    wrongly-offset image even though the diagram itself rendered correctly.
+
+8. **Judging whether a PR's existing screenshot is stale means comparing against what
+   the screenshot captured, not against which files changed.** "The same template was
+   modified since the screenshot" is only a lead. Evidence is the intersection of two
+   things: the region of the page the image actually shows (read the image, or convert
+   its height into screens of the page), and which section of the template or page the
+   change landed in. A reviewer's "update the screenshot with recent changes" case: a
+   rebase pulled in another PR that edited the same template, so it was asserted that
+   the screenshot "will surely show it" — but that change only touched a section the
+   screenshots never captured, and the images came out identical. Check in two layers:
+   (a) whether the PR's own UI diff changed between the push the screenshot was taken at
+   and now (compare the added/removed lines of the affected source per push), and (b)
+   whether anything the base brought in lands inside the captured region. If the captured
+   region can't be established, say "probably stale/fresh" rather than "definitely".

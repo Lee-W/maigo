@@ -61,6 +61,11 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 
 - 使用者若給 substantive feedback（追問、要 re-read、pivot），先處理那個再推進
 - 使用者說「全部一起看」/ `batch them` / `do them all` → 放掉這個 gate 直到 batch 結束
+  - 放掉 go-ahead 的同時，**裁決也集中到最後問一次**：每顆審完只發佈報告，must-fix 放不放、
+    nit 怎麼送等全部審完後一次問，不要每顆審完就中斷（逐顆中斷會讓使用者重複看同樣格式的
+    問題）。收尾用 AskUserQuestion，每次最多 4 題、分輪問完；每題推薦項放第一個，選項寫清楚
+    must-fix 與 nit 各自怎麼處理；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者
+    必須先決定才不會白做」的前提（例如範圍需要改審）才提前問。
 - 最後一個 PR 跑完 → queue 行改成最終 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）
 
 ## 交付時效

@@ -582,3 +582,28 @@ grep 呼叫點不算證據——測試 helper 可能被別條路徑間接存取�
 `test_cleanup_persists_partial_cache_on_downstream_failure` 命中。
 
 相關：本檔第 8 節（單點觀測不足以支撐全稱結論）、第 21 節（缺席宣告要直查權威來源）。
+
+## 24. 對有未 commit 改動的檔做 mutation canary，還原不能用 `git checkout`
+
+做 mutation canary（暫時改壞 → 確認測試轉紅 → 還原）時，還原手法取決於**該檔現在跟
+HEAD 差在哪、那些差異要不要留**：
+
+- 檔案與 HEAD 一致 → `git checkout -- <file>` 可以，用 hash 對帳確認即可。
+- 檔案帶有要保留的未 commit 改動（正是你剛寫、正在驗的那段）→ `git checkout --` 會還原到
+  HEAD，連 WIP 一起丟掉，而 canary 本身看起來完全成功，直到 hash 對帳才發現。改法：先把檔案
+  複製成備份、改壞、跑測試、再複製回去；或先 `git add` 該檔，再從 index 還原。
+- 這條與第 11 節「全域 ruff hook 的還原順序」不衝突但別混用：那條是刻意連自己的 edit 一起丟、
+  再補回去；canary 只需要丟掉「改壞的那一下」，用備份還原比較便宜，也不會漏掉補回那一步。
+
+**備份放哪**：放在目標檔旁邊（帶任務名的檔名，例如 `<file>.canary-bak`）或本 session 專屬的
+暫存目錄，不要用共用暫存目錄裡的泛用檔名——平行 agent 可能先一步把它覆寫成另一個版本。
+
+**對帳用三方**：磁碟上的檔、備份、`git show HEAD:<file>`。只比「磁碟 vs 備份」會一致而看不出
+備份已被汙染；`HEAD` 那一方是唯一不會被平行 agent 動到的錨點。檔案沒有要保留的 WIP 時，
+直接 `git show HEAD:<file> > <file>` 比從備份還原更可靠。
+
+判準一句：**還原前先問「這個檔案現在跟 HEAD 差在哪，那些差異我要不要留」**；要留，就不能把
+`git checkout --` 當還原鍵。
+
+相關：本檔第 8 節（canary 全綠的成因分類）講的是「怎麼解讀結果」，這條講的是「怎麼不弄壞受驗
+對象」。
