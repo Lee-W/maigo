@@ -110,8 +110,11 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   [`airflow-aware` 的「Every worktree shares one sqlite test DB」一節](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)。
 
 - 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到具名 ref**（例如
-  `git fetch <remote> pull/<N>/head:review-pr-<N>`），或直接用裸 SHA，交辦 prompt 裡要寫明
-  「不要用 `FETCH_HEAD`」。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
+  `git fetch <remote> +pull/<N>/head:refs/review/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
+  「不要用 `FETCH_HEAD`」。**refspec 開頭要有 `+`**：重審時早先 session 留下的同名 ref 已存在，
+  沒有 `+` 會被 `! [rejected] (non-fast-forward)` 拒絕、ref 靜默留在舊 head，後面的 worktree 與
+  所有派工就對著舊 head 審（實例：重審時 `review-pr-<N>` 仍指著舊 head，PR 實際 head 早已前進）。fetch 後一律拿 `git rev-parse <ref>` 與
+  `gh pr view <N> --json headRefOid` 比對，不一致就停下重抓。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
   讀到的可能是別隻 agent 的 PR。實例（2026-10-01）：一隻探索 agent 拿 `git diff main FETCH_HEAD`
   看到另一顆 PR 的 snowflake 改動，就誤判成「main 在 session 中途被 fast-forward」；查 `git reflog`
   才確認 main 根本沒動。

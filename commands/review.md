@@ -59,6 +59,8 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 ### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
 **先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。
+**`status: conflict` 時 rubric 檔裡既有的 cache 區塊是舊 head 的過期快取，不是現況**——現 head 的 diff 以 `gh pr diff` 另存為準，並交代燈／爽世不要引用該區塊。
+常見成因：重審時舊 rubric 的 H1 被加上 `(re-review, head <sha>)` 之類的註記，與快取要的標題不一致；重審 rubric 的 H1 保持首次的原標題，head 與重審註記寫進本體第一段，不寫進 H1。
 
 - **取 diff**：
   - GitHub PR → `gh pr view <num/url> --json title,body,additions,deletions`、`gh pr diff <num/url>`
