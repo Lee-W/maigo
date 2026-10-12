@@ -255,6 +255,13 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
 
+### 收場總結重貼回覆草稿
+
+步驟 7、8 會跟使用者多輪互動並寫檔，步驟 6 的回覆草稿因此被推出視線。全部步驟走完後，**最後一則總結要把
+步驟 6 的回覆草稿（每條的原始 comment 連結 ＋ fenced block）原樣再貼一次**，不要寫「草稿在上一則訊息」——
+回覆草稿是這個命令唯一要使用者拿去貼的交付物，不能只留在中途的訊息裡。重貼前沿用步驟 6 的規則：草稿若
+已隔過 rebase 或新 commit，先重驗其中點名的符號與全稱陳述。
+
 ## Memory propose confirm flow
 
 address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不會產生 `## Memory propose`。
