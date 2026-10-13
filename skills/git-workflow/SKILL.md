@@ -245,7 +245,11 @@ recipes in `references/worktree-hygiene.md`:
 
 - **Worktree layout** — worktrees live nested under the main worktree's own
   `.worktrees/<topic>` (branch `<topic>`), matching the same path template a
-  personal worktree manager (e.g. worktrunk) already uses for the repo.
+  personal worktree manager (e.g. worktrunk) already uses for the repo. Don't
+  open one with the harness's built-in `EnterWorktree` (it creates a locked
+  `.claude/worktrees/<name>` on branch `worktree-<name>`); use
+  `git worktree add`. Command and fix-up recipe in
+  `references/worktree-hygiene.md`.
 - **Start a task in its own worktree from the outset, not midway** — a
   mid-task switch costs more than staying (untracked files don't follow a
   branch switch, running agents get interrupted); correct on the *next* task.

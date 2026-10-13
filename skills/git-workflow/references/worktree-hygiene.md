@@ -24,18 +24,23 @@ git worktree list --porcelain | head -1 | sed 's/^worktree //'
 (the porcelain output's first entry is always the main worktree, regardless
 of which worktree the command runs from).
 
-A harness's built-in "create worktree" tool may default to a differently
-decorated branch name (e.g. `worktree-<topic>-<issue-number>`) — that default
-does not match this convention and should be corrected:
+**Don't open a task worktree with the harness's built-in `EnterWorktree`
+tool.** Its defaults don't match this layout: the path is
+`.claude/worktrees/<name>`, the branch is `worktree-<name>` (possibly with an
+issue number appended), and the worktree is created locked. Run
+`git worktree list` first to see where the repo's existing worktrees live,
+then create it yourself:
 
 ```bash
-git worktree add -b <topic> <root>/.worktrees/<topic> upstream/main
+git worktree add -b <topic> <root>/.worktrees/<topic> <remote>/main
 ```
 
-If the harness already created a differently-named one, fix it after the
-fact rather than discarding the commit:
+If one was already created the wrong way, fix it after the fact rather than
+discarding the commit. Unlock first if it is locked, and compare
+`git diff | shasum` before and after the move:
 
 ```bash
+git worktree unlock <wrong-path>   # only if locked
 git worktree move <wrong-path> <root>/.worktrees/<topic>
 git -C <root>/.worktrees/<topic> branch -m <old-name> <topic>
 ```
