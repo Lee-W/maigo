@@ -441,6 +441,15 @@ worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree
 找到現存的那一份再 upsert**，不要假設它在主 worktree、也不要照抄任何舊記錄的路徑；
 找不到任何 `board.md` → 問使用者要建在哪，不要自己挑一個 worktree 建。
 
+**報告與 board 可能不在同一個 worktree。** `review/<id>/review.md` 與 `draft.md` 由
+`artifact_path.py` 落在**執行命令所在 worktree** 的 `.maigo/` 下；`board_state.py` 的
+`--maigo-root` 只讀該根底下的 `.maigo/review/<id>/review.md`（`_auto_local_verdict_at`），
+找不到就退回 GitHub reviews 與 `prior_status`。在 board 以外的 worktree 跑 `/maigo:review`
+時，細節檔 `## 筆記` 裡以 `.maigo/` 為基準的相對路徑會開不起來，本地 verdict 也可能不被
+`board_state.py` 看見。回寫時把筆記改寫成絕對路徑，或把 `review/<id>/` 複製到 board 所在根的
+`.maigo/review/`；不要因為路徑相對就假設報告在 board 旁邊（2026-10-14 實例：6 顆 PR 在 topic
+worktree 審完、board 在別的 worktree，筆記改用絕對路徑）。
+
 **Upsert 紀律**（單項 upsert 的日期更新、容易被漏掉的獨立檢查、verdict 未必已送出 GitHub）
 三條實務守則見
 [`references/upsert-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/upsert-discipline.md)。

@@ -177,6 +177,7 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 - Any uncleared item → verdict stays NEEDS_CHANGES or BLOCKED
 - "我改了類似的地方" / "順便修了別的" doesn't clear a must-fix
 - New problems found in this round still count — being "round 3" is not a reason to relax
+- When briefing the reviewer for a re-review, ask for the whole changed passage to be checked sentence by sentence and **every** finding listed in one pass. A reviewer who only re-checks the sentence just fixed surfaces one new unsupported claim per round, and a doc fix can drag on for three or four rounds.
 
 When new commits or a new maintainer review arrive on a PR **already
 reviewed before**, do a delta re-review against the stored report rather
