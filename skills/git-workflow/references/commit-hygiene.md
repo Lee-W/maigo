@@ -292,3 +292,13 @@ stack the dependent part after the other PR merges. Don't just report "stacked o
 the fact. Case (2026-09-30): Snowflake Cortex work was stacked on apache/airflow #73532; the user
 asked "why aren't the first two commits mine?" and it was split — auth + model hook based on
 `main`, the managed-agent part waiting for #73532 to merge.
+
+## Judge a commit by its own exit code and HEAD hash; after a hook block, diff against `HEAD`
+
+Capture `git commit`'s exit code on its own, then compare `git log -1`'s hash with the expected
+one. Don't chain the commit with a following `git log` in one command and read the final exit
+code — it reports the `git log`, not the commit.
+
+A pre-commit hook that blocks the commit can leave the index reset, so `git diff --cached` comes
+back empty (a patch built from it had 0 lines). To capture the intended change after a block, use
+`git diff HEAD`.

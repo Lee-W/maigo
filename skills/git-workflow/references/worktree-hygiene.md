@@ -438,3 +438,26 @@ in the history for no benefit.
 How to apply: `git reset --soft $(git merge-base main HEAD)`, stage the
 relevant files, and land one commit with a message that follows the repo's
 own convention (see [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)).
+
+## Follow-up of an already-merged PR stays in the original worktree
+
+When a squash-merged PR needs a follow-up (e.g. local commits were never pushed before the merge),
+keep the fix in the **original topic worktree and branch** — don't open a new worktree and
+cherry-pick. The user manages worktrees and pushes themselves; each extra worktree is one more
+thing for them to clean up.
+
+1. `git status` clean, then `git log origin/main..HEAD` to see which commits the squash already
+   absorbed.
+2. Create a backup branch at the current HEAD, then
+   `git rebase --onto origin/main <last-merged-commit>` to drop the merged ones.
+3. Compare `git show HEAD:<file> | shasum` against the pre-rebase version for each touched file;
+   delete the backup branch only when the hashes match.
+4. Don't push or open a PR; hand it back to the user.
+
+## Before replying "fixed" / "linked it", confirm the PR head contains the commit
+
+A local commit isn't on the PR. Before drafting or posting a review reply that claims a fix or
+added link, run `gh pr view <PR> --json commits --jq '.commits[].oid'` and check the commit is in
+the list (or `git branch -vv` shows no `ahead N`). If it isn't, tell the user it's not pushed yet
+instead of replying first. Why: a reply promised a link whose commit never got pushed; the PR merged
+without it, the reviewer asked where it was, and a separate follow-up PR was needed.

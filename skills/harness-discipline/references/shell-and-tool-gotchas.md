@@ -136,3 +136,17 @@ branch 都顯示「沒有對應 PR」），把假結果當成事實回報。
 4. 呼叫掛住時先讀 harness 給的 interim output 看卡在哪，再判斷；不要重試同一條指令。
 
 相關：與本檔第 1 節同族——指令回報成功、或回報了*某個東西*，卻沒有做到或沒有回答你問的事。
+
+## 6. 大型 CI job 日誌：用 `gh api`，別用 `gh run view --log-failed`
+
+**現象**：`gh run view <run> --job <id> --log-failed` 抓大型 job 日誌（上萬行）會先卡到被
+harness 丟背景，最後曾觀察到回 `failed to get run log: stream error: CANCEL`（視情況而異）——exit 0、檔案只有那一行
+錯誤，容易被誤當成日誌。
+
+**做法**：
+
+1. `gh pr checks <PR>` 取 job URL，尾段即 job id。
+2. `gh api --allow-escape-sequences repos/<owner>/<repo>/actions/jobs/<job_id>/logs 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > <scratchpad>/<id>.log`
+   （不加旗標會因含終端跳脫字元被拒，exit 1、檔案為空）。
+3. 先 `wc -l` 確認不是單行錯誤，再 grep 失敗行（如 `Z FAILED `、`Failed$|hook id`）並依測試名定位
+   traceback。遇到 CANCEL 就換路，不要重試同一條指令。

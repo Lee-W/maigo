@@ -209,3 +209,20 @@ have deleted a definition that no longer existed. Report which reds are
 Cross-reference "Recompute base refs live" and "A green/skipped CI check and
 a changelog line are proxies, not proof" above — same family of stale-proxy
 traps, this one specific to CI-red triage.
+
+## Recover overwritten PR versions via the force-push timeline
+
+To find out which PR revision dropped something, the local reflog isn't enough: it only holds
+rebase replays, not versions that were pushed and later overwritten by a force-push.
+
+1. Query GraphQL `timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT])` on the PR; each event
+   has `beforeCommit{oid}` and `afterCommit{oid}`.
+2. GitHub often still serves overwritten commits by SHA: resolve the full SHA with
+   `gh api repos/<owner>/<repo>/commits/<short-sha> --jq .sha`, then
+   `GIT_CONFIG_GLOBAL=/dev/null git fetch https://github.com/<owner>/<repo>.git <full-sha>`
+   (whether an orphaned SHA can still be fetched depends on GitHub's server behaviour and may fail).
+3. `git show <sha>:<file>` and compare version by version.
+
+When comparing kwargs inside a call (e.g. `Log(...)`), grep with both `-B` and `-A` so fields
+that sit before the anchor line (`event=`) aren't missed; if you suspect you missed one, print the
+whole block before concluding.

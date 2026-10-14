@@ -679,6 +679,22 @@ uv run ...` (a single command, with `env` doing the prefixing) —
 under `shlex.split` + `subprocess.run`, the same mechanism as that rule's
 `ENV=val cmd` example; it only works under an actual shell.
 
+Two further shapes of the same clash (the Stop hook counts as one more concurrent runner):
+
+- **Parallel agents plus the Stop hook can corrupt the shared DB at init.** Beyond the symptoms
+  above: a DB left half-initialised makes *every* later run fail at collection
+  (`table callback_request already exists` / `Unable to re-initialize the SQLite test DB`, N
+  errors, 0 tests run), it does not self-heal, and it is unrelated to the diff. Treat the hook's
+  red from this as environment noise and don't edit `.claude/test-command` because of it; the
+  fix is the per-agent private `AIRFLOW_HOME` above (e.g. `<scratchpad>/airflow_home_<agent>`).
+- **A verifier and the Stop hook running the same batch against the same `AIRFLOW_HOME` can give
+  false reds** (a failure set that differs run to run). Have the verifier copy that home
+  (`/bin/cp -R <that AIRFLOW_HOME> <scratchpad>/af-home-<name>`) and use the copy; the point is
+  that the verifier's home is its own, wherever the original lives. While a verifier is
+  `running` (confirm with `ListAgents`), hook reds are noise: don't write them into
+  `.claude/known-test-failures`. Root cause unproven — repeated greens on the isolated DB only
+  support the interference explanation.
+
 ### A new worktree needs a scoped test command, a fresh `AIRFLOW_HOME` per verifier run, and a few env fix-ups
 
 Differences from the entries above that bite on every new worktree (state them in the
@@ -692,12 +708,16 @@ delegation prompt, not just in your own head):
   `.claude/skip-test-verification`, which turns verification off entirely. When a test is renamed,
   grep the command for the old id (`ERROR: not found:` means the suite never ran), and list only
   files this change touched so an old task's leftover paths don't bring unrelated reds in.
-- **Reusing one on-disk `AIRFLOW_HOME` accumulates residue.** One fixed directory reused by the
-  Stop hook, subagents and manual reruns accumulates state: the same suite was observed going
-  green twice on a fresh dir yet red intermittently (`FOREIGN KEY constraint failed`, a
-  different test each time) on the reused one. So have each verifier run use a new empty
-  `AIRFLOW_HOME`, sequentially rather than in parallel, and before treating a red as evidence,
-  rerun once against a fresh dir.
+- **Reusing one on-disk `AIRFLOW_HOME` accumulates residue.**
+  One fixed directory reused by the Stop hook, subagents and manual reruns accumulates
+  state: the same suite was observed going green twice on a fresh dir yet red intermittently
+  (`FOREIGN KEY constraint failed`, a different test each time) on the reused one. So have each
+  verifier run use a new empty `AIRFLOW_HOME`, sequentially rather than in parallel, and before
+  treating a red as evidence, rerun once against a fresh dir.
+  Separately, a private home's DB can also be corrupted outright, e.g. by an aborted pytest
+  (every test errors at table creation with `table X already exists`, a different table each
+  time; `--with-db-init` doesn't help): delete its `airflow.db` and the `.airflow_db_initialised`
+  marker (git-ignored; `/bin/rm -f`) and rerun. Never touch the shared default-home DB.
 - **`ModuleNotFoundError: No module named 'airflow_shared'` at fixture setup** (structlog
   `caplog` / `cap_structlog`): a fresh worktree's `.venv` lacks the editable `.pth` for
   `shared/*/src`, so the whole batch errors rather than fails. Add those `src` directories to
@@ -711,6 +731,16 @@ delegation prompt, not just in your own head):
   image from the registry and running `uv run --project <pkg> pytest` inside it. It is not
   breeze and not the CI environment, so say so in the report; and tests that need Linux skip
   wholesale on macOS, so a macOS green doesn't verify them.
+
+### Don't let a subagent `uv sync` a shared worktree `.venv` — only `uv run --frozen`
+
+Scope: a subagent working in a uv-workspace monorepo worktree whose `.venv` is shared. (The
+plain `uv sync --project ...` above, at §2 and §4, is for your own or an isolated environment,
+where pruning is acceptable.) A subagent running `uv sync --frozen --project <pkg>` there prunes
+packages outside that package's dependency set from the shared `.venv` (a large number were
+observed removed), including optional extras. Tests then flip from pass to **skip**, not
+red, so nothing alerts you. State it in the delegation prompt: `uv sync` is forbidden, use only
+`uv run --frozen --project <pkg> ...`; after the run, check that the skipped count didn't jump.
 
 ## 5. Repo-scoped commands need a pinned working directory across worktrees
 
