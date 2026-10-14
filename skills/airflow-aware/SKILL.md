@@ -446,7 +446,7 @@ sub-check states. The file covers:
 - **10.32** A zero-argument method that returns derived state should be a `@property` (nit)
 - **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
 - **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON (Request changes, scope-gated to provider hook connection-field parsing)
-- **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"` (Request changes, scope-gated to scheduler-side `Log(...)` additions)
+- **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks

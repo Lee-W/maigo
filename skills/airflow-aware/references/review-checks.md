@@ -1091,7 +1091,7 @@ How to apply: for (1) ask "what identity does this connection authenticate as af
 fallback?"; for (2) feed the hook an empty form value and the documented JSON string and see
 both parse.
 
-## 10.35 Scheduler-written audit `Log(...)` rows must set the owner *(Request changes)*
+## 10.35 Scheduler-written audit `Log(...)` rows must set the owner and, for Dag events, `dag_id` *(Request changes)*
 
 **Scope gate**: applies only when a diff adds or changes a `Log(...)` row written from the
 scheduler side (background work in `jobs/scheduler_job_runner.py` and its helpers), not API or CLI
@@ -1100,6 +1100,15 @@ audit rows.
 A row the scheduler writes on its own has no request user, so without an explicit owner the audit
 log shows an empty one. Set `owner="scheduler"` and `owner_display_name="Scheduler"`, copying the
 existing precedent (the drain-completed row), and assert both fields in the test.
+
+Also set `dag_id` whenever the event belongs to a Dag. `PermittedEventLogFilter`
+(`airflow-core/src/airflow/api_fastapi/core_api/security.py`) treats a row without `dag_id` as a
+non-Dag event: only someone holding `AUDIT_LOGS_ALL` sees it, on the global Audit Log page. Any
+Dag's audit page (filtered by `dag_id`) never shows it, and there is no Dag-level authorization
+for it. When the event is scheduler-level with no single culprit Dag, write one row per affected
+Dag, with an upper bound on the number of rows. Leave `dag_id` as `None` only when no Dag is
+involved. Public instance: the apache/airflow #71072 review (a partition cap event written as a
+single row without `dag_id`).
 
 How to apply: `grep -n 'owner="scheduler"' airflow-core/src/airflow/jobs/scheduler_job_runner.py`
 for the precedent. If the row is committed through a separate session (so it survives an outer
@@ -1524,14 +1533,17 @@ Scope gate: applies when a diff touches code that fetches with `skip_locked` /
 `with_row_locks` and infers "everything handled" from the fetched row count. It is the
 sibling of 10.17 (same HA, row-locked family).
 
-Under `skip_locked`, getting fewer rows than `limit` does not mean the backlog is empty:
-under HA, replica A can lock 500 rows and replica B get only 100. If B resets an
-edge-triggered flag on that short fetch, the next tick repeats the warning and audit row for
-the same episode (apache/airflow #71072 review).
+Under `skip_locked`, getting fewer rows than `limit` — or none — does not mean the backlog is
+empty: under HA, replica A can lock 500 rows and replica B get only 100, or replicas A and C
+can lock everything and B's fetch comes back empty. If B resets an edge-triggered flag on
+that short or empty fetch, the next tick repeats the warning and audit row for the same
+episode (apache/airflow #71072 review, two rounds: short fetch first, then empty fetch).
 
-- Reset the flag only when the fetch is empty, or when an **unlocked** count is `<= cap`.
-- A short fetch while the flag is True still has to run the count; while the flag is False it
-  may skip the count.
+- Reset the flag only when an **unlocked** count is `<= cap`; that includes the empty-fetch
+  path, which is not exempt.
+- A short or empty fetch while the flag is True still has to run the count; while the flag is
+  False it may skip the count.
 - SQLite doesn't lock rows, so an HA test can't rely on real locks: mock the module's
-  `with_row_locks` (for example a side effect that makes the query apply `.limit(1)`) to
-  simulate another replica holding rows.
+  `with_row_locks` with a side effect that makes the query apply `.limit(1)` to simulate a
+  short fetch and `.limit(0)` to simulate an empty one while the backlog is still above the
+  cap.
