@@ -249,6 +249,16 @@ recipes in `references/worktree-hygiene.md`:
 - **Start a task in its own worktree from the outset, not midway** — a
   mid-task switch costs more than staying (untracked files don't follow a
   branch switch, running agents get interrupted); correct on the *next* task.
+- **Work already finished in the shared tree, user wants it committed from a
+  worktree** — move it, don't redo it: save `git diff HEAD` as a patch (not
+  `--cached`: a failed commit hook resets the index, leaving it empty) and
+  record `shasum -a 256` of each file; `worktree_path.py` for the path, then
+  `git worktree add -b <topic> <path> <remote>/main`; in the worktree
+  `git apply --check`, apply, and commit only when the hashes match file for
+  file; then in the original tree `git restore` those files, switch back, and
+  delete the temporary branch. Untracked new files never appear in
+  `git diff HEAD` and need copying separately (inferred from git's behaviour,
+  not exercised in the session that added this entry).
 - **`ListAgents` before touching the git index** on a shared checkout — a
   peer session can be on the same checkout/branch with zero mutual awareness,
   and `git status` alone won't reveal it.
