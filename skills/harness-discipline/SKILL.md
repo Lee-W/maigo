@@ -76,7 +76,9 @@ triage-rubric / pr-comments 這類）由 `scripts/artifact_path.py` 統一命名
   當全稱結論（換一個會改變結果的觀測點來隔離）——具體案例見
   [`references/evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)；接外部資料源前先做有界 PoC 也在該檔（§22）。
 - **shell／工具的沉默失敗**：zsh glob 不加引號會讓命令根本沒跑（不是「查無結果」）、
-  `uv run` 會無聲換掉 editable install——驗的要是實際在跑的那一份，見
+  `uv run` 會無聲換掉 editable install、heredoc 只餵最後一個指令、zsh 的 `path` 變數會蓋掉
+  `PATH`、profile alias 讓 `cp`／`mv`／`cd` 靜默失效——這些都是指令回報成功或根本沒跑，卻沒做到
+  你以為的事；其中 `uv run` 那項尤其要驗「實際在跑的那一份」，見
   [`references/shell-and-tool-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/shell-and-tool-gotchas.md)。
 
 ### docs-only 批次的例外

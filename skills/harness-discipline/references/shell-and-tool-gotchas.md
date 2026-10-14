@@ -1,9 +1,10 @@
 # Harness Discipline — Shell and Tool Gotchas
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
-兩組「工具的失敗不長得像失敗」的坑：一個是指令根本沒跑卻像「查無結果」，一個是驗到的
-根本不是實際在跑的那一份。Read this file when 你要動態組指令參數、要拿 shell 輸出當
-「沒有」的證據，或要驗證一個依賴本地開發中套件的專案。
+五組「工具的失敗不長得像失敗」的坑：指令根本沒跑卻像「查無結果」、驗到的根本不是實際在跑
+的那一份、heredoc 餵錯指令而掛住、zsh 的 `path` 變數蓋掉 `PATH`、profile alias 讓檔案
+操作與量測靜默失效。Read this file when 你要動態組指令參數、要拿 shell 輸出當「沒有」
+的證據、要驗證一個依賴本地開發中套件的專案，或要在 shell 裡寫迴圈、heredoc、檔案替換。
 
 ---
 
@@ -76,3 +77,62 @@ hook 的 `entry: uv run ...`——每 commit 一次就洗掉一次環境，`git 
 2. `uv pip install -e <local-pkg-path>` 裝完立刻 `git checkout -- pyproject.toml uv.lock`。
    它會把本機絕對路徑回寫進 `[tool.uv.sources]` 並改 lock；路徑進 repo 會讓 CI 拉不到；
    repo 若有 guard，通常也只在該檔被 stage 時才擋，忘了還原就等著被下次 `git add` 帶走。
+
+## 3. heredoc 只餵給複合指令裡的最後一個指令
+
+**規則**：要餵 stdin 的指令（`git commit -F -`、`psql -f -`、`kubectl apply -f -`）獨占
+一次 Bash 呼叫，heredoc 緊接在**它自己**後面。
+
+**理由**：複合指令（`a && b; c`）尾端的 `<<'EOF'` 只會餵給**最後一個**指令。寫成
+`git add X && git commit -F - > log 2>&1; git status <<'EOF' ... EOF`，commit 讀不到
+stdin，無聲掛住直到 timeout，被移進背景後還得手動停掉。掛住期間若沒留下半成品，那是運氣，
+不是設計。
+
+**怎麼套用**：
+
+1. 讀 stdin 的指令一次一個呼叫，驗證輸出的指令另開一次。
+2. 呼叫掛住時先停掉它，再用唯讀指令（`git log -1`、`git status`）確認有沒有留下半成品，
+   不要直接重跑同一條。
+
+## 4. zsh 的 `path` 變數綁定 `PATH`
+
+**規則**：zsh 的迴圈變數與賦值別用 `path`（也避開 `cdpath`、`fpath`、`manpath`、
+`module_path`），改用 `dir`、`file`、`wt` 之類的名稱。
+
+**理由**：`path` 是與 `PATH` 綁定的特殊陣列。`while read -r path x; do ...` 或
+`for path in ...` 會把 `PATH` 蓋成單一路徑，之後同一段腳本的 `wc`、`tr`、`git` 全部
+`command not found`。危險處在於其他欄位會「看起來正常地」變成空值或預設字串（例如每個
+branch 都顯示「沒有對應 PR」），把假結果當成事實回報。
+
+**怎麼套用**：腳本輸出出現任何 `command not found` 或 `(eval):` 開頭的錯誤，整輪結果作廢
+重跑，不得只挑能用的欄位。
+
+## 5. profile alias 讓檔案操作與量測靜默失效
+
+**規則**：Bash 工具的 shell 會載入使用者 profile，其中的 alias 會改變指令行為。任何
+「會改檔」或「結果會當證據」的指令，用 `/bin/<cmd>` 呼叫，並在下一步前確認效果真的發生。
+
+**理由**：每種 alias 的失敗方式都不同，沒有單一症狀可以盯：
+
+- **`cp`／`mv` 被換成互動式**（`-i`）：`cp` 印出 `not overwritten` 卻 **exit 0**，什麼
+  都沒複製；`mv` 在沒有 tty 時卡在確認提示，整個呼叫 timeout。`cp -f` 擋不住，alias 的
+  `-i` 會贏。後果是還原式實驗（改壞 → 測試 → 還原）的「還原」其實沒發生，前後兩次量的是
+  同一份檔案，得到一模一樣的假綠；或卡死時檔案停在被改壞的狀態。
+- **`cd` 被換成別的導航工具**：目標不在它的資料庫時印出「沒有匹配」，但**不換目錄**。
+  `cd X && cmd` 安全（`&&` 短路），單獨一行的 `cd X` 之後接的指令會在原本的目錄執行，輸出
+  看起來完全正常——可能對錯的工作樹做 checkout，或量到錯的環境。
+- **`df`／`cat` 被換成參數不相容的替代品**：`df -h /` 印出替代品的用法說明、`cat -v` 回
+  「unexpected argument」。不是掛住也不是錯誤結論，只是沒回答問題，容易誤以為底層查詢本身
+  壞了。
+
+**怎麼套用**：
+
+1. 覆寫／移動檔案用 `/bin/cp -f`、`/bin/mv -f`；看原始位元組用 `/bin/cat -v`；查磁碟用
+   `/bin/df -h`。
+2. 不要用 `cd` 指向工作樹：git 用 `git -C <absolute>`，其他指令用絕對路徑；結論取決於「在
+   哪個樹跑」時，前後各印一次 `git rev-parse --short HEAD`。
+3. 替換或還原檔案後，用 checksum、`git status --porcelain` 或 `git diff --stat` 確認效果
+   真的發生，不採信「指令沒報錯」。
+4. 呼叫掛住時先讀 harness 給的 interim output 看卡在哪，再判斷；不要重試同一條指令。
+
+相關：與本檔第 1 節同族——指令回報成功、或回報了*某個東西*，卻沒有做到或沒有回答你問的事。
