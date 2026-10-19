@@ -119,6 +119,14 @@ new activity afterwards parks the PR in ⏳; new author activity flips it back t
 [`work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) §2 and
 already cover the board side — this note covers only what a *draft* should keep.
 
+### Someone else's PR with only should-fix or nit findings: draft APPROVE and keep the nits out
+
+When a review of another contributor's PR ends as "approve with nits" and nothing is must-fix (docs gaps, wording, a missing one-clause mention), default the review draft to APPROVE with a short body and no inline comments. Tell the user the nits in the terminal and offer a follow-up branch or worktree for them instead. Only must-fix findings go into the sent review.
+
+**Why**: a round of nit fixes costs the author a cycle for no gain, and a maintainer can fold the gaps in with a follow-up of their own. The typical case is a gap the PR merely exposed rather than introduced.
+
+How to apply: if the user explicitly asks for the nits to be in the review, do that. Opening the follow-up worktree and pushing it is the user's action; stack it on the PR head only when the edit depends on the PR's change.
+
 ### 多 PR batch 最終 roll-up
 
 batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行改成 roll-up：

@@ -1069,7 +1069,7 @@ floor.
 
 Source: 2026-09-29 vendor-provider extra-floor fix (apache/airflow #73532 sibling floor).
 
-## 10.34 A provider hook's connection-field parsing: rejected credentials fail closed, nullable form strings accept `null` and JSON *(Request changes)*
+## 10.34 A provider hook's connection-field parsing: rejected credentials fail closed, nullable form strings accept `null` and JSON, validation errors never echo the value *(Request changes)*
 
 **Scope gate**: applies when a diff touches how a provider hook reads or validates connection
 fields — a credentials path that a provider class can reject, or an `extra` field that
@@ -1086,10 +1086,18 @@ fields — a credentials path that a provider class can reject, or an `extra` fi
    suggests. The hook should treat `null` as empty and parse a string that starts with `[` as JSON
    (bad JSON, or a non-string item, raises with a named error) — not just type-check the value.
    Same review (`MCPHook` stdio `args`).
+3. **Validation errors on `extra` values report the type and the key or index, never the value.**
+   The secrets masker registers `extra` values only under sensitive key names, so a field such as a
+   stdio `args` list is not masked, and one item can carry a Bearer token that then lands in the task
+   log. Report `got <type> at index <i>` / `got <type> for key <k>` (see `_validate_env_dict` in the
+   common.ai MCP hook), including in the invalid-JSON branch, and never interpolate the value (no
+   `{args!r}`). Add a test that passes a secret-looking string and asserts it is absent from the
+   exception text. Same review (`MCPHook` stdio `args`).
 
 How to apply: for (1) ask "what identity does this connection authenticate as after the
 fallback?"; for (2) feed the hook an empty form value and the documented JSON string and see
-both parse.
+both parse; for (3) grep the new validator's f-strings for `!r` on the input and check the test
+asserts the secret is absent.
 
 ## 10.35 Scheduler-written audit `Log(...)` rows must set the owner and, for Dag events, `dag_id` *(Request changes)*
 

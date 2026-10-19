@@ -445,7 +445,7 @@ sub-check states. The file covers:
 - **10.31** `# use next version` on a cross-provider floor is the documented release-prep mechanism; zero hits in today's `pyproject.toml` files is not "no precedent". Only ask whether every API used is already released (judgment gate, scope-gated to cross-provider floors carrying the marker)
 - **10.32** A zero-argument method that returns derived state should be a `@property` (nit)
 - **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
-- **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON (Request changes, scope-gated to provider hook connection-field parsing)
+- **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON, validation errors never echo the value (Request changes, scope-gated to provider hook connection-field parsing)
 - **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
@@ -502,6 +502,7 @@ beats per-endpoint pedantic accuracy.
   that gets overwritten at release time. Reordering/placement feedback on
   this file is answered by editing **above** the marker (usually a short
   lead-in sentence), never by moving content at or after it.
+- Status claims in provider docs (stability markers, release state, CI wording): verify against a primary source and align every mention — `references/docs-conventions.md`
 - When a new parameter/flag changes user-visible API semantics (e.g. how a
   special character is interpreted in a query param), the **public
   description / OpenAPI spec must be updated in the same change** as the

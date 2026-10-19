@@ -165,6 +165,8 @@ private helper introduced deep inside a larger diff is the easiest place
 for a noun-only name to slip past review; don't grant private names a free
 pass just because they're private.
 
+**When delegating the work**: copy this rule verbatim into the implementer's brief and add "check every added or copied method name against it; a sibling file that already uses a noun-style name is not precedent". The same sibling files often violate the rule themselves, and copying them reproduces the violation (apache/airflow #74695: new `_tool_name` methods copied from `ObjectStorageToolset` and `SandboxToolset`, which the reviewer also missed). In the reviewer's brief, make the naming item scan **every `def` the diff adds**, and keep the exemption list to names a framework really dictates (for example a pydantic-ai property such as `tool_name_conflict_hint`), so the reviewer does not end up checking only the exempt names. When a sibling file turns out to violate the rule as well, ask the user whether to rename it in the same change.
+
 ### Provider module names don't repeat the provider prefix (AIP-21)
 
 AIP-21 dropped the provider prefix from module names inside a provider package:

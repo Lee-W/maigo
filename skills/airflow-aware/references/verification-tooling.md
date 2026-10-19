@@ -902,3 +902,18 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    and now (compare the added/removed lines of the affected source per push), and (b)
    whether anything the base brought in lands inside the captured region. If the captured
    region can't be established, say "probably stale/fresh" rather than "definitely".
+
+## After `git worktree move`: stale absolute paths cause false failures
+
+A moved worktree keeps the absolute path of its old location in git-ignored files, which survive the move. Before debugging code, confirm the failure is path-related (the same test file is green on a clean checkout of `HEAD` in another worktree and red only here), then check these. The symptom depends on how the tool is invoked.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A pre-commit/prek `mypy-<project>` hook fails with exit 126, or with ``Failed to spawn: `mypy` `` (os error 2) when the hook runs `uv run ... mypy` | the shebang of `.build/mypy-venvs/<hook>/bin/mypy` still execs the old path's python; prek's re-sync reinstalls packages but not this shim | `head -1 .build/mypy-venvs/<hook>/bin/mypy`; if it shows the old path and `git check-ignore .build` confirms it is ignored, delete that hook's venv directory and rerun |
+| ``Failed to spawn: `pytest` `` | the `.venv/bin/<cmd>` shebang | run `python -m pytest` |
+| Many tests red with tracebacks into a directory that no longer exists, or source lines shown as `???` | stale `.pyc` files embed the old path | delete the ignored `__pycache__` directories (the package's and its parents, e.g. `dev/registry/tests/__pycache__`) and rerun |
+| Stop hook reports `ModuleNotFoundError` or runs in the wrong directory | `.claude/test-command` contains the old absolute `AIRFLOW_HOME` or `PYTHONPATH` | rewrite the file; the hook splits it with `shlex.split` and runs it without a shell, so carry variables with `env VAR=...` |
+
+Provider venvs also need `PYTHONPATH=<worktree>/shared/secrets_masker/src` for tests that use the structlog `caplog` fixture (otherwise `No module named 'airflow_shared'` at fixture setup), and that path goes stale on a move too.
+
+Look at the shim first when you see `Failed to spawn: mypy`: do not ask for `--no-verify` before the root cause is checked and cannot be fixed, and confirm each such authorization per commit.

@@ -651,3 +651,13 @@ rendered before a screenshot counts as evidence, see
   `contributing-docs/*.rst` is rendered by GitHub natively and is not built by Sphinx, so a
   Sphinx directive (mermaid included) doesn't apply — check for a `conf.py` and whether the
   folder is in the `breeze build-docs` list first.
+
+## Status claims in provider docs: verify against a primary source and align every mention
+
+Before writing or approving a claim about stability, release state, CI or support in a provider's docs, changelog or PR description:
+
+1. **Stability and Experimental markers.** Grep the feature name separately in the stability page, the feature's own page, the changelog and the PR description (one grep per spelling; check each pattern against a known hit), and align all of them in the same PR. A feature marked Experimental while the stability table still lists it as stable is the typical miss. The same applies when adding an exception to an unconditional sentence ("unchanged", "model instance"): grep each phrasing separately across docs and docstrings and mark every hit "exception added" or "not affected".
+2. **Release state** ("shipped in X", "not released before 1.0", "safe to remove before 1.0"). Check each symbol or alias with `git ls-remote --tags` and `git show <tag>:<path>`, not with memory or commit dates. Separate the module path from the package-level re-export. Put a changelog `.. note::` in a section that is not cut yet, and recheck its position after resolving a merge conflict. Write what you cannot verify as unconfirmed.
+3. **Present-tense promises about CI, support or stability.** Each one must point at an existing mechanism (a CI job, a process, a file); otherwise soften it into a non-claim. For CI wording, read the workflow and the scripts it runs rather than earlier prose or the PR description, and do not treat "canary" as "scheduled".
+
+Examples (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while three toolsets had no `tool_prefix`; another said "shipped in 0.10.0" while the tag showed the class in an earlier release; a plan promised "the changelog records the latest tested version" when no CI job tracked that.

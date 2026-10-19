@@ -40,6 +40,8 @@ git worktree move <wrong-path> <root>/.worktrees/<topic>
 git -C <root>/.worktrees/<topic> branch -m <old-name> <topic>
 ```
 
+After a move, git-ignored files keep the old absolute path and cause false failures; see the "After `git worktree move`" section of [`airflow-aware/references/verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md).
+
 A new worktree needs its own per-worktree tooling setup (e.g. a repo-specific
 environment bootstrap script) run once — don't assume it's inherited from the
 main checkout.
