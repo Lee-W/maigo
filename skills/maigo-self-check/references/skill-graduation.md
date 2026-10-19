@@ -58,6 +58,15 @@ Read this file when executing the corresponding crystallize step.
   確認落點不在 maigo repo 裡 → 該候選跳過（留在記憶層），不要硬套用這份
   checklist 的機制。
 
+  **內容引用的符號與機制必須已經在 target repo 的 upstream**：畢業前，對來源
+  記憶裡點名的每個符號、函式、旗標，在 target repo 跑
+  `git grep <symbol> origin/<default-branch>`。只存在於本機未 push 或未合併
+  commit 的符號，不能寫進 skill——skill 會被別的 repo 與別的 session 讀到，引用
+  一個還不存在的機制等於寫下假事實。該筆（或該筆裡引用那個符號的部分）留在
+  記憶層，等合併後再提。實例：一筆 provider 的程式碼慣例引用了一個只在未 push
+  commit 裡的 helper，`origin/main` 查無命中，只畢業同一組候選裡不依賴它的
+  另一半。
+
 ## Step 4 — 公開性檢查
 
 **公開性檢查**（propose 前先跑，每筆候選都做）：
