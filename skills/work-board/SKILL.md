@@ -211,6 +211,7 @@ rank 決定排序與所在 section，10 級由緊急到不急：P0 最急，P9 �
 | 🔀 你的 PR | `有衝突` | P1 |
 | 🔀 你的 PR | `CI 紅` | P1 |
 | 🔀 你的 PR | `CHANGES_REQUESTED` | P1 |
+| 👀 在審的 PR | `待送出`（本地報告待你看／決定是否送出；報告已寫好只差送出，與「卡住的」同為 P1） | P1 |
 | 🔀 你的 PR | `有新 comment` | P2 |
 | 🔀 你的 PR | `可合併` | P3 |
 | 🔀 你的 PR | `CI 等待` | P8 |
@@ -218,7 +219,6 @@ rank 決定排序與所在 section，10 級由緊急到不急：P0 最急，P9 �
 | 👀 在審的 PR | `他人草稿` | P8 |
 | 👀 在審的 PR | `待 review` | P4 |
 | 👀 在審的 PR | `↩︎ 回你的球` | P2 |
-| 👀 在審的 PR | `待送出`（本地報告待你看／決定是否送出） | P3 |
 | 👀 在審的 PR | `已看完`（本地確認，或已送出但無本地 verdict） | P8 |
 | 👀 在審的 PR | `BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE` | P8 |
 | 跨型別終端 | `closed` / `merged` | P9 |
@@ -345,7 +345,7 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | `isDraft == true` | `他人草稿` | ⏳ | P8 |
 | report 的 head 與目前 head 不同，或最後 review／已看完／送出後有新 commit、作者留言 | `↩︎ 回你的球` → `/maigo:review <n>` | 🎯 | P2 |
 | 使用者明確 `--reviewed` 本版 report，之後無新活動 | `已看完`；本地確認，不代表送出 GitHub | ⏳ | P8 |
-| 有本地 report / verdict，尚未確認且沒有這輪送出的 GitHub review | `待送出`；先看 report，再決定送出或 `--reviewed` | 🎯 | P3 |
+| 有本地 report / verdict，尚未確認且沒有這輪送出的 GitHub review | `待送出`；先看 report，再決定送出或 `--reviewed` | 🎯 | P1 |
 | GitHub 已送出這輪 review，且無新活動 | 本地 verdict（若有）；否則 `已看完` | ⏳ | P8 |
 | 沒有本地 report 或已送出 review | `待 review` → `/maigo:review <n>` | 🎯 | P4 |
 

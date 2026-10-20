@@ -305,7 +305,7 @@ class TestClassifyReviewPr:
         assert result.rank is bs.Rank.P8
 
     def test_unposted_verdict_when_review_not_posted(self):
-        """Prior 是 active verdict，但 `reviews` 裡沒有你貼出的項目 → 待送出（P3）。"""
+        """Prior 是 active verdict，但 `reviews` 裡沒有你貼出的項目 → 待送出（P1）。"""
         gh_meta = {
             "state": "OPEN",
             "isDraft": False,
@@ -317,7 +317,7 @@ class TestClassifyReviewPr:
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE)
         assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
         assert result.section is bs.Section.NEXT
-        assert result.rank is bs.Rank.P3
+        assert result.rank is bs.Rank.P1
         assert (
             result.next_action
             == "gh pr review <n> --comment --body-file <review-draft>"
@@ -367,7 +367,7 @@ class TestClassifyReviewPrLocalVerdictAt:
         )
         assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
         assert result.section is bs.Section.NEXT
-        assert result.rank is bs.Rank.P3
+        assert result.rank is bs.Rank.P1
 
     def test_review_after_local_verdict_with_no_author_activity_keeps_verdict(self):
         """(b) review 晚於本地 verdict 產生時間，作者之後無活動 → 保留原 verdict。"""
@@ -564,12 +564,12 @@ def test_review_view_filters_and_orders_mixed_board_without_losing_metadata(
     assert bs.main(["--you", YOU, "--reviews"]) == 0
     filtered = json.loads(capsys.readouterr().out)
     assert [row["title"] for row in filtered] == [
-        "New push",
         "Report ready",
+        "New push",
         "First review",
     ]
-    assert filtered[1]["last_reviewed_at"] == "2026-01-01T00:00:00Z"
-    assert filtered[1]["review_time_source"] == "report"
+    assert filtered[0]["last_reviewed_at"] == "2026-01-01T00:00:00Z"
+    assert filtered[0]["review_time_source"] == "report"
     assert filtered[2]["author"] == "alice"
     monkeypatch.setattr("sys.stdin", io.StringIO(payload))
     assert bs.main(["--you", YOU]) == 0
@@ -776,6 +776,20 @@ class TestRankTotality:
             assert bs._section_for_rank(rank) in set(bs.Section)
 
 
+class TestUnpostedVerdictRankOrder:
+    def test_unposted_verdict_ranks_before_ball_back(self):
+        meta = bs._STATUS_META
+        assert (
+            meta[bs.BoardStatus.UNPOSTED_VERDICT].rank
+            < meta[bs.BoardStatus.BALL_BACK].rank
+        )
+
+    def test_unposted_verdict_is_p1_and_mergeable_stays_p3(self):
+        meta = bs._STATUS_META
+        assert meta[bs.BoardStatus.UNPOSTED_VERDICT].rank is bs.Rank.P1
+        assert meta[bs.BoardStatus.MERGEABLE].rank is bs.Rank.P3
+
+
 class TestNextActionForStatus:
     @pytest.mark.parametrize(
         ("status", "expected"),
@@ -808,7 +822,7 @@ class TestNextActionForStatus:
             pytest.param("NEEDS_CHANGES", None, id="needs-changes"),
             pytest.param("APPROVE_WITH_NITS", None, id="approve-with-nits"),
             pytest.param("APPROVE", None, id="approve"),
-            # P1：卡住的
+            # P1：卡住的，以及待送出
             pytest.param("有衝突", "/maigo:address-comments", id="conflict"),
             pytest.param("CI 紅", "gh pr checks <n>", id="ci-red"),
             pytest.param(
@@ -816,13 +830,13 @@ class TestNextActionForStatus:
                 "/maigo:address-comments",
                 id="changes-requested",
             ),
-            # P3：一步就結束
-            pytest.param("可合併", "gh pr merge <n>", id="mergeable"),
             pytest.param(
                 "待送出",
                 "gh pr review <n> --comment --body-file <review-draft>",
                 id="unposted-verdict",
             ),
+            # P3：一步就結束
+            pytest.param("可合併", "gh pr merge <n>", id="mergeable"),
             # P4：等你審
             pytest.param("待 review", "/maigo:review <n>", id="pending-review"),
             # 未知狀態詞

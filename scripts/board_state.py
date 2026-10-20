@@ -164,19 +164,19 @@ def _missing_draft_action(draft: str) -> str:
 _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P0：抓不到
     BoardStatus.UNREACHABLE: StatusMeta(Rank.P0, None),
-    # P1：卡住的
+    # P1：卡住的，以及報告已寫好只差送出的（待送出要快點送，排在回你的球之前）
     BoardStatus.CONFLICT: StatusMeta(Rank.P1, "/maigo:address-comments"),
     BoardStatus.CI_RED: StatusMeta(Rank.P1, "gh pr checks <n>"),
     BoardStatus.CHANGES_REQUESTED: StatusMeta(Rank.P1, "/maigo:address-comments"),
+    BoardStatus.UNPOSTED_VERDICT: StatusMeta(
+        Rank.P1, f"gh pr review <n> --comment --body-file {_REVIEW_DRAFT_PLACEHOLDER}"
+    ),
     # P2：球被打回
     BoardStatus.BALL_BACK: StatusMeta(Rank.P2, "/maigo:review <n>"),
     BoardStatus.NEW_REPLY: StatusMeta(Rank.P2, "/maigo:triage-issue <n>"),
     BoardStatus.NEW_COMMENT: StatusMeta(Rank.P2, "/maigo:address-comments"),
     # P3：一步就結束
     BoardStatus.MERGEABLE: StatusMeta(Rank.P3, "gh pr merge <n>"),
-    BoardStatus.UNPOSTED_VERDICT: StatusMeta(
-        Rank.P3, f"gh pr review <n> --comment --body-file {_REVIEW_DRAFT_PLACEHOLDER}"
-    ),
     # P4：等你審
     BoardStatus.PENDING_REVIEW: StatusMeta(Rank.P4, "/maigo:review <n>"),
     # P5：手上正在做
