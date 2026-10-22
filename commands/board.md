@@ -74,15 +74,17 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 `refresh` 子命令（實作在 `scripts/board_refresh.py`）；它用 compare-and-swap 保護寫回（規則見
 [`skills/work-board` §3(b)](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）：
 
-1. 跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery]`
-   （在 board 所在 repo 的任一 worktree 內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷）。
+1. 跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery] [--weights <file>]`
+   （在 board 所在 repo 的任一 worktree 內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷；
+   `--weights <file>` 指定同 rank 內加權檔、覆寫預設的 repo 層與使用者層設定，格式見
+   [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 2. 依 exit code 分流：
    - **exit 0** → 依輸出的 JSON（`pending_reviews`、`top`、`counts`、`warnings`、`errors`、`removed`、
      `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`learn_pending`）做 §4。
    - **exit 2**（CAS 衝突：board.md 或細節檔在刷新期間被改過；除了 review.md 的 ack 標記外未寫任何檔）→ 直接重跑一次；再撞到就停下，
      告訴使用者 board 正被別的 session 寫。**不要**改用 `Write`。
    - **exit 1**（前置條件拒絕）→ 依訊息分流：舊格式或 `review-board.md` → 走下面的「手動流程 fallback」
-     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷` → 回報原文。
+     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權設定檔有壞行（訊息含檔名與行號）→ 回報原文。
    - **exit 3**（寫入階段失敗）→ 回報備份路徑與錯誤，不 fallback。`--json` 的 `exit_reason` 是 `write_failed`
      ＝已從備份還原；是 `post_write_failed` ＝board 已是新版、只有 ledger／snapshot 沒寫成，把輸出列出的
      未寫事件回報給使用者，說明重跑是安全的。
@@ -134,7 +136,10 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
    三張球權判定表、排序與 ✅ 保留天數見
    [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
    `classify()` 是判定邏輯的唯一正典。
-5. **寫回**——用 `Edit`（不整份 `Write`）：依 rank 升序 ＋ 同 rank 內 `updatedAt` 升序寫回 🎯 的編號清單
+5. **寫回**——用 `Edit`（不整份 `Write`）：依 rank 升序 ＋ 同 rank 內加權（`board-weights.txt`，可選，
+   只在同 rank 內調整、不改 rank／section，規則見
+   [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
+   ＋ 同 rank 同加權內 `updatedAt` 升序寫回 🎯 的編號清單
    （`⏳`/`✅` 依 `updatedAt` 降序、無編號）；行內容用 `index_entry`，加最終 checkbox、badge、編號。
    - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）。checkbox 一律以 `board_state` 回傳
      的 `checked` 為準：👀 勾了卻回 `no_report` 或 `head_changed`，若分類結果仍是待看
@@ -211,7 +216,7 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。
 🧠 有 N 項你勾了還沒盤點 → /maigo:board --learn
 ```
 
-**`--reviews`**：完整刷新與寫回仍使用未過濾的結果；對話只顯示待看 PR。
+**`--reviews`**：完整刷新與寫回仍使用未過濾的結果；對話只顯示待看 PR。`--reviews` 不套用加權（只依 rank 排序）。
 可另以 `board_state.py --reviews` 取得依 rank 排序的檢視結果，**不可用過濾後結果覆寫
 整份 board**。包含 `待 review`、`↩︎ 回你的球`、`待送出`；已看完、等人、草稿與結案不列入。
 

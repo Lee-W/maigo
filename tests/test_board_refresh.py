@@ -34,6 +34,14 @@ def fixed_clock(monkeypatch):
     time.tzset()
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(monkeypatch, tmp_path_factory):
+    """The user-layer weights file lives under ~/.config: never read the real one."""
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
 def url(n: int, kind: str = "pull", repo: str = REPO) -> str:
     return f"https://github.com/{repo}/{kind}/{n}"
 
@@ -431,6 +439,143 @@ def test_t7_sort_and_counts(tmp_path, gh):
     ]
     assert waiting == ["6", "5"]  # newest first
     assert "## 🎯 下一件（4）" in lines and "## ✅ 最近結案（0）" in lines
+
+
+# --- board-weights: same-rank boost ---------------------------------------------
+
+EXAMPLE_WEIGHTS = """\
+# boosted authors first, then topics
+author:kaxil
+author:FrankYang0529
+title:common\\.ai|PydanticAI|LLMOperator|AgentOperator|DocumentLoader
+"""
+
+
+def focus_order(root: Path) -> list[int]:
+    return [
+        int(ln.split(" i/")[1].split(".md")[0])
+        for ln in board_lines(root)
+        if ln[:1].isdigit() and ". [" in ln[:6]
+    ]
+
+
+def setup_weight_prs(root, gh, authors, titles=None):
+    write_board(root, board_text(focus=[row(n, author=a) for n, a in authors.items()]))
+    for n, author in authors.items():
+        put_detail(root, n)
+        gh.prs[n] = pr_meta(n, author=author, updated=f"2026-09-0{n}T00:00:00Z")
+        gh.prs[n]["title"] = (titles or {}).get(n, f"PR {n}")
+
+
+AUTHORS = {1: "carol", 2: "dave", 3: "kaxil", 4: "erin"}
+
+
+def test_w1_boosted_author_sorts_first_within_the_same_rank(tmp_path, gh):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    (tmp_path / ".maigo" / "board-weights.txt").write_text("author:KAXIL\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert focus_order(tmp_path) == [3, 1, 2, 4]  # boosted first, rest oldest-first
+
+
+def test_w1_title_regex_is_case_insensitive_and_first_matching_rule_wins(tmp_path, gh):
+    setup_weight_prs(
+        tmp_path,
+        gh,
+        AUTHORS,
+        titles={2: "Fix pydanticai agent", 4: "Docs for Common.AI"},
+    )
+    (tmp_path / ".maigo" / "board-weights.txt").write_text(EXAMPLE_WEIGHTS)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    # kaxil (rule 1) beats both title matches (rule 3); the two matches tie -> oldest first
+    assert focus_order(tmp_path) == [3, 2, 4, 1]
+
+
+def test_w2_boost_never_crosses_a_rank(tmp_path, gh):
+    focus = [row(1, author="kaxil"), row(2, icon="🔀", status="CI 紅", author="me")]
+    write_board(tmp_path, board_text(focus=focus))
+    for n in (1, 2):
+        put_detail(tmp_path, n)
+    gh.prs[1] = pr_meta(1, author="kaxil")
+    gh.prs[2] = pr_meta(2, author="me", statusCheckRollup=[{"conclusion": "FAILURE"}])
+    (tmp_path / ".maigo" / "board-weights.txt").write_text("author:kaxil\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert focus_order(tmp_path) == [2, 1]  # CI 紅 outranks the boosted 待 review
+
+
+def test_w2_boost_does_not_reorder_the_waiting_section(gh):
+    rows = [
+        {"rank": 5, "author": a, "title": "t", "updated_at": ts, "key": ("o", "r", n)}
+        for n, (a, ts) in enumerate(
+            [("carol", "2026-09-02T00:00:00Z"), ("kaxil", "2026-09-01T00:00:00Z")]
+        )
+    ]
+    rules = refresh.parse_weights("author:kaxil\n", "w.txt")
+    assert [r["author"] for r in refresh.sort_rows("⏳", rows, rules)] == [
+        "carol",
+        "kaxil",
+    ]  # newest first, untouched by the boost
+
+
+def test_w3_no_config_keeps_the_original_order(tmp_path, gh):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert focus_order(tmp_path) == [1, 2, 3, 4]  # oldest-updated first, as before
+
+
+def test_w4_repo_layer_outranks_the_user_layer(tmp_path, gh, isolated_home):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    (tmp_path / ".maigo" / "board-weights.txt").write_text("author:kaxil\n")
+    user_dir = isolated_home / ".config" / "maigo"
+    user_dir.mkdir(parents=True)
+    (user_dir / "board-weights.txt").write_text("author:erin\nauthor:dave\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert focus_order(tmp_path) == [3, 4, 2, 1]  # kaxil (repo), erin, dave (user)
+
+
+def test_w5_weights_flag_replaces_both_layers(tmp_path, gh, isolated_home):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    (tmp_path / ".maigo" / "board-weights.txt").write_text("author:kaxil\n")
+    explicit = tmp_path / "elsewhere.txt"
+    explicit.write_text("author:erin\n")
+    assert (
+        run_cli(tmp_path, "--apply", "--no-discovery", "--weights", str(explicit)) == 0
+    )
+    assert focus_order(tmp_path) == [4, 1, 2, 3]  # only erin is boosted
+    assert (
+        run_cli(tmp_path, "--no-discovery", "--weights", str(tmp_path / "no.txt")) == 1
+    )
+
+
+@pytest.mark.parametrize(
+    ("content", "lineno", "needle"),
+    [
+        ("# c\nauthor:kaxil\nlabel:foo\n", 3, "label:foo"),
+        ("author:kaxil\n\ntitle:(unclosed\n", 3, "regex"),
+        ("author:\n", 1, "author:"),
+        ("author:ka xil\n", 1, "author:ka xil"),
+    ],
+)
+def test_w6_bad_line_exits_1_naming_file_and_line(
+    tmp_path, gh, capsys, content, lineno, needle
+):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    path = tmp_path / ".maigo" / "board-weights.txt"
+    path.write_text(content)
+    before = tree_hash(tmp_path)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 1
+    err = capsys.readouterr().err
+    assert f"{path}:{lineno}:" in err and needle in err
+    assert tree_hash(tmp_path) == before  # rejected before anything was written
+    assert not [c for c in gh.calls if c[:2] == ["gh", "pr"]]  # and before any fetch
+
+
+def test_w7_utf8_bom_at_file_start_is_ignored(tmp_path, gh):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    (tmp_path / ".maigo" / "board-weights.txt").write_bytes(
+        b"\xef\xbb\xbfauthor:kaxil\n"
+    )
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert focus_order(tmp_path) == [3, 1, 2, 4]
 
 
 # --- T8 / T9: aging and closed artifacts ------------------------------------------

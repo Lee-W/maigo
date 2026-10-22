@@ -264,9 +264,32 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 
 ### 排序
 
-- 🎯 區：**rank 升序 → 同 rank 內 `updatedAt` 升序**——排名先分先後，同一級內最久沒動的
-  排前面（沿用舊「責任感排序」的精神，但改成明確的 `updatedAt`）。編號 `1. 2. 3.` 就是
-  這個排序結果，排名本身不顯示在行內。
+- 🎯 區：**rank 升序 → 同 rank 內加權（boost）升序 → `updatedAt` 升序**——排名先分先後，
+  同一級內先看使用者設定的加權，再看最久沒動的（沿用舊「責任感排序」的精神，但改成明確的
+  `updatedAt`）。編號 `1. 2. 3.` 就是這個排序結果，排名本身不顯示在行內。
+- **同 rank 內加權**（使用者可設定）：只在同一個 rank 內調整先後，**不改 rank、不改 section**，
+  所以 P1 永遠排在 P4 的加權項目前面；⏳ / ✅ 區不套用；`--reviews` 檢視（`board_state.py`）只依
+  rank 排序，**不套用加權**。加權規則放持久設定檔、由 `refresh` 每次重算，不把手動順序寫進
+  `board.md`，所以刷新不會洗掉。設定檔（兩者都不存在＝無加權，行為與沒有這個功能時完全相同）：
+  - repo 層：`<maigo-root>/.maigo/board-weights.txt`
+  - 使用者層：`~/.config/maigo/board-weights.txt`（與 `repos.txt` 同目錄）
+  - 兩者都存在時 repo 層規則排在前面（優先）；`refresh --weights <file>` 覆寫兩者，只讀該檔。
+
+  格式是純文字，一行一條規則，空行與 `#` 開頭的行忽略：
+  - `author:<login>`——大小寫不分，精確比對 gh author login
+  - `title:<regex>`——大小寫不分的 `re.search`，比對該行的 title
+
+  boost ＝第一條命中規則的序號（依檔案行序、兩檔合併時 repo 層在前連續編號；
+  越前面越優先）；沒命中＝一個比任何規則都大的值。壞行（未知前綴、`author:` 值含空白、
+  regex 編譯失敗）fail loudly：`refresh` 以前置條件拒絕（exit 1），訊息指出檔名與行號，不會靜默忽略。
+  範例：
+
+  ```text
+  # 先排 kaxil、FrankYang0529 的項目，再排 common.ai 相關主題
+  author:kaxil
+  author:FrankYang0529
+  title:common\.ai|PydanticAI|LLMOperator|AgentOperator|DocumentLoader
+  ```
 - ⏳ / ✅ 區：`updatedAt` 降序（這兩區是查閱，不是待辦）。
 - ✅ 區超過 7 天的行在刷新時自動清掉，清掉時同時寫入排除紀錄（`reason: aged`，§3a）
   （唯一例外：待盤點未完成的行〔(`[x]` 或 `🔖`) 且沒有 `🧠`〕不清，學完才走）。

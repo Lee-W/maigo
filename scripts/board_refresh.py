@@ -48,6 +48,8 @@ SECTION_TITLES = {"🎯": "## 🎯 下一件", "⏳": "## ⏳ 等別人", "✅":
 BADGE_ORDER = "🧠🔖💤"
 AGE_LIMIT = timedelta(days=7)
 BACKUP_KEEP = 10
+WEIGHTS_FILENAME = "board-weights.txt"
+WEIGHT_PREFIXES = ("author", "title")
 NOTE_MAX = 80
 JUDGMENT_HEADING = "## 判斷"
 NEW_PRESERVED = "## 判斷\n\n\n## 筆記\n\n<!-- 手寫區 -->\n"
@@ -84,6 +86,73 @@ class RefreshError(Exception):
         self.reason = reason
         self.message = message
         self.extra = extra
+
+
+@dataclass(frozen=True)
+class WeightRule:
+    """One `board-weights.txt` rule: exact author login, or a title regex."""
+
+    kind: str  # "author" | "title"
+    author: str = ""  # lowercased login (kind == "author")
+    pattern: re.Pattern | None = None  # case-insensitive (kind == "title")
+
+
+def parse_weights(text: str, source: str) -> list[WeightRule]:
+    """Parse one weights file; any bad line is a RefreshError(1) naming file:line."""
+    rules: list[WeightRule] = []
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        prefix, _, value = line.partition(":")
+        value = value.strip()
+        if (
+            prefix not in WEIGHT_PREFIXES
+            or not value
+            or (prefix == "author" and any(c.isspace() for c in value))
+        ):
+            raise RefreshError(
+                1,
+                f"{source}:{number}: 無法解析加權規則 {line!r}"
+                "（只接受 `author:<login>` 或 `title:<regex>`）",
+            )
+        if prefix == "author":
+            rules.append(WeightRule("author", author=value.lower()))
+            continue
+        try:
+            pattern = re.compile(value, re.IGNORECASE)
+        except re.error as error:
+            raise RefreshError(
+                1, f"{source}:{number}: regex 編譯失敗 {value!r}（{error}）"
+            ) from error
+        rules.append(WeightRule("title", pattern=pattern))
+    return rules
+
+
+def load_weights(root: Path, explicit: Path | None = None) -> list[WeightRule]:
+    """`--weights` reads only that file (must exist); else repo layer, then user layer.
+
+    Both layers absent means no weighting. Repo-layer rules come first, so they win.
+    """
+    if explicit is not None:
+        sources = [explicit.expanduser()]
+    else:
+        sources = [
+            root / ".maigo" / WEIGHTS_FILENAME,
+            Path("~/.config/maigo").expanduser() / WEIGHTS_FILENAME,
+        ]
+    rules: list[WeightRule] = []
+    for path in sources:
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            if explicit is not None:
+                raise RefreshError(1, f"找不到加權檔 {path}") from None
+            continue
+        except (OSError, UnicodeDecodeError) as error:
+            raise RefreshError(1, f"{path}: 無法讀取加權檔（{error}）") from error
+        rules.extend(parse_weights(text, str(path)))
+    return rules
 
 
 # --- pure rendering (no I/O) ---------------------------------------------------
@@ -175,15 +244,41 @@ def _epoch(value: str | None) -> float:
         return float("-inf")
 
 
-def sort_rows(section: str, rows: list[dict]) -> list[dict]:
-    """🎯: rank asc, then updated_at asc. ⏳/✅: updated_at desc. Missing time = oldest."""
+def compute_boost(row: dict, rules: list[WeightRule]) -> int:
+    """Index of the first matching rule; no match sorts after every rule."""
+    author = (row.get("author") or "").lower()
+    title = row.get("title") or ""
+    for index, rule in enumerate(rules):
+        if rule.kind == "author":
+            if author and author == rule.author:
+                return index
+        elif rule.pattern is not None and rule.pattern.search(title):
+            return index
+    return len(rules)
+
+
+def sort_rows(
+    section: str, rows: list[dict], rules: list[WeightRule] | None = None
+) -> list[dict]:
+    """🎯: rank asc, boost asc, updated_at asc. ⏳/✅: updated_at desc (no boost).
+
+    Missing time = oldest. Boost only reorders within one rank; it never moves a row
+    across ranks or sections.
+    """
 
     def tiebreak(row: dict) -> tuple:
         return row.get("key") or ("", "", 0)
 
     if section == "🎯":
+        active = rules or []
         return sorted(
-            rows, key=lambda r: (r["rank"], _epoch(r.get("updated_at")), tiebreak(r))
+            rows,
+            key=lambda r: (
+                r["rank"],
+                compute_boost(r, active),
+                _epoch(r.get("updated_at")),
+                tiebreak(r),
+            ),
         )
     return sorted(rows, key=lambda r: (-_epoch(r.get("updated_at")), tiebreak(r)))
 
@@ -653,7 +748,9 @@ def _ended_at(row: dict) -> str | None:
     return meta.get("mergedAt") or meta.get("closedAt") or meta.get("updatedAt")
 
 
-def build(g: Gathered, ack_results: list[dict]) -> Built:
+def build(
+    g: Gathered, ack_results: list[dict], rules: list[WeightRule] | None = None
+) -> Built:
     overrides = {
         r["url"]: r["simulated_review"] for r in ack_results if "simulated_review" in r
     }
@@ -755,7 +852,7 @@ def build(g: Gathered, ack_results: list[dict]) -> Built:
         kept.append(row)
 
     rows_by_section = {
-        s: sort_rows(s, [r for r in kept if r["section"] == s]) for s in SECTIONS
+        s: sort_rows(s, [r for r in kept if r["section"] == s], rules) for s in SECTIONS
     }
     all_rows = [r for s in SECTIONS for r in rows_by_section[s]]
     text = render_board(
@@ -1098,9 +1195,11 @@ def run_refresh(
     discovery: bool = True,
     stale_days: int = board_state.STALE_DAYS_DEFAULT,
     jobs: int = 8,
+    weights_file: Path | None = None,
     now: datetime | None = None,
 ) -> dict:
     now = now or _now()
+    rules = load_weights(root, weights_file)  # bad lines reject before any gh call
     g = gather(
         root, repo, you, now=now, add=add, max_new=max_new, discovery=discovery,
         stale_days=stale_days, jobs=jobs,
@@ -1110,7 +1209,7 @@ def run_refresh(
     ):  # CAS #1: before any side effect
         raise RefreshError(2, CAS_MESSAGE.format(what="board.md"))
     ack_results = run_acks(g, dry_run=not apply)
-    built = build(g, ack_results)
+    built = build(g, ack_results, rules)
     summary = summarize(g, built)
     summary["applied"] = apply
     if not apply:
@@ -1323,6 +1422,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--stale-days", type=int, default=board_state.STALE_DAYS_DEFAULT
     )
     parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument(
+        "--weights",
+        type=Path,
+        help="同 rank 內加權檔（覆寫 repo 層與使用者層，只讀此檔）",
+    )
     parser.add_argument("--json", action="store_true")
 
 
@@ -1334,7 +1438,7 @@ def cli(args: argparse.Namespace, *, now: datetime | None = None) -> int:
         summary = run_refresh(
             root, repo, you, apply=args.apply, add=args.add, max_new=args.max_new,
             discovery=not args.no_discovery, stale_days=args.stale_days,
-            jobs=args.jobs, now=now,
+            jobs=args.jobs, weights_file=args.weights, now=now,
         )  # fmt: skip
     except RefreshError as error:
         reason = (

@@ -36,7 +36,7 @@ python3 scripts/board_sync.py snapshot ...
 ```
 python3 scripts/board_sync.py refresh [--apply] [--add <url|n>...] [--max-new 50]
         [--no-discovery] [--stale-days 14] [--jobs 8] [--json]
-        [--maigo-root <path>] [--repo <owner/name>] [--you <login>]
+        [--maigo-root <path>] [--repo <owner/name>] [--you <login>] [--weights <file>]
 ```
 
 不帶 `--apply` 是預覽（印 unified diff，不寫檔、不 ack）。exit code：0 成功（含無變動）／預覽；
