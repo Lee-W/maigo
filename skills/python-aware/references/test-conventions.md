@@ -16,7 +16,7 @@ When delivering new tests, self-check two things before calling it done:
   regression-guard rationale) above the `pytest.param(...)` line — don't leave it in a
   docstring that disappears once the tests are merged.
 - **Repeated setup/cleanup across tests** → extract to a fixture. Look for the repo's
-  existing shared helper first (e.g. Airflow's `tests_common.test_utils.db.clear_db_*`)
+  existing shared helper first (e.g. a shared DB-cleanup helper)
   rather than writing a fresh `session.execute(delete(...))` per test.
 
 Don't force tests into the same parametrize when any of these three signals is present —
@@ -75,13 +75,13 @@ method dispatch.
 
 ```python
 # Preferred
-assert runner._log.error.mock_calls == [
-    mock.call("dag_model.next_dagrun_partition_key is None; expected str", dag_id="x"),
+assert service._log.error.mock_calls == [
+    mock.call("order.shipping_key is None; expected str", order_id="x"),
 ]
 
 # Not preferred
-runner._log.error.assert_called_once_with(
-    "dag_model.next_dagrun_partition_key is None; expected str", dag_id="x",
+service._log.error.assert_called_once_with(
+    "order.shipping_key is None; expected str", order_id="x",
 )
 ```
 
@@ -98,11 +98,11 @@ How to apply:
   specific method; pick the root form (`m.mock_calls == [mock.call.method(args)]`)
   only when you also want to assert "no other method was called on the
   parent".
-- For `LoggingMixin`-derived classes (where `self.log` is a property backed
-  by `self._log`), preload the cache instead of patching the property:
-  `instance._log = mock.MagicMock()` before the action, then assert on
-  `instance._log.<level>.mock_calls` after. See "Log assertion when the log
-  IS the observable behaviour" below for the `LoggingMixin` specifics.
+- When the logger is a read-only `@property` backed by a cached attribute
+  (e.g. `self.log` backed by `self._log`), preload the cache instead of
+  patching the property: `instance._log = mock.MagicMock()` before the
+  action, then assert on `instance._log.<level>.mock_calls` after. See "Log
+  assertion when the log IS the observable behaviour" below.
 
 ---
 
@@ -114,12 +114,12 @@ checks:
 
 ```python
 # Preferred
-assert list(HourWindow().to_upstream(period_start)) == [
+assert list(expand_hour(period_start)) == [
     datetime(2024, 6, 10, 14, m) for m in range(60)
 ]
 
 # Not preferred
-members = list(HourWindow().to_upstream(period_start))
+members = list(expand_hour(period_start))
 assert len(members) == 60
 assert members[0] == datetime(2024, 6, 10, 14, 0)
 assert members[-1] == datetime(2024, 6, 10, 14, 59)
@@ -160,18 +160,18 @@ same test. Pin the boundary explicitly with a pair:
 
 ```python
 # At-cap is allowed: cap=7, fanout=7 → all 7 rows queued, no log entry
-@conf_vars({("scheduler", "partition_fanout_max_keys"): "7"})
-def test_partition_fanout_at_cap_is_allowed(...):
+def test_fanout_at_cap_is_allowed(set_cap, ...):
+    set_cap(7)
     ...
-    assert count(AssetPartitionDagRun) == 7
-    assert count(Log, event="partition fanout exceeded") == 0
+    assert count(QueuedItem) == 7
+    assert count(LogEntry, event="fanout exceeded") == 0
 
 # One-over-cap trips: cap=6, fanout=7 → 0 rows, 1 log entry
-@conf_vars({("scheduler", "partition_fanout_max_keys"): "6"})
-def test_partition_fanout_one_over_cap_trips(...):
+def test_fanout_one_over_cap_trips(set_cap, ...):
+    set_cap(6)
     ...
-    assert count(AssetPartitionDagRun) == 0
-    assert count(Log, event="partition fanout exceeded") == 1
+    assert count(QueuedItem) == 0
+    assert count(LogEntry, event="fanout exceeded") == 1
 ```
 
 Applies anywhere a numeric threshold gates behaviour — caps, retry limits,
@@ -311,13 +311,12 @@ and verify the new behavior is genuinely harmless first — **especially for
 credential / authentication fallback logic**, where "the test is now wrong" and "the
 production change silently broke a fallback" look identical from the test's diff alone.
 
-Case study: an Airflow remote-logging provider-dispatch migration dropped a
-conn-id fallback; a test asserting the old fallback started failing, and rewriting it to
-match the new (fallback-free) expectation looked like the obvious fix. Confirmed correct
-only after tracing `AwsGenericHook.conn_config`'s truthiness check — `aws_conn_id=""` is
-equivalent to `None` there (both fall through to boto3's default credential chain), so
-dropping the fallback was actually safe. Without that trace, "the test is green" would
-have been mistaken for "the change is verified."
+Case study: a migration dropped a credential fallback (a connection-id default); a test
+asserting the old fallback started failing, and rewriting it to match the new
+(fallback-free) expectation looked like the obvious fix. Before touching the test, the
+real runtime consumer of that value was traced to confirm the empty value takes the same
+path as "unset" there, so dropping the fallback was actually safe. Without that trace,
+"the test is green" would have been mistaken for "the change is verified."
 
 How to apply: when a test failure traces back to a recent production commit (not a bug
 in the test itself), find that value's actual runtime consumer and verify the behavior
@@ -329,7 +328,7 @@ credential/auth fallback paths as the highest-scrutiny case of this pattern.
 ## A missing fixture is not "can't test" — build one
 
 A test/QA case that merely lacks a shipped example fixture (e.g. an example
-Dag) is **not** "can't-test" or "deferred" by default. The default action is
+file) is **not** "can't-test" or "deferred" by default. The default action is
 to build the smallest purpose-built fixture and actually run it.
 
 "Needs a fixture" and "cannot be verified" are two different things —
@@ -392,9 +391,9 @@ compute.
 
 ## Log assertion when the log IS the observable behaviour
 
-Airflow's `AGENTS.md` guidance ("Do not use `caplog` in tests, prefer
-checking logic and not log output") is a *preference for behaviour checks
-over log scraping*, not a blanket ban on log assertions. When a code path's
+A repo rule such as "do not use `caplog` in tests, prefer checking logic and
+not log output" is a *preference for behaviour checks over log scraping*, not
+a blanket ban on log assertions. When a code path's
 stated purpose is "skip and explain to the operator," the log entry **is**
 the observable behaviour, and dropping the log assertion drops the test's
 value.
@@ -404,14 +403,14 @@ call signature via `.mock_calls` (see "Prefer `.mock_calls` equality" above),
 instead of substring-matching `caplog.text`.
 
 ```python
-# LoggingMixin.log is a @property backed by self._log — preload the cache to mock.
-runner._log = mock.MagicMock()
-with mock.patch.object(runner, "_get_current_dag") as mock_get_dag:
-    runner._create_dag_runs([dag_model], session)
+# .log is a read-only @property backed by self._log — preload the cache to mock.
+service._log = mock.MagicMock()
+with mock.patch.object(service, "_load_config") as mock_load:
+    service.process([order], session)
 
-mock_get_dag.assert_not_called()
-assert runner._log.error.mock_calls == [
-    mock.call("dag_model.next_dagrun_partition_key is None; expected str", dag_id="..."),
+mock_load.assert_not_called()
+assert service._log.error.mock_calls == [
+    mock.call("order.shipping_key is None; expected str", order_id="..."),
 ]
 ```
 
@@ -427,8 +426,8 @@ How to apply:
 - Ask "is this log entry part of the contract this test exists to defend?"
   before dropping a `caplog`-style assertion. If yes, replace it with logger
   mocking — don't delete it.
-- For `LoggingMixin` (where `.log` is a `@property` with no setter), set
-  `instance._log = mock.MagicMock()` directly —
+- When `.log` is a `@property` with no setter, set the backing attribute
+  (`instance._log = mock.MagicMock()`) directly —
   `mock.patch.object(instance, "log")` fails with "property has no
   deleter".
 - Use the `.mock_calls` form: `assert instance._log.error.mock_calls == [mock.call(msg, kw=v)]`.
@@ -437,16 +436,15 @@ How to apply:
   state change, a return value, a side-effect on a model). The exception is
   operator-visibility — diagnostic logs that have no other observable
   channel.
-- **When the test uses structlog `caplog`, assertions must use the full event
-  string, not a prefix.** `StructlogCapture.__contains__`
-  (`devel-common/src/tests_common/test_utils/logs.py`) compares strings with
-  `e["event"] == target` — exact match. So `"only the prefix" not in caplog`
-  is always true and the assertion is decorative (apache/airflow #71072: a
-  reviewer caught three of these). Extract the full log message into one
-  module-level constant and reuse it in every `in` / `not in` /
-  `e.get("event") ==` check. Before writing or reviewing any
-  `not in caplog`, confirm the string is the whole event, then run one
-  mutation (make the log actually fire) to confirm the assertion turns red.
+- **When the test uses a structured-log capture helper, assertions must use
+  the full event string, not a prefix.** First check whether the helper's
+  `in` is an exact match or a substring match. If it is an exact match,
+  `"only the prefix" not in capture` is always true and the assertion is
+  decorative. Extract the full log message into one module-level constant and
+  reuse it in every `in` / `not in` / `e.get("event") ==` check. Before
+  writing or reviewing any `not in capture`, confirm the string is the whole
+  event, then run one mutation (make the log actually fire) to confirm the
+  assertion turns red.
 
 ---
 
@@ -541,7 +539,7 @@ How to apply:
 
 ## Mocking the resolver removes the guard entirely
 
-Tests that mock the resolver/factory (`infer_model`, `infer_provider_class`,
+Tests that mock the resolver/factory (`infer_model`, `resolve_backend`,
 plugin loaders, URI dispatchers) only prove kwargs were assembled and
 forwarded — not that the string values themselves are valid. Under a mock, a
 string is an opaque token; swapping in any value produces the same assertion
@@ -553,12 +551,10 @@ One layer deeper, the same failure shows up in the data source a drift
 tripwire reads: it must be the source runtime actually consults, not
 whichever is easiest to parse. A source that's never read at runtime
 produces a tripwire that stays green forever while the value users actually
-see is wrong. Airflow provider example: the connection UI's runtime source
-is `provider.yaml`'s `conn-fields`; when that's present, the hook's
-`get_ui_field_behaviour()` is never called (`providers_manager.py`'s
-`ui_metadata_loaded` gate — that path is deprecated since 3.2.0), so a
-tripwire built on `get_ui_field_behaviour()["placeholders"]` guards a string
-nobody's form ever shows.
+see is wrong. Example: a UI placeholder is read at runtime from a config file,
+and a legacy code path that supplied it is shadowed whenever the file defines
+the field; a tripwire built on the legacy path guards a string nobody ever
+sees.
 
 Discriminating power must be verified **per source**, not once combined:
 flip each source back to a bad value independently and name which assertion
@@ -642,12 +638,11 @@ often vacuous because each side asserts against the same hard-coded constant
 (`assert a == {"x"} and b == {"x"}`), which never reacts when both sides move together.
 
 How to apply: mutate **each side alone** and confirm the test goes red *because the two sides are
-unequal*. In apache/airflow #71477, `test_readers_agree_on_which_pages_are_guides` (working-tree
-reader vs git-tag reader) was only shown to discriminate by two one-sided mutations: dropping the
-filter on the `extract_parameters` side only (worktree gains 3 keys, tag side unchanged), then on
-the `extract_versions` side only. The "shared predicate always returns `True`" mutation only proves
-the predicate is used. When two tests cover one bug, also name which assertion turns red for each
-(see the mutation-canary rule above).
+unequal*. For example, a test that two readers (one reading the working tree, one reading a
+tagged release) agree on which items are excluded is only shown to discriminate by two one-sided
+mutations: dropping the filter on one reader only, then on the other only. The "shared predicate
+always returns `True`" mutation only proves the predicate is used. When two tests cover one bug,
+also name which assertion turns red for each (see the mutation-canary rule above).
 
 ---
 
@@ -672,8 +667,8 @@ How to apply: assert on the model class so the value really goes through parsing
 wrapper return `model_dump()`: that injects every default (`False`, `None`) into each output and
 changes behaviour for all downstream generated files; returning the input payload is usually
 deliberate. Whenever you see a `validate_*(payload)["..."]` chain, check what the function returns
-first. A file with one such assertion usually has more, including older ones. In apache/airflow
-#71477 the first round only renamed the sibling test without changing its assertion — a reviewer
+first. A file with one such assertion usually has more, including older ones. In one reviewed
+change the first round only renamed the sibling test without changing its assertion — a reviewer
 flagged it as the same defect in a new coat.
 
 ---
@@ -696,12 +691,8 @@ Python details (verified, not inferred):
 
 - For `class X(str, Enum)`, `hash(member) == hash(value)`, so `{X.A: v}.get("a")` hits and dict
   annotations can stay `dict[str, ...]`.
-- Airflow's serde (`task-sdk/src/airflow/sdk/serde/__init__.py`) takes `.value` explicitly, so the
-  DB stores a plain string and reads back a plain `str`; existing tests keep passing.
 - Don't add `__str__` just because a sibling enum has one: without an override `str(X.A)` is
   `"X.A"`, but only add it if a caller needs it — otherwise it is untested dead code.
-
-(apache/airflow #72149, `TerminationReason` in the openai provider.)
 
 ---
 
@@ -709,10 +700,10 @@ Python details (verified, not inferred):
 
 When a key decides whether a resource is shared (stream, connection, cache), every component field
 of the key needs a test that differs from the baseline in **only that field**. If dropping a field
-from the key leaves the suite green, that is a coverage gap. Example: in apache/airflow #68625 the
-shared stream key could lose `kafka_config_id` with all tests still green; the fix was
-`test_shared_stream_key_separates_topics_and_connections`. (Single-PR evidence so far — treat as a
-cheap checklist item, not a settled pattern.)
+from the key leaves the suite green, that is a coverage gap. Example: a shared stream key could
+lose its connection-id field with all tests still green; the fix was a test that varies topics and
+connections separately. (Single-case evidence so far — treat as a cheap checklist item, not a
+settled pattern.)
 
 ---
 
@@ -721,24 +712,24 @@ cheap checklist item, not a settled pattern.)
 When testing that an old name / value / behaviour is gone in the new release, take the old value
 from the previous release tag (`git show <tag-of-previous-release>:<path>`), never from memory. A
 value that never existed fails "now" in every version and proves nothing. When delegating the
-check, require the verifier to confirm the old value against the tag. Example: a test Dag used
-`pydantic-ai-azure` as the "old conn_type", but the previous release's `provider.yaml` actually
-said `pydanticai-azure`; the negative half returned `Unknown hook type` on every version and even
-passed one fresh-context verification round before being caught.
+check, require the verifier to confirm the old value against the tag. Example: a test used
+`old-name-with-hyphens` as the "old config key", but the previous release actually said
+`oldnamewithhyphens`; the negative half failed with "unknown key" on every version and even passed
+one fresh-context verification round before being caught.
 
 ---
 
 ## Paired fetch + count queries share one predicate helper, with a decoy test per predicate
 
 When a fetch query and a backlog-count query each hand-write their `WHERE`, the count drifts and
-drops conditions. Example (apache/airflow #71072): the scheduler's partitioned-asset count omitted
-`is_paused` / `is_draining`, so paused Dags inflated the backlog and raised false alarms.
+drops conditions. Example: a backlog count omitted two
+status flags that the fetch query filtered on, so paused items inflated the backlog and raised false
+alarms.
 
 How to apply: extract one verb-named helper that returns the predicate tuple (e.g.
-`_build_pending_partitioned_apdr_filters`) and use `.where(*...)` in both queries. Then write one
+`_build_pending_filters`) and use `.where(*...)` in both queries. Then write one
 **decoy test per predicate**: create the data, then flip a single flag. Mind DB constraints when
-flipping — `is_paused` and `is_draining` cannot both be set (`CHECK NOT (is_paused AND
-is_draining)`). Apply whenever you add or change a fetch-then-count query pair.
+flipping — a CHECK constraint may forbid two flags being set at once. Apply whenever you add or change a fetch-then-count query pair.
 
 ---
 
@@ -748,10 +739,9 @@ When a diff adds a test class at a point that sits between an existing class's
 `@pytest.mark.skipif(...)` (or other class-level marker) and its `class` line, the
 decorator silently re-attaches to the **new** class and the original class loses its
 guard. The failure is invisible wherever the environment is newer than the guard's
-threshold: example (apache/airflow #74396) — new classes were inserted between a
-`skipif(not AIRFLOW_V_3_1_PLUS)` and the class it guarded; the local run (Airflow 3.3+)
-was fully green, and only the old-version compat jobs went red
-(`module 'airflow' has no attribute 'sdk'`), 18 tests across two jobs.
+threshold: example — new classes were inserted between a
+`skipif(sys.version_info < (3, 11))` and the class it guarded; the local run (a newer
+interpreter) was fully green, and only the old-version CI jobs went red.
 
 How to apply: when a diff adds a test class, read the lines directly above and below
 the insertion point and confirm every pre-existing decorator is still attached to the
@@ -768,8 +758,8 @@ introduces the test must also add every data entry and doc row that already exis
 Otherwise that commit fails when checked out alone (bisect, cherry-pick, per-commit CI), and the
 reviewer will ask for the entries to be folded into the earlier commit.
 
-Case: a provider-list guard test landed in one commit while the data entry and the doc row for one
-provider were added in the next commit.
+Case: a registry-list guard test landed in one commit while the data entry and the doc row for one
+registry item were added in the next commit.
 
 How to apply: for each commit that adds a guard test, run the guard against that commit's tree, not
 only against the branch tip.
@@ -815,11 +805,6 @@ string with `==`. pytest still diffs the two huge strings on failure — even in
 — so the regression shows up as a timeout kill instead of a red test. Split it into the smallest
 checks that pin the property, for example `kept[0] == "a"` and
 `set(kept[1:]) == {"\N{GRINNING FACE}"}`.
-
-Case (apache/airflow #74026, reviewer measurement): with the surrogate guard under test removed,
-the whole-string comparison took about 8 minutes under breeze to fail (CI's limit is 60 seconds),
-because pytest diffed two ~250,000-character strings; after the split, removing the guard turned
-the `set(kept[1:])` line red in 2.5 seconds.
 
 How to apply: find the smallest checkable shape of the property (first element, element set,
 length bound) so a failure only diffs a small object; then run one mutation canary and confirm it

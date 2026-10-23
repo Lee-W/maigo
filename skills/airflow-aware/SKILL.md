@@ -112,6 +112,7 @@ Its "Contents" list enumerates 10.1–10.37 plus the unnumbered DB portability a
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
 | `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity |
 | `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs, docs examples |
+| `references/test-cases.md` | Writing or reviewing Airflow tests: Airflow instances and Airflow-specific facts behind the python-aware test-conventions rules (read alongside the rule) |
 | `references/ui-conventions.md` | `airflow-core/src/airflow/ui` changes; zh-TW translation rules |
 | `references/naming.md` | The naming hook fires, or editing a historical archival file |
 | `references/delivery.md` | Finishing a feature, QA / status docs, docs-page PRs, doc-only commit subjects, backports |
