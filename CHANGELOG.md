@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.66.0 (2026-10-23)
+
+### Feat
+
+- **board**: add same-rank boost rules for the 🎯 sort
+- **work-board**: rank 待送出 at P1 so drafted reviews surface before 回你的球
+
 ## v0.65.1 (2026-10-07)
 
 ### Fix
