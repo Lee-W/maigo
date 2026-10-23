@@ -5,6 +5,49 @@ Loaded on demand by `skills/airflow-aware/SKILL.md` §10 — **review tasks only
 an item 10+ in the checklist output, with the stated Block / Request-changes severity.
 Outside of a review context (quick-fix / refactor), do not gate tasks on these.
 
+## Contents
+
+Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` §10 refers to):
+
+- **10.1** Execution API wire-format gate (Block)
+- **10.2** Multi-PR split: wire-format symbol cross-check (Block)
+- **10.3** Top-level imports of Unix-only modules (Block)
+- **10.4** `TYPE_CHECKING` guards for heavy type-only imports (Request changes)
+- **10.5** Security finding classification (3-way triage before reporting)
+- **10.6** Newsfragment file presence (Request changes)
+- **10.7** Provider changelog: breaking/important behavior changes must be hand-edited into `docs/changelog.rst` (Request changes, scope-gated to `providers/`)
+- **10.8** Revert of a recent fix: check for a tracking issue first (judgment gate, scope-gated to revert PRs)
+- **10.9** Self-discovered bugfix: verify upstream doesn't already have it (Request changes, scope-gated)
+- **10.10** Forward-looking code comments need a tracking-issue URL or neutral rewrite (Request changes, scope-gated)
+- **10.11** Newsfragment content must reflect a genuine capability delta vs upstream (Request changes)
+- **10.12** Operator `__init__` vs `execute()` check placement, and rendered-guard symmetry (Request changes, scope-gated to direct `BaseOperator` subclasses)
+- **10.13** registry `slice`/`first` cutoffs need a sort key (Request changes, scope-gated to `registry/src/*.njk` and its data source)
+- **10.14** New provider, or new major capability surface, needs a governance-gate check (informational, scope-gated)
+- **10.15** Cross-timetable `partition_date` comparisons must normalize via `localize_partition_datetime` (Request changes, scope-gated)
+- **10.16** Logging/audit field review: cap+sort unbounded collections; reject fields redundant with a sibling (Request changes)
+- **10.17** A capped, row-locked query must not use a `LIMIT cap + 1` probe row (Request changes)
+- **10.18** `providers/common/ai` hook capability additions: check three parity axes (Request changes, scope-gated)
+- **10.19** A `DAGResponse` (or derived-model) field addition must exist on `DagModel` (Block, scope-gated)
+- **10.20** Two queries scanning the same rows under the same `WHERE` predicate should merge (Request changes)
+- **10.21** Don't flag release-manager/CI-generated docs as scope creep, and don't require a per-PR edit to them (judgment gate, scope-gated to `providers/*/docs/index.rst` and `airflow-ctl/RELEASE_NOTES.rst`)
+- **10.22** Dialect-dispatch catch-all `else` branch defaulting to sqlite is a footgun — reuse the canonical upsert helper or fail loud (Request changes)
+- **10.23** registry class-level module `category` string is not user-visible — don't confuse it with the type `label` (Request changes, scope-gated to `dev/registry/` and `registry/`)
+- **10.24** Operator's own `xcom_push()` calls for extra keys need their own `do_xcom_push` guard (Request changes)
+- **10.25** Frame an SDK/Core capability gap as feature completion, not a bugfix — but check release state first (judgment gate)
+- **10.26** `common.ai` vendor enumeration must come from `infer_provider_class`, not `known_model_names()` (Request changes, scope-gated to `providers/common/ai`)
+- **10.27** Metric ratio three-question check: denominator must increment before the op, a per-call ratio unbounded by 1 isn't a "rate", the two counters must share a population (Request changes)
+- **10.28** A schema-validated new field needs an authoring-schema cross-check (Request changes, scope-gated to new schema-validated fields such as a `provider.yaml` sub-key)
+- **10.29** Template-field value-path check: coercion belongs at the top of `execute()`, every entry point sharing the coercion, native and rendered-string paths must accept the same values (Request changes, scope-gated to operators with a template field)
+- **10.30** Two checks before touching a provider metadata schema: a single-provider concept stays out of the shared schema/directive; only the authoring schema (`provider.yaml.schema.json`) may be tightened, never the runtime one (`provider_info.schema.json`) (Request changes, scope-gated to those two schema files)
+- **10.31** `# use next version` on a cross-provider floor is the documented release-prep mechanism; zero hits in today's `pyproject.toml` files is not "no precedent". Only ask whether every API used is already released (judgment gate, scope-gated to cross-provider floors carrying the marker)
+- **10.32** A zero-argument method that returns derived state should be a `@property` (nit)
+- **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
+- **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON, validation errors never echo the value (Request changes, scope-gated to provider hook connection-field parsing)
+- **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
+- **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
+- **10.37** Before unifying several return paths of a released, stable-listed operator into one helper, read each path's behavior in the last release tag (Request changes, scope-gated to such unifications)
+- **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
+
 ## Secrets masker tests: `@pytest.mark.enable_redact` + reset before use
 
 Airflow-specific supplement to `python-aware`'s "Tests touching global state must

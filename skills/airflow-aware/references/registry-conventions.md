@@ -1,6 +1,6 @@
 # Airflow provider registry conventions (`dev/registry/`, `registry/`)
 
-Loaded on demand by `skills/airflow-aware/SKILL.md` §10 and
+Loaded on demand by `skills/airflow-aware/SKILL.md` §5 (and its References index) and
 [`references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md) —
 apache/airflow's Provider Registry site (https://airflow.apache.org/registry/)
 touchpoints, review-time checks, and verification recipes. Read this file

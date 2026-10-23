@@ -23,6 +23,15 @@ It can also be triggered manually via a memory entry with `triggers: [commitizen
 
 Once loaded, treat every convention as background — do not re-read each task.
 
+### Layering
+
+This skill sits on top of the Python language layer. **Read
+[`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/SKILL.md) first**
+for the general Python toolchain, coding and pytest/mock conventions; this skill lists only what is
+specific to commitizen. Precedence: the repo's own `AGENTS.md` / `CLAUDE.md` > this skill >
+`python-aware`. Where this skill restates a Python habit, it is a repo-specific rule, not a
+duplicate of the language layer.
+
 ## Read AGENTS.md first
 
 The single source of truth for contributor conventions lives in the repo itself.
@@ -133,6 +142,10 @@ From AGENTS.md lines 62–72:
 
 This skill pairs with
 [`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md).
+
+It also composes
+[`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/SKILL.md)
+(the Python language layer) — see Layering above.
 
 **Review scenario** — run `strict-review`'s 9-item base checklist as usual, then apply
 commitizen-aware conventions as project-specific supplements:

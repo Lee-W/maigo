@@ -111,3 +111,19 @@ How to apply: when adding a UI endpoint keyed by a user-authored string,
 follow the pending-partition-run detail endpoint's shape and use a query
 param — don't copy the path-param shape of sibling routes whose params are
 controlled IDs.
+
+## zh-TW locale content
+
+**zh-TW locale content**: call it "Taiwanese Mandarin", never "Traditional
+Chinese" — this applies to commit messages, PR text, docs, and comments
+produced for this repo. When translating a UI string, check the repo's
+existing zh-TW translations for established terminology before coining a
+new term. A newly added plural `*_one` key says the literal `1`, not
+`{{count}}` (that branch only renders when the count is 1); existing `_one`
+keys that still interpolate are left alone, so don't retro-fix them in a
+"fill missing translations" change. When delegating an i18n fill-in to a
+subagent, paste these rules into the prompt one by one (it cannot read this
+skill, and "follow the existing pattern" can point at the wrong convention
+in the same file) and add a matching acceptance check, e.g. new `_one` keys
+say the literal `1`. See
+[`delegation-sizing`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md).

@@ -133,6 +133,9 @@ named function in your own module, export it via `__all__`, and point docs at
 that layer instead. Check docstring `:func:` cross-references for the same
 symbol while you're at it — don't fix only the `.rst`.
 
+User-facing doc snippets teach the canonical import (e.g. `from airflow.sdk import dag, task`), never a
+provider-internal compatibility shim path meant only for in-package shipped code.
+
 ---
 
 ## Shared examples use the ecosystem-standard endpoint, not a single backend's private path
@@ -630,3 +633,29 @@ Before writing or approving a claim about stability, release state, CI or suppor
 3. **Present-tense promises about CI, support or stability.** Each one must point at an existing mechanism (a CI job, a process, a file); otherwise soften it into a non-claim. For CI wording, read the workflow and the scripts it runs rather than earlier prose or the PR description, and do not treat "canary" as "scheduled".
 
 Examples (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while three toolsets had no `tool_prefix`; another said "shipped in 0.10.0" while the tag showed the class in an earlier release; a plan promised "the changelog records the latest tested version" when no CI job tracked that.
+
+## "When to use X vs Y" comparison docs
+
+A comparison doc needs why (X's core value proposition), when (bullets mapped to concrete operator/API names with doc
+links), a mirrored "use Y instead when…" list, and a one-line rule of thumb at the end. Find the *real* axis of difference
+before writing the difference section — a surface feature comparison that both sides share equally hasn't found the axis yet
+(e.g. two "agent" operators don't differ by whether they have tools/MCP if both do; they differ by where the loop executes and
+who controls the tools).
+
+## Section headers name the specific things compared; no internal-component words
+
+Section headers/labels name the specific things being compared, not a generic count or umbrella ("Two styles of X" teaches
+nothing — name the styles). Keep internal-component words (e.g. "scheduler") out of user-facing prose; phrase from the Dag
+author's observable perspective.
+
+## `providers/<x>/docs/index.rst`: hand-written prologue above, auto-generated block below
+
+`providers/<x>/docs/index.rst` has a hand-written prologue followed by an auto-generated block (marked by an "AUTOMATICALLY
+GENERATED" comment) that gets overwritten at release time. Reordering/placement feedback on this file is answered by editing
+**above** the marker (usually a short lead-in sentence), never by moving content at or after it.
+
+## A change in user-visible API semantics updates the public description in the same change
+
+When a new parameter/flag changes user-visible API semantics (e.g. how a special character is interpreted in a query param),
+the **public description / OpenAPI spec must be updated in the same change** as the code — not left describing the old
+semantics. Regenerate the spec + client after editing.

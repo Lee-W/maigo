@@ -591,20 +591,20 @@ the abstract.
 
 When a class already has one half of an obvious pair as a parameter/field/method name, name its
 counterpart symmetrically rather than reaching for a role-descriptive label — prefer
-`upstream_mapper` / `downstream_mapper` over `upstream_mapper` / `fine_mapper`. Symmetric naming
+`input_codec` / `output_codec` over `input_codec` / `final_codec`. Symmetric naming
 makes the pairing explicit at the call site and in docstrings.
 
-This also applies **across sibling classes**, not just within one. If one mapper class uses
-`upstream_mapper` / `downstream_mapper`, a structural sibling class should use `upstream_mapper` for
-the same role — not a vague near-synonym like `source_mapper`. Cross-class naming drift forces the
+This also applies **across sibling classes**, not just within one. If one codec-wrapper class uses
+`input_codec` / `output_codec`, a structural sibling class should use `input_codec` for
+the same role — not a vague near-synonym like `source_codec`. Cross-class naming drift forces the
 reader to learn two vocabularies for the same concept and obscures that the classes are sibling
 compositions.
 
 ### How to apply during review
 
 Reach for descriptive names only when pair members truly play different structural roles
-(`upstream_mapper` + `window` is fine because they aren't the same kind of thing; `upstream_mapper`
-+ `fine_mapper` is not, because both are mappers). Applies equally to method names and attribute
+(`input_codec` + `max_size` is fine because they aren't the same kind of thing; `input_codec`
++ `final_codec` is not, because both are codecs). Applies equally to method names and attribute
 names, not just `__init__` kwargs — and a serialized (wire-format) shape follows the same renames.
 
 ---

@@ -451,6 +451,41 @@ module, wrong key set) looks different — see
 [`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
 (new hooks module registration).
 
+### `uv run --project` vs `--directory` danger zone
+
+In an Airflow worktree, `uv run --directory "$WT" <cmd>` is safe — it uses the
+existing venv for that directory and does not trigger a re-resolve.
+
+`uv run --project "$WT" <cmd>` only becomes dangerous when `$WT` is the
+**whole worktree root**: that triggers a full workspace-level dependency
+resolve, which pulls in `apache-airflow[all]` → `apache-airflow-providers-jdbc`
+→ `jpype1`. Building `jpype1` needs Java, and macOS's default `/usr/bin/java`
+is an empty stub, so the build fails at CMake's `find_package(Java)` step.
+
+`uv run --project airflow-core <cmd>` (pointing at a monorepo **sub-project
+name**, e.g. `uv run --project airflow-core pytest …`, not a worktree path) is a different, safe
+usage: it resolves only that sub-project's dependency set, not the whole
+workspace. Don't conflate the two — the danger is specific to `--project` at
+a worktree root, not to `--project` itself.
+
+### `verify_completion` in this repo
+
+`repo_detect` writes `.claude/skip-test-verification` on first detection so the
+Stop-hook does not try to run a host-side `uv run pytest` (which pulls `jpype1`
+→ cmake `FindJava` and fails on machines without a JDK; the 90s timeout also
+cannot cover any Airflow subproject's suite). To re-enable verification for a
+focused area, delete that file or replace it with a targeted
+`.claude/test-command` such as
+`uv run --project airflow-core pytest tests/unit/<path>/test_<file>.py`.
+
+**jpype1 fallback**: if the Stop-hook still encounters a `jpype1` / `cmake` /
+`FindJava` error (because `.claude/skip-test-verification` was missing or the
+hook executed before `repo_detect` had a chance to write it), treat it as a
+**known upstream constraint** and move on. Do not try to install a JDK, patch
+`jpype1` import paths, or rewire the lock file — those are upstream issues, not
+part of any maigo task scope. If verification was genuinely needed, run a
+targeted single-file pytest manually instead.
+
 ## 4. Attribution — don't accept a red's cause without proving it
 
 ### Airflow `test-command` prefixes — the command runs as argv, not through a shell

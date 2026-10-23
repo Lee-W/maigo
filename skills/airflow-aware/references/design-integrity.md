@@ -8,9 +8,8 @@ version-skew tolerance, normalizing partial data) live in
 [`skills/strict-review/references/design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md).
 Read this file when designing or reviewing a new base/framework API on an Airflow hot loop.
 
-Core ↔ SDK paired-class attribute symmetry is already covered in
-`skills/airflow-aware/SKILL.md` §9 ("Core ↔ SDK paired-class symmetry") — not
-repeated here.
+Also here: Core ↔ SDK paired-class symmetry, CLI/REST design consistency, and partitioned / scheduling-range
+API granularity (moved out of `SKILL.md`; the hard rule for each stays there).
 
 ---
 
@@ -107,5 +106,59 @@ Airflow-specific instances of rules that now live in the generic file; read them
   `Managed agent None on None failed; failing over to None` — exactly the line the docs tell
   operators to read to find the broken member. The fix normalized in the helper on **both** success
   and failure paths, and the four callers now index directly.
-- **Part N (symmetric naming)**: the mapper examples are Airflow's partition mappers
-  (`upstream_mapper` / `downstream_mapper`, with `Window` as the structurally different pair member).
+
+## Core ↔ SDK paired-class symmetry
+
+Several public APIs exist as paired classes — one in `airflow-core/` and one in
+`task-sdk/` with the same conceptual role and the same name (e.g., the temporal
+partition mappers `_BaseTemporalMapper` in `airflow.partition_mappers.temporal`
+vs `airflow.sdk.definitions.partition_mappers.temporal`). When the two
+implementations drift on a **same-named attribute**, the divergence is a
+**bug**, not a nit — even if both sides happen to work in practice because
+downstream code (encoders, serializers, consumers) tolerates both shapes.
+
+Things to compare side-by-side when reviewing or self-reviewing such a class:
+
+- Constructor signature (kwargs, positional-vs-keyword, defaults).
+- Attribute *type* after `__init__` (e.g., is `_timezone` always
+  `Timezone | FixedTimezone` on both sides, or is one side keeping a raw
+  `str`?).
+- Validation / normalization step in `__init__` (e.g., one side runs
+  `parse_timezone()`, the other stores verbatim).
+- Eager-raise behaviour for invalid input.
+
+Do **not** accept "this can be a separate PR" framing just because the gap
+is "merely" a type or validation asymmetry. Fix it in the current PR. The
+related question — whether the overall patch is a **bugfix** or **feature
+completion**, which determines newsfragment + backport label — is a
+separate axis covered by the SDK/Core release-state framing memory
+(check release tags via `git tag --contains <sha>` **and** `git show
+<tag>:<file>` to confirm).
+
+## CLI and REST design consistency
+
+Before designing a new CLI command's semantic, filter, or default, **grep
+sibling commands first** — cross-command consistency outranks a per-command
+UX win. If a proposed behavior diverges from how sibling commands treat the
+same semantic field (e.g. a date-range filter, an end-date clamp), be able to
+explain *why* this command deviates; if you can't, align with the siblings
+instead. Do this before implementation, not after review blocks it.
+
+When adding a REST endpoint that parallels an existing CLI command, name it
+after the **CLI's verb** and the existing REST verb vocabulary, not a more
+literally-accurate coined word — e.g. `clearPartitions` (mirroring CLI
+`airflow partitions clear` and REST `clearDagRuns`) beats a technically-more-
+precise `resetPartitionFields`. Consistency across the user-facing surface
+beats per-endpoint pedantic accuracy.
+
+## Partitioned / scheduling-range API granularity
+
+Don't type a partitioned/scheduling-range API parameter at `date` granularity
+(`datetime.date`) — take `datetime` bounds and walk the timetable's own
+cadence instead. A `date`-typed parameter makes a sub-day window structurally
+inexpressible, and day-bound expansion logic then silently widens any window
+to the whole local day even for an hourly-cadence timetable. When adding or
+reviewing timetable/backfill range behavior: pass datetimes and honor bounds
+as both-ends-inclusive instants; always add a sub-day cron case
+(`"0 * * * *"`) to the tests — day-grained tests alone give a false green on
+day-bound bugs.
