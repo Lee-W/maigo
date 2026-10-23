@@ -627,6 +627,28 @@ check exists to catch (§10.26 again). Gate the loosened direction behind its
 own version constant, and prove the tripwire still fires with a mutation
 canary (§6 above) before considering the fix done.
 
+### `uv.lock` during a rebase, and when `prek` commit blames it on the RST license hook
+
+**Rebase.** On an apache/airflow branch, a conflicted `uv.lock` can show up
+staged as *deleted* (the repo's rule is "delete and regenerate on conflict").
+`git rebase --continue` would then commit that deletion into history. Restore
+the base version mid-rebase with `git checkout HEAD -- uv.lock`, resolve the
+other conflicts, continue, and only after the rebase regenerate with the
+repo-pinned uv (`rm uv.lock && uv lock`) in a **separate commit**. Between the
+rebase finishing and the regeneration, `uv lock --check` fails because the new
+dependencies aren't in the lock yet — that is the expected state.
+
+**`prek` commit blocked by "Add license for all RST files".** In commit mode,
+`prek` can report that hook as failed ("files were modified by this hook")
+when the real cause is something silently rewriting `uv.lock` during the run.
+The `uv.lock` change is unrelated to your commit: a standalone full `prek`
+run exits 0 while still rewriting `uv.lock`, and `UV_FROZEN=1` doesn't stop
+it. Workaround: `git update-index --assume-unchanged uv.lock` for the
+duration of the commit, then immediately `git update-index
+--no-assume-unchanged uv.lock` and `git checkout -- uv.lock`. Unknown (not
+investigated): which hook does the rewrite, and whether a clean `main`
+behaves the same.
+
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 
 `AIRFLOW_HOME` defaults to `~/airflow` for every worktree, so

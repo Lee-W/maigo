@@ -186,6 +186,8 @@ Full diagnostic — confirm the drift, find when it was introduced, worked case
 study, and how to handle in a feature PR — is in the "uv.lock drift diagnostic"
 section of `references/review-checks.md`.
 
+Rebase handling of `uv.lock` and the `prek` commit-blame workaround: `references/verification-tooling.md`.
+
 ### 4. Code style — Ruff + Mypy
 
 - Formatter: `uv run ruff format`
