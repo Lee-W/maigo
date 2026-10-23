@@ -2,12 +2,12 @@
 
 Loaded on demand by [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) —
 full mechanics for the multi-PR batch path: how Raana sorts and prints the queue, the
-per-PR status pre-processing table (merged / closed / draft), and the one-PR-at-a-time
-gate between reviews. Read this file when `/maigo:review` receives more than one target.
+per-PR status pre-processing table (merged / closed / draft), the default
+run-them-all-in-parallel flow, and the opt-in one-at-a-time gate. Read this file when `/maigo:review` receives more than one target.
 
 ---
 
-`/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後一次一個 review；每完成一個 PR 等使用者 go-ahead 才推進。
+`/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後**預設一次平行審完全部**，不在 PR 與 PR 之間等 go-ahead；使用者明講要逐顆才改成一次一個、每顆等 go-ahead（見「逐顆模式」）。
 
 ## 樂奈先抓 metadata 排隊
 
@@ -33,10 +33,10 @@ gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDra
 | 3 | #Z | … | +A/-B | ⚠️ CHANGES_REQUESTED |
 | — | #W | … | — | ⏭️ skipped (merged) |
 
-從 **#X** 開始。
+共 N 顆，平行開跑（排序只決定 roll-up 與 board 的呈現順序）。
 ```
 
-第一個 PR **不必**等 go-ahead——使用者送多 PR 進來就已經授權 batch 啟動。「等 go-ahead」規則只套在 PR 與 PR 之間。
+使用者送多 PR 進來就已經授權整批啟動——**不需要**任何 go-ahead，PR 與 PR 之間也不停。
 
 ## 狀態前置處理（每 PR 進 §1 前）
 
@@ -49,7 +49,37 @@ gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDra
 
 merged / closed 的 PR **不需要** review report——只在 queue 表標 skipped 一行帶過。
 
-## 一次一個 PR 規則
+## 預設：平行審完全部、統一 publish、board 放最前
+
+多 PR 參數的預設流程（不必使用者另外交代）：
+
+1. **先排隊、再一次 fetch**：樂奈 metadata 排好 queue、前置處理表過完後，orchestrator
+   **一次**把所有要審的 PR head fetch 成具名本機 ref（`+pull/<N>/head:refs/review/pr-<N>-latest`，
+   不用 `FETCH_HEAD`，fetch 後對 `headRefOid`——細節見下方「大批平行 spawn」一節的 fetch 規則）。
+   各 agent 不各自 fetch，避免搶 fetch 與讀到別顆的 head。
+2. **平行審**：🟡 爽世唯讀，並行度不受下面這條上限；🟣 立希每顆各自一個**獨立 worktree**（Airflow
+   另要各自 fresh `AIRFLOW_HOME`，見下方一節），但**同時存在的 worktree 最多 2–3 個**（與
+   [`teammate-flow` 的「Worktree safety in parallel batch review」](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md)
+   同一個數字——曾經約 10 個並行 worktree 耗盡硬碟、整個 verify 階段掛掉兩次），開之前先查剩餘磁碟
+   （每個約 2GB 以上），超過上限的 PR 排隊等前面的立希收工、worktree 移除後再開。並行度另照下方
+   「節流」縮波次，每波一完成就落地。
+3. **全部跑完才統一收尾**：每顆審完只產出並發佈 report（本地 report；貼上 GitHub 仍是使用者的動作，
+   「交付時效」那節不變：裁決集中問一次，但每份 report 一產出本地就可讀、可先貼，使用者不必等整批
+   問完；見「交付時效」）；must-fix 放不放、nit 怎麼送，**全部審完後集中問一次**（收尾用
+   AskUserQuestion，每次最多 4 題、分輪問完；每題推薦項放第一個，選項寫清楚 must-fix 與 nit 各自
+   怎麼處理）；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者必須先決定才不會白做」的
+   前提（例如範圍需要改審）才提前問。draft PR 仍照前置處理表先問。
+4. **board 單一寫手**：Work Board 由**單一** agent 以 `Edit` 回寫（不要每顆各寫一次、也不整份
+   覆寫；規則見 `skills/work-board`），這批 PR 的行放 🎯 最前面。
+5. 最後走 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）。
+
+Why：一次五顆 PR 照舊預設審完第一顆就停下等 go-ahead，使用者的回應是「一次看完，都寫 board，
+放到最前面」——逐顆停頓只是把等待成本丟給使用者，而且 report 版型一樣、沒有節省判斷。
+
+## 逐顆模式（使用者明講才用）
+
+只有使用者明確要求逐顆（「一顆一顆來」、`one at a time`、「先看第一顆」之類）才走這個模式；
+同一 session 內以使用者**最新**的指示為準。
 
 每個 PR 走完 §1-§4 出完一份 review report 後，orchestrator 在 report 結尾加一行：
 
@@ -60,12 +90,8 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 然後**停下來等使用者明確 go-ahead**。任何短肯定（`好` / `ok` / `next` / `下一個` / `繼續` / `go` / `yep`）都算。
 
 - 使用者若給 substantive feedback（追問、要 re-read、pivot），先處理那個再推進
-- 使用者說「全部一起看」/ `batch them` / `do them all` → 放掉這個 gate 直到 batch 結束
-  - 放掉 go-ahead 的同時，**裁決也集中到最後問一次**：每顆審完只發佈報告，must-fix 放不放、
-    nit 怎麼送等全部審完後一次問，不要每顆審完就中斷（逐顆中斷會讓使用者重複看同樣格式的
-    問題）。收尾用 AskUserQuestion，每次最多 4 題、分輪問完；每題推薦項放第一個，選項寫清楚
-    must-fix 與 nit 各自怎麼處理；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者
-    必須先決定才不會白做」的前提（例如範圍需要改審）才提前問。
+- 使用者中途說「全部一起看」/ `batch them` / `do them all` → 回到上面的預設流程，放掉這個 gate
+  直到 batch 結束（裁決同樣集中到最後問一次）
 - 最後一個 PR 跑完 → queue 行改成最終 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）
 
 ## 交付時效

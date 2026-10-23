@@ -806,3 +806,23 @@ Two checks for drift-tripwire tests, both found on one SQL validator's tripwire 
    construct and only a later reference-collection step flags it, a name like `..._rejected` is
    false; name it for the real condition (`..._flagged_only_when_<option>_is_set`) and pin the real
    acceptance with an explicit assertion.
+
+## Asserting on a very large string: split into short assertions that never diff the big object
+
+When a test must verify a string hundreds of thousands of characters long (a truncation result,
+a repeated emoji), don't write `assert (kept == expected) is True` and don't compare the whole
+string with `==`. pytest still diffs the two huge strings on failure — even inside `(...) is True`
+— so the regression shows up as a timeout kill instead of a red test. Split it into the smallest
+checks that pin the property, for example `kept[0] == "a"` and
+`set(kept[1:]) == {"\N{GRINNING FACE}"}`.
+
+Case (apache/airflow #74026, reviewer measurement): with the surrogate guard under test removed,
+the whole-string comparison took about 8 minutes under breeze to fail (CI's limit is 60 seconds),
+because pytest diffed two ~250,000-character strings; after the split, removing the guard turned
+the `set(kept[1:])` line red in 2.5 seconds.
+
+How to apply: find the smallest checkable shape of the property (first element, element set,
+length bound) so a failure only diffs a small object; then run one mutation canary and confirm it
+fails fast **and name which assertion turned red**. A comment, if any, states only the concrete
+constraint (a whole-string comparison makes pytest diff a huge string on failure); don't claim
+"fails fast" unless you measured it.

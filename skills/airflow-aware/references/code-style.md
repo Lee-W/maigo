@@ -236,8 +236,16 @@ provider's `pyproject.toml` version and `docs/changelog.rst`, and whether the
 commit that added it is already on `main`). Unreleased means it isn't a
 breaking change and needs no changelog entry or newsfragment (providers never
 use newsfragments). If it has already released, treat the removal as a
-breaking change instead. When moving the code, carry over every `why` from
-the original docstring to its new home — don't leave bare logic behind.
+breaking change instead. **"Shipped" is decided by PyPI, not by local tags**:
+`curl https://pypi.org/pypi/<dist>/json` and read `releases` / `upload_time`
+(local tags can stop at `1.0.0rc3` while `1.0.0` is already published). For a
+stable-listed toolset/operator, deleting a deprecated alias or changing a
+type/default after the stable release is breaking — keep it until the next
+major. Case: #74695 removed `HookToolset.tool_name_prefix` and described it under
+the 1.0.0 changelog section; a maintainer pointed out 1.0.0 was already on PyPI,
+and the removal was reverted entirely. When moving the code, carry over every
+`why` from the original docstring to its new home — don't leave bare logic
+behind.
 
 ### Adopting a core/task-sdk symbol: verify it exists at the provider's declared floor
 
@@ -281,7 +289,39 @@ Case: apache/airflow #72156 — a reviewer suggested `_preset_connections`;
 floor was `apache-airflow>=3.0.0`. The fix seeded the hook's own cache
 instead, which cut the same query count without a version gate.
 
+For **provider tests and code that branch on a 3.3-only symbol** (and for the
+rule that a test importing one must gate with `skipif(not AIRFLOW_V_3_3_PLUS)`
+and keep the import out of module top level), see
+[`verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)
+("Code that branches on a 3.3-only SDK symbol …").
+
 ## Validation and enforcement
+
+### A fixed override of a base `@property` is a class attribute; "get or raise" is walrus + early return
+
+Two maintainer-review preferences for Airflow code (the property one from #74695):
+
+- **Overriding a base-class `@property` with a constant**: write a class attribute
+  (`name: str = (...)`), not `@property def name(self)`. Follow the same file's
+  existing `agent_template_fields: Sequence[str] = (...)` form, no `ClassVar`. A
+  maintainer asked "does this need to be a property? one attribute is enough" about
+  `tool_name_conflict_hint` on `SQLToolset`/`DataFusionToolset`, which return a fixed
+  string. Before changing it, confirm the base only *reads* the attribute
+  (pydantic-ai's `combined.py` does), and keep sibling classes consistent. Whether
+  mypy accepts an attribute overriding a property is unverified — if in doubt, check
+  with `uvx mypy` or CI.
+- **"Fetch a value, raise if missing"**: success path as an early `return`, the
+  `raise` at the tail, with a single walrus —
+
+  ```python
+  if command and (log_path := json.loads(command).get("log_path")):
+      return log_path
+  raise HTTPException(status.HTTP_404_NOT_FOUND, f"No log path found for callback {task.task_id}")
+  ```
+
+  not `log_path = ... if command else None` + `if not log_path: raise` + `return
+  log_path`. It drops a `None` intermediate and one inverted check. Single walrus,
+  single-level condition only; don't force it onto nested or multiple walruses.
 
 ### Raise at construction instead of documenting a structural footgun
 

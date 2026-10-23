@@ -260,6 +260,51 @@ reviewer kaxil brought coverage from 6/19 to 19/19 in one pass. Treat a new
 module type's CSS coverage as a checklist to walk explicitly, not
 something a first read-through reliably catches.
 
+## New hooks module in a provider: register it in `provider.yaml`, absorb the regenerated file, and split commits carefully *(narrow — read when a diff adds a module under a provider's `hooks/`, or a pydantic-ai vendor label)*
+
+Adding a `.py` module under `providers/<x>/…/hooks/` makes the first
+`git commit` fail in `check-provider-yaml-valid` — a **real** error, not the
+stale-image false failure in
+[`verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)
+("`check-provider-yaml-valid` failing with an `ibm-db` `arch_` `NameError`").
+Case: common.ai's new `hooks/local_model_backends.py` produced `Incorrect content
+of key 'hooks/python-modules' … Items in the left set but not the right: '<new
+module>'`.
+
+- **Register it before you implement**: add the module under the same
+  integration's `python-modules` in `provider.yaml`'s `hooks:` block, after the
+  existing modules. A plan must not list `provider.yaml` as "explicitly not
+  touched" when the change adds a hooks module.
+- **Expect a second commit round.** After `provider.yaml` is fixed, the
+  `Update providers build files` hook regenerates `get_provider_info.py` and
+  fails because it modified a file. Check
+  `git diff -- providers/<x>/src/.../get_provider_info.py` shows only the lines
+  for that module, `git add` it, and commit again; the second round is green.
+  The commit output is tens of KB — locate the error with
+  `grep -n 'Error\|Failed'`, don't read it all.
+- **Splitting one change into several commits: untracked new modules trip the
+  hook on the earlier commits.** prek stashes only *tracked* unstaged changes;
+  an untracked `hooks/<new>.py` stays on disk, the hook scans the disk, and it
+  compares against HEAD's/staged `provider.yaml`: "Module `…hooks.<new>` contains
+  hooks class(es) … but is not registered". Don't `SKIP=` it. Park the files:
+  `git ls-files --others --exclude-standard > list.txt`; `tar -cf park.tar -T
+  list.txt` and `shasum $(cat list.txt) > before.sha` (tarball and checksums in
+  the scratchpad); delete them with `/bin/rm`; commit the earlier commits; then
+  `tar -xf park.tar && shasum -c before.sha` — every line `OK` before the next
+  commit.
+- **New pydantic-ai vendor in common.ai needs three label sites**, inserted in
+  alphabetical order: `providers/common/ai/provider.yaml`'s `external-services`;
+  the generated `…/common/ai/get_provider_info.py` (insert at the same position
+  by hand); and `LABELS` in
+  `tests/unit/common/ai/test_provider_metadata.py`. Missing one turns
+  `TestPydanticAIExternalServicesDrift`'s `test_every_installed_vendor_is_declared`,
+  `test_every_installed_module_has_a_label` and
+  `test_known_model_name_prefixes_are_all_labelled` red — typically right after a
+  `uv.lock` bump brings the new vendor in (`<unlabelled:xxx>` in the output). For
+  what counts as reachable and how to gate the version floor, see the
+  `external-services` section below and the dependency-floor paragraph in
+  [`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/design-integrity.md).
+
 ## `provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's `get_ui_field_behaviour()` entirely (narrow — read when a diff changes connection-form UI text)
 
 **Scope note**: applies when a diff changes a connection type's user-visible

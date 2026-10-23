@@ -35,6 +35,40 @@ The hash/state a plan or brief was written against can go stale by execution
 time — the instruction should carry its own on-the-spot verification, not
 assume the world hasn't moved.
 
+## Folding a fix into a non-tip commit when `-i` is unavailable
+
+The harness blocks interactive flags (`git rebase -i`, `git add -i`), so marking
+a commit `edit` in an interactive rebase isn't an option. Two routes, in order:
+
+**Primary — `--fixup` + non-interactive `--autosquash`** (git ≥ 2.38, which dropped
+the `-i` requirement for `--autosquash`; verified on 2.55). Works however many
+commits sit on top of the target; the target needn't be HEAD.
+
+1. `git add <files>`, then `git commit --fixup=<target-sha>`. The generated
+   `fixup! <target subject>` message passes Airflow's
+   `check-no-conventional-commit-message` hook.
+2. `GIT_EDITOR=true git rebase --autosquash <the target's parent>`. Use the
+   target's **parent** as the base, not `upstream/main` — an `upstream/main` base
+   silently rebases onto new upstream commits and changes more than intended.
+
+**Fallback — split the patches by hand**, only when one file's hunks must be divided
+between different commits so no single `--fixup` covers them:
+
+1. Capture each independent hunk as its own patch file (`git diff --cached --
+   <file>` / `git diff -- <file>`), one per target commit.
+2. `git checkout HEAD -- <file>` to reset the file to the tip's committed state.
+3. `git apply <patch-for-the-earlier-commit>`, stage, `git commit --amend --no-edit`
+   — valid only while that earlier commit *is* HEAD.
+4. `git apply <patch-for-the-later-commit>` on top, stage, commit normally.
+
+Run `git apply --check` first: overlapping hunks can make the second patch fail
+against the first one's result.
+
+Verify the rewrite lost nothing: tag the old tip first (`git tag
+backup/pre-amend-<date>`); then `git diff <pre-rewrite-sha> HEAD --stat` must equal
+exactly the change being folded in, and the subject lists of the old and new
+ranges (`git log --format=%s`) must be identical.
+
 ## Edit a JSON field with precise replacement, not full re-serialize
 
 To change a single field in an existing JSON file (a version bump, a flag

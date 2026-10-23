@@ -197,6 +197,12 @@ both directions is not a tripwire. (2026-09-17, `common.ai` `external-services`:
 provider supports `pydantic-ai-slim` from 2.23.0 upward and CI exercises that
 floor.)
 
+When the new upstream item is a vendor, the declaration itself touches three
+places (`provider.yaml`, the generated `get_provider_info.py`, and the test's
+`LABELS`) — see
+[`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+("New hooks module in a provider …").
+
 ---
 
 ## Normalize partial data at its source, not at each caller

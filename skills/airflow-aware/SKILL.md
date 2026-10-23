@@ -335,6 +335,7 @@ status doc for a feature that ships:
 
 - Write commit messages and PR titles from the **user-impact perspective** — describe what
   changes for users, not which files were touched.
+- **Before writing any commit message or PR text in apache/airflow, load the repo's `airflow-pr-draft-summary` skill** — it takes precedence over `maigo:commit-message` (body states the why, subject ≤70 chars, not Conventional Commits, no `Co-Authored-By`).
 - Agent-opened PRs must include a `Generated-by:` footer in the PR body
   (see the "Pull requests" section of `AGENTS.md` for the exact format).
 - **Newsfragments are only required** for changes to `airflow-core/`, `chart/`, or `dev/mypy/`.
@@ -449,6 +450,9 @@ sub-check states. The file covers:
 - **10.33** Setting a cross-provider optional-extra floor: check every API used against released tags, don't copy a sibling's floor (Request changes, scope-gated to cross-provider extra floors)
 - **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON, validation errors never echo the value (Request changes, scope-gated to provider hook connection-field parsing)
 - **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
+- **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
+- **10.37** Before unifying several return paths of a released, stable-listed operator into one helper, read each path's behavior in the last release tag (Request changes, scope-gated to such unifications)
+- **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
 plus the Airflow case studies backing `strict-review`'s recurring must-fix patterns.
 Outside of a review context (quick-fix / refactor), skip the file — these checks
@@ -568,7 +572,7 @@ airflow-aware conventions as Airflow-specific supplements:
 - Conventions 4 and 5 reinforce the style and correctness checks (base items 5–6).
 - Convention 6 (delivery completeness) reinforces the acceptance-match check (base item 1).
 - Convention 7 (testing) reinforces the evidence and edge-case checks (base items 2–3).
-- **§10 sub-checks (10.1–10.35, in `references/review-checks.md`) become items 10+**
+- **§10 sub-checks (10.1–10.37, in `references/review-checks.md`) become items 10+**
   in the checklist output, with Block / Request-changes severity inherited from each
   sub-section.
 

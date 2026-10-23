@@ -99,3 +99,21 @@ looks plausible.
 **How to check.** Order doc work after behaviour work; list what each behaviour commit
 changed and grep the docs for each; do not promise anything you cannot verify (if a
 vendor default cannot be found, say "raised" rather than quoting a number).
+
+## 7. A count in a PR description must equal what the diff actually changes
+
+**Rule.** When reviewing someone else's PR, check every number in the description ("changed four
+tests", "touches N files", "updates N fields") against the diff. A mismatch is a must-fix: ask
+the author to correct the description to the real number — don't rewrite the whole description
+for them.
+
+**Why.** The description becomes the source for the commit message and changelog; a wrong count
+makes later readers believe tests were exercised by this PR that were not. Case (apache/airflow
+#73607): the description said four `ModuleContract` field tests were changed, the diff touched
+only two — the other two (`accepts_legacy_*`) already went through
+`ModuleContract.model_validate` in the base commit.
+
+**How to check.** `git diff --stat`, or list the changed items file by file, then compare each
+claimed count. Report only the discrepancy. This is the counterpart of the rewritten-claim check
+in the harness-discipline skill: that one asks whether a *reworded* claim holds per shape; this
+one asks whether the *numbers* equal the diff.

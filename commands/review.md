@@ -40,8 +40,8 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ## 多 PR 批次與狀態前置處理
 
-`/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後一次一個 review；每完成一個 PR 等使用者 go-ahead 才推進。完整排序規則、queue 表格式、merged/closed/draft 前置處理表、一次一個 PR 的 go-ahead 規則，見
-`skills/strict-review/references/review-batch-queue.md`。多 PR 參數代表「現在要開始逐顆 review」；
+`/maigo:review` 接受**多個** PR 用空白或逗號分隔。orchestrator 自動排序後**預設平行審完全部**（統一 publish、board 放最前），PR 與 PR 之間不等 go-ahead；使用者明講要逐顆才一次一個。完整排序規則、queue 表格式、merged/closed/draft 前置處理表、平行預設流程與逐顆模式的 go-ahead 規則，見
+`skills/strict-review/references/review-batch-queue.md`。多 PR 參數代表「現在要開始把這批全部 review 完」；
 若只是要把一批 PR 放進跨 session board，改用 `/maigo:board <pr-1> <pr-2> ...`。
 長期跨 session 追一批 PR 時用
 [`/maigo:board`](https://github.com/Lee-W/maigo/blob/main/commands/board.md) 的 Work Board
@@ -279,7 +279,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - Soyo 的 review 輸出若含 `## Memory propose`，
   把 review report 完整呈現給使用者後再觸發 confirm flow；
   不要在使用者讀完 report 之前插入確認問題。
-- **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、PR 與 PR 間等 go-ahead——細節見「## 多 PR 批次與狀態前置處理」；不要一次 fire 多個 review，不要自己決定 draft 要不要看。
+- **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、預設平行審完全部並統一 publish（逐顆等 go-ahead 只在使用者明講時用）——細節見「## 多 PR 批次與狀態前置處理」；平行時依 batch-queue reference 先一次 fetch 各 PR head、立希各用獨立 worktree；不要自己決定 draft 要不要看。
 - **Work Board**：使用者長期追一批 PR 時維護 `.maigo/board.md`；每跑完一顆依
   [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 回寫狀態。
   刷新 / 查看 board 用 `/maigo:board`。board 決定誰該看，review 負責看，兩者不重疊。
@@ -288,5 +288,5 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 草擬 GitHub PR review thread 回覆時，依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)——預設簡短、不引 SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
 - **裁決 gate（§4.5）與 Soyo propose 的關係**：gate 把「不適用+理由」導向 Soyo 的即時 propose；
   orchestrator 自己不寫記憶、不 soften review；記憶寫入唯一路徑是 Soyo propose → confirm flow。
-  gate 在單一 PR 的 report 之後、下一個 PR 的 go-ahead 之前——不與批次推進混淆。
+  gate 在單一 PR 的 report 之後；平行預設下各 PR 的 gate 集中到全部審完後問一次（逐顆模式則在下一個 PR 的 go-ahead 之前）——不與批次推進混淆。
 - **A 步驟（§5 學習收尾）**：orchestrator 親跑、不開新 agent、只讀 GitHub（不回覆 / 不 resolve thread、不 push、不碰 GitHub 寫入）。

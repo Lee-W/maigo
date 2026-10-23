@@ -748,6 +748,9 @@ self.do_xcom_push:` in the same PR, and require a test asserting
 `xcom_push.assert_not_called()` when the flag is off. Case study:
 apache/airflow#72151, caught by a reviewer.
 
+For `providers/common/ai` model output pushed to XCom, see 10.36 (helper routing and dump mode) and
+10.37 (released-behavior check before unifying paths).
+
 ## 10.25 Frame an SDK/Core capability gap as feature completion, not a bugfix — but check release state first *(judgment gate)*
 
 **Scope gate**: applies when a branch adds a kwarg/attribute to a Task SDK
@@ -1123,6 +1126,101 @@ for the precedent. If the row is committed through a separate session (so it sur
 rollback), the test must also use the `clear_audit_log_rows` fixture, otherwise the row leaks into
 other tests.
 
+## 10.36 `common.ai` model output pushed to XCom: route every path through the `output_type.py` helpers, and pick the dump mode deliberately *(narrow — only when a diff adds or changes a `providers/common/ai` path that pushes a pydantic model into XCom; Request changes)*
+
+**Scope gate**: `providers/common/ai` operators/utilities that turn model output into an XCom value.
+Companion to 10.24 (the extra-`xcom_push` guard) and 10.37 (check each path's released behavior
+before unifying paths into one helper).
+
+- **Helper provenance**: the helpers named here (`is_model_dump_required`, `dump_output_for_xcom`
+  in `providers/common/ai/.../utils/output_type.py`) come from apache/airflow #74695; confirm they
+  exist on the base branch before citing them, and otherwise apply the same decisions to
+  whatever the branch has.
+- **Never hand-roll `serialize_output and isinstance(output, BaseModel)`.** Decide whether a dump
+  is required through the shared check (`is_model_dump_required`). The worker only registers
+  classes that `iter_pydantic_models(output_type)` can find; with a `list` / `tuple` /
+  `ToolOutput` `output_type` it finds none, so the model must be dumped to a dict or the
+  downstream task fails with "not found in allow list". A subclass that overrides `execute` (e.g.
+  `LLMFileAnalysisOperator`) does not inherit the parent's decision — it must call it itself.
+- **Enumerate every site that decides whether to dump** when adding a return path or an operator,
+  including those inside utilities (`rehydrate_pydantic_output`), not just the ones the reviewer
+  named (`change-site-enumeration`).
+- **Dump mode — the one decision rule (10.37 refers back to it):**
+  1. Is a dump required at all? Only when the shared check says so (above).
+  2. Default: python-mode — `model_dump()` for a top-level model, `TypeAdapter(Any).dump_python(...,
+     mode="python")` for list / tuple / dict (except the plain list / tuple case marked
+     Unconfirmed below) — which keeps `date`, `Decimal`, `UUID` as their
+     types (released behavior; see 10.37).
+  3. Switch the **whole** output to JSON-mode (`to_jsonable_python(output, by_alias=False)`, in
+     `dump_output_for_xcom`) only where python-mode cannot work: a model sits in a set, frozenset
+     or dict key at any depth (the dumped model is a dict → `TypeError: unhashable type:
+     'dict'`; the walker `_iter_models_in_output` marks these `in_set=True`), or the worker
+     cannot register the class. Such outputs get string dates, which the docs must state.
+  An earlier version of the helper (#74695 round C10) used JSON-mode everywhere because
+  python-mode leaves `HttpUrl` / `Path` / `Enum` as objects that `airflow.sdk.serde.serialize`
+  can reject; round C11 narrowed it to the rule above (see 10.37).
+  Unconfirmed: whether a plain `list` / `tuple` output (whose classes the worker's
+  `iter_pydantic_models` lookup does not find, per the first bullet) counts as "worker cannot
+  register the class" for step 3 or stays python-mode — the notes only establish that such a model
+  must become a dict. Compare with the helper's actual behavior once #74695 is merged, and don't
+  assert either mode for that shape until then.
+- **Tests**: cover set, frozenset, set inside a list, frozenset inside a dict value, and a model
+  as a dict key (the last two are the ones a top-level-only test misses; a review caught the
+  dict-key case), and feed at least one result to the real `serde.serialize` instead of
+  asserting on the dump alone.
+
+## 10.37 Before unifying several return paths into one helper, read each path's behavior in the last release tag *(narrow — when a diff folds divergent paths of a released, stable-listed operator into a shared helper; Request changes)*
+
+Companion to 10.36 (which dump mode; this one: whether a path may change at all).
+
+For each path being folded in, read what it did in the last **released** version —
+`git show <last-release-tag>:<path>` (e.g. `providers-common-ai/1.0.0`) — before deciding which
+paths can share one mode. A stable-listed operator's behavior may not change in a minor release,
+and "make the helper uniform" often silently changes some paths. Build a table: path × released
+behavior (`file:line`) × the helper's new behavior; for every row that differs, ask "can a user
+of the released version see the difference?"
+
+Case (#74695, `dump_output_for_xcom`): 1.0.0 used python-mode `model_dump()` on every path, with
+one extra fork on the agent human-in-the-loop path ("class not registered"). The first unification
+used JSON-mode everywhere, so with `serialize_output=True`, and on the no-walker path, `date` /
+`Decimal` / `UUID` fields turned into strings — a regression for a minor upgrade (downstream
+`inv["due"] < today` raises `TypeError`). The fix applied 10.36's rule: JSON-mode only where
+python-mode cannot work (model in a set / dict key, or class not registrable by the worker); keep
+`model_dump()` elsewhere. Also check whether two
+paths were already merged into one boolean at operator level (there,
+`serialize_output or not _CORE_WALKER`) before assuming the helper has to tell them apart: in
+1.0.0 those two had the same behavior, so splitting them was unnecessary.
+
+## DB portability and concurrency: four review checks *(narrow — when a diff touches a scheduler timer callback, a `DELETE` built from a subquery, Postgres error-code handling, or a unique-constraint get-or-create; Request changes)*
+
+- **A scheduler timer that queries the DB and recomputes from scratch each round gets
+  `non_fatal=True`.** For `timers.call_regular_interval` callbacks where skipping one round is
+  harmless, leave it unset and a `statement_timeout` escapes `timers.run()`, `_execute` re-raises,
+  and the `SchedulerJob` exits. Precedent: #69487 (`_remove_unreferenced_triggers`,
+  `_reap_stale_connection_tests`); raised again in the #75404 review. Check it whenever a timer is
+  added or changed.
+- **Feed a `DELETE` from `.subquery()`, not `.cte()`.** In `airflow-core`, for
+  `delete(...).where(col.in_(select(q.c.x)))`, Vitess/PlanetScale reject a `WITH` inside
+  `DELETE`. A query that is only referenced by `SELECT`s, even several times, may stay a CTE
+  (#75127; pointed out in the #75404 review).
+- **Postgres error codes: read `pgcode` (psycopg2) *and* `sqlstate` (psycopg3).** Airflow's default
+  driver is psycopg3 (`_USE_PSYCOPG3` in `airflow-core/src/airflow/settings.py`: `find_spec("psycopg")`
+  present). `DeadlockDetected` is `orig.pgcode` on psycopg2 but `orig.sqlstate` (`"40P01"`) on
+  psycopg3, whose `args` hold only the message; MySQL (pymysql) uses `args[0]` (an int such as
+  1213). A check that reads only `pgcode` returns False on the default driver, and a test with a
+  `Mock` carrying a fake `pgcode` cannot show it. Test with real `psycopg.errors.*`
+  (`pytest.importorskip` inside the test function), and set `sqlstate=None` explicitly on a
+  `Mock` (Mock attributes are truthy by default). The sibling `is_lock_not_available_error` had
+  the same gap when this was found.
+- **A unique-constraint race loser retries the whole get-or-create, not just the `SELECT`.** The
+  winner may already have been consumed (scheduler sets `created_dag_run_id`, a validator clears
+  the key), releasing the constraint so a re-`SELECT` returns `None` and the code still raises.
+  Re-run "find latest pending → `INSERT`" each round, rebuilding the object (it can't be reused
+  after the savepoint rolls back), and bare-`raise` on the last round so the original traceback
+  survives. A mock that returns `None` can't show this: the test must assert DB state, not
+  `call_count`, and reproduce "consumed after the `IntegrityError`, before the re-query" on a
+  real DB.
+
 ## Don't proliferate example Dags — fold into an existing one
 
 When a PR demonstrates a new trigger / operator / scheduling pattern,
@@ -1268,6 +1366,11 @@ change being made. Older `uv` writes explicit `marker = ...` on dependency
 entries that newer `uv` omits or normalizes away, so re-locking with an
 older `uv` than the one that generated the committed lock rewrites the whole
 file into the older serialization format.
+
+For the rebase-time procedure — restore `main`'s lock, then a plain minimal `uv lock` (no
+`rm uv.lock`, no `--upgrade`) — and how to verify it per package, see
+[`verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)
+("Minimal re-lock …").
 
 **Check before locking:**
 

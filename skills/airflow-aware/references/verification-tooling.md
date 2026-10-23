@@ -519,6 +519,31 @@ manual`'s `mypy-providers` hook surfaces the same false failure.
 5. Worth filing upstream as a local-environment defect, but it never blocks
    a PR whose own mypy is clean on the host.
 
+### `check-provider-yaml-valid` failing with an `ibm-db` `arch_` `NameError` is a stale CI image, not your `provider.yaml`
+
+The hook runs *inside* the Breeze CI image. When `Dockerfile.ci` changed and
+the image wasn't rebuilt, it fails for reasons unrelated to `provider.yaml`
+content: it prints "important files are modified … since last time image was
+built" / "Likely CI image needs rebuild", the rebuild prompt is declined by the
+forced `no` answer, the in-container `uv sync --no-dev` then fails building
+`ibm-db` with `NameError: name 'arch_' is not defined` and ends in `Error 1
+returned`. The output contains **no** provider.yaml validation message; the
+`Run mypy for providers (manual)` hook fails from the same root cause. On this
+arm64 hosts the image can't be rebuilt (previous entry), so the hook yields no
+real result locally — record it as an environment limit.
+
+Attribute it instead of reading the 600-line output: run the same hook on a
+file you did **not** change
+(`prek run check-provider-yaml-valid --files providers/amazon/provider.yaml`);
+failing on the same line proves it's unrelated to your diff. Don't filter the
+output with grep to decide. To land the commit: `git commit --no-verify`, and
+separately run the commit-msg hook that `--no-verify` also skips
+(`check-no-conventional-commit-message`, via `--hook-stage commit-msg
+--commit-msg-filename <file>`). A *real* provider.yaml error (unregistered
+module, wrong key set) looks different — see
+[`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+(new hooks module registration).
+
 ## 4. Attribution — don't accept a red's cause without proving it
 
 ### A scoped test run being red doesn't mean your diff caused it
@@ -550,6 +575,89 @@ and make the configured command a one-liner that invokes it
 (`/bin/sh /abs/path/to/run-tests.sh`). Verify by testing the way the harness
 actually runs it, not via an interactive shell — a shell-eval green proves
 nothing about argv-exec.
+
+Prefixes a provider/breeze `test-command` usually needs, each written with
+the absolute `/usr/bin/env` so no shell is involved (the full command shape:
+`/usr/bin/env AIRFLOW_HOME=<scratchpad>/airflow-home uv run --frozen --project
+providers/<p> python -m pytest <files> -q`; `mkdir -p` the home first):
+
+- **`AIRFLOW_HOME=<empty dir>`** — without it, a sqlite DB already sitting under the
+  default home makes the whole batch **ERROR at setup** rather than fail
+  (`table callback_request already exists`, `index idx_xcom_key already exists`;
+  e.g. 205 errors, 0 tests run), which the Stop hook reads as "suite never ran".
+  The residue/corruption rules and the per-agent-home recipe are in the next
+  sections ("Every worktree shares one sqlite test DB", "A new worktree needs a
+  scoped test command") — don't restate them here.
+- **`COLUMNS=200`** — the hook's environment has `COLUMNS=0`, so rich falls back to
+  80 columns and wraps long lines. A test asserting a contiguous string that
+  contains a long `tmp_path` then fails only under the hook (breeze's
+  `test_shim_version_check.py::test_warn_if_shim_outdated_older_installed`
+  wraps `needs to` / `be upgraded`) while every manual run is green. Put
+  `/usr/bin/env COLUMNS=200 uv run pytest -x` in the untracked
+  `dev/breeze/.claude/test-command`; don't edit the test (backport branches
+  shouldn't carry it) and don't add it to `.claude/known-test-failures`. When
+  "hook red, manual green", add `--junitxml=<scratchpad>/hook-junit.xml` to the
+  command to capture the real failure message before concluding anything.
+- **`python -m pytest`, not `pytest`** — in `providers/common/ai`,
+  `uv run --project providers/common/ai pytest <path>` can fail with
+  ``Failed to spawn: `pytest` `` (os error 2) while `python -m pytest` works
+  (it doesn't depend on a console-script entry point). Observed only in
+  common.ai; recheck before generalizing to another provider.
+
+Verify with `shlex.split` + `subprocess.run` and `COLUMNS=0` in the environment,
+never `bash -c`.
+
+### Code that branches on a 3.3-only SDK symbol: simulate the old SDK before calling it done, and keep 3.3-only imports out of test-module top level
+
+Compat jobs run the provider against Airflow 2.11 / 3.0 / 3.1 / 3.2, where
+3.3-only symbols (`iter_pydantic_models`,
+`SUPPORTS_OPERATOR_DESERIALIZATION_WALKER`, `NEVER_EXPIRE`,
+`airflow.sdk.serde` helpers, …) don't exist. A dev environment that has them
+verifies none of that. Three rules, each from a case where a maintainer's
+"please handle <3.3 compatibility" came back more than once (#74396, #74695):
+
+1. **Before declaring done on code that branches on whether such a symbol
+   exists, rerun under a simulated old SDK.** Write a pytest `-p` plugin
+   (scratchpad) that, in `pytest_configure`, deletes **every** symbol the
+   target version lacks — the flag *and* the function together. Deleting only
+   one produces a self-contradictory environment and a false failure. Confirm
+   against the real old source (`git show task-sdk/<version>:<path>`) that the
+   deleted symbols truly don't exist there. It is a simulation: the pushed
+   Compat job stays the final verdict. Case: in #74695 a helper returned `True`
+   when `iter_pydantic_models` was missing; the 2.11.1 / 3.0.6 / 3.1.8 / 3.2.2
+   Compat jobs went red on 11 tests at once, because all three roles had only
+   run where the symbol exists.
+2. **A test that really exercises 3.3-only behavior needs
+   `@pytest.mark.skipif(not AIRFLOW_V_3_3_PLUS, reason=...)`** (flag from
+   `tests_common.test_utils.version_compat`; same shape as
+   `operators/test_llm.py`'s `requires_typed_xcom`). Patching the module's own
+   `AIRFLOW_V_3_3_PLUS` to `True` only fools the module's gate: if the code
+   then lazily imports a 3.3 symbol (e.g. `TaskStateStoreUsageBudget.save()`
+   importing `NEVER_EXPIRE`) inside a `try/except` in `src`, the `ImportError`
+   is swallowed and the test fails quietly (`assert_called_once` sees 0
+   calls) instead of erroring. Tests that only hit mocks are fine. Don't make
+   the helper return a special value on old versions to get a test green.
+3. **Don't import a 3.3-only module at test-file top level.** A top-level
+   `from airflow.sdk.serde import deserialize, serialize` fails collection on
+   the older versions, and pytest stops with `Interrupted: N errors during
+   collection` — the *whole provider's* tests don't run, including unrelated
+   ones. Put the import in the file's existing
+   `try: from airflow.sdk.serde import SUPPORTS_OPERATOR_DESERIALIZATION_WALKER as _CORE_WALKER`
+   / `except ImportError: _CORE_WALKER = False` block (ruff isort merges it
+   into a parenthesized import); grep every use of the names first and confirm
+   each user test is gated by a skipif. Verify with a plugin that sets
+   `sys.modules["airflow.sdk.serde"] = None` in `pytest_collectstart` and run
+   `--collect-only -q` on the file: the old shape must ERROR, the fixed shape
+   exit 0.
+
+How this fits the "check the floor, not just the ceiling" paragraph below
+(which says *not* a bare `try`/`except`): the `try`/`except ImportError` here
+only supplies the flag/symbols so the module imports at all; **the gate is the
+skipif** on each test that depends on them. A `try`/`except` that is the only
+thing standing between an old version and a silently-passing or silently-wrong
+test is the shape that paragraph rules out. The `AIRFLOW_V_3_3_PLUS` convention
+itself is in
+[`code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md).
 
 ### A PR that raises a dependency floor makes an unsynced venv produce a false red — and defeats the usual base-commit attribution check
 
@@ -618,7 +726,10 @@ newer version installed, so this gap is invisible locally. Follow the
 existing shape rather than inventing one: a version constant plus
 `pytest.mark.skipif` (e.g. `ALL_DECLARED_VENDORS_AVAILABLE_FROM` in
 `providers/common/ai/tests/unit/common/ai/test_provider_metadata.py`) — not a
-bare `try`/`except` that silently swallows the gap.
+bare `try`/`except` that silently swallows the gap. (A `try`/`except
+ImportError` that only sets a flag so a test module still imports is not that
+shape, as long as a skipif gates the tests — see the 3.3-only SDK symbol
+section above.)
 
 **Don't stop at making the assertion pass.** Widening it in only one
 direction (e.g. dropping a strict two-way equality to a one-way subset check)
@@ -630,13 +741,23 @@ canary (§6 above) before considering the fix done.
 ### `uv.lock` during a rebase, and when `prek` commit blames it on the RST license hook
 
 **Rebase.** On an apache/airflow branch, a conflicted `uv.lock` can show up
-staged as *deleted* (the repo's rule is "delete and regenerate on conflict").
+staged as *deleted* (AGENTS.md says to delete and regenerate on conflict).
 `git rebase --continue` would then commit that deletion into history. Restore
 the base version mid-rebase with `git checkout HEAD -- uv.lock`, resolve the
-other conflicts, continue, and only after the rebase regenerate with the
-repo-pinned uv (`rm uv.lock && uv lock`) in a **separate commit**. Between the
-rebase finishing and the regeneration, `uv lock --check` fails because the new
-dependencies aren't in the lock yet — that is the expected state.
+other conflicts, continue, and only after the rebase re-lock **minimally** in a
+**separate commit**: restore the target branch's (`main`'s) `uv.lock`, then run
+plain `uv lock` with the repo-pinned uv (`uvx uv@<pin> lock`) — no `rm`, no
+`--upgrade`. Between the rebase finishing and the re-lock, `uv lock --check`
+fails because the new dependencies aren't in the lock yet — that is the
+expected state.
+
+**Don't follow the `rm uv.lock && uv lock` wording** that the repo's AGENTS.md
+and the uv-lock-rebase-notice bot suggest for a conflicted lock: it re-resolves
+the whole file and drags unrelated upgrades into the PR (#74026 round 4: 52
+unrelated packages, e.g. `pydantic-ai-slim` 2.56→2.57, `pyexasol` 2→3, which in
+turn forced a vendor-declaration and gate change), and the reviewer rejected it.
+`rm` is only the fallback for when plain `uv lock` on top of the restored base
+lock cannot resolve.
 
 **`prek` commit blocked by "Add license for all RST files".** In commit mode,
 `prek` can report that hook as failed ("files were modified by this hook")
@@ -648,6 +769,81 @@ duration of the commit, then immediately `git update-index
 --no-assume-unchanged uv.lock` and `git checkout -- uv.lock`. Unknown (not
 investigated): which hook does the rewrite, and whether a clean `main`
 behaves the same.
+
+### Minimal re-lock: how to verify it, and keeping the venv, the base diff and nested `uv` in line with the lock
+
+The pinned-`uv` rules (marker churn, `uvx uv@<pin>`, the decisive base-lock
+test) are in
+[`review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+("`uv` version must match the repo pin …") — this section only adds what
+the rebase paragraph above needs.
+
+- **Verify a minimal re-lock per package, not by eyeballing.** After
+  restoring `main`'s lock and running plain `uv lock`, compare the two locks with
+  `python3 -I` + `tomllib`, package by package (name + version + marker
+  entries). The only allowed differences are the new packages and the new
+  extra/specifier entries of your own change. Run the comparison once on a
+  known-wrong lock first (positive control): it must catch a version bump and a
+  missing second `pyvespa` entry. Two `pyvespa` entries (e.g. `<3.14` and
+  `>=3.14`) are a Python-version split, not duplicates — don't delete one. The
+  authoritative signal is `uv lock --check` exit 0. If the lock goes back to
+  `main`'s `pydantic-ai-slim` version, revert the vendor declarations and the
+  `ALL_DECLARED_VENDORS_AVAILABLE_FROM`-style gate to `main`'s too
+  (`provider.yaml`, `get_provider_info.py`, `test_provider_metadata.py`), and
+  write "tested version" claims in docs from the lock's actual value.
+- **After restoring/downgrading the lock, align the `.venv` before any test
+  that reads installed versions.** The `.venv` doesn't follow the lock; a drift
+  test such as `test_provider_metadata.py` (reads the installed
+  `pydantic-ai-slim`) then runs against the old environment and gives a false
+  red or green, and the Stop hook eats the same false red. List mismatches with
+  `python3 -I` + `tomllib` (lock) vs `importlib.metadata` (`.venv`), then
+  `uv pip install --python <worktree>/.venv/bin/python --no-deps <pkg>==<lock
+  version>` for just those packages (this touches only the ignored `.venv`,
+  never `uv.lock`), and re-read `importlib.metadata` to prove they now match.
+  Check `shasum uv.lock` is unchanged and `uv lock --check` exits 0 afterwards;
+  treat hook reds during the gap as noise (don't write them into
+  `.claude/known-test-failures`).
+- **Judge "what did this PR change in `uv.lock`" against the PR's own parent,
+  not `git merge-base HEAD origin/main`.** A local `origin/main` that is stale
+  while the branch sits on newer upstream puts the merge-base on an old commit
+  and the diff fills with thousands of lines of upstream bumps (~7,600 lines
+  seen where the PR was +27/−49). Count the PR's commits
+  (`git log --oneline`), then `git diff HEAD~N -- uv.lock` and compare
+  name + version per package.
+- **A broken base lock isn't your branch's fault.** If `uv run`/`uv sync`
+  report `Failed to parse uv.lock` or `Found duplicate package <pkg>`, check
+  `git diff <base> HEAD -- uv.lock` (empty ⇒ not yours) and
+  `git show <base>:uv.lock | grep -c '^name = "<pkg>"'` against
+  `origin/main`'s. If `origin/main` already fixed it, rebase. Otherwise,
+  re-lock with the repo-pinned uv in its own commit and prove it with
+  `uvx uv@<pin> lock --check` plus `uv sync --frozen --project <p> --dry-run`.
+  To keep verifying meanwhile, point `.claude/test-command` at
+  `<worktree>/.venv/bin/python -m pytest` (still behind `/usr/bin/env
+  AIRFLOW_HOME=<empty dir>`, since the hook has no shell), use `uvx ruff` for
+  lint, and if the mypy hook blocks the commit because its `uv sync --frozen`
+  fails, `--no-verify` under the existing per-commit authorization rule below,
+  stating it in the report. Don't edit `uv.lock` to make it parse.
+- **Nested `uv run` inside pytest can pick a too-old `.venv/bin/uv`.**
+  `devel-common`'s `pytest_plugin.py` runs
+  `uv run update_providers_dependencies.py` at import; the inner `uv`
+  resolves to `.venv/bin/uv`, and if that is below the repo's required version
+  (log line 1: `Required uv version … does not match the running version`) the
+  inner call exits 2 and the whole run dies before collection. The
+  trailing `CalledProcessError` is only the consequence, and running that script
+  alone uses the system `uv` and succeeds, so it looks transient. Fix:
+  `uv sync --frozen --project providers/<p>` (touches only the ignored `.venv`,
+  but removes other providers' packages — re-sync to test another provider).
+  Editing `PATH` instead is an untested inference.
+- **Bumping the repo's `uv` version: `dev/breeze/uv.lock` is a separate
+  lock** (`uv` is a transitive dependency of `hatch` there, not listed in its
+  `pyproject.toml`), easy to miss after the root files are updated. From
+  `dev/breeze`: `uvx uv@<version> lock --upgrade-package 'uv==<version>'` (a
+  bare `--upgrade-package uv` jumps to the latest, not the pin), then
+  `uvx uv@<version> lock --check` (exit 0). Expect the diff to be only `uv`'s
+  version/URL/hashes plus `revision` if the new `uv` bumps the format. Close
+  out with `git grep -n -F '<old version>' -- . ':!*uv.lock'` and a
+  `grep -c` on both locks (remaining lock hits may be a hash coincidence — read
+  the line). Don't `grep -r` the whole monorepo.
 
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 
@@ -849,25 +1045,20 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
 1. Build only the affected distribution, not the whole docs site:
 
    ```bash
-   ANSWER=no breeze build-docs <provider short name> --docs-only --clean-build
+   ANSWER=no breeze build-docs --package-filter apache-airflow-providers-<x> --one-pass-only --clean-build
    ```
 
-   Use the short name (e.g. `common.ai`), not the full distribution name
-   (`apache-airflow-providers-common-ai`) — the full name exits 2. The
-   flags themselves are `--docs-only` and `--clean-build` — the
-   plausible-looking `--doc-only` / `--clean` also exit 2, with a usage
-   error and a "Did you mean" suggestion. This is a repeat mistake (plan
-   text got it wrong from memory on 2026-07-14 and again on 2026-09-11) —
-   look the flags up rather than typing them from recollection.
-
-   To reproduce a CI docs-spelling failure (`Incorrect Spelling:
-   '<word>'`) locally, run the same command with `--spellcheck-only`
-   (`-s`) instead of `--docs-only` — it only spell-checks, doesn't build,
-   and breeze self-reports "Forcing --one-pass-only" once scoped to a
-   single package, finishing in a few minutes with `Finished
-   spell-checking successfully` when clean. That command's exit code is
-   the authoritative verdict for this class of failure; a grep for the
-   flagged word only locates it, it doesn't prove the fix worked.
+   `--package-filter` takes the full distribution name (a glob is allowed);
+   the positional form takes the short name (e.g. `common.ai`) — passing the
+   full name positionally exits 2. The default scope already builds the Python
+   docs **and** spell-checks them, so there is no separate spelling flag: to
+   reproduce a CI docs-spelling failure (`Incorrect Spelling: '<word>'`) rerun
+   this same command, and treat its exit code as the authoritative verdict —
+   a grep for the flagged word only locates it, it doesn't prove the fix
+   worked. This is a repeat mistake (plan text typed flags from memory on
+   2026-07-14 and again on 2026-09-11): look the flags up in `breeze
+   build-docs --help` of the worktree you are in (see the flags note in the
+   last section of this chapter).
 
 2. The built output lands under
    `generated/_build/docs/apache-airflow-providers-<dist>/stable/`. Open the
@@ -893,22 +1084,14 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    `document.styleSheets.length > 0` in the page to catch an unstyled blank
    capture.
 
-5. **Order matters when you need both a spelling verdict and the rendered
-   page**: `--spellcheck-only` cleans the HTML output directory and its
-   builder emits no HTML, so any HTML an earlier `--docs-only` run left
-   behind is gone afterward — running `--docs-only` then `--spellcheck-only`
-   leaves the output directory with no `*.html` at all. A later screenshot
-   attempt then fails with `FileNotFoundError`, which looks like a build
-   failure but isn't one (both commands exited 0). Put `--docs-only`
-   **after** `--spellcheck-only` whenever the rendered HTML is the evidence
-   you need — it's the only direct signal that a new `:ref:` actually
-   resolved; a zero-hit warning grep or a bare exit code proves nothing
-   about one specific cross-reference.
+5. **The rendered HTML is the evidence for a cross-reference.** A new `:ref:`
+   resolving is only directly visible in the built page; a zero-hit warning grep
+   or a bare exit code proves nothing about one specific cross-reference.
 
 6. This machine's own ability to run `build-docs` is unrelated to whether
    its Breeze CI image can be rebuilt. `ANSWER=no breeze build-docs
-   <short-name> --docs-only` (and `--clean-build`, and `--spellcheck-only`)
-   complete with exit 0 here in a few minutes — that's a separate image
+   --package-filter apache-airflow-providers-<x> --one-pass-only` (with or
+   without `--clean-build`) completes with exit 0 here in a few minutes — that's a separate image
    from the one that fails to rebuild on arm64 (see §3's
    `breeze-ci-image-unbuildable-arm64` entry below). Don't read "the CI
    image is unbuildable on this machine" as "skip the docs build check" —
@@ -954,6 +1137,62 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
    and now (compare the added/removed lines of the affected source per push), and (b)
    whether anything the base brought in lands inside the captured region. If the captured
    region can't be established, say "probably stale/fresh" rather than "definitely".
+
+### Local docs, chart and prek recipes (companions to steps 1–6 above)
+
+- **Flags — check `--help`, the steps above may name flags your breeze lacks.**
+  In current `main` (checked in `developer_commands.py` and `breeze build-docs
+  --help` at `01907e047f5`) there is **no** `--docs-only`, `--spellcheck-only`
+  or `--python`; `--docs-only` exits with `No such option`. Select a
+  provider with `--package-filter apache-airflow-providers-<x>` (or the short
+  positional `common.ai`) plus `--one-pass-only`; the default scope already
+  builds Python docs *and* spell-checks them (steps 1–6 above use this form).
+  `--sdk-docs-only` is SDK-only. On an older release branch whose `--help`
+  still lists `--docs-only` / `--spellcheck-only`, those flags are defined there (confirmed in the `v3-1-test` / `v3-2-test` source, not run).
+- **A fresh worktree's first `breeze build-docs` is slow.** It first builds that
+  worktree's own breeze venv (~10 min, silent), then builds the CI image from
+  scratch (30+ min of apt downloads) before Sphinx starts; with a recent CI
+  image the image step takes seconds to minutes. Run it in the background,
+  output to a file:
+  `breeze build-docs --package-filter apache-airflow-providers-<x> --answer y
+  > <log> 2>&1 < /dev/null`. Without `--answer` and with a non-tty stdin, breeze
+  asks whether to build the image and aborts with `Errno 22`, exit 1 — which
+  looks like a docs failure but is the prompt. The background task's "exit 0"
+  is the wrapper's; read the real verdict from an `echo DOCS_EXIT=$?` you add
+  and from "Documentation build is successful". Spelling has no separate pass
+  line (only the sphinxcontrib-spelling install line appears), so
+  "no spelling report" is weak evidence. Verify rendering from the built HTML
+  (`generated/_build/docs/<dist>/stable/…/*.html`, newer than the rst), not by
+  grepping the rst. If it can't finish in time, say in the PR that the docs
+  build is left to CI.
+- **Host (no breeze) docs build on macOS can be a false report.**
+  `uv run --group docs build-docs` in a provider directory without the enchant C
+  library fails to load `sphinxcontrib.spelling`, reports doc-build and spelling
+  errors, and still exits 0 — nothing was verified. Look for "Finished docs
+  building successfully" and "Finished spell-checking successfully", not the exit
+  code. Local route: `brew install enchant`, set `PYENCHANT_LIBRARY_PATH` to the
+  `libenchant-2.dylib` under Homebrew's `lib` directory (`$(brew --prefix)/lib`),
+  and add every `<worktree>/shared/*/src` to `PYTHONPATH` (else
+  `ModuleNotFoundError: airflow_shared` from the `metrics_tables_from_registry`
+  extension). Homebrew's dictionary lacks `Anthropic` and yields ~55 extra
+  spelling hits, mostly unrelated to your change and never baselined against
+  `main`; decide whether a hit is yours with `git show HEAD:<file>` (does the
+  line already exist?). The breeze route needs no enchant, but another worktree
+  building at the same time competes for the Docker daemon (a CI image build once
+  stalled 70+ min).
+- **Chart tests need breeze — there is no local `helm`.**
+  `uv run --frozen --project chart python -m pytest chart/tests/...` raises
+  `FileNotFoundError: 'helm'`. Use `breeze testing helm-tests --use-xdist
+  --test-type <component>` (e.g. `airflow_core`; ~80 s, 769 passed, when the CI
+  image already exists). Don't add `--skip-image-upgrade-check --answer no`:
+  they were taken as pytest arguments (exit 4). For a mutation check, restore the
+  template to `main`'s and rerun the same command to see the matching test go red.
+- **A local `prek` older than `minimum_prek_version`** in `.pre-commit-config.yaml`
+  (currently `0.4.8`) fails with `Failed to parse .pre-commit-config.yaml`
+  (exit 2). Run `uvx prek@<required version> run --files <each file listed>`
+  instead of touching the global install; the output must actually show
+  `Passed` (not `no files to check`), and `shasum` the files before and after to
+  prove no auto-fixer changed them.
 
 ## After `git worktree move`: stale absolute paths cause false failures
 
