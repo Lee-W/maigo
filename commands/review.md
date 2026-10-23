@@ -136,6 +136,9 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --topic "Review draft: <PR title>"`
 取得落檔路徑（`.maigo/review/<id>/draft.md`），把草稿逐字寫進那個路徑，並寫進 board 細節檔的
 `## 筆記`。只起草、不送出。
+board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
+要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
+工作筆記不要混進去，否則會原樣貼上 GitHub。
 
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
