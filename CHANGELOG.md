@@ -5,6 +5,16 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.67.0 (2026-10-23)
+
+### Feat
+
+- **skills**: add python-aware language layer and move Python conventions out of strict-review
+
+### Fix
+
+- **artifact-path**: suggest the first free attempt instead of always attempt 2
+
 ## v0.66.0 (2026-10-23)
 
 ### Feat
