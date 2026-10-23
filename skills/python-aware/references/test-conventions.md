@@ -876,3 +876,18 @@ repo's wordlist — whitelisting suppresses legitimate catches elsewhere in the
 repo. Verify a candidate first with `uvx codespell <file-or-scratch>` (exit
 0 = unflagged). The test only needs *an* invalid value; it doesn't need to be
 a realistic misspelling of the valid one.
+
+---
+
+## Unix domain socket paths in tests are length-limited: don't build them under pytest's `tmp_path`
+
+A unix domain socket path is limited to about 104 bytes on macOS (`sockaddr_un`) and 108 on
+Linux. pytest's `tmp_path` is a deep directory that often exceeds that, and the failure is
+subtle: `bind` fails, the socket file never appears, and the server process looks alive while
+nothing can connect.
+
+How to apply: for a test that opens a unix socket (for example `nvim --listen <path>`), create
+a short directory with `tempfile.mkdtemp()` (it lives directly under the system temp dir),
+put the socket there, and clean the directory up yourself (a fixture with `yield` plus
+`shutil.rmtree`). If a socket-based test hangs or can't connect only on some machines, check the
+path length first.

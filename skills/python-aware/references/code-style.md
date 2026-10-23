@@ -329,3 +329,26 @@ with the behavioral statement: "any time-of-day or timezone offset in the
 value is ignored; only the calendar date is used." Keep the *contract* (what
 goes in, what the effect is), drop the *how*. Verify the real behavior before
 documenting it — the mechanism you assume may be wrong.
+
+---
+
+## Subprocess
+
+### Check `returncode != 0` before reading `stdout`
+
+After calling a CLI subprocess, check `returncode` first and read `stdout` second. An empty
+`stdout` does not mean success: `git status` outside a git repository exits 128 with empty
+stdout, so a check that only looks at stdout reads that as "clean".
+
+In a fail-open helper the `returncode` check must come before the stdout check:
+
+```python
+result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+if result.returncode != 0:
+    return True  # command failed: fail open, don't assume "clean"
+return bool(result.stdout.strip())
+```
+
+How to apply: when writing or reviewing subprocess code, ask "what does this branch do when the
+command itself fails?" and add a test that runs it where the command fails (for example a
+`tmp_path` that is not a git repository).

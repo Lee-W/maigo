@@ -61,3 +61,25 @@ plain AST/text check and hurts portability; `>=3.10` ("3.10 or newer") is
 what's actually meant. The shebang matters because the runner execs the entry
 file directly — a file with no shebang gets run under `/bin/sh`, which chokes
 on Python syntax.
+
+## Coverage: the `--cov` target must have the same shape as `[tool.coverage.run] source`
+
+When measuring one module's coverage from a single test, give `--cov` the same kind of
+target the config's `[tool.coverage.run] source = [...]` uses. With `source = ["mypkg"]`
+(a module name):
+
+- ✅ `uv run pytest tests/test_x.py::test_y --cov=mypkg.permission --cov-branch --cov-report=term-missing`
+- ❌ `--cov=src/mypkg/permission` (a path) → **silently reports 0%**, exit code still 0
+
+**Why this matters**: a false 0% looks exactly like a real 0% — no warning, no non-zero exit
+code. If you are deciding "is this code exercised at all?", you reach the opposite conclusion
+and may add a test that was never needed.
+
+How to apply:
+
+- Read `[tool.coverage.run] source` (in `pyproject.toml` or `.coveragerc`) first and match its
+  shape (module name vs. path) in `--cov`.
+- When you get 0%, suspect the target before concluding "not covered": re-run with a test that
+  certainly exercises the code and confirm the number moves.
+- To judge branch coverage, pass both `--cov-branch` and `--cov-report=term-missing`; without
+  `--cov-branch` the report cannot show `A->B` arcs.
