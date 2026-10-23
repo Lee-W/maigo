@@ -475,6 +475,98 @@ class TestResolveForWrite:
         assert result.existing_topic == "Plan: something else"
         assert result.suggested_path == ".maigo/plan-42-2.md"
 
+    def test_conflict_suggests_next_attempt_when_attempt_2_taken_by_other_topic(
+        self, tmp_path: Path
+    ):
+        # T1：-2 已被另一個主題占用 → 候選不能再指向 -2，要遞增到 -3。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
+        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
+        )
+        assert result.status == "conflict"
+        assert result.path is None
+        assert result.suggested_path == ".maigo/plan-42-3.md"
+
+    def test_conflict_suggests_attempt_2_when_it_already_has_same_topic(
+        self, tmp_path: Path
+    ):
+        # T2：-2 的 H1 與 incoming 相同 → 候選就是 -2，status 仍是 conflict
+        # （-1 檔屬於別的主題；同意閘門不因找到同主題檔而放寬）。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
+        (maigo_dir / "plan-42-2.md").write_text("# Plan: C\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
+        )
+        assert result.status == "conflict"
+        assert result.path is None
+        assert result.suggested_path == ".maigo/plan-42-2.md"
+
+    def test_nested_conflict_suggests_next_attempt_when_attempt_2_taken(
+        self, tmp_path: Path
+    ):
+        # T3：巢狀 kind 同樣遞增，且留在同一個分目錄裡（rubric-3.md，不是 42-3/）。
+        folder = tmp_path / ".maigo" / "review" / "42"
+        folder.mkdir(parents=True)
+        (folder / "rubric.md").write_text("# Review rubric: A\n", encoding="utf-8")
+        (folder / "rubric-2.md").write_text("# Review rubric: B\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "review-rubric",
+            "Review rubric: C",
+            url=_URL,
+            home_repo=_HOME_REPO,
+            cwd=tmp_path,
+        )
+        assert result.status == "conflict"
+        assert result.suggested_path == ".maigo/review/42/rubric-3.md"
+
+    def test_conflict_suggests_first_free_attempt_not_highest_plus_one(
+        self, tmp_path: Path
+    ):
+        # T4：-2 被占用、-3 空著、-4 被占用 → 取第一個空號 -3，不是最大號 + 1。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
+        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        (maigo_dir / "plan-42-4.md").write_text("# Plan: D\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
+        )
+        assert result.suggested_path == ".maigo/plan-42-3.md"
+
+    def test_conflict_suggests_past_two_consecutive_taken_attempts(
+        self, tmp_path: Path
+    ):
+        # T7：-2、-3 都被其他主題占用 → 要連續跳過，取 -4（抓「只跳一次」的實作）。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        for name, topic in (("", "A"), ("-2", "B"), ("-3", "D")):
+            (maigo_dir / f"plan-42{name}.md").write_text(
+                f"# Plan: {topic}\n", encoding="utf-8"
+            )
+        result = ap.resolve_for_write(
+            "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
+        )
+        assert result.suggested_path == ".maigo/plan-42-4.md"
+
+    def test_conflict_suggestion_treats_attempt_without_h1_as_available(
+        self, tmp_path: Path
+    ):
+        # T5：-2 存在但沒有 H1 → 與主路徑 status="new" 的判準一致，視為可用。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
+        (maigo_dir / "plan-42-2.md").write_text("no heading here\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
+        )
+        assert result.status == "conflict"
+        assert result.suggested_path == ".maigo/plan-42-2.md"
+
     def test_legacy_exists_flag_when_old_fixed_name_present(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
@@ -578,6 +670,31 @@ class TestCli:
             "conflict_owner: Plan: something else",
             "suggest: .maigo/plan-42-2.md",
         ]
+        assert not any(line.startswith("path:") for line in out)
+
+    def test_conflict_suggest_line_skips_taken_attempt(self, tmp_path: Path, capsys):
+        # T6：CLI 路徑也拿到遞增後的候選；status / exit 3 / 不印 path: 不變。
+        maigo_dir = tmp_path / ".maigo"
+        maigo_dir.mkdir()
+        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
+        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        exit_code = ap.main(
+            [
+                "plan",
+                "--topic",
+                "Plan: C",
+                "--url",
+                _URL,
+                "--repo",
+                _HOME_REPO,
+                "--cwd",
+                str(tmp_path),
+            ]
+        )
+        out = capsys.readouterr().out.splitlines()
+        assert exit_code == 3
+        assert "suggest: .maigo/plan-42-3.md" in out
+        assert out[0] == "status: conflict"
         assert not any(line.startswith("path:") for line in out)
 
     def test_legacy_exists_line_appended(self, tmp_path: Path, capsys):

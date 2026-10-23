@@ -46,20 +46,20 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    使用者，不要自作主張換名或覆寫。`status: same_topic` 才是安全續寫；
    `status: new` 直接照 `path:` 那行的路徑寫入。
 
-   **`suggest:` 只是單層候選（第 2 個 attempt），不會檢查這個路徑本身是否也
-   已被別的主題占用**——非巢狀 kind（`plan`）長成 `plan-<id>-2.md`；巢狀
-   kind（`review` / `review-rubric` / `review-draft` / `pr-comments` /
-   `triage-rubric`）後綴落在檔名層、不是目錄層，長成
-   `review/<id>/rubric-2.md` 這類，不是另開一個 `review/<id>-2/` 資料夾。
-   如果同一個 identifier 底下已經有 `-2`、`-3` 甚至更多份不同主題的產物
-   （常發生在同一個 branch/PR 上跑過多輪 `/maigo:go`、`/maigo:quick` 之
-   後），`suggest:` 給的路徑可能撞到其中一份。使用 `suggest:` 之前，由有 Bash
-   的寫手或代辦的 orchestrator `ls` 對應資料夾（非巢狀 kind 是
-   `.maigo/`；巢狀 kind 是 `.maigo/review/<id>/` 或 `.maigo/issue/<id>/`）
-   加讀 H1 核對，確認候選路徑真的沒被佔用，必要時往下遞增到 `-3`、`-4`；
-   不要對 `suggest:` 的路徑照單全收。**這一步要有 Bash 才做得到**——沒有
-   Bash 的 agent（🩵 Tomori）永遠不會走到這裡：conflict 一律由 orchestrator
-   在 spawn 她之前處理掉，處理結果連同最終路徑才交給她。
+   **`suggest:` 已經幫你往下找過空位**：它是從第 2 個 attempt 起，第一個
+   「檔案不存在、沒有 H1、或 H1 與本次主題相同」的路徑，不是固定的 `-2`。
+   同一個 branch/PR 跑過多輪 `/maigo:go`、`/maigo:quick` 留下 `-2`、`-3`……
+   不同主題的產物時，候選會自動跳過它們——非巢狀 kind（`plan`）長成
+   `plan-<id>-3.md` 這類；巢狀 kind（`review` / `review-rubric` /
+   `review-draft` / `pr-comments` / `triage-rubric`）後綴落在檔名層、不是目錄
+   層，長成 `review/<id>/rubric-3.md` 這類，不是另開 `review/<id>-3/` 資料夾。
+   候選若剛好是 H1 與本次主題相同的既有檔，代表以前已經用同一個主題續寫過，
+   status 仍是 `conflict`，只是在 `suggest:` 提示可以接著用那一份。
+
+   **不論候選長什麼樣，都要經使用者同意才使用**——找到空位不等於可以直接寫入，
+   同意閘門不因此放寬。**這一步要有 Bash 才做得到**——沒有 Bash 的 agent
+   （🩵 Tomori）永遠不會走到這裡：conflict 一律由 orchestrator 在 spawn 她之前
+   處理掉，處理結果連同最終路徑才交給她。
 
 4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）與分目錄前扁平檔
    （`flat_exists:` 那行指的檔案，只有巢狀 kind 才可能有）都只可讀、不可當

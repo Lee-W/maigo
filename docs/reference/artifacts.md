@@ -9,7 +9,7 @@
 
 所有 kind 全部由 `scripts/artifact_path.py` 的 `_KNOWN_KINDS` 單一正典定義，
 `resolve_for_write()` 負責一般產物的歸屬檢查（最終 review 報告用下述 publisher）——同一路徑撞到不同主題時回
-`status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選路徑，
+`status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選路徑（從第 2 個 attempt 起第一個未被其他主題占用者；也可能指到 H1 相同的既有檔，status 仍是 conflict），
 不擅自覆寫。分兩種形狀：
 
 ### `plan`（扁平，`<kind>-<id>.md`）

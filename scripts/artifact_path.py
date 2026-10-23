@@ -49,8 +49,9 @@ stdout 第 1 行 `status: new|same_topic|conflict`；
 非 conflict 時第 2 行 `path: .maigo/plan-<id>.md`（巢狀 kind 則是
 `path: .maigo/review/<id>/rubric.md` 這類）；
 conflict 時第 2 行 `conflict_owner: <既有 H1>`、第 3 行
-`suggest: .maigo/plan-<id>-2.md`（候選路徑，第 2 個 attempt，須經使用者同意
-才可以用），**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可
+`suggest: .maigo/plan-<id>-<n>.md`（候選路徑：從第 2 個 attempt 起，第一個
+未被其他主題占用者——不存在、沒有 H1、或 H1 與本次主題相同的既有檔，所以
+`<n>` 可能是 2、3……；status 仍是 conflict，須經使用者同意才可以用），**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可
 寫入的 `path:` 行。舊固定檔名存在時（不論 status）多印一行
 `legacy_exists: .maigo/<kind>.md`；巢狀 kind 若存在分目錄前的扁平檔
 （`.maigo/<kind>-<id>.md`）多印一行 `flat_exists: <path>`——兩者都只供讀取
@@ -330,9 +331,26 @@ class Resolution:
     incoming_topic: str
     suggested_path: (
         str | None
-    )  # conflict 時的候選（第 2 attempt 的路徑），須經使用者同意才用
+    )  # conflict 時的候選（從第 2 attempt 起第一個未被其他主題占用者），須經使用者同意才用
     legacy_path: str | None  # 舊固定檔名存在時填，僅供讀取退路
     flat_path: str | None = None  # 巢狀 kind 的分目錄前扁平檔存在時填，僅供讀取退路
+
+
+def _first_available_attempt(
+    kind: str, identifier: str, cwd: str | Path, normalized_topic: str
+) -> str:
+    """
+    從 attempt 2 起往上找第一個「不存在、沒有 H1、或 H1 與 `normalized_topic` 相同」
+    的路徑。判準與 `resolve_for_write()` 主路徑的 `"new"` / `"same_topic"` 一致；
+    `read_topic()` 的讀取失敗照舊往上拋。目錄裡的檔案數有限，迴圈一定會終止。
+    """
+    attempt = 2
+    while True:
+        candidate = artifact_path(kind, identifier, attempt=attempt)
+        existing = read_topic(Path(cwd) / candidate)
+        if existing is None or existing == normalized_topic:
+            return candidate
+        attempt += 1
 
 
 def resolve_for_write(
@@ -349,7 +367,9 @@ def resolve_for_write(
     同一次呼叫就完成命名（四級鏈）＋ 歸屬比對：目標路徑不存在，或存在但沒有
     H1 → `"new"`；H1 與 `topic` 相同 → `"same_topic"`（續寫是安全的）；H1
     不同 → `"conflict"`，`path=None`，呼叫端必須先問使用者才能用
-    `suggested_path`。全程唯讀，不建立、不覆寫任何檔案。
+    `suggested_path`——它是從 attempt 2 起第一個不存在、沒有 H1、或 H1 與
+    `topic` 相同的路徑（找到 H1 相同的 `-k` 檔也只是候選，不改 status）。
+    全程唯讀，不建立、不覆寫任何檔案。
     """
     identifier = resolve_identifier(cwd, url=url, home_repo=home_repo)
     path_str = artifact_path(kind, identifier)
@@ -392,7 +412,9 @@ def resolve_for_write(
         path=None,
         existing_topic=existing_topic,
         incoming_topic=normalized_incoming,
-        suggested_path=artifact_path(kind, identifier, attempt=2),
+        suggested_path=_first_available_attempt(
+            kind, identifier, cwd, normalized_incoming
+        ),
         legacy_path=legacy_result,
         flat_path=flat_result,
     )
