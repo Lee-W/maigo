@@ -8,9 +8,10 @@ checkout and one of the topics below applies.
 This file covers **static** style — conventions a reader or a linter can
 check without running the code. For **execution-time** gotchas (attrs
 eq/hash conventions, serialization field-read conventions, scheduler/session
-lifecycle traps, and Python/pydantic version-skew type-system pitfalls),
-see
-[`references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/runtime-gotchas.md).
+lifecycle traps), see
+[`references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/runtime-gotchas.md);
+for Python/pydantic version-skew type-system pitfalls, see
+[`python-aware/references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/runtime-gotchas.md).
 
 ## Imports
 

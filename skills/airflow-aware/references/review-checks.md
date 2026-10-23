@@ -7,8 +7,8 @@ Outside of a review context (quick-fix / refactor), do not gate tasks on these.
 
 ## Secrets masker tests: `@pytest.mark.enable_redact` + reset before use
 
-Airflow-specific supplement to `strict-review`'s "Tests touching global state must
-reset themselves" convention (`skills/strict-review/references/test-conventions.md`):
+Airflow-specific supplement to `python-aware`'s "Tests touching global state must
+reset themselves" convention (`skills/python-aware/references/test-conventions.md`):
 a test that calls `mask_secret()` must be marked `@pytest.mark.enable_redact` (a global
 autouse fixture otherwise patches redact/mask_secret out) and must call
 `reset_secrets_masker()` before registering its own pattern — otherwise it inherits
@@ -957,7 +957,7 @@ when citing this item and cross-reference 10.12.
   native path. Write paired tests: the same value's native form and string
   form should assert the same result (cross-reference the "reject-path
   tests need one case per shape" section of
-  [`skills/strict-review/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/test-conventions.md)).
+  [`skills/python-aware/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/test-conventions.md)).
 
 ## 10.30 Two checks before touching a provider metadata schema *(Request changes)*
 

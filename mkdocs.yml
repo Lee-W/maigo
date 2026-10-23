@@ -56,6 +56,7 @@ nav:
       - strict-review: skills/strict-review.md
       - airflow-aware: skills/airflow-aware.md
       - commitizen-aware: skills/commitizen-aware.md
+      - python-aware: skills/python-aware.md
       - commit-message: skills/commit-message.md
       - failure-handling: skills/failure-handling.md
       - github-title-description: skills/github-title-description.md

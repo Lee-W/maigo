@@ -1,13 +1,14 @@
-# Airflow runtime gotchas (attrs, serialization, sessions, type-system version skew)
+# Airflow runtime gotchas (attrs, serialization, sessions)
 
 Loaded on demand by `skills/airflow-aware/SKILL.md` and
 [`references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md) —
 execution-time defects that pass a type checker and a casual read but fail
 against a specific SQLAlchemy version, Python version, or session lifecycle.
 Read this file when writing or reviewing code that touches attrs eq/hash
-conventions, (de)serialization field reads, a `create_session`/scoped-session
-boundary, or a type/version-sensitive construct (`Annotated` constraints,
-nested enums, subscripted generics, `Decimal`→`int`).
+conventions, (de)serialization field reads, or a `create_session`/scoped-session
+boundary. Python/pydantic version-skew type-system pitfalls (`Annotated`
+constraints, nested enums, subscripted generics, `Decimal`→`int`) live in
+[`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/runtime-gotchas.md).
 
 ---
 
@@ -167,116 +168,3 @@ a `suggestion` block wholesale isn't safe; run it before trusting it (same
 posture as
 [`skills/harness-discipline`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md)'s
 guidance on verifying per target rather than trusting a conclusion).
-
-## Type-system gotchas
-
-### pydantic `Annotated` field constraints: bare `= None` default, not `Field(default=None)`
-
-When a pydantic v2 field carries its validation constraints in the type via
-`Annotated[str, StringConstraints(...)] | None`, the default assignment is
-separate from the constraints — `= Field(default=None)` is then a pure
-redundant wrapper: with no other `Field()` args, it behaves identically to
-a bare `= None`. Verified empirically (pydantic 2.13.4): both forms accept
-and reject the same inputs, store the same value, and generate the same
-JSON schema (`{'anyOf': [...], 'default': None, ...}`). Because the schema
-is identical, switching between the two forms needs **no** OpenAPI/UI/ctl
-codegen regeneration.
-
-Prefer bare `= None` to match sibling optional fields
-(`access_control: X | None = None`); only reach for `Field(...)` when
-actually using one of its args (alias, description, default_factory, etc.).
-Example: `partition_key: Annotated[str, StringConstraints(pattern=r"\S",
-max_length=ID_LEN)] | None = None` in `CreateAssetEventsBody`.
-
-### Nested-enum annotation needs the qualified name; the default value can stay bare
-
-When an enum (or any class) is nested inside another class — e.g. `class
-Window:` with `class Direction(str, Enum): ...` inside it — a method
-annotation written as the bare nested name **fails `typing.get_type_hints`**:
-
-```python
-def __init__(self, *, direction: Direction = Direction.FORWARD) -> None:  # BAD annotation
-```
-
-Under `from __future__ import annotations` the annotation is the *string*
-`"Direction"`, resolved later against the function's **module globals** —
-where only `Window` exists, not bare `Direction`.
-`get_type_hints(Window.__init__)` raises `NameError: name 'Direction' is
-not defined`, breaking anything that introspects the signature
-(serialization frameworks, pydantic, docs tooling).
-
-Fix — qualify the **annotation**, keep the **default** bare:
-
-```python
-def __init__(self, *, direction: Window.Direction = Direction.FORWARD) -> None:
-    self.direction = self.Direction(direction)
-```
-
-The two resolve at different times: the annotation string
-`"Window.Direction"` resolves against module globals (`Window` is a
-module-level name, `.Direction` is its attribute) ✓. The default
-*expression* `Direction.FORWARD` evaluates at class-body execution time,
-where bare `Direction` **is** in scope (the nested class is defined before
-the method) — writing `Window.Direction.FORWARD` there would `NameError`
-instead, since `Window` isn't bound yet during its own class-body
-execution. In method bodies use `self.Direction(...)` /
-`cls.Direction(...)`; at module level (helpers outside the class) use the
-full `Window.Direction.X` (runtime, `Window` is bound by call time).
-
-Verify empirically with `typing.get_type_hints(Cls.__init__)` before
-trusting either form.
-
-### `isinstance(list[int], type)` is `True` on Python 3.10, `False` on 3.11+
-
-`isinstance(list[int], type)` returns `True` on **Python 3.10** and only
-changed to `False` on 3.11+ via
-[gh-101162](https://github.com/python/cpython/issues/101162). Airflow still
-supports 3.10, so any type-introspection gate that uses
-`isinstance(x, type)` to mean "this is not a subscripted generic" is
-silently ineffective on the oldest supported version — running tests only
-on 3.11+ gives a false green.
-
-Case: `common.ai`'s `usage_limits._resolve_field_type` receives
-`list[int] | None`; the top-level origin is a union, so it passes the
-top-level check and reduces to `list[int]` — `isinstance(resolved, type)`
-then fails to reject it, and the container field gets treated as
-coercible. The fix is to check `typing.get_origin(resolved) is not None`
-again **after** the union reduction, rather than relying on `isinstance`.
-
-Same-family risk: `typing.get_args()`'s **argument count** alone doesn't
-distinguish a union from any other subscripted generic (`list[int]` also
-has exactly one argument) — check `get_origin` instead. See also
-[`skills/strict-review/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/test-conventions.md)'s
-"Reject-path tests need one case per shape, not one representative value" —
-a type-introspection gate like this one needs a 3.10-shaped test case, not
-just a 3.11+ one.
-
-### `int(Decimal(...))` bypasses CPython's digit-count limit
-
-CPython bounds `int(str)` and `str(int)` to 4300 digits (the
-CVE-2020-10735 mitigation; tunable via `sys.set_int_max_str_digits`), but
-**`int(Decimal)` has no such limit**. Switching a coercion path from
-string parsing to `Decimal` parsing then `int()` silently removes that
-language-level protection.
-
-Case: `common.ai`'s `usage_limits._coerce_int` added a `Decimal` fallback so
-a rendered value like `"5.0"` would also be accepted; `"1E+100000"` then
-first burns CPU building a six-digit-count integer, and only blows up when
-the error-message formatter does `{value!r}` on it — raising CPython's own
-`Exceeds the limit (4300 digits)` instead of the module's intended, named
-`ValueError`. Fix: guard it yourself — `parsed.adjusted() >= 4300` raises a
-named error before it ever reaches `int()`.
-
-Two transferable lessons:
-
-1. **Switching conversion paths can silently drop a language-level
-   guard** — `int(str)` / `int(Decimal)` / `int(float)` don't share the
-   same constraints; verify the specific path actually being used, not
-   "int() is protected" in general.
-2. **The error-handling path itself can throw** — `repr()`-ing a huge
-   integer isn't free. Confirm a value can actually be formatted before
-   interpolating it into an error message; when the value is unbounded,
-   bound and order it first (same reasoning as bounding and ordering any
-   unbounded collection rendered into a DB row or log — see
-   [`references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
-   §10.16).

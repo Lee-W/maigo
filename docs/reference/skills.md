@@ -36,6 +36,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`strict-review`](../skills/strict-review.md) | Soyo | `/maigo:go` step 5、`/maigo:review` step 3 | 預設 BLOCKED + 9 項 checklist + evidence-driven |
 | [`airflow-aware`](../skills/airflow-aware.md) | — (知識層) | 任何 skill（在 apache-airflow contributor checkout 時由 repo-detect hook 自動載入） | Airflow contributor 慣例：Dag 命名規則、Breeze/uv 環境、Ruff/Mypy 風格、coding rules、pytest patterns、PR hygiene（英文） |
 | [`commitizen-aware`](../skills/commitizen-aware.md) | — (知識層) | 任何 skill（在 commitizen-tools/commitizen contributor checkout 時由 repo-detect hook 自動載入） | commitizen contributor 慣例：uv + poe 任務、Conventional Commits 自舉、ruff/mypy lint、pytest、PR guidelines（英文） |
+| [`python-aware`](../skills/python-aware.md) | — (知識層) | airflow-aware / commitizen-aware 組合載入；strict-review 審 Python diff 時條件式載入；任何 Python 工作中也可由 description 自行觸發 | Python 語言層慣例：uv/ruff 工具鏈習慣、coding rules（assert／monotonic／import）、pytest 與 mock 慣例（英文） |
 | [`commit-message`](../skills/commit-message.md) | — (orchestrator 直跑) | `/maigo:go` step 7、`/maigo:quick` step 4、`/maigo:team` step 7 | 從 diff 草擬 user-impact subject + 短 body 的 commit message，避免把 PR motivation 倒進 commit log |
 | [`failure-handling`](../skills/failure-handling.md) | — (流程層) | `/maigo:go` 失敗處理段、`/maigo:quick` 同段、`/maigo:team` 同段、`/maigo:address-comments` step 5 | 爽世擋下 / 立希驗證紅 / 2 次同條停下找使用者的共用流程 |
 | [`github-title-description`](../skills/github-title-description.md) | Tomori | `/maigo:describe-pr` step 2 | 從 branch commits / diff 產 user-impact PR title + Why / What / Test Plan |
@@ -105,6 +106,7 @@ graph LR
         doc_link["doc-link-convention"]
         airflow_aware["airflow-aware"]
         commitizen_aware["commitizen-aware"]
+        python_aware["python-aware"]
         maigo_self_check["maigo-self-check"]
         github_reply_draft["github-reply-draft"]
         git_workflow["git-workflow"]
@@ -203,6 +205,9 @@ graph LR
     repo_detect --> commitizen_aware
     airflow_aware --> strict_review
     commitizen_aware --> strict_review
+    airflow_aware --> python_aware
+    commitizen_aware --> python_aware
+    strict_review -.-> python_aware
     airflow_aware --> airflow_refs
     strict_review -.->|case studies| airflow_refs
 

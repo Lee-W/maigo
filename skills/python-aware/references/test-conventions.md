@@ -1,6 +1,6 @@
-# Strict Review — Test Conventions (Extended)
+# Python-Aware — Test Conventions (Extended)
 
-Loaded on demand by `skills/strict-review/SKILL.md` — **expanded rationale
+Loaded on demand by `skills/python-aware/SKILL.md` — **expanded rationale
 and recipes for test-writing / test-review conventions that recur often
 enough to be named**. Read this file when reviewing or writing tests and one
 of the patterns below applies.
@@ -211,7 +211,7 @@ Case: a coercion reduced a type annotation using the **argument count** returned
 the code actually recognized it as a container — meanwhile `list[int]`, the case that
 would actually misbehave, was never rejected and got silently reduced to its element
 type instead. Switching to `get_origin()` was the real fix. When coverage is uncertain,
-verify with a mutation canary (see the Mutation test section of `strict-review/SKILL.md`).
+verify with a mutation canary (see the Mutation test section of [`skills/strict-review/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)).
 
 ---
 

@@ -81,6 +81,13 @@ triggers: [airflow-aware]
 Soyo: read `skills/<name>/SKILL.md` → append as item 10+. If not found, log and continue.
 Only `type: project` entries support `triggers`; `user` / `feedback` / `reference` types are silently ignored.
 
+## Language layer composition
+
+當 diff 含 `.py`、`pyproject.toml` 或 pytest 設定時，Soyo 先讀
+`skills/python-aware/SKILL.md`，把它的 Testing 與 Coding rules 兩段當成 base items 3–6 的補充，
+違反時以 must-fix 引用該條規則；展開說明與案例在 `skills/python-aware/references/test-conventions.md`。
+Python 專屬的測試與工具規則只放在 python-aware，這裡不重複。目前只有 Python 有語言層，其他語言的 diff 不適用。
+
 ## Must-fix format: problem + specific改法 + reason
 
 Bad must-fix:
@@ -259,8 +266,6 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
   Enum/class/type consumed by a user-facing kwarg must be reachable from the same
   top-level import as the sibling class that uses it; missing `__all__` / lazy-import
   entries is must-fix, not nit. Details: `references/recurring-patterns.md`.
-- **測試要預設用 parametrize** — 疊 assert 或近重複 test method → must-fix，拆成
-  `@pytest.mark.parametrize` + `pytest.param(..., id=...)` 標 case 名稱。
 - **不要框框式區段分隔註解** — `# ----` / `# --- 區段名 ---` 全刪含 label，靠函式邊界與空行分段。
 - **Concurrent PR 根本修法優先** — 有 SDK 層根本修法時肯定當前解但明確指向根本修法，說明 supersede 關係。
   Details: `references/recurring-patterns.md`.
@@ -269,23 +274,6 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
 - **Naming: guard-then-hook pairs use two distinct verbs, not an underscore** — check for an existing same-file pairing convention before naming; collapsing to `x`/`_x` when the file's other pairs use two verbs reads as confusing, not idiomatic. Details: `references/recurring-patterns.md`.
 - **State the rule, don't enumerate a code-derived set** — a comment/docstring listing "all the other X" goes stale as the set grows; require the rule itself. Hitting the same incomplete-enumeration defect a second round is a signal to change approach, not add the N+1th member.
   Details: `references/recurring-patterns.md`.
-
-## Test conventions (references)
-
-Ten test-writing / test-review patterns for mock assertions, sequence
-coverage, boundary pairing, drift guards, and forced-churn discipline; details and worked
-examples in `references/test-conventions.md`:
-
-- **Mock assertions** — prefer `m.method.mock_calls == [mock.call(...)]` over `assert_called_once_with`.
-- **Full-sequence assertions** — assert the whole iterable/list, not head+tail+length.
-- **Cap-boundary pairs** — a numeric cap needs both an at-cap (allowed) and one-over-cap (trips) test.
-- **No thin test helpers** — assert only the field the function under test decides; skip one-use wrapper helpers.
-- **Minimize forced test churn** — keep an existing test's diff to the forced minimum; add a new test for new behavior.
-- **Build the fixture, don't defer** — a missing example fixture is not "can't test"; build the smallest purpose-built one.
-- **Drift guard green in its own commit** — the commit that adds an "every X needs an entry" test must add the existing entries and doc rows too, or it fails when checked out alone.
-- **Private SDK path: fail, don't skip** — a test that depends on a third-party SDK's private module `pytest.fail`s when the path is missing; a skip hides the gap behind a green CI.
-- **Tripwire tests: prove which assertion fails, name the component** — mutate one deny-list entry and name the assertion that turns red; a test name must not credit a rejection that only a downstream function performs.
-- **Log assertion when the log IS the observable** — Airflow's "no caplog" rule is about scraping vs. checking logic, not a ban on asserting an operator-visibility log call via a mocked logger.
 
 ## Design integrity checks (references)
 
