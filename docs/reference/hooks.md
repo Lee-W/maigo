@@ -120,6 +120,9 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
    skill 內容定位為「knowledge layer」（contributor 慣例），參考 `skills/airflow-aware/SKILL.md` 結構：
    開頭寫 `**Loaded by**: repo-detect hook (SessionStart) when <project> is detected`，
    後接 When to apply / 命名 / 環境 / 測試 / PR 等子段。
+   若該 repo 的語言已有語言層 skill（目前：`python-aware`），開頭要加組合宣告
+   （先讀語言層；優先序 repo `AGENTS.md` > repo-aware > 語言層），內文只列 repo 專屬規則。
+   分層慣例見 [skills.md 的 Language layer 段](skills.md#language-layer)。
 
 完成後跑 `uv run python scripts/validate_plugin.py` 確認 skill cross-ref 通過
 （validator 會抓 `repo_detect.py` 引用的 `skills/<name>/` 是否存在）。

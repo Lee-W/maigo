@@ -35,7 +35,8 @@ Read this file when executing the corresponding crystallize step.
   |---|---|
   | 一行講完的通用規則 | 併進既有 skill 本體的對應段 |
   | 帶案例敘事的 pattern | 既有 skill 本體加一行摘要；案例展開寫進該 skill 的 `references/<topic>.md` |
-  | 專案限定知識（如 Airflow 案例） | 對應 repo-aware skill（如 `airflow-aware`）的本體或其 `references/`，**不進通用 skill** |
+  | 語言通用慣例（不綁特定 repo，例如 pytest／mock／import 規則） | 對應語言層 skill（目前：`python-aware`）的本體或 `references/`；沒有對應語言層 → 留在記憶層，不要塞進 repo-aware skill |
+  | 專案限定知識（如 Airflow 案例）；判斷句：規則換到另一個同語言 repo 仍然成立 → 不是專案限定，改走上一列 | 對應 repo-aware skill（如 `airflow-aware`）的本體或其 `references/`，**不進通用 skill** |
   | 自成一群的新慣例 | 先評估能否掛進相近既有 skill 的 `references/`；真的無處可掛才 `新建 skill <name>`（給建議 name + 一句 description + 預定 owner / consumer） |
 
   **併進優先**：落點預設先試「併進既有 skill / references」，新建 standalone skill 是

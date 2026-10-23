@@ -247,6 +247,26 @@ description: This skill should be used when ...    # 必填
 `description` 欄位很重要——Claude 在判斷該不該拉某個 skill 進來時讀的就是這欄。
 寫成 `This skill should be used when ...` 模式比較容易被正確匹配。
 
+## Language layer
+
+語言層 skill 命名為 `<lang>-aware`。repo-aware skill（`airflow-aware`、`commitizen-aware`）只放**該 repo 專屬**的規則；
+換到另一個同語言 repo 仍然成立的慣例，屬於**語言層** skill。目前只有
+[`python-aware`](../skills/python-aware.md)。
+
+- **命名**：`<lang>-aware`（例：`python-aware`）。與 repo-aware 同為知識層，不是 review checklist。
+- **優先序**：repo 自己的 `AGENTS.md` / `CLAUDE.md` > repo-aware skill > 語言層。
+  repo-aware 若要推翻語言層的預設，必須寫成明示的 override（例：`Airflow override: …`），
+  沉默代表語言層預設成立。
+- **依賴方向**：單向——repo-aware → 語言層；`strict-review` 在 diff 含該語言時條件式讀取語言層
+  （見 `strict-review/SKILL.md` 的 Language layer composition 段）。語言層不得反過來引用 repo-aware。
+- **載入方式**：不改 hook。repo-aware skill 在開頭用組合宣告寫明「先讀 `<lang>-aware`」；
+  語言層自己的 `description` 也允許 model 在該語言的任何工作中自行觸發。
+- **何時才建新的語言層**：已經有一批實際素材（來自 crystallize 的畢業條目或從 repo-aware 搬出的通用規則）。
+  不建沒有素材的空殼——其他語言目前沒有語言層，這一節就是擴充點。
+- **新增 repo-aware skill 時**：若該 repo 的語言已有語言層，開頭要宣告組合並寫明優先序，
+  內文只列 repo 專屬規則；畢業新慣例時的落點判斷見
+  [`skill-graduation.md`](https://github.com/Lee-W/maigo/blob/main/skills/maigo-self-check/references/skill-graduation.md)。
+
 ## Memory-triggered skill 載入
 
 skill 也可以被 memory entry 觸發載入——不需要在 agent prompt 裡直接引用。

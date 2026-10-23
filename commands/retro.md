@@ -38,8 +38,14 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
      - `個人 memory`：使用者的偏好、workflow 習慣、跨 session 記憶的事實
      - `maigo 文件缺口`：描述的是「maigo 如何工作 / maigo 的某個慣例 / 實作規範」
        → 應進 maigo 的 source file（例：`docs/reference/memory.md`、`CONTRIBUTING.md`），而不是寫進個人 memory
+     - `repo／語言慣例`：某個 repo 或某個語言的寫碼慣例（pytest／mock／import 規則、某 repo 的 PR 規則），**不是** maigo 自身怎麼運作
+       → 仍存成個人 memory（`type: project`），`description` 開頭標 `畢業候選 → <python-aware|airflow-aware|…>`
+       （換到另一個同語言 repo 仍成立 → 語言層，否則 → 該 repo 的 repo-aware skill；判斷依 [`skill-graduation.md`](https://github.com/Lee-W/maigo/blob/main/skills/maigo-self-check/references/skill-graduation.md) 落點表）；
+       寫入 skill 一律交給 `/maigo:crystallize`，**retro 不直接 Edit `skills/`**
    - 依目的地調整問法：
      - **個人 memory** → **AskUserQuestion**「要存這筆嗎？」選項：`存` / `修改` / `跳過` / `結束 retro`
+     - **repo／語言慣例** → **AskUserQuestion**「要存成畢業候選嗎？」選項同個人 memory（`存` / `修改` / `跳過` / `結束 retro`）；
+       「存」走下方步驟 3 的 `/maigo:remember` 流程，不新增寫檔路徑
      - **maigo 文件缺口** → **AskUserQuestion**「要更新 maigo 文件嗎？」選項：
        `更新 maigo 文件`（orchestrator 直接 Edit 指定 source file）/ `改存 personal memory` / `跳過` / `結束 retro`
 
@@ -54,6 +60,7 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 
 5. 所有候選跑完，或使用者「結束 retro」→ 印 summary：「本次 retro 存了 K 筆：
    `<name1>`（`<type1>`）、`<name2>`（`<type2>`）...」。
+   若其中有標 `畢業候選` 的條目，補一句提示：「有 N 筆畢業候選，之後跑 `/maigo:crystallize` 收進對應 skill」。
 
 6. **🌑 Mortis 結算（一句）**
 
@@ -95,7 +102,7 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **一次只 propose 一筆**——不要一次列五筆讓使用者勾選；逐筆問，使用者答完才下一筆。
   （理由：勾選 UI 鼓勵草率回答；逐筆強迫使用者真的看過。）
-- **目的地優先**——每筆 propose 前先判斷「個人 memory vs maigo 文件缺口」；把 maigo 本身的規則/慣例/實作規範存成個人 memory，是把 plugin 知識放錯地方。
+- **目的地優先**——每筆 propose 前先判斷「個人 memory／maigo 文件缺口／repo／語言慣例」三類；把 maigo 本身的規則/慣例/實作規範存成個人 memory，是把 plugin 知識放錯地方；repo／語言慣例只存成畢業候選 memory、交給 `/maigo:crystallize`，retro 不直接寫 `skills/`。
 - **不延伸推斷**——只用使用者實際講過 / context 浮現的東西，不要「補充使用者可能也想存的」。
 - **不複製 `/maigo:remember` 的寫檔 spec**——指向它就好。寫檔 / index / rollback / 同 slug 處理都遵照 remember 的步驟 6 + 「失敗 / 中斷處理」段。
 - **不 delegate 給 Tomori 或 Anon**——orchestrator 自己跑。
