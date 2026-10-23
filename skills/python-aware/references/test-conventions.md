@@ -826,3 +826,68 @@ length bound) so a failure only diffs a small object; then run one mutation cana
 fails fast **and name which assertion turned red**. A comment, if any, states only the concrete
 constraint (a whole-string comparison makes pytest diff a huge string on failure); don't claim
 "fails fast" unless you measured it.
+
+## Don't assert a class attribute equals a literal
+
+Don't write `assert SomeClass.allowed_fields == ("a", "b")` (or the same
+pattern for any other class attribute / constant). It only fails when
+someone edits the attribute and the assertion separately — it restates the
+source line rather than testing behavior.
+
+Test the behavior the attribute drives instead: if the attribute lists the
+fields a renderer processes, assert the fields actually render as expected
+after calling the renderer.
+
+The diagnostic question is "under what circumstances does this assertion
+fail?" — if the only answer is "someone changed the source without updating
+the test," it has no discriminating power.
+
+Before deleting an existing literal-equality assertion in favor of a
+behavior test, check whether it covers something the new behavior test
+doesn't (e.g. `allowed_fields == ("file_id", "endpoint", "metadata")` asserts
+`file_id` is present, which a render test might not exercise). If that gap is
+pre-existing behavior and the repo's convention is not to backfill tests for
+existing logic, leave it untested; if the change introduced it, add a
+behavior test for it before deleting the literal-equality assertion.
+
+## A hand-written stub shape can't contradict the docstring it copies
+
+When a test stubs a third-party object's serialization method
+(`model_dump` / `to_dict` / `dict()`) and hand-writes the return value, that
+hand-written value is also the assertion's expected value — so it can never
+disagree with anything the docstring claims about that shape. The docstring
+and the test end up agreeing on a shape the upstream SDK never actually
+returns, and CI stays green. `spec=` only constrains the interface (which
+attributes/methods exist), not the data shape.
+
+Fix: for a plain value object (pydantic model, dataclass, attrs class),
+construct a real instance and let upstream decide the shape; reserve
+mocking for actual I/O boundaries (client, connection, hook). Before
+switching to a real instance, confirm it works across the supported version
+range — if the package's model uses `extra="allow"`, pass fields that are
+only required in newer versions too, so the same literal expected dict holds
+against both the pin floor and latest. Don't paste a full literal dump into a
+*doc* (fields can be added between versions) — that level of literal detail
+belongs in the test, not the docstring. If replacing the mock removes an
+assertion's discriminating power (e.g. an all-int payload makes
+`mode="json"` and the default dump identical), don't reintroduce the mock
+just to keep that assertion.
+
+Example: a stub for a usage object's `model_dump` was hand-written as a flat
+dict; the real SDK object nests two levels deep. The docstring copied the
+same flat shape, so a user following it hit a `KeyError`.
+
+## A deliberate-typo test value can collide with codespell's dictionary
+
+Applies when the repo runs `codespell`. When an invalid-input test case's
+value is a *deliberate misspelling* (e.g. a typo'd enum value, to prove
+construction raises), the hook will flag it if that typo happens to be a real
+dictionary entry — `foward` is in codespell's dictionary (`foward ==>
+forward`), so `pytest.param("foward", ...)` fails the hook.
+
+Fix: pick a misspelling that is **not** in the dictionary (e.g. `forwrd` — a
+dropped letter, not a known typo) rather than whitelisting the word in the
+repo's wordlist — whitelisting suppresses legitimate catches elsewhere in the
+repo. Verify a candidate first with `uvx codespell <file-or-scratch>` (exit
+0 = unflagged). The test only needs *an* invalid value; it doesn't need to be
+a realistic misspelling of the valid one.

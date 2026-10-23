@@ -198,6 +198,14 @@ point (e.g. "intentionally" / "by design") the comment was meant to convey —
 narrowing scope to avoid over-enumeration can silently drop the original
 point along with it.
 
+**Companion case: a check now enforces the invariant a comment enumerates by hand.** When a
+lint hook / test / linter rule starts **enforcing** an invariant that a prose comment previously
+described member by member (e.g. a comment listing which fields two sibling classes must keep in
+sync), delete the manual enumeration once the check covers it. Keep only the part the check cannot
+convey — typically *why* the constraint exists. The enumeration drifts from the enforcement over time
+(the check gets updated, the comment doesn't); the check is the authoritative spec, so a comment
+duplicating it is a maintenance liability, not a safety net.
+
 ## A list already owned by another section defers to it — no partial copy
 
 When some other section already **owns** an enumerated list (rejected constructs, supported formats,
@@ -453,10 +461,10 @@ How to apply: when a symbol would collide with a builtin or another import,
 import the module and qualify the reference instead of aliasing the symbol.
 Only alias when a module-qualified reference is genuinely impossible, and say
 why. This is about *unnecessary* new aliases — an alias already established
-in the surrounding code stays as-is; match the file, don't crusade. Airflow's
-import-placement conventions (top-level vs `TYPE_CHECKING` vs lazy, and this
-alias rule specifically) are also covered in
-[`skills/airflow-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md).
+in the surrounding code stays as-is; match the file, don't crusade. The Python
+import-placement conventions (top-level vs `TYPE_CHECKING` vs lazy, and the
+monkeypatch trap this alias rule causes) are also covered in
+[`skills/python-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/code-style.md).
 
 ---
 

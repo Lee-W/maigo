@@ -70,7 +70,7 @@ fallback masks data corruption as a valid value instead of surfacing it. If
 a required field can genuinely go missing, fail loud with a clear error
 message (see `decode_deadline_alert`'s `interval` case above), rather than
 documenting the gap as a known limitation — the same posture as
-[`references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md)'s
+[`python-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/code-style.md)'s
 "Raise at construction instead of documenting a structural footgun."
 
 ## Scheduler session lifecycle: scoped sessions, an escaping exception, and a per-tick event-listener trap

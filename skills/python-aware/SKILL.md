@@ -49,9 +49,10 @@ A repo-aware skill that wants to change a default here must say so explicitly
 
 | Reference | Read when |
 |---|---|
-| `references/test-conventions.md` | Writing or reviewing tests and one of the named patterns below applies (mock assertions, parametrize, reject-path shapes, tripwires…) — full rationale and recipes |
+| `references/code-style.md` | Writing or reviewing Python style: import placement and aliasing, naming and constants, raise-vs-document validation, `ContextVar` in async generators, mypy narrowing, docstring conventions |
+| `references/test-conventions.md` | Writing or reviewing tests and one of the named patterns below applies (mock assertions, parametrize, reject-path shapes, tripwires, class-attribute / stub-shape / codespell traps…) — full rationale and recipes |
 | `references/runtime-gotchas.md` | Code that passes a type checker and a casual read but misbehaves at runtime: pydantic `Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int` |
-| `references/tooling.md` | Dependency-floor bumps that make a stale venv go red, or several agents sharing one worktree `.venv` |
+| `references/tooling.md` | Dependency-floor bumps that make a stale venv go red, several agents sharing one worktree `.venv`, or a script a hook runner executes directly |
 
 ## Coding rules
 

@@ -1,4 +1,4 @@
-# Python tooling gotchas (stale environments, shared `.venv`)
+# Python tooling gotchas (stale environments, shared `.venv`, hook scripts)
 
 Loaded on demand by `skills/python-aware/SKILL.md` — environment traps that make a
 test run look red, green, or skipped for reasons unrelated to the code under review.
@@ -50,3 +50,14 @@ packages outside that package's dependency set from the shared `.venv` (a large 
 observed removed), including optional extras. Tests then flip from pass to **skip**, not
 red, so nothing alerts you. State it in the delegation prompt: `uv sync` is forbidden, use only
 `uv run --frozen --project <pkg> ...`; after the run, check that the skipped count didn't jump.
+
+## A script that a hook runner executes directly: `requires-python` without an upper cap, and keep the shebang
+
+For a new script that a hook runner execs directly, write the PEP 723 inline
+metadata as `# requires-python = ">=3.10"` — **no `<3.11` upper cap** — and
+keep the `#!/usr/bin/env python` shebang as the first line. An upper cap pins
+the script's venv to exactly one Python version, which is unnecessary for a
+plain AST/text check and hurts portability; `>=3.10` ("3.10 or newer") is
+what's actually meant. The shebang matters because the runner execs the entry
+file directly — a file with no shebang gets run under `/bin/sh`, which chokes
+on Python syntax.

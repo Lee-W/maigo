@@ -595,8 +595,7 @@ it's a genuine technical term that belongs there (rare). The same posture
 applies to the user-facing parts of a PR body and commit message; reviewers
 read those too. Distinct from the "A deliberate-typo test value can collide
 with codespell's dictionary" entry in
-[`references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md)'s
-Tests section — that one is about `codespell` flagging a *deliberate*
+[`python-aware/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/test-conventions.md) — that one is about `codespell` flagging a *deliberate*
 misspelling in a `.py` test value, not a coined-but-intentional word in
 `.rst` prose.
 

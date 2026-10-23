@@ -58,7 +58,7 @@ prek run --all-files   # prek, not pre-commit: the runner upstream specifies
 
 - **Do not add new `raise AirflowException`** — use a more specific exception class.
 - **`session` must be keyword-only**, and the callee must not call `session.commit()`; transaction management is the caller's job.
-- Imports, docstrings, naming/constants, validation posture, mypy narrowing, prek hook scripts: `references/code-style.md`. attrs eq/hash, serialize/decode, scoped-session gotchas: `references/runtime-gotchas.md`. General Python rules (no `assert`, `time.monotonic()`, import placement): `python-aware`.
+- Airflow-specific style (optional-extra import guard, naming, provider hooks, Dag authoring): `references/code-style.md`; general Python style (imports, validation, mypy, docstrings): `python-aware`'s `code-style.md`. attrs eq/hash, serialize/decode, scoped-session gotchas: `references/runtime-gotchas.md`. General Python rules (no `assert`, `time.monotonic()`, import placement): `python-aware`.
 - A brand-new `provider.yaml` module-section *type* trips a validator check — read the "New provider.yaml module section" recipe in `references/registry-conventions.md` first.
 
 ### 6. Delivery completeness
@@ -105,7 +105,7 @@ Its "Contents" list enumerates 10.1–10.37 plus the unnumbered DB portability a
 
 | Reference | Read when |
 |---|---|
-| `references/code-style.md` | Writing or reviewing Python in an Airflow checkout: imports, docstrings, naming/constants, version-floor checks, `logical_date` example guidance, authoring rules |
+| `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, Dag authoring |
 | `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle |
 | `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds; attribution; docs screenshot procedure |
 | `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); uv.lock drift diagnostic |
