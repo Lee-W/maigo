@@ -237,6 +237,8 @@ result**. A smaller count means upstream already carried out part of that
 change itself, and git silently dropped the now-already-applied hunks —
 there is no warning, only a file/line count that no longer matches.
 
+Note that `rebase --continue` also runs no commit hooks at all — see [`hook-runner-verification.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/hook-runner-verification.md).
+
 Why: a rebase of a commit describing four kinds of edits (a connection-form
 placeholder, a hook docstring, `get_provider_info.py`, and a test) landed as
 a single-file diff (test only) because upstream had already merged a PR

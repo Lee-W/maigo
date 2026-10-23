@@ -12,66 +12,16 @@ gives a confusing or unstable result.
 
 `prek run` reporting `exit 0` is not by itself evidence a hook actually
 checked your change. Several distinct mechanisms can produce a clean-looking
-run that checked nothing, or checked the wrong content.
+run that checked nothing, or checked the wrong content. The general hook-runner
+shapes (stashing of unstaged changes, zsh word-splitting of `--files`, `git add -N`,
+`git rebase --continue` running no hooks, a `files:` regex that never matches, a corrupted
+toolchain cache) are in
+[`git-workflow`'s `hook-runner-verification.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/hook-runner-verification.md);
+only the Airflow-specific ones are listed here.
 
-### Unstaged changes are stashed away, then restored
-
-`prek run <hook>` stashes any unstaged changes to a patch file in
-`~/.cache/prek/patches/` before executing, then restores them afterward — the
-hook only ever sees **staged + committed** content. This is silent (prek just
-prints `Unstaged changes detected, stashing...` / `Restored working tree
-changes from ...`), so a PASS with unstaged edits in flight means "your
-staged/committed state is clean," not "your current edit is clean."
-
-This applies to `--from-ref <base>`, to `--all-files`, **and to `--files
-<paths>`** — naming the exact paths does not exempt you from staging. Before
-trusting any prek green as evidence about a just-made edit, `git add` it
-first, or confirm `git diff --stat` (unstaged) is empty. Alternative:
-invoke the underlying tool directly (`uv run --project <dist> ruff format
-<file>`), which sees the real on-disk tree with no stashing.
-
-`--from-ref` can also silently compute an empty diff range and report
-`(no files to check) Skipped` for a hook even though your change *is*
-staged/committed — read `Skipped` as "did not run," never as "passed."
-
-### zsh word-splitting turns `--files $VAR` into one giant nonexistent filename
-
-`prek run --files $FILES` (files stored in a variable first) gives a false
-green under **zsh**: zsh does not word-split an unquoted variable expansion
-(bash does), so prek receives the whole space-joined string as a *single*
-filename. prek silently skips nonexistent filenames — every hook prints
-`(no files to check) Skipped`, and the overall exit code is **0**. Looking
-only at exit code hides this; **check the Passed/Skipped distribution per
-hook**, not just the overall code.
-
-Correct form (command substitution *does* word-split in zsh):
-
-```zsh
-prek run --stage pre-commit --files $(git diff --cached --name-only | tr '\n' ' ')
-```
-
-Two adjacent traps in the same family:
-
-- `--from-ref` and `--files` **cannot be combined** — prek 0.4.6 errors
-  outright rather than picking one. Pick one flag per invocation.
-- **Manually listing files and missing one is also a false green, with zero
-  signal.** Output stays all-`Passed`, exit 0 — nothing indicates a file was
-  left out (a missed `docs/changelog.rst` skipped its dedicated
-  format/duplicate-entry hook entirely in one incident, only caught by
-  re-counting against the commit). Derive the file list from `git diff
-  --name-only <base> <head>`, count it, and report "N files listed / N files
-  in the commit" so a mismatch is visible.
-
-### `git add -N` breaks the hook runner itself
-
-A file staged with `git add -N` (intent-to-add) has an all-zero blob hash.
-prek's pre-hook worktree cleanup runs `git rm --cached --` over the index,
-which exits 128 on such an entry — the hook never runs and prek reports
-**exit 2** (`Failed to clean work tree`). This is a tooling failure, not a
-finding about your code, but it is easy to misread as "the hook caught
-something." Never leave a file in `-N` state when prek will run — either
-fully `git add <path>` it, or leave it untracked and read it directly instead
-of trying to make `git diff` show it.
+Reproduce a hook failure from the repo root (see that file) — with one Airflow exception:
+deliberately running from `providers/` is acceptable to avoid a root-level lychee SSH failure
+that is unrelated to your change, never to make the target hook pass.
 
 ### The `identity` hook can report a false "files were modified" failure
 
@@ -82,23 +32,10 @@ commit is blocked with `Print checked files ... files were modified by this
 hook`, but `git status --short` shows the working tree matches the index
 exactly, that's a false signal. Confirm before dismissing it: run the full
 pre-commit stage on just those files (`prek run --files "path/a.py"
-"path/b.py"`, quoting each path individually to dodge the zsh trap above);
+"path/b.py"`, quoting each path individually to dodge the zsh word-splitting trap described in `harness-discipline`'s `shell-and-tool-gotchas.md`);
 exit 0 and zero modifications means the false signal is real. Escape hatch:
 `git commit --no-verify`, then separately run the commit-msg hook against
 the already-written message so it isn't silently skipped.
-
-### `git rebase --continue` runs no hooks at all
-
-`git rebase --continue`'s resulting commit does **not** trigger pre-commit /
-prek — its output is only `Recorded resolution ...` and `[detached HEAD
-<sha>] <subject>`, with no hook lines whatsoever. (`git commit --amend` in
-the same worktree does run the full stage.) The tell is simply **whether the
-hook output lines are present** — their absence means the commit was never
-checked, even if an earlier `amend` in the same session was green; that
-green doesn't carry forward across a rebase, since the commit is re-applied
-onto a new base with unreviewed conflict resolutions and upstream code.
-Follow-up verification: `prek run --from-ref upstream/<target_branch> --stage
-pre-commit` (subject to the stashing and word-splitting traps above).
 
 ## 2. Coverage gaps — prek passing doesn't mean the thing you care about ran
 
@@ -175,20 +112,6 @@ Each sub-config's `files:` patterns and `entry:` paths are also relative to
 *that config's directory* — invoke those hooks from that directory
 (`cd airflow-core && uv run prek run <hook> --files "src/airflow/ui/..."`),
 not from the repo root.
-
-### A misconfigured `files:` regex can leave a hook permanently inert
-
-`providers/.pre-commit-config.yaml`'s `check-connection-doc-labels` hook has
-`files: ^.*/docs/.*/connections.*\.rst$` — which requires an extra directory
-level between `docs/` and `connections` that the real path
-(`providers/<name>/docs/connections/*.rst`) doesn't have. All 100 real
-connection docs across all providers match **zero** times; the hook has
-never actually run against any of them. Running it reports `(no files to
-check) Skipped` and **exit 0** — indistinguishable from passing. When a
-hook's regex is suspect, verify by running the underlying check script
-directly rather than through prek, and confirm the Passed/Skipped
-distribution, not just the exit code — the same diagnostic used for the zsh
-word-splitting trap above applies here too.
 
 ### `scripts/in_container/run_provider_yaml_files_check.py` cannot be pytest-unit-tested — verify by behavior instead
 
@@ -331,22 +254,6 @@ broken": unblock with `git commit --no-verify`, then run the full `prek run
 Don't retry the full hook set in the foreground repeatedly — each attempt
 just gets cut off by the timeout and restarts the same slow build from
 scratch.
-
-### A root-owned or half-deleted prek toolchain cache breaks every Python hook
-
-When every Python-based prek hook fails with `... No such file or directory`
-pointing at `~/.cache/prek/tools/python/<version>/bin/python`, the cached
-interpreter is corrupt (partially deleted). If those leftovers are
-root-owned (from a past `sudo prek` run), a non-sudo `rm`/`chmod` gets
-Permission denied — the fix needs `sudo rm -rf
-~/.cache/prek/tools/python/<version>`; prek re-downloads it on next run.
-`SKIP=<hook>` only skips one hook, but all Python hooks share the same
-toolchain, so `--no-verify` (after validating ruff/tests directly) is the
-practical escape until the cache is fixed. A related but distinct failure —
-a single hook failing the same way while the toolchain itself is fine — is a
-vanished compiled-wrapper file under `~/.cache/prek/cache/python/`; that one
-needs no `sudo`, since it's a cache directory rather than the root-owned
-toolchain directory.
 
 ### A stale local `airflow.db` schema breaks a whole provider test suite
 
@@ -546,35 +453,13 @@ module, wrong key set) looks different — see
 
 ## 4. Attribution — don't accept a red's cause without proving it
 
-### A scoped test run being red doesn't mean your diff caused it
+### Airflow `test-command` prefixes — the command runs as argv, not through a shell
 
-Before narrowing a scoped test command further (or accepting a red result as
-a regression from your change), require **0 lines** of `git diff
-<base>...HEAD -- <path of the red tests>` (and the corresponding source
-path) before calling those failures pre-existing/unrelated. Narrowing scope
-until a run goes green is the same move as loosening an assertion — the
-scope has to be justified by what the diff actually touched, not by what
-happens to pass.
-
-When the branch changes a data file rather than Python (a JSON schema,
-`provider.yaml`, a config template), there is no mirroring test file to
-scope to — invert the approach: find the test that *loads* that data file
-and narrow to it with `-k`. Then **prove the gate is live** before trusting
-a fast green on it: inject a deliberate break into the data file, confirm
-the scoped command fails, restore from a byte-exact backup, confirm green
-again.
-
-### `.claude/test-command` (or any harness-invoked test script) runs as argv, not through a shell
-
-A command configured to run as a fixed test entry point is typically
-`exec`'d directly (`shlex.split` + `subprocess.run`, no shell) — an
-`ENV=val cmd` prefix fails with `command not found` (note an unexpanded
-`$HOME` in the error is the diagnostic), and there's no `&&`, no `$(...)`,
-no `~` expansion. Put any setup logic into a sibling shell script instead
-and make the configured command a one-liner that invokes it
-(`/bin/sh /abs/path/to/run-tests.sh`). Verify by testing the way the harness
-actually runs it, not via an interactive shell — a shell-eval green proves
-nothing about argv-exec.
+How a harness-invoked test script (`.claude/test-command`) is executed — `shlex.split` +
+`subprocess.run`, no shell, so no `ENV=val` prefix, `&&`, `$(...)` or `~` — and how to verify
+it, is in
+[`harness-discipline`'s `shell-and-tool-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/shell-and-tool-gotchas.md).
+Only the Airflow-specific prefixes are listed here.
 
 Prefixes a provider/breeze `test-command` usually needs, each written with
 the absolute `/usr/bin/env` so no shell is involved (the full command shape:
@@ -603,9 +488,6 @@ providers/<p> python -m pytest <files> -q`; `mkdir -p` the home first):
   ``Failed to spawn: `pytest` `` (os error 2) while `python -m pytest` works
   (it doesn't depend on a console-script entry point). Observed only in
   common.ai; recheck before generalizing to another provider.
-
-Verify with `shlex.split` + `subprocess.run` and `COLUMNS=0` in the environment,
-never `bash -c`.
 
 ### Code that branches on a 3.3-only SDK symbol: simulate the old SDK before calling it done, and keep 3.3-only imports out of test-module top level
 
@@ -659,41 +541,6 @@ test is the shape that paragraph rules out. The `AIRFLOW_V_3_3_PLUS` convention
 itself is in
 [`code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md).
 
-### A PR that raises a dependency floor makes an unsynced venv produce a false red — and defeats the usual base-commit attribution check
-
-When a PR changes a `pyproject.toml` version floor or `uv.lock`, **neither
-the local `.venv` nor the Breeze image picks it up automatically**. Running
-that package's tests without syncing first produces `ImportError: cannot
-import name '<NewSymbol>'`-style collection errors — that's the environment
-missing the version the PR requires, not a code defect.
-
-**Why this false red is unusually dangerous**: the usual attribution check —
-"rerun on the base commit; if it's broken there too, it's pre-existing, not
-this PR's fault" — gives the *right procedure* but the *wrong conclusion*
-here. The base commit is broken too (it also needs the new floor, since the
-floor bump usually comes from a lower layer of the same stack), so the
-result gets attributed to "pre-existing, ignore" — but the true story is
-"the PR's required version was never installed," and **the entire test run
-carries zero information, including the tests that "passed."**
-
-Judgment: **before running tests, check whether the PR (or a layer beneath
-it in the same stack) touched a version floor or the lock file.** If so,
-sync the environment first.
-
-```bash
-uv sync --project <PROJECT>           # install per the PR's lock
-# probe with the PR's own newly-introduced symbol, not just a version string
-uv run --project <PROJECT> python -c \
-  "from <pkg>.<mod> import <NewSymbol>; import <pkg>; print(<pkg>.__version__)"
-```
-
-Only proceed to tests once the probe prints the expected version and
-imports cleanly; if it doesn't, stop and report where it's stuck rather than
-running tests against a half-synced environment. Don't reach for Breeze as
-a shortcut here either — the image's packages are equally stale, and a
-fresh worktree's first Breeze run can separately stall on an image build.
-`uv run --project <PROJECT> pytest` is sufficient once synced.
-
 ### A rebase that bumps `uv.lock` makes an installed-package comparison test red — and that's the PR's responsibility, not a false red
 
 When a PR carries a test that compares against an **installed** third-party
@@ -736,7 +583,7 @@ direction (e.g. dropping a strict two-way equality to a one-way subset check)
 just to get past the immediate red reopens the exact defect a two-directional
 check exists to catch (§10.26 again). Gate the loosened direction behind its
 own version constant, and prove the tripwire still fires with a mutation
-canary (§6 above) before considering the fix done.
+canary (§5 below, and `evidence-discipline.md` §24) before considering the fix done.
 
 ### `uv.lock` during a rebase, and when `prek` commit blames it on the RST license hook
 
@@ -868,8 +715,8 @@ reproduces the exact same clash. Never delete the user's `~/airflow/airflow.db`
 without asking — it's their shared local dev DB, not a disposable artifact of
 this worktree.
 
-If this is wired into `.claude/test-command`, remember this section's earlier
-"runs as argv, not through a shell" rule: write it as `env AIRFLOW_HOME=<dir>
+If this is wired into `.claude/test-command`, remember the "Airflow `test-command`
+prefixes — the command runs as argv, not through a shell" entry above: write it as `env AIRFLOW_HOME=<dir>
 uv run ...` (a single command, with `env` doing the prefixing) —
 `AIRFLOW_HOME=<dir> uv run ...` without `env` fails with `command not found`
 under `shlex.split` + `subprocess.run`, the same mechanism as that rule's
@@ -928,77 +775,17 @@ delegation prompt, not just in your own head):
   breeze and not the CI environment, so say so in the report; and tests that need Linux skip
   wholesale on macOS, so a macOS green doesn't verify them.
 
-### Don't let a subagent `uv sync` a shared worktree `.venv` — only `uv run --frozen`
+## 5. Generated files: mutation canary and breeze-generated artifacts
 
-Scope: a subagent working in a uv-workspace monorepo worktree whose `.venv` is shared. (The
-plain `uv sync --project ...` above, at §2 and §4, is for your own or an isolated environment,
-where pruning is acceptable.) A subagent running `uv sync --frozen --project <pkg>` there prunes
-packages outside that package's dependency set from the shared `.venv` (a large number were
-observed removed), including optional extras. Tests then flip from pass to **skip**, not
-red, so nothing alerts you. State it in the delegation prompt: `uv sync` is forbidden, use only
-`uv run --frozen --project <pkg> ...`; after the run, check that the skipped count didn't jump.
-
-## 5. Repo-scoped commands need a pinned working directory across worktrees
-
-When multiple git worktrees of the same repo exist side by side, the Bash
-tool's working directory **gets reset between invocations**, and `cd` can be
-intercepted by a directory-jump wrapper (e.g. zoxide) that fails silently on
-a miss instead of raising an error and without changing directory. Running
-any repo-scoped command with relative paths — `prek`, `uv run --project`,
-`pytest`, a code-generation script — while sitting in the wrong worktree
-does not error. It matches nothing, and every hook/step reports `0 files` /
-`(no files to check)` / `Skipped`, with the overall exit code still **0**.
-Confirmed shape: `prek run --files <relative paths> --stage pre-commit` run
-from the wrong worktree reported 250 hooks `Skipped` and only 4 `Passed`,
-exit 0 — the relative paths resolved to unmodified files in that worktree,
-not the ones actually changed.
-
-How to apply: wrap repo-scoped commands in a subshell that pins the
-directory explicitly, and print `pwd` in the *same* invocation as evidence —
-don't rely on "the previous command already put me there":
-
-```zsh
-(builtin cd "<worktree>" && pwd && prek run --files <paths> --stage pre-commit)
-```
-
-`builtin cd` bypasses a directory-jump wrapper that shadows the `cd`
-builtin. For pure git operations, `git -C <worktree>` is enough on its own
-and needs no subshell.
-
-Judgment: seeing a large fraction of `Skipped` / `(no files to check)` /
-`0 files` while the exit code is still 0 is itself the signal to suspect the
-wrong directory or an unexpanded argument — never read it as "passed."
-
-## 6. Verifying a generated file's idempotence needs a mutation canary, not just a shasum diff
-
-Re-running a generator and diffing the resulting shasum against the
-committed file only shows "the file didn't change." That is indistinguishable
-from "the generator never touched this file at all" — wrong working
-directory, an unexpanded `--files` argument, or a hook scoped to a different
-path all produce the exact same unchanged shasum. A matching shasum is
-necessary but not sufficient evidence that a committed file is truly kept in
-sync by its generator.
-
-How to apply — add a mutation canary before trusting the shasum match:
-
-1. Back up the file with an absolute-path copy that bypasses any `cp -i`
-   alias (e.g. `/bin/cp -f <file> <backup-path>`), and record its shasum.
-2. Deliberately corrupt the file (e.g. `printf '\n# canary\n' >> <file>`)
-   and confirm the shasum **actually changed** — this proves the mutation
-   took effect and the file isn't, say, read-only or symlinked elsewhere.
-3. Re-run the generator or hook that is supposed to produce this file.
-4. Judge success only when **both** signals hold together: the
-   generator/hook itself reports non-zero / `Failed` (proof that it read
-   and rewrote the file), **and** the file's shasum is back to the original
-   value recorded in step 1.
-5. If the shasum did not return to the original value, restore from the
-   backup rather than trusting a partial rewrite.
-
-This applies to any committed-but-generated artifact: provider registry
-modules like `get_provider_info.py`, OpenAPI specs, Task SDK/ctl datamodels,
-metrics registries, supervisor schema snapshots — anywhere a "the generator
-produced this, don't hand-edit it" claim needs to be verified rather than
-assumed.
+Re-running a generator and diffing the resulting shasum only shows "the file didn't change" — that
+is indistinguishable from "the generator never touched this file". The general procedure (back up,
+corrupt, confirm the shasum changed, re-run, require both a generator failure and a restored
+shasum) is in
+[`harness-discipline`'s `evidence-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/evidence-discipline.md)
+§24, "驗證『產生檔』的冪等性". In this repo it applies to the committed-but-generated artifacts:
+provider registry modules like `get_provider_info.py`, OpenAPI specs, Task SDK/ctl datamodels,
+metrics registries, supervisor schema snapshots — anywhere a "the generator produced this,
+don't hand-edit it" claim needs to be verified rather than assumed.
 
 ### Backport conflicts on breeze-generated hash files: take incoming + verify with a scoped regenerate, not a global `--check-only`
 
@@ -1037,7 +824,7 @@ Verify freshness by importing a recently-added symbol via `uvx --from
 durable upstream fix would add `cache-keys = [{ file = "pyproject.toml" },
 { file = "src/**/*.py" }]` to `[tool.uv]` in `dev/breeze/pyproject.toml`.
 
-## 7. Docs page screenshot procedure
+## 6. Docs page screenshot procedure
 
 When a PR adds or changes a docs page, attach a screenshot at PR-open time —
 see `airflow-aware/SKILL.md` §8. This section is the how-to.
@@ -1194,17 +981,20 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
   `Passed` (not `no files to check`), and `shasum` the files before and after to
   prove no auto-fixer changed them.
 
-## After `git worktree move`: stale absolute paths cause false failures
+## After `git worktree move`: Airflow-specific stale paths
 
-A moved worktree keeps the absolute path of its old location in git-ignored files, which survive the move. Before debugging code, confirm the failure is path-related (the same test file is green on a clean checkout of `HEAD` in another worktree and red only here), then check these. The symptom depends on how the tool is invoked.
+The general symptoms and fixes (stale shebangs, stale `.pyc`, an old absolute path in
+`.claude/test-command`) are in
+[`git-workflow`'s `worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)
+("After `git worktree move`"). The Airflow-specific instances:
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| A pre-commit/prek `mypy-<project>` hook fails with exit 126, or with ``Failed to spawn: `mypy` `` (os error 2) when the hook runs `uv run ... mypy` | the shebang of `.build/mypy-venvs/<hook>/bin/mypy` still execs the old path's python; prek's re-sync reinstalls packages but not this shim | `head -1 .build/mypy-venvs/<hook>/bin/mypy`; if it shows the old path and `git check-ignore .build` confirms it is ignored, delete that hook's venv directory and rerun |
-| ``Failed to spawn: `pytest` `` | the `.venv/bin/<cmd>` shebang | run `python -m pytest` |
-| Many tests red with tracebacks into a directory that no longer exists, or source lines shown as `???` | stale `.pyc` files embed the old path | delete the ignored `__pycache__` directories (the package's and its parents, e.g. `dev/registry/tests/__pycache__`) and rerun |
-| Stop hook reports `ModuleNotFoundError` or runs in the wrong directory | `.claude/test-command` contains the old absolute `AIRFLOW_HOME` or `PYTHONPATH` | rewrite the file; the hook splits it with `shlex.split` and runs it without a shell, so carry variables with `env VAR=...` |
-
-Provider venvs also need `PYTHONPATH=<worktree>/shared/secrets_masker/src` for tests that use the structlog `caplog` fixture (otherwise `No module named 'airflow_shared'` at fixture setup), and that path goes stale on a move too.
-
-Look at the shim first when you see `Failed to spawn: mypy`: do not ask for `--no-verify` before the root cause is checked and cannot be fixed, and confirm each such authorization per commit.
+- A pre-commit/prek `mypy-<project>` hook fails with exit 126, or with ``Failed to spawn: `mypy` ``
+  (os error 2) when the hook runs `uv run ... mypy`: the shebang of `.build/mypy-venvs/<hook>/bin/mypy`
+  still execs the old path's python. `head -1 .build/mypy-venvs/<hook>/bin/mypy`; if it shows the old
+  path and `git check-ignore .build` confirms it is ignored, delete that hook's venv directory and
+  rerun.
+- Stale `.pyc` example: `dev/registry/tests/__pycache__`.
+- `.claude/test-command` may carry the old absolute `AIRFLOW_HOME`.
+- Provider venvs also need `PYTHONPATH=<worktree>/shared/secrets_masker/src` for tests that use the
+  structlog `caplog` fixture (otherwise `No module named 'airflow_shared'` at fixture setup), and
+  that path goes stale on a move too.

@@ -303,7 +303,8 @@ module>'`.
   `uv.lock` bump brings the new vendor in (`<unlabelled:xxx>` in the output). For
   what counts as reachable and how to gate the version floor, see the
   `external-services` section below and the dependency-floor paragraph in
-  [`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/design-integrity.md).
+  [`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md#extension-the-dependency-floor)
+  (Part P).
 
 ## `provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's `get_ui_field_behaviour()` entirely (narrow — read when a diff changes connection-form UI text)
 

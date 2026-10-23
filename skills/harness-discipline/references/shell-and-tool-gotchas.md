@@ -44,6 +44,27 @@ bash 會依 `IFS` 把未加引號的變數拆成多個字，**zsh 預設不會**
 **怎麼套用**：多欄位資料改用陣列，或直接改用 Python 處理，省下引號地獄；驗證 shell 腳本
 時印出拆分後的每個欄位，確認真的被拆開。
 
+**hook runner 版本（`pre-commit`／`prek`）**：`prek run --files $FILES`（檔名先存進變數）在 zsh
+下會把整串以空白相連的字串當成**單一檔名**；prek 靜默略過不存在的檔名，於是每個 hook 都印
+`(no files to check) Skipped`、整體 exit code 仍是 **0**。只看 exit code 會漏掉，要看**每個
+hook 的 Passed／Skipped 分佈**。正確寫法是用命令替換（zsh 對 `$(...)` 的結果會切字），或逐一
+列出、各自加引號：
+
+```zsh
+prek run --stage pre-commit --files $(git diff --cached --name-only | tr '\n' ' ')
+```
+
+同族的兩個陷阱：
+
+- `--from-ref` 與 `--files` **不能合用**（prek 0.4.6 直接報錯，不會擇一），一次只用一個旗標。
+- **手動列檔漏掉一個也是無訊號的假綠**：輸出全是 `Passed`、exit 0，沒有任何跡象顯示少了檔
+  （曾有一次漏列 changelog 檔，它專屬的格式／重複條目 hook 整個被跳過，事後重數才發現）。檔案
+  清單從 `git diff --name-only <base> <head>` 產生並計數，回報「列了 N 個檔／commit 內有 N 個
+  檔」，讓落差看得見。
+
+hook runner 本身的其他假綠形狀見
+[`git-workflow` 的 `hook-runner-verification.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/hook-runner-verification.md)。
+
 ## 2. 驗證的是不是實際在跑的那一份
 
 **規則**：宣稱「修好了／驗過了」之前，先確認你驗的是使用者實際會執行的那一份——PATH 上的
@@ -60,6 +81,18 @@ executable、實際載入的套件位置、長駐程式的目前 process——�
   ```
 
   印出的路徑要是開發目錄（`<local-pkg-path>`），不是 `.venv/`。
+
+### harness 呼叫的測試指令是 argv，不經 shell
+
+被設定成固定測試入口的指令（例如 `.claude/test-command`、hook 呼叫的 script）通常是直接
+`exec`（`shlex.split` ＋ `subprocess.run`，沒有 shell）：`ENV=val cmd` 前綴會報
+`command not found`（錯誤訊息裡出現沒展開的 `$HOME` 就是診斷線索），也沒有 `&&`、`$(...)`、
+`~` 展開。需要的前置設定寫進一支旁邊的 shell script，讓設定的指令只是一行去呼叫它
+（`/bin/sh /abs/path/to/run-tests.sh`），或用絕對路徑的 `/usr/bin/env VAR=val cmd` 帶環境變數。
+
+**驗證要照 harness 實際的執行方式測**（`shlex.split` ＋ `subprocess.run`，環境裡若有
+`COLUMNS=0` 一併帶上），不要用互動式 shell 或 `bash -c`——shell 裡 eval 通過，對 argv 執行的
+呼叫端毫無保證。
 
 ### `uv run` 會無聲換掉 editable install
 

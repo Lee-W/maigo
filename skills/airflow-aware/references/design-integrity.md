@@ -1,70 +1,16 @@
 # Airflow design-integrity conventions (framework / base API design)
 
-Loaded on demand by `skills/airflow-aware/SKILL.md` — design-level conventions
-for framework-internal base classes, paired guard conditions, and
-hot-loop extension surfaces (scheduler / triggerer / API request handler /
-Dag parser). Read this file when designing or reviewing a new base/framework
-API, a type-pairing guard, or an extension point on a hot loop.
+Loaded on demand by `skills/airflow-aware/SKILL.md` — **Airflow-specific** design-level conventions
+for hot-loop extension surfaces (scheduler / triggerer / API request handler / Dag parser),
+`Window` semantics, common.ai adapters, and the Airflow cases behind the generic rules. The generic
+framework-design rules (type-pairing guards, symmetric naming, structural closing of sum-types,
+version-skew tolerance, normalizing partial data) live in
+[`skills/strict-review/references/design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md).
+Read this file when designing or reviewing a new base/framework API on an Airflow hot loop.
 
 Core ↔ SDK paired-class attribute symmetry is already covered in
 `skills/airflow-aware/SKILL.md` §9 ("Core ↔ SDK paired-class symmetry") — not
 repeated here.
-
----
-
-## Type-pairing guards compare declared attributes, never "is method overridden" proxies
-
-When guarding a constraint between two paired objects (e.g. two mapper
-classes that must decode to the same type), compare a **declared attribute**
-on both sides with a single equality check — do not use "is this method
-overridden" as a proxy for the property you actually care about, and do not
-write two directional/mirrored branches with duplicated messages.
-
-Why: an override-based proxy encodes an assumption about *why* someone
-overrides a method — an override can still return the same type, producing a
-false rejection. A declared attribute states the contract directly, and a
-symmetric mismatch check is one comparison (`if a.expected_type is not
-b.expected_type: raise`), not two mirrored branches.
-
-How to apply: when guarding a pairing constraint, add the declared-attribute
-contract to **both** sides of the pair (core and SDK, if the pair spans
-both), and write a single `is not` comparison. If one side already has the
-declared attribute and the other doesn't, add it to the missing side rather
-than working around the gap with an override check.
-
-Airflow already has a prek-hook precedent for the "two definitions must stay
-manually in sync" version of this risk:
-`scripts/ci/prek/check_partition_mapper_defaults_in_sync.py` (see
-`.pre-commit-config.yaml:344-350`), which diffs the field-name sets core and
-SDK each maintain. A second instance surfaced on PR #69761 —
-`shared/plugins_manager`'s TypedDict vs. the Pydantic response model in
-`airflow.api_fastapi.core_api.datamodels.plugins` — when review flagged the
-lack of an automated sync check between the two. When a review raises this
-class of "two definitions need to stay in sync" nit, point at this existing
-hook as the concrete pattern to replicate rather than suggesting "this should
-be automated somehow" in the abstract.
-
----
-
-## Name a parameter's obvious counterpart symmetrically, not descriptively
-
-When a class already has one half of an obvious pair as a parameter/field/
-method name, name its counterpart symmetrically rather than reaching for a
-role-descriptive label — prefer `upstream_mapper` / `downstream_mapper` over
-`upstream_mapper` / `fine_mapper`. Symmetric naming makes the pairing
-explicit at the call site and in docstrings.
-
-This also applies **across sibling classes**, not just within one. If one
-mapper class uses `upstream_mapper` / `downstream_mapper`, a structural
-sibling class should use `upstream_mapper` for the same role — not a vague
-near-synonym like `source_mapper`. Cross-class naming drift forces the
-reader to learn two vocabularies for the same concept and obscures that the
-classes are sibling compositions. Reach for descriptive names only when pair
-members truly play different structural roles (e.g. `upstream_mapper` +
-`window` is fine because they aren't the same kind of thing; `upstream_mapper`
-+ `fine_mapper` is not, because both are mappers). Applies equally to method
-names and attribute names, not just `__init__` kwargs — and the wire-format
-(`serialize()`) shape follows the same renames.
 
 ---
 
@@ -83,50 +29,16 @@ does not close the other:
    O(1), an open (public, non-closed) extension surface lets a user subclass
    put arbitrary logic into it. The only reliable way to close this is a
    structural reject — an encoder/serializer `BUILTIN_*` allowlist plus a
-   `<Foo>NotSupported`-style exception — not a loud disclaimer (see below).
+   `<Foo>NotSupported`-style exception — not a loud disclaimer (Part O in the generic file).
 
 How to apply: when evaluating a new callback / hook / policy object / event
 filter / timetable extension on a hot path, answer both axes explicitly — (a)
 is every builtin implementation genuinely O(1) (if not, don't expose it to
 the hot loop, or cache/pre-compute); (b) does the subclass surface need
-closing, and is the closing mechanism structural (see the next entry) rather
+closing, and is the closing mechanism structural (Part O in the generic file) rather
 than a comment. Don't assume closing one axis buys safety on the other — a
 closed subclass surface doesn't stop a builtin method from being slow, and a
 fast builtin method doesn't stop a user subclass from adding an N+1 query.
-
----
-
-## Close a framework-internal sum-type/policy object structurally, not visibly
-
-A framework-internal sum-type / policy object (e.g. a small closed set of
-builtin strategy classes consumed by a hot loop) should be **"low-key
-closed"**, not hard-enforced with visible machinery. Structural close — an
-encoder/serializer that rejects anything outside a `BUILTIN_*` allowlist — is
-the actual enforcement. Visible signals like `abc.ABC` / `@abstractmethod` /
-`__init_subclass__` raising / a `NotImplementedError` stub / an explicit "do
-not subclass" disclaimer are all **loud "subclass me" signals** — they carry
-the same IDE-autocomplete/`help()`/Sphinx visual weight as an invitation to
-extend, whether the words say "subclass me" or "don't subclass me". A clean
-user-facing interface (a plain base class, no methods, a docstring describing
-only behavior) plus structural rejection at the encoder layer is more durable
-than a text warning, especially for a hot-loop extension point (scheduler
-tick / triggerer poll / API handler) where any DB query or network call a
-user smuggles into an override degrades throughput.
-
-How to apply when designing a new framework-internal sum-type / policy
-object consumed by a hot path:
-
-- Keep the user-facing (SDK-side) base a plain class with no methods; the
-  docstring describes only observable behavior.
-- If a type checker forces a method stub, keep the stub on the internal
-  (core-only) side the user never imports.
-- Reject non-builtin instances structurally at the encoder, via a
-  `BUILTIN_*` allowlist plus a dedicated `NotSupported`-style exception.
-- Don't write "extend / subclass to / extension point / pluggable" in the
-  docstring — and don't write "do not subclass" either; both are the same
-  kind of loud signal.
-- Don't add `__init_subclass__`-style runtime hard-enforcement — it's heavier
-  than the encoder-level reject and still advertises the extension point.
 
 ---
 
@@ -154,82 +66,6 @@ and only break uniformity when explicitly asked for calendar alignment.
 
 ---
 
-## Version-skew tolerance belongs at the client/transport boundary, not in generated models
-
-When a versioned client (Task SDK talking to the Execution API, a Python
-client talking to a REST API) hits a missing field because the server is
-older than the client's generated models, the fix is **not** to relax the
-generated model's `required` declaration to make the field optional.
-
-Why: a generated model faithfully reflects the contract of the spec version
-it was generated from — those fields really were required in that version;
-the codegen didn't mis-mark them. Relaxing them to optional has two costs:
-(a) it also drops validation for a version-**matched** server, sacrificing a
-correct check to accommodate a mismatched one; and (b) the model then
-misrepresents its own version's contract from that point on. The actual
-problem is a version mismatch between client and server, not an error in the
-model definition.
-
-How to apply: put compatibility tolerance at the **call site / transport
-boundary** (e.g. the response-validation step in the client's operations
-layer), never in the model definition or codegen template. Keep the
-tolerance as narrow as possible — catch only the specific error shape a
-version skew produces (e.g. a pydantic `ValidationError` where
-`error["type"] == "missing"`), re-raise everything else, and log the
-synthesized field so the fabricated value leaves a trace. The same judgment
-applies to any client/server pair with independently-versioned generated
-models on each side, not just one specific API.
-
-The same principle governs the **dependency floor**. When a drift tripwire — a
-test that derives what the package can reach from what is actually installed —
-fails on a low-dependency CI job because the declared feature set names things a
-newer upstream release introduced, raising the package's own lower bound is the
-wrong fix: it forces every downstream user to upgrade so that a documentation
-page reads complete. Absorb the skew in the layer that knows about it. Assert
-the direction that holds on every supported version (anything installed must be
-declared) unconditionally, and gate the opposite direction (anything declared
-must exist upstream) on the release that carries the whole declared set, naming
-that release in a constant so the next reader sees which version the list was
-derived from. Prove with a mutation canary that the unconditional direction is
-still red when something is genuinely missing — a gate that silently disables
-both directions is not a tripwire. (2026-09-17, `common.ai` `external-services`:
-`snowflake` landed in pydantic-ai 2.27.0 and `crusoe` in 2.28.0, while the
-provider supports `pydantic-ai-slim` from 2.23.0 upward and CI exercises that
-floor.)
-
-When the new upstream item is a vendor, the declaration itself touches three
-places (`provider.yaml`, the generated `get_provider_info.py`, and the test's
-`LABELS`) — see
-[`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
-("New hooks module in a provider …").
-
----
-
-## Normalize partial data at its source, not at each caller
-
-When a helper returns a partial structure on a failure path (`{}`, `None`, a dict missing keys),
-complete the shape **inside the helper** rather than letting every caller `.get(key, default)`.
-Scattered defaults drift apart: the caller that forgets one is the bug, and because its neighbours
-did supply defaults it looks deliberate rather than missed.
-
-Case (apache/airflow #72786): `_resolve_agent_ref()` returned `{}` on failure; four callers handled
-it — three with `.get(k, default)`, one with a bare `.get(k)`. That one printed the failover
-warning `Managed agent None on None failed; failing over to None` — exactly the line the docs tell
-operators to read to find the broken member. The fix normalized in the helper on **both** success
-and failure paths, and the four callers now index directly.
-
-Two traps:
-
-- **Fixing only the failure branch is not enough.** If just the `except` returns a sentinel and the
-  success path is passed through unchanged, a "didn't raise but returned a dict missing keys" hole
-  stays open — and deleting the callers' defaults then becomes a `KeyError`, worse than the
-  original bug. Normalize both paths or keep the caller defaults; never half of each.
-- **Normalizing is not swallowing.** In `ref = _normalize(obj.attr)` the argument is evaluated
-  before the call, so a raise propagates unchanged. Surfacing what is deliberately broken while
-  degrading what someone else broke can coexist.
-
----
-
 ## common.ai wraps vendor agent SDKs as adapters, not operators
 
 When common.ai integrates a vendor agent SDK that brings its own loop, the shape is the adapter
@@ -244,3 +80,32 @@ maintainer and reshaped into an `AirflowTools` adapter.
 
 How to apply: for a new vendor SDK, compare against the existing adapters' shape and guarantee
 list; before proposing an operator, answer "what does it give that `AgentOperator` cannot?"
+
+---
+
+## Airflow cases behind the generic design-integrity rules
+
+Airflow-specific instances of rules that now live in the generic file; read them alongside it.
+
+- **Part M (type-pairing guards, "two definitions must stay in sync")**: Airflow already has a
+  prek-hook precedent for this risk: `scripts/ci/prek/check_partition_mapper_defaults_in_sync.py`
+  (see `.pre-commit-config.yaml:344-350`), which diffs the field-name sets core and SDK each
+  maintain. A second instance surfaced on PR #69761 — `shared/plugins_manager`'s TypedDict vs. the
+  Pydantic response model in `airflow.api_fastapi.core_api.datamodels.plugins` — when review flagged
+  the lack of an automated sync check between the two. When a review raises this class of nit,
+  point at the existing hook as the concrete pattern to replicate.
+- **Part P (version-skew tolerance, dependency floor)**: the Airflow instance is
+  (2026-09-17) `common.ai` `external-services`: `snowflake` landed in pydantic-ai 2.27.0 and
+  `crusoe` in 2.28.0, while the provider supports `pydantic-ai-slim` from 2.23.0 upward and CI
+  exercises that floor. When the new upstream item is a vendor, the declaration itself touches three
+  places (`provider.yaml`, the generated `get_provider_info.py`, and the test's `LABELS`) — see
+  [`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
+  ("New hooks module in a provider …").
+- **Part L variant (normalize partial data at its source)**: apache/airflow #72786 —
+  `_resolve_agent_ref()` returned `{}` on failure; four callers handled it — three with
+  `.get(k, default)`, one with a bare `.get(k)`. That one printed the failover warning
+  `Managed agent None on None failed; failing over to None` — exactly the line the docs tell
+  operators to read to find the broken member. The fix normalized in the helper on **both** success
+  and failure paths, and the four callers now index directly.
+- **Part N (symmetric naming)**: the mapper examples are Airflow's partition mappers
+  (`upstream_mapper` / `downstream_mapper`, with `Window` as the structurally different pair member).

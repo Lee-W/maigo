@@ -307,6 +307,14 @@ The same file covers a mid-rebase Stop-hook red that is only an intermediate
 commit, and where `isolation: "worktree"` places a worktree when the caller is
 already in one.
 
+## Hook runner false greens (references)
+
+When a `pre-commit` / `prek` run reports `exit 0` but may have checked nothing —
+unstaged changes stashed away, `git add -N`, `git rebase --continue` running no
+hooks, a hook's `files:` regex that never matches, a corrupted prek toolchain
+cache, reproducing from the wrong directory, or building a new hook — read
+[`references/hook-runner-verification.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/hook-runner-verification.md).
+
 ## What this skill does NOT cover
 
 - Drafting the commit message text itself — see

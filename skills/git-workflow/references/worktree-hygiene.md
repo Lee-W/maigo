@@ -45,7 +45,7 @@ git worktree move <wrong-path> <root>/.worktrees/<topic>
 git -C <root>/.worktrees/<topic> branch -m <old-name> <topic>
 ```
 
-After a move, git-ignored files keep the old absolute path and cause false failures; see the "After `git worktree move`" section of [`airflow-aware/references/verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md).
+After a move, git-ignored files keep the old absolute path and cause false failures; see the "After `git worktree move`: stale absolute paths cause false failures" section below (Airflow-specific instances are in [`airflow-aware/references/verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)).
 
 A new worktree needs its own per-worktree tooling setup (e.g. a repo-specific
 environment bootstrap script) run once — don't assume it's inherited from the
@@ -466,3 +466,53 @@ added link, run `gh pr view <PR> --json commits --jq '.commits[].oid'` and check
 the list (or `git branch -vv` shows no `ahead N`). If it isn't, tell the user it's not pushed yet
 instead of replying first. Why: a reply promised a link whose commit never got pushed; the PR merged
 without it, the reviewer asked where it was, and a separate follow-up PR was needed.
+
+## Repo-scoped commands need a pinned working directory across worktrees
+
+When multiple git worktrees of the same repo exist side by side, the Bash
+tool's working directory **gets reset between invocations**, and `cd` can be
+intercepted by a directory-jump wrapper (e.g. zoxide) that fails silently on
+a miss instead of raising an error and without changing directory. Running
+any repo-scoped command with relative paths — a hook runner (`prek`),
+`uv run --project`, `pytest`, a code-generation script — while sitting in the
+wrong worktree does not error. It matches nothing, and every hook/step
+reports `0 files` / `(no files to check)` / `Skipped`, with the overall exit
+code still **0**. Confirmed shape: `prek run --files <relative paths> --stage
+pre-commit` run from the wrong worktree reported 250 hooks `Skipped` and only
+4 `Passed`, exit 0 — the relative paths resolved to unmodified files in that
+worktree, not the ones actually changed.
+
+How to apply: wrap repo-scoped commands in a subshell that pins the
+directory explicitly, and print `pwd` in the *same* invocation as evidence —
+don't rely on "the previous command already put me there":
+
+```zsh
+(builtin cd "<worktree>" && pwd && prek run --files <paths> --stage pre-commit)
+```
+
+`builtin cd` bypasses a directory-jump wrapper that shadows the `cd`
+builtin. For pure git operations, `git -C <worktree>` is enough on its own
+and needs no subshell.
+
+Judgment: seeing a large fraction of `Skipped` / `(no files to check)` /
+`0 files` while the exit code is still 0 is itself the signal to suspect the
+wrong directory or an unexpanded argument — never read it as "passed."
+
+## After `git worktree move`: stale absolute paths cause false failures
+
+A moved worktree keeps the absolute path of its old location in git-ignored
+files, which survive the move. Before debugging code, confirm the failure is
+path-related (the same test file is green on a clean checkout of `HEAD` in
+another worktree and red only here), then check these. The symptom depends on
+how the tool is invoked.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A hook that runs a tool from a hook-managed venv under an ignored directory fails with exit 126, or with ``Failed to spawn: `<tool>` `` (os error 2) | the shebang of that venv's `bin/<tool>` still execs the old path's python; the hook runner's re-sync reinstalls packages but not this shim | `head -1 <venv>/bin/<tool>`; if it shows the old path and `git check-ignore <venv-dir>` confirms it is ignored, delete that hook's venv directory and rerun |
+| ``Failed to spawn: `pytest` `` | the `.venv/bin/<cmd>` shebang | run `python -m pytest` |
+| Many tests red with tracebacks into a directory that no longer exists, or source lines shown as `???` | stale `.pyc` files embed the old path | delete the ignored `__pycache__` directories (the package's and its parents) and rerun |
+| Stop hook reports `ModuleNotFoundError` or runs in the wrong directory | `.claude/test-command` contains an old absolute path in an environment variable (`PYTHONPATH`, a home directory) | rewrite the file; the hook splits it with `shlex.split` and runs it without a shell, so carry variables with `env VAR=...` |
+
+Look at the shim first when you see `Failed to spawn: <tool>`: do not ask for
+`--no-verify` before the root cause is checked and cannot be fixed, and
+confirm each such authorization per commit.

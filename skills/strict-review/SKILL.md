@@ -286,6 +286,11 @@ details and recipes in `references/design-integrity.md`:
 - **Prefer polymorphism over type-switching in the caller** — an `isinstance` chain or type-flag branch in the caller is a signal to push behavior onto a base-class method instead; don't extend the switch with a new flag.
 - **Fix at the owning layer** — a defect in behavior owned by an upstream module/library gets an upstream option or callback, not a downstream workaround; details in `references/design-integrity.md` Part L.
 - **External tools are optional and runtime-detected** — detect the binary, don't add a hard dependency; fallback must not leave the user with neither path; extension of Part E.
+- **Type-pairing guards compare declared attributes** — never use "is this method overridden" as a proxy; one `is not` comparison on a declared attribute of both sides (Part M).
+- **Name a counterpart symmetrically** — `upstream_x` / `downstream_x`, not `upstream_x` / `fine_x`; sibling classes share the vocabulary (Part N).
+- **Close a framework-internal sum-type structurally, not visibly** — an encoder-level allowlist, not `ABC` / "do not subclass" text (Part O).
+- **Version-skew tolerance at the client/transport boundary** — not by relaxing generated models or raising the dependency floor (Part P).
+- **Normalize partial helper data at its source** — a variant of the owning-layer rule in Part L.
 
 ## Claims and evidence checks (references)
 

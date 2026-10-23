@@ -345,7 +345,7 @@ status doc for a feature that ships:
 - If this PR adds or changes a docs page, attach a before/after screenshot at PR-open time —
   a new reader-facing docs page counts as user-facing for the PR template's screenshot
   requirement, even though "it's just docs." Don't wait for a reviewer to ask. See the
-  screenshot procedure in `references/verification-tooling.md` §7.
+  screenshot procedure in `references/verification-tooling.md` §6.
 - **Don't prefix a doc-only commit's subject with `Docs:`.** `docs` is
   itself a Conventional Commits type name, so
   `scripts/ci/prek/check_no_conventional_commit_message.py` matches
@@ -502,7 +502,7 @@ beats per-endpoint pedantic accuracy.
   copy with a "not exhaustive" disclaimer** — the one exception is an item
   the page already set up a forward reference to. Full criterion and case
   study in
-  [`references/docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md).
+  [`strict-review/references/recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md).
 - **`providers/<x>/docs/index.rst` has a hand-written prologue followed by an
   auto-generated block** (marked by an "AUTOMATICALLY GENERATED" comment)
   that gets overwritten at release time. Reordering/placement feedback on
