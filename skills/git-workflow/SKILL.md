@@ -299,6 +299,9 @@ before restating a status claim, reusing a cached base ref, or running a
 destructive reset. Recovery recipes, base-ref staleness, and CI/changelog
 proxy traps in
 [`references/shared-worktree-state.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/shared-worktree-state.md).
+The same file covers a mid-rebase Stop-hook red that is only an intermediate
+commit, and where `isolation: "worktree"` places a worktree when the caller is
+already in one.
 
 ## What this skill does NOT cover
 

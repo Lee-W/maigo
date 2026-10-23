@@ -142,6 +142,28 @@ landed: independently run `git log` / `git status` in **both** the path you
 gave it and the tool's auto-created isolation path to confirm the work landed
 where intended before treating the task as done.
 
+Placement also differs when the *caller* is already inside a worktree: with
+`isolation: "worktree"` the new worktree was observed to be created under the
+original repo root (not under the current worktree) and to start from a branch
+near `main`, not the current PR branch (observed once, not checked against
+official docs). So when the work must build on a PR branch, say in the prompt
+which branch to cut from, and require the agent to report the actual worktree
+path and its starting commit.
+
+## A Stop-hook red in the middle of a rebase may just be an intermediate commit
+
+While a rebase is stopped on a conflict or on an intermediate commit, a Stop
+hook failure can simply mean that commit isn't self-consistent on its own —
+not that anything regressed. Finish resolving, run the rebase to the tip, and
+verify there. Don't change definitions to appease the hook, and don't add the
+failures to `known-test-failures`.
+
+Example (apache/airflow #74695): stopped on the first commit, the hook reported
+the same 15 failures (`test_sql.py`, `test_datafusion.py`) eight times, because
+that commit's `sql.py` / `datafusion.py` called `_build_tool_name` while only
+defining `_tool_name`; a later commit added the definition. After the rebase
+finished, the same tests at the tip: 796 passed.
+
 ## A green/skipped CI check and a changelog line are proxies, not proof
 
 Two distinct traps in reading state through a proxy instead of the primary
