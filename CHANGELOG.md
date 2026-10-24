@@ -5,6 +5,17 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.68.0 (2026-10-24)
+
+### Feat
+
+- **token-usage**: record subagent usage from SubagentStop transcripts
+
+### Fix
+
+- **teammate-quality-check**: fall back to the transcript when last_assistant_message is missing
+- **verify-completion**: parse parametrized pytest IDs with bracket matching
+
 ## v0.67.0 (2026-10-23)
 
 ### Feat
