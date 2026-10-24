@@ -242,12 +242,18 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 ## SubagentStop — `hooks/teammate_quality_check.py`
 
 由 Agent 工具啟動的 Maigo subagent 回覆完成時觸發。Matcher 限定 Maigo 的五位角色，
-以 `agent_type`（例如 `maigo:Soyo`）辨識角色，從 `last_assistant_message` 取得輸出，
-並以事件提供的 `cwd` 檢查 artifact、寫入 retry log。
+以 `agent_type`（例如 `maigo:Soyo`）辨識角色，優先從 `last_assistant_message` 取得輸出；
+缺少或為空時（以 `SubagentHandback` 結尾的 agent 不會帶這個欄位），改讀 `agent_transcript_path`
+指向的 transcript，取最後一次 `SubagentHandback` 的 `input.message`，再沒有就取最後一則 text。
+兩者都拿不到才回報「缺少 last_assistant_message」。並以事件提供的 `cwd` 檢查 artifact、寫入 retry log。
 
 不符合最低規格就輸出 `{"decision":"block","reason":"..."}`，exit 0；通過時省略
 `decision`。這是 [SubagentStop 的官方契約](https://code.claude.com/docs/en/hooks#subagentstop)。
 原先使用的 TeammateIdle 屬於 agent team 的閒置事件，沒有直接提供角色輸出，已移除該註冊。
+
+**限制**：agent 以 `SubagentHandback` 結尾時，`block` 不一定能讓它重新跑起來（agent 已經交棒結束），
+實際效果可能只剩 `systemMessage` 的告知。這點目前只是從 transcript 尾端推論，尚無 runtime 驗證；
+`block` 語意不因輸入來源（payload 或 transcript）而分流。transcript 格式未文件化，讀取採 fail-open。
 
 ### 各角色擋的條件
 

@@ -716,6 +716,7 @@ class TestMain:
             pytest.param("PreToolUse", 1, id="legacy-path"),
             pytest.param("PostToolUse", 0, id="token-usage"),
             pytest.param("SubagentStop", 0, id="subagent-stop"),
+            pytest.param("SubagentStop", 1, id="subagent-stop-token-usage"),
             pytest.param("Stop", 0, id="stop"),
         ],
     )
@@ -855,3 +856,78 @@ def test_real_subagent_events_scope_retry_and_approval_reset(tmp_path):
     assert "RETRY LIMIT" in run()["reason"]
     assert run(approved).get("decision") is None
     assert "RETRY LIMIT" not in run()["reason"]
+
+
+# ---------------------------------------------------------------------------
+# SubagentStop transcript fallback (missing last_assistant_message)
+# ---------------------------------------------------------------------------
+
+
+def _write_transcript(tmp_path: Path, content: list[dict]) -> Path:
+    path = tmp_path / "agent.jsonl"
+    row = {"type": "assistant", "message": {"id": "m1", "content": content}}
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    return path
+
+
+def _handback(text: str) -> dict:
+    return {"type": "tool_use", "name": "SubagentHandback", "input": {"message": text}}
+
+
+class TestTranscriptFallback:
+    def _run(self, monkeypatch, capsys, tmp_path, transcript, **extra):
+        payload = {
+            "agent_type": "maigo:Anon",
+            "cwd": str(tmp_path),
+            "agent_transcript_path": str(transcript),
+            **extra,
+        }
+        return run_hook_main(tqc, payload, monkeypatch, capsys)
+
+    def test_handback_content_reaches_handler_passing(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        path = _write_transcript(tmp_path, [_handback("Updated `src/example.py`")])
+        result = self._run(monkeypatch, capsys, tmp_path, path)
+        assert result.get("decision") is None
+
+    def test_handback_content_reaches_handler_failing(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        path = _write_transcript(tmp_path, [_handback("改好了")])
+        result = self._run(monkeypatch, capsys, tmp_path, path)
+        assert result["decision"] == "block"
+        assert "檔案路徑" in result["reason"]
+
+    def test_text_only_transcript(self, monkeypatch, capsys, tmp_path):
+        path = _write_transcript(
+            tmp_path, [{"type": "text", "text": "Updated `src/example.py`"}]
+        )
+        result = self._run(monkeypatch, capsys, tmp_path, path)
+        assert result.get("decision") is None
+
+    def test_empty_last_message_also_falls_back(self, monkeypatch, capsys, tmp_path):
+        path = _write_transcript(tmp_path, [_handback("Updated `src/example.py`")])
+        result = self._run(
+            monkeypatch, capsys, tmp_path, path, last_assistant_message="  "
+        )
+        assert result.get("decision") is None
+
+    def test_nothing_available_keeps_original_block(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        path = _write_transcript(tmp_path, [{"type": "tool_use", "name": "Bash"}])
+        result = self._run(monkeypatch, capsys, tmp_path, path)
+        assert result["decision"] == "block"
+        assert (
+            result["reason"]
+            == "maigo:Anon".removeprefix("maigo:")
+            + " 的 SubagentStop 缺少 last_assistant_message，請補完角色輸出。"
+        )
+
+    def test_payload_message_wins_over_transcript(self, monkeypatch, capsys, tmp_path):
+        path = _write_transcript(tmp_path, [_handback("Updated `src/example.py`")])
+        result = self._run(
+            monkeypatch, capsys, tmp_path, path, last_assistant_message="改好了"
+        )
+        assert result["decision"] == "block"

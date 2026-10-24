@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _grep_criteria import block_reason, find_literal_grep_criteria
 from _hook_io import emit_stop as emit
 from _retry_log import RetryScope, record_and_count
+from _transcript import final_report, read_with_retry
 
 SOYO_RETRY_LIMIT = 2
 REVIEW_MODE_ITEMS = json.loads(
@@ -524,6 +525,13 @@ def main() -> None:
         return
 
     output = data.get("last_assistant_message")
+    if not isinstance(output, str) or not output.strip():
+        transcript = data.get("agent_transcript_path")
+        output = (
+            read_with_retry(final_report, Path(transcript))
+            if isinstance(transcript, str) and transcript
+            else None
+        )
     if not isinstance(output, str) or not output.strip():
         emit(
             "block",
