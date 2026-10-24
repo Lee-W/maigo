@@ -177,13 +177,69 @@ def run_command(cmd: list[str], cwd: Path) -> tuple[int, str]:
         return -1, f"cannot run {' '.join(cmd)}: {exc}"
 
 
+def _scan_pytest_id(text: str, start: int) -> int | None:
+    """Return the end index of the pytest node ID that starts at ``start``.
+
+    A parametrized ID can contain spaces, nested ``[]`` and `` - `` (for example
+    ``test_x[a b-c]`` or ``test_x[n[1]-[2]]``), and `` - `` is also the separator
+    pytest puts before its message. So ``\\S+`` cannot tell where the ID ends:
+    it truncates at the first space. Instead, the ID ends at the first whitespace
+    outside brackets, or at the ``]`` that balances the first ``[``.
+
+    Returns ``None`` when the brackets do not balance before the end of the line;
+    the caller then falls back to the old ``\\S+`` behaviour. Limitation: a path
+    containing a space is not handled (the old regex had the same limit).
+    """
+    i = start
+    n = len(text)
+    while i < n and not text[i].isspace():
+        if text[i] == "[":
+            depth = 0
+            j = i
+            while j < n and text[j] != "\n":
+                if text[j] == "[":
+                    depth += 1
+                elif text[j] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            else:
+                return None
+            i = j + 1
+            continue
+        i += 1
+    return i
+
+
 def extract_failures(output: str) -> set[str]:
     """Heuristic extraction of failed test names from common test runner output."""
     failures: set[str] = set()
-    # pytest: "FAILED tests/x.py::test_y"
-    failures.update(re.findall(r"FAILED (\S+)", output))
-    # pytest summary: "tests/x.py::test_y FAILED"
-    failures.update(re.findall(r"(\S+::\S+)\s+FAILED", output))
+    # pytest: "FAILED tests/x.py::test_y" (not anchored to line start, like before)
+    for m in re.finditer(r"FAILED (?=\S)", output):
+        token = re.match(r"\S+", output[m.end() :])
+        if token is None:  # pragma: no cover - guarded by the lookahead
+            continue
+        if "::" not in token.group():
+            failures.add(token.group())
+            continue
+        end = _scan_pytest_id(output, m.end())
+        failures.add(output[m.end() : end] if end is not None else token.group())
+    # pytest -v: "tests/x.py::test_y FAILED  [ 33%]"
+    for line in output.splitlines():
+        pos = 0
+        while (hit := re.compile(r"\S+::").search(line, pos)) is not None:
+            start = hit.start()
+            token_end = start + len(re.match(r"\S+", line[start:]).group())  # type: ignore[union-attr]
+            end = _scan_pytest_id(line, start)
+            if end is None:
+                if re.match(r"\s+FAILED", line[token_end:]):
+                    failures.add(line[start:token_end])
+                pos = token_end
+                continue
+            if re.match(r"\s+FAILED\b", line[end:]):
+                failures.add(line[start:end])
+            pos = max(end, token_end)
     # jest: "FAIL src/x.test.js"
     failures.update(re.findall(r"FAIL\s+(\S+\.(?:test|spec)\.[jt]sx?)", output))
     # cargo test: "test foo ... FAILED"

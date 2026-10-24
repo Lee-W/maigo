@@ -373,7 +373,7 @@ Stop 事件沒有可靠的 task ID，因此這條入口不累計跨呼叫的重�
 |------|------|
 | `skip-test-verification` | 第一行非空非註解視為原因，整個檢查跳過 |
 | `test-command` | 完全覆寫 test 指令（用 `shlex.split` 解析，支援引號；以 argv 執行，無 shell expansion） |
-| `known-test-failures` | 已知失敗名單（一行一個），不擋這些；只擋「新的」失敗 |
+| `known-test-failures` | 已知失敗名單（一行一個），不擋這些；只擋「新的」失敗。要寫 pytest 印出的**完整** ID（例如 `tests/x.py::test_y[a b]`，含參數化方括號），比對方式是整行字串相等 |
 
 `test-command` 是 argv，不是 shell command line——`shlex.split` 之後直接 `subprocess.run`，所以 `&&`、`||`、`|`、`;`、重導向、glob、變數展開全部不生效，它們會變成前一個指令的**參數**。要跑多個 target 就用單一指令帶多路徑（`pytest <path1> <path2>`）；真的需要串接，包成 script 再讓 `test-command` 指向它。
 
@@ -395,7 +395,7 @@ message 強調「這不是 test fail，是 import 錯」。
 
 | 框架 | 模式 |
 |------|------|
-| pytest | `FAILED <name>` 或 `<file>::<test> FAILED` |
+| pytest | `FAILED <name>` 或 `<file>::<test> FAILED`；`<name>` 是完整 node ID，含參數化方括號內的空白與巢狀 `[]` |
 | jest | `FAIL <file>.test.[jt]sx?` |
 | cargo test | `test <name> ... FAILED` |
 | go test | `--- FAIL: <name>` |

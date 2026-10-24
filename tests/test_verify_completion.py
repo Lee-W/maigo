@@ -46,6 +46,62 @@ class TestExtractFailures:
         assert "tests/b.py::test_2" in failures
         assert "TestBar" in failures
 
+    def test_pytest_prefix_param_with_space(self):
+        out = "FAILED test_fmt.py::test_space[a b-c] - AssertionError: msg"
+        failures = verify_completion.extract_failures(out)
+        assert "test_fmt.py::test_space[a b-c]" in failures
+        assert "test_fmt.py::test_space[a" not in failures
+
+    def test_pytest_prefix_nested_brackets(self):
+        out = "FAILED test_fmt.py::test_nested[n[1]-[2]] - assert False"
+        failures = verify_completion.extract_failures(out)
+        assert failures == {"test_fmt.py::test_nested[n[1]-[2]]"}
+
+    def test_pytest_prefix_plain_with_message(self):
+        out = "FAILED test_fmt.py::test_plain - assert False"
+        failures = verify_completion.extract_failures(out)
+        assert failures == {"test_fmt.py::test_plain"}
+
+    def test_pytest_prefix_param_without_message(self):
+        out = "FAILED test_fmt.py::test_space[a b-c]"
+        assert verify_completion.extract_failures(out) == {
+            "test_fmt.py::test_space[a b-c]"
+        }
+
+    def test_pytest_verbose_suffix_param_with_space(self):
+        out = "test_fmt.py::test_space[a b-c] FAILED                                    [ 33%]"
+        failures = verify_completion.extract_failures(out)
+        assert failures == {"test_fmt.py::test_space[a b-c]"}
+        assert "test_fmt.py::test_space[a" not in failures
+
+    def test_pytest_id_containing_dash_separator(self):
+        out = "FAILED test_x.py::test_x[a - b] - assert False"
+        failures = verify_completion.extract_failures(out)
+        assert failures == {"test_x.py::test_x[a - b]"}
+        assert "test_x.py::test_x[a" not in failures
+
+    def test_pytest_both_formats_dedupe(self):
+        out = (
+            "test_fmt.py::test_space[a b-c] FAILED   [ 33%]\n"
+            "FAILED test_fmt.py::test_space[a b-c] - AssertionError: msg"
+        )
+        assert verify_completion.extract_failures(out) == {
+            "test_fmt.py::test_space[a b-c]"
+        }
+
+    def test_pytest_multiple_ids_on_one_line(self):
+        out = "a.py::t1 PASSED b.py::t2 FAILED"
+        assert verify_completion.extract_failures(out) == {"b.py::t2"}
+
+    def test_pytest_char_after_closing_bracket(self):
+        prefix = verify_completion.extract_failures("FAILED t.py::test_y[a]x - boom")
+        suffix = verify_completion.extract_failures("t.py::test_y[a]x FAILED")
+        assert prefix == suffix == {"t.py::test_y[a]x"}
+
+    def test_pytest_unbalanced_bracket_falls_back_to_nonspace(self):
+        out = "FAILED test_x.py::test_x[a b - assert False"
+        assert verify_completion.extract_failures(out) == {"test_x.py::test_x[a"}
+
 
 # ---------------------------------------------------------------------------
 # read_known_failures
