@@ -202,11 +202,21 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 
 5 秒上限。純 regex，毫秒級完成。
 
-## PostToolUse — `hooks/token_usage.py`
+## PostToolUse／SubagentStop — `hooks/token_usage.py`
 
-只匹配 `Agent` 工具。foreground subagent 完成時，直接讀 Claude Code
-`tool_response.usage` 提供的 metadata，寫入目前 repo 的 `.maigo/token-usage.jsonl`。
-不重新送內容給模型、不跑 tokenizer，也不自行估算。
+兩條路徑都寫入目前 repo 的 `.maigo/token-usage.jsonl`，不重新送內容給模型、不跑 tokenizer，也不自行估算：
+
+- **PostToolUse**（matcher `Agent`）：foreground subagent 完成時，直接讀 Claude Code
+  `tool_response.usage` 提供的 metadata。
+- **SubagentStop**（另一個不帶 matcher 的 group，記錄**所有** agent 類型，不限 Maigo 角色）：
+  讀 payload 的 `agent_transcript_path`，把 assistant 行的 `message.usage` 四個 token 欄加總，
+  同一個 `message.id` 只算一次（transcript 會把同一則訊息拆成多行重複記錄）。
+  這條路徑讓 background agent 也有紀錄，因為它們的 PostToolUse 拿不到 usage。
+  `model` 取 transcript 的 `requestedModel`，可能是別名（例如 `sonnet`），與 PostToolUse 的
+  `resolvedModel` 完整 ID 並存時，`breakdown` 的 model 分組會出現兩種命名。
+  payload 缺 `agent_transcript_path` 時直接略過，不推導路徑。
+  transcript 格式 Claude Code 並未文件化，讀取器全程 fail-open：壞行、缺欄位、檔案不存在都靜默略過；
+  讀不到可用資料時最多再試 2 次、間隔 150ms。
 
 每行一筆 JSON：
 
@@ -214,10 +224,10 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 {"ts":"2026-07-16T12:00:00Z","session_id":"...","agent_id":"...","agent_type":"maigo:Soyo","model":"claude-sonnet","input_tokens":8320,"output_tokens":1230,"cache_creation_input_tokens":400,"cache_read_input_tokens":2500}
 ```
 
-以 `session_id + agent_id` 去重。下列情況靜默略過：
+兩條路徑共用同一份 log，以 `session_id + agent_id` 去重，所以 foreground agent 只會記一筆。下列情況靜默略過：
 
-- `status` 不是 `completed`（包含 background agent 的 `async_launched`）
-- harness 沒提供 `usage`
+- PostToolUse：`status` 不是 `completed`（包含 background agent 的 `async_launched`）
+- PostToolUse：harness 沒提供 `usage`；SubagentStop：transcript 不存在、不可讀或四欄全為 0
 - malformed input、無法建立 `.maigo/` 或寫檔失敗
 - Codex plugin（Codex manifest 不安裝 Claude Code lifecycle hook）
 
@@ -436,6 +446,11 @@ message 強調「這不是 test fail，是 import 錯」。
 # 模擬 SubagentStop 觸發
 python3 -c "import json; print(json.dumps({'hook_event_name':'SubagentStop','agent_type':'maigo:Soyo','last_assistant_message':'## Verdict\nBLOCKED\n## Checklist\n- [ ] foo'}))" \
   | python3 hooks/teammate_quality_check.py
+
+# 模擬 SubagentStop 的 transcript fallback / token usage（先準備 fixture JSONL，
+# 每行一筆 {"type":"assistant","message":{"id":"m1","usage":{...},"content":[...]}}）
+python3 -c "import json; print(json.dumps({'hook_event_name':'SubagentStop','session_id':'demo','agent_id':'agent-1','agent_type':'general-purpose','cwd':'/path/to/project','agent_transcript_path':'/path/to/agent.jsonl'}))" \
+  | python3 hooks/token_usage.py
 
 # 模擬 Stop 觸發
 python3 -c "import json,sys; print(json.dumps({'cwd':'/path/to/project'}))" \

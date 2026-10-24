@@ -56,6 +56,15 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/token_usage.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [

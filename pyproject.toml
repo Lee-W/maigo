@@ -25,6 +25,7 @@ module = [
   "_retry_log",
   "_session_head",
   "_token_usage",
+  "_transcript",
   "artifact_path",
   "board_state",
   "board_sync",

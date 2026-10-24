@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import datetime
 import json
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-USAGE_FIELDS = (
-    "input_tokens",
-    "output_tokens",
-    "cache_creation_input_tokens",
-    "cache_read_input_tokens",
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _transcript import USAGE_FIELDS, read_with_retry, sum_usage  # noqa: E402
+
 LOG_PATH = Path(".maigo/token-usage.jsonl")
 
 
@@ -74,25 +72,72 @@ def record_agent_usage(data: dict[str, Any]) -> bool:
     if not any(counts.values()):
         return False
 
-    log_path = Path(cwd) / LOG_PATH
-    entries, _ = read_entries(log_path)
-    if any(
-        entry.get("session_id") == session_id and entry.get("agent_id") == agent_id
-        for entry in entries
-    ):
-        return False
-
     tool_input = data.get("tool_input")
     agent_type = (
         tool_input.get("subagent_type") if isinstance(tool_input, dict) else None
     )
+    return _append_record(
+        cwd,
+        {
+            "session_id": session_id,
+            "agent_id": agent_id,
+            "agent_type": agent_type if isinstance(agent_type, str) else None,
+            "model": response.get("resolvedModel"),
+            **counts,
+        },
+    )
+
+
+def record_subagent_usage(data: dict[str, Any]) -> bool:
+    """Append one usage record summed from a SubagentStop transcript, fail-open."""
+    if data.get("hook_event_name") != "SubagentStop":
+        return False
+    session_id = data.get("session_id")
+    agent_id = data.get("agent_id")
+    cwd = data.get("cwd")
+    transcript = data.get("agent_transcript_path")
+    if not isinstance(session_id, str) or not session_id:
+        return False
+    if not isinstance(agent_id, str) or not agent_id:
+        return False
+    if not isinstance(cwd, str) or not cwd:
+        return False
+    if not isinstance(transcript, str) or not transcript:
+        return False
+
+    result = read_with_retry(sum_usage, Path(transcript))
+    if result is None:
+        return False
+    counts, model = result
+    if not any(counts.values()):
+        return False
+
+    agent_type = data.get("agent_type")
+    return _append_record(
+        cwd,
+        {
+            "session_id": session_id,
+            "agent_id": agent_id,
+            "agent_type": agent_type if isinstance(agent_type, str) else None,
+            "model": model,
+            **counts,
+        },
+    )
+
+
+def _append_record(cwd: str, fields: dict[str, Any]) -> bool:
+    """Append a record unless session_id + agent_id is already logged."""
+    log_path = Path(cwd) / LOG_PATH
+    entries, _ = read_entries(log_path)
+    if any(
+        entry.get("session_id") == fields["session_id"]
+        and entry.get("agent_id") == fields["agent_id"]
+        for entry in entries
+    ):
+        return False
     record = {
         "ts": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "session_id": session_id,
-        "agent_id": agent_id,
-        "agent_type": agent_type if isinstance(agent_type, str) else None,
-        "model": response.get("resolvedModel"),
-        **counts,
+        **fields,
     }
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -184,7 +229,7 @@ def _compact(value: int) -> str:
 
 def format_one_line(summary: UsageSummary) -> str:
     if summary.tracked_agents == 0:
-        return "Token usage：無可用 metadata（背景 agent、Codex 或舊版 harness 可能不提供）"
+        return "Token usage：無可用 metadata（Codex、舊版 harness 或 transcript 不可讀時可能不提供）"
     return (
         f"Token usage：input {_compact(summary.input_tokens)}｜"
         f"output {_compact(summary.output_tokens)}｜"
