@@ -227,6 +227,7 @@ Stop 沒有可靠的 task ID。換 agent、沒有 hook 或缺識別碼時，由 
 
 - 爽世連續擋 **2 次**同一條 must-fix → 停下，請使用者介入（可能是計畫本身有問題）
 - 立希連續紅 **2 次**同一個 test → 停下，請使用者介入（可能 test 本身需要更新）
+  這條的機器計次只在 `scripts/verify_task.py` 沿用同一組 `--run-id`／`--task-id` 時成立；Stop hook 不累計跨呼叫次數（失敗仍照常 block），預算由 orchestrator 自己記。
 
 「同一條 must-fix」判準：Soyo 輸出的 must-fix 條目**指向同一個檔案 + 同一個函式 / 區段 + 同一類問題描述**（不要求 wording 完全相同，但語意相同算同條）。Anon 改 wording、換實作方式但問題本質沒解掉 → 仍算同條。
 
