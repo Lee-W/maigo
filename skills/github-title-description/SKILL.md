@@ -90,6 +90,7 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 | 版本演進敘事（「v1 是這樣做，後來因為 Z 改成 Y」） | 這種討論屬於 PR review thread，不屬於 description |
 | `## What` 逐檔案條列（「改了 a.py / 改了 b.py / 改了 c.py」） | reviewer 自己看 diff 就有檔案清單；description 該講行為改變，不是檔案清單 |
 | `## Test Plan` 貼整段 test 檔內容 | reviewer 要的是「測了什麼」的摘要，不是原始碼；貼檔案內容讓 test plan 難掃 |
+| 帶確切 commit sha（`(a8910e8)`、`見 306feea`） | rebase / squash 後 sha 失效，對 reviewer 也沒有資訊量；改用描述性文字（「移除 exclude-newer 豁免」）。**永遠不帶**，不因為「方便對照」而例外 |
 
 **可選段（有才加，不要為了塞而塞）**：
 
