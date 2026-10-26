@@ -23,6 +23,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 以下四步在 `/maigo:go` 和 `/maigo:team` 都必須照順序走：
 
 1. **🐱 樂奈 (Raana)** — 探 codebase，找出相關位置與既有慣例。「看完了。相關的在這三個檔案。」
+   探索必含兩項：(a) **pending branch 重疊掃描**——`git branch -a` 列出本機與 remote 的 branch，對名稱或時間上可能相關的候選跑 `git log --oneline <base>..<branch>` 與 `git diff --stat <base>...<branch>`，回報哪些 branch 改到同一批檔案；(b) 任務涉及版本升級時的 **upstream 現況**——該套件在 PyPI 的最新正式版、對應的 constraints／tag／image 是否存在。這兩項落在探索階段，交給 🩵 燈決定基底；不能推成 🎀 愛音的 Step 0。實例：某次升版 plan 寫完後 orchestrator 才查到一條 pending branch 改的正是同一塊 `pyproject.toml`、且上游已出正式版，plan 多走一輪修訂。
 2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`）。「……讓我先理清楚它想做什麼。」
    派工前由 orchestrator 在目標 cwd 執行 `python3 "<maigo-root>/scripts/artifact_path.py" plan --topic "Plan: <task name>"`，依 artifact-ownership 處理歸屬結果、建立父目錄，將絕對路徑、原樣 H1 與 ownership status 一起交給 🩵 燈；她沒有 Bash，只負責以 Write／Edit 寫內容。缺少路徑時回報 orchestrator 補齊，不自行組檔名。
    **交辦是「移植一批 commit 到另一個 target」這種形狀時**（例：「看這 N 個 commit，另一個
@@ -47,7 +48,7 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 
 | 交棒 | 必須留下什麼 | 不能怎樣 |
 |------|-------------|----------|
-| 🐱 樂奈 → 🩵 燈 | 相關位置、既有慣例、異狀、潛在影響面 | 不把探索報告寫成實作計畫 |
+| 🐱 樂奈 → 🩵 燈 | 相關位置、既有慣例、異狀、潛在影響面、重疊的 pending branch 與 upstream 現況 | 不把探索報告寫成實作計畫 |
 | 🩵 燈 → 🎀 愛音 | 交出實際 plan 路徑（`.maigo/plan-<id>.md`），裡面清楚標 `Goal`、`Steps`、acceptance、blocking decisions | 不把風險藏在語氣裡；不讓 🎀 愛音猜路徑或內容 |
 | 🎀 愛音 → 🟡 爽世 | 每個 step 的完成狀態、改了哪些檔、sanity check / test output | 不用「應該」「大概」包裝未驗證狀態 |
 | 🟡 爽世 → 🎀 愛音 | 編號 must-fix、具體改法、為什麼、還缺什麼 evidence | 不只說方向，讓 🎀 愛音猜怎麼修 |
@@ -139,6 +140,14 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 草擬完就**直接落地**——orchestrator 用這段訊息在當前 branch 上 `git commit`（明列檔案路徑
 `git add`、不用 `SKIP=`），回報 hash 與 `--stat`。**push 不代跑**，那是使用者的動作。
 使用者要改 wording / amend / 拆合，自己接手即可。
+
+**Plan 要求拆成多個 commit 時**（細粒度 commit 偏好，或同一個檔案要分屬兩個 commit），改在 🎀 愛音
+的實作交辦裡要求她依 plan 的拆法**逐 step `git commit`**——明列檔案路徑 `git add`、不用 `--no-verify`
+／`SKIP=`、不加任何 attribution trailer、不 push；orchestrator 收尾時就不再另外 commit。此時 🟡 爽世與
+🟣 立希的交辦要**同時**指向 `git diff <base>...HEAD`（已 commit 的部分）、`git diff HEAD` 與
+`git status --porcelain`（未 commit 與 untracked 的殘留），並把「commit 拆法是否符合 plan、每個 commit
+沒有 attribution trailer」列進審查／驗證條件。實例：某次 Python＋Airflow 升版拆成五個 commit，其中兩個
+都動 `pyproject.toml`，事後用 `git add -p` 拆遠比逐 step commit 容易出錯。
 
 若使用者或後續步驟確實要跑 git 操作（stage / amend / 診斷 diff 大小），
 依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
