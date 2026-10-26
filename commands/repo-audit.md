@@ -1,6 +1,6 @@
 ---
 description: repo 自身內部健診（read-only orchestrator 主持）——掃已合併可刪的 branch、未關 PR、TODO/FIXME 積壓、skill 健診（孤兒 / 重疊候選 / 指向失效）、已合併可清的 worktree（不限佈局），彙整成可複製的處置 checklist，不執行任何寫入。🌑 Mortis 一句結算。不 delegate 五人，orchestrator 直跑。
-allowed-tools: Bash(git branch --merged:*), Bash(gh pr list:*), Bash(grep:*), Bash(git worktree list:*), Bash(gh search prs:*), Read
+allowed-tools: Bash(git branch --merged:*), Bash(git cherry:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(gh pr list:*), Bash(grep:*), Bash(git worktree list:*), Bash(gh search prs:*), Read
 ---
 
 <!-- mkdocs-include-start -->
@@ -28,7 +28,36 @@ read-only 內部健診——不刪 branch、不關 PR、不改 code。
 git branch --merged main
 ```
 
-過濾掉 `main` 與當前 branch 自身，列出其餘已合入 main 的本地 branch。
+過濾掉 `main` 與當前 branch 自身，列出其餘已合入 main 的本地 branch，理由標「已合入 main（ancestor）」。
+
+`git branch --merged` 只認 commit ancestry；rebase / squash / cherry-pick 合併後 commit hash
+不同，認不出來，但這些 branch 仍可刪。對**未被 `--merged` 列出**的其餘本地 branch（同樣排除
+`main` 與當前 branch；`--merged` 已列出的跳過下面兩項，避免重複列出）各跑兩項唯讀辨識：
+
+```bash
+git cherry main <branch>
+gh pr list --state merged --head <branch> --base main --json number,url,mergedAt,headRefOid
+```
+
+（`--base` 用實際主 branch，上面以 `main` 示意。）
+
+- `git cherry` 輸出**每一行都是 `-`**（patch 內容已等價存在於 main；rebase / cherry-pick 場景）→
+  理由標「patch-equivalent 已在 main」。有任何 `+` 行表示至少一個 commit 還沒進 main，這項不命中。
+  輸出為空不當作命中（該情形 branch 多半已是 ancestor，本應被 `--merged` 列出；空輸出不足以證明可刪）。
+- `gh pr list` 回傳非空（該 head branch 有 MERGED 的 PR；squash 場景 patch 不等價，只能靠這項）→
+  多筆時取 `mergedAt` 最新的一筆，再做機械式防護：
+  - `git rev-parse <branch>` 等於該筆 `headRefOid`，或
+  - `git merge-base --is-ancestor $(git rev-parse <branch>) <headRefOid>` exit 0（branch tip 是
+    PR 合併時 head 的 ancestor；`headRefOid` 在本機不存在則視為不通過）
+
+  任一成立 → 理由標「PR #N merged」。兩者皆不成立（例如 **PR 合併後 branch 又加了 commit**，或同名
+  branch 被重複使用做新工作）→ **不列入可刪**，改在 checklist 以註解標「PR #N 合併後 branch 有新
+  commit，勿刪」。若 `git cherry` 已命中（patch 內容確實已在 main），仍以 cherry 的理由列入，
+不標勿刪。
+
+兩項都命中就並列兩個理由。**每個辨識出的 branch 都附理由**，寫進 checklist（見輸出結構）；
+`gh` 不可用時只做 `git cherry` 那項。這類 branch 不是 ancestor，之後刪除要用 `git branch -D`
+而非 `-d`，checklist 已照此區分。
 → **列出，不刪除。**
 
 > **限制**：假設 main-based 工作流（`main` 為基準 branch）。detached HEAD 或其他分支策略的邊界情況暫不處理。
@@ -100,7 +129,10 @@ Group F 的跨 repo 總索引是不同東西，不在這裡順手加跨 repo 掃
 # repo-audit 處置 checklist（以下指令 repo-audit 不會執行，確認後自行貼）
 
 ## A. 可刪 branch
-git branch -d <branch-name>
+git branch -d <branch-name>  # 已合入 main（ancestor）
+git branch -D <branch-name>  # patch-equivalent 已在 main（已確認 tip 無未合併 commit）
+git branch -D <branch-name>  # PR #<number> merged（已確認 tip 無未合併 commit）
+# <branch-name>：PR #<number> 合併後 branch 有新 commit，勿刪
 # 若需要刪遠端：git push origin --delete <branch-name>
 
 ## B. 待處理 PR
@@ -139,7 +171,7 @@ git branch -D <branch-name>
 - **完全 read-only**：不刪 branch、不關 PR、不改 code；處置只輸出文字，不執行。
 - **不 delegate 五人**：orchestrator 直接執行 git / gh / grep 指令 + 讀 SKILL.md 判斷，彙整輸出。
 - **任一指令失敗 → 跳過該段 + Mortis 1 句告知，不中斷整輪**：
-  - `gh` 失敗（未安裝 / 未登入）→ 跳過 B 段（判斷 E 段合併狀態用的 `gh search prs` 同樣受影響，跳過即可，不擋 E 段其餘列表輸出）
+  - `gh` 失敗（未安裝 / 未登入）→ 跳過 B 段與 A 段的「PR merged」辨識（`git cherry` 照跑）（判斷 E 段合併狀態用的 `gh search prs` 同樣受影響，跳過即可，不擋 E 段其餘列表輸出）
   - `git` / `grep` 失敗 → 跳過對應段
 - **D 段是判斷型 advisory**：孤兒 / 重疊 / 指向失效三類都只列出候選，不代使用者拍板合併或刪除。
 - **開場**：🌙 Doloris 帶入（鋪陳語氣，見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)）。
