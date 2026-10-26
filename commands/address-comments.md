@@ -31,7 +31,7 @@ description: 讀當前 branch 對應 PR 的 review 意見，列出讓使用者�
 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
 消費此參數、解析成入口 cwd 下的絕對路徑。每個 work item 的內層 route 沿用這份選擇。
 
-orchestrator 親自跑步驟 1–4：
+orchestrator 親自跑步驟 1–4（含 1.5）：
 
 ### 1. Pre-flight gate — 讀不到 PR 直接擋下
 
@@ -48,6 +48,43 @@ orchestrator 親自跑步驟 1–4：
 
 過關後記下 `number` / `title` / `url` / `headRefName` / `baseRefName`，往下走。
 PR 若是 `MERGED` / `CLOSED` 狀態——不擋，但在列表時標出狀態提醒使用者。
+
+### 1.5 Conflict 偵測 — 有衝突先解，再處理意見
+
+在讀意見、挑項目**之前**，先確認 branch 與 PR base 能乾淨合併（意見的 `file:line` 與「現狀驗證」
+都以解完衝突後的 HEAD 為準，衝突沒解就處理意見，之後 rebase 會讓行號與判定全部過期）：
+
+```bash
+gh pr view --json mergeable,mergeStateStatus
+git merge-tree --write-tree origin/<baseRefName> HEAD
+```
+
+兩條指令的分工：**以 `gh` 為主，`git merge-tree` 只在 `mergeable` 為 `UNKNOWN` 時補跑**。
+
+- `mergeable` 為 `MERGEABLE`（`mergeStateStatus` 非 `DIRTY`）→ 無衝突，直接進步驟 2。
+- `mergeable` 為 `CONFLICTING`（`mergeStateStatus` 為 `DIRTY`）→ 有衝突，進入下方處理。
+- `mergeable` 為 `UNKNOWN`（GitHub 還在計算）→ 跑 `git merge-tree --write-tree`：有衝突時 exit 1
+  並列出衝突檔、無衝突 exit 0（只做合成、不動 working tree，需 git 2.38+，先用 `git --version`
+  確認；版本不足就視為判不出來）。兩邊都判不出來 → 停下問使用者。
+
+注意兩者看的對象不同：`gh` 看的是**遠端 PR head** 與 base，`git merge-tree` 用的是**本機 HEAD** 與
+`origin/<baseRefName>`；本機有未 push 的 commit，或 `origin/<baseRefName>` 不是最新（必要時請使用者先
+`git fetch`）時，兩者結論可能不一致，不一致時以本機結果為準並向使用者說明。
+
+有衝突時：
+
+1. **先看 repo 慣例再選 rebase 或 merge**：依
+   [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
+   與該 repo 的貢獻規範（`CONTRIBUTING`、近期 `git log --merges` 有無 merge commit）；
+   兩者都查不出慣例 → 問使用者選哪個，不自己猜。
+2. **解衝突**：兩邊改動可機械合併（互不相干的相鄰行、單邊只是搬位置）才自己解；
+   **雙方語意衝突**（兩邊都改了同一段邏輯、取捨會改變行為）→ **停下**，把衝突檔、雙方各自的意圖攤給
+   使用者，不自行猜。
+3. **解完驗證**：確認沒有殘留衝突標記（`git diff --check`）、`git status` 乾淨，並跑該 repo 的測試／檢查
+   指令；通過才進步驟 2。
+4. **不 push**：rebase 後歷史改寫需要 force push，merge 也要 push 才會更新 PR——兩者都由使用者自己執行；
+   Finale 提醒「衝突解決後尚未 push」。此處的 rebase / merge 是本步驟的明確授權，不受步驟 5
+   「不 rebase」限制（那條管的是各 work item 的 commit 落地）。
 
 ### 2. 抓 GitHub 上的 comments
 
