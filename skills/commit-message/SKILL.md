@@ -91,6 +91,7 @@ The body is for the **future bisecting engineer**, not the current reviewer:
 | Decision narrative — "After discussion we chose A over B" | Belongs in PR review thread, not commit log |
 | No body at all on a breaking change | The break + newsfragment pointer must be on the commit |
 | Restating the subject as the body | Adds bytes without adding signal |
+| Citing an exact commit sha (`reverts a8910e8`, `see 306feea`) | Shas go stale after rebase / squash and carry no meaning for readers; describe the change instead. **Never include one**, no exceptions |
 
 ## Amend vs new commit
 
