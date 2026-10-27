@@ -232,6 +232,8 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 - Everything outward stays drafted-and-stopped — never auto-run `git push` / `--force-with-lease` / `gh pr create` / `gh issue create` unless the user explicitly asks this turn.
 - A "Recommended" pick inside a batch `AskUserQuestion` is not authorization to open an issue — show the draft, wait for "post this".
 - Fixing an already-pushed branch: commit/amend locally and stop; mention `--force-with-lease` but neither run it nor frame it as the recommended next step. Case studies: `references/outward-ops-authority.md`.
+- Commits go on a feature branch, not `main`; if they already landed there, rescue them as in `references/outward-ops-authority.md` "Commit on a feature branch".
+- Rebasing a branch that contains merge commits, or onto an advanced base: see `references/commit-hygiene.md` "Rebase correctness".
 
 ## Worktree hygiene (references)
 

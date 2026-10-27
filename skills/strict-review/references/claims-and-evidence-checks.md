@@ -117,3 +117,35 @@ only two — the other two (`accepts_legacy_*`) already went through
 claimed count. Report only the discrepancy. This is the counterpart of the rewritten-claim check
 in the harness-discipline skill: that one asks whether a *reworded* claim holds per shape; this
 one asks whether the *numbers* equal the diff.
+
+## 8. A "fix flaky test" PR needs repeated-run or timeout-margin evidence
+
+**Rule.** When reviewing a PR that fixes a flaky or timeout test, expect the description to carry
+one line of evidence: either "ran the test N times in CI and it did not reproduce", or the
+reasoning behind the chosen deadline/timeout value. After confirming the fix gates on a real
+happens-before boundary, still raise a request for that line when it is missing. Don't block on
+it if the logic is correct, but don't approve silently either.
+
+**Why.** A flaky fix is about stability under CI timing, so one green run does not show the race
+is gone. Without repeated-run results or the margin calculation, the reviewer cannot tell "race
+pinned" from "race made rarer"; correct synchronization logic is necessary but not sufficient.
+Seen on a shared-stream overflow test fix (apache/airflow #68651).
+
+**How to check.** Look in the description for a run count or a deadline derivation; if neither,
+ask for it as an evidence-pending item.
+
+## 9. A query-count test that mocks a collaborator proves only the layer under test
+
+**Rule.** When reviewing an N+1 / "constant query count" test, read what it patches. If a
+downstream collaborator is mocked, the measured count covers only the tested layer, not
+end-to-end behaviour. Open the mocked function, count its per-item queries, and scope the PR's
+claim to the layer the test really exercises; flag over-broad wording such as "keeps query usage
+stable as N grows" and say whether the residual cost is a separate optimization.
+
+**Why.** Case (apache/airflow #65367, "Fix N+1 queries in trigger asset event submission"): the
+test mocked `AssetManager.register_asset_change`, so it proved the eager-load change removed the
+watcher-to-asset N+1, but `register_asset_change` itself re-queries the asset once per item. The
+description's "stable query usage" was therefore over-claimed.
+
+**How to check.** For each patched name in the test, ask whether it runs per item in production
+and issues queries; if so the "constant" claim is unproven for that path.

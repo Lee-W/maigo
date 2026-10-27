@@ -318,6 +318,31 @@ that were committed leave status clean too — grep for leftover markers over **
 claim**, not a narrower one). Related: a dropped hunk makes the commit message stale (see the
 section above); this section is how to prove whether any hunk was dropped.
 
+## Rebase correctness: merge commits, and every commit must stay green
+
+**Merge commits can carry changes that `git rebase` silently drops.** By default `git rebase`
+discards merge commits, so anything a contributor added inside one (a fix folded into a conflict
+resolution, an extra hunk) vanishes while the replayed diff still looks normal. If
+`git log --merges <main>..<branch>` is non-empty, "number of non-merge commits" is not a fact you
+can rely on. The safe path is to rebuild rather than replay: reset to the target `main`, apply the
+three-dot diff with `git apply --3way` (the diff comes from `git diff <main>...<branch>`),
+recreate the feature commit under the original author (`--author`), then compare the pre/post
+diff hashes (see "Prove a rebase lost nothing with a delta-of-deltas" above).
+
+**Green at HEAD is not enough after a rebase onto an advanced base.** If the new base added a
+file that imports a symbol an intermediate commit of the branch renamed or deleted, every commit
+from that one until the commit that fixes the import is broken, which hurts `git bisect`. Case
+(2026-10-26): a base-added module imported a helper that the branch's "split the hashing layer"
+commit removed, and only a refactor four commits later switched to the new name. HEAD was green
+after the first rebase; the four commits in between each failed on import.
+
+- After the rebase, check commit by commit the files the base added that depend on symbols the
+  branch changed, not just the tip's test run.
+- To repair: mark that commit `edit` through `GIT_SEQUENCE_EDITOR` in a second `rebase -i`, fix
+  the import at that step, `git commit --amend --no-edit`, `git rebase --continue`.
+- Confirm with `git diff <first-result> HEAD` that the final tree is unchanged; only the middle
+  commits got cleaner. Leave messages alone; don't squash or skip.
+
 ## Stacking on someone else's unmerged PR: state commit ownership in the options up front
 
 Before stacking a branch on another contributor's unmerged PR (e.g. to use an API it adds), put
@@ -328,6 +353,11 @@ stack the dependent part after the other PR merges. Don't just report "stacked o
 the fact. Case (2026-09-30): Snowflake Cortex work was stacked on apache/airflow #73532; the user
 asked "why aren't the first two commits mine?" and it was split — auth + model hook based on
 `main`, the managed-agent part waiting for #73532 to merge.
+
+When the dependency is **your own** unmerged feature branch (not someone else's PR), don't wait for
+it to merge: open the new worktree from that branch's HEAD, set the PR base to that branch, and
+rebase onto `main` once the lower branch merges. Offer "wait for the merge, then branch from
+`main`" as the alternative option, not the default.
 
 ## Judge a commit by its own exit code and HEAD hash; after a hook block, diff against `HEAD`
 

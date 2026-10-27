@@ -49,6 +49,7 @@ prek run --all-files   # prek, not pre-commit: the runner upstream specifies
 - Reproduce a prek/CI hook failure from the **repo root** (only exception: `providers/`, to dodge an unrelated lychee failure — `references/verification-tooling.md` §1). Scratch scripts go in `dev/`.
 - Before trusting a `prek` / `pytest` "Passed", local false reds, `verify_completion` / `jpype1` handling, `uv.lock` rebase handling: `references/verification-tooling.md`.
 - A `uv.lock` diff you did not cause is usually drift on `main` — keep the re-lock out of a feature PR (`references/review-checks.md`, "uv.lock drift diagnostic").
+- The commit hook runs the whole prek set and can outrun the Bash tool's timeout: run `ruff` / `ruff-format` / `mypy-<project>` by name on your changes first, then `--no-verify`; on a backport branch run both linters; a `uv.lock` diff that *downgrades* a package is a transitive-cap side effect — `references/verification-tooling.md`.
 
 ### 4. Code style — Ruff + Mypy
 

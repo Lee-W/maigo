@@ -50,6 +50,22 @@ stays on the branch, is trivially amendable, and reaches nobody.
    whatever `Generated-by:` wording that PR already carries rather than
    normalizing it to a different agent-name string.
 
+## Commit on a feature branch, never on `main`
+
+Open a branch (`git switch -c <type>/<topic>`) before the first commit, once the working tree is
+clean, and keep every phase of a multi-phase task on that one branch rather than one branch per
+phase. Drafting the push is still the user's step, and the draft names the branch
+(`git push -u origin <branch>`), never `main`. Verified-green still means commit directly; it just
+means commit on the branch.
+
+If commits have already landed on `main`: only when they are **not pushed** and `git status` is
+clean, run `git branch <name>`, confirm the new branch points at those commits
+(`git log <name> -3`), and only then `git reset --hard <remote>/main`, where `<remote>` is the
+remote main tracks in that repo (often `upstream`, since `origin` may be a fork); the commits survive
+on the new branch. Case: a whole batch of
+design-refactor commits was made on local `main` of a repo whose history is all feature branches
+merged by rebase, and the user asked why `main` was about to be pushed.
+
 ## Don't casually open a GitHub issue or PR
 
 Creating an issue or PR is visible to others and hard to walk back — treat

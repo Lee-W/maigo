@@ -651,3 +651,24 @@ marker、output function 這幾種形狀在新版失敗（apache/airflow #74537 
 
 相關：本檔第 8 節（單點觀測不足以支撐全稱結論）——4 個組合通過同樣不能推出「所有輸入形狀
 都通過」。
+
+## 26. 外部 ref 寫進設定前，先確認它真的存在（GitHub Actions、pin、tag）
+
+寫進 workflow、範本設定、pre-commit 設定的每一個 `owner/repo@ref`，commit 前逐一用 API 確認
+該 ref 存在：
+
+```sh
+gh api repos/<owner>/<repo>/git/ref/tags/<ref> --jq .ref      # tag
+gh api repos/<owner>/<repo>/git/ref/heads/<branch> --jq .ref  # branch，例如 release/v1
+```
+
+**理由**：研究 agent 回報的「最新 vN」通常是由 release 版號推出來的，不等於可用的 tag 名；
+有的 action 不發浮動 major tag，只發完整 semver（例如某 setup 類 action 從某個 major 起只有
+`v10.3.2`，沒有 `v10`）。本機測試只解析 YAML、不解析 action ref，所以抓不到。實例：某 repo
+的 CI pin 升級把不存在的浮動 tag 寫進 root 與範本 workflow，十個 job 全死在「Set up job」，
+錯誤是 `Unable to resolve action …, unable to find version v10`。
+
+**怎麼套用**：版本研究類任務的驗收條件要包含「每個 ref 用上述 API 查過、回傳 `refs/tags/…`」，
+並交給 fresh-context 驗證者逐一重跑，不採信回報的版號。
+
+相關：本檔第 22 節（接外部資料源前先實打）與第 13 節（subagent 的論據自己重跑）。

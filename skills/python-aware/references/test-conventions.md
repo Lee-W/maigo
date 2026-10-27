@@ -585,6 +585,10 @@ How to apply during review:
 - A test that only asserts `mock.call_args` on a mocked hook/dependency is
   not behavioral evidence; ask for a real-object substitution or an
   integration path.
+- A query-count / N+1 test that mocks a downstream collaborator proves the
+  count only for the layer under test; the mocked path's per-row queries are
+  invisible, so scope the claim to that layer (review check in
+  [`strict-review` claims-and-evidence-checks](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md)).
 
 ---
 

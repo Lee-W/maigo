@@ -255,6 +255,45 @@ Don't retry the full hook set in the foreground repeatedly — each attempt
 just gets cut off by the timeout and restarts the same slow build from
 scratch.
 
+**Order, and the one exception.** The general rule (next section) is: run the named hooks
+first, commit with `--no-verify` only when they are green. This fresh-worktree case is the
+exception: the named mypy hook would itself hit the slow first build, so commit with
+`--no-verify` first and run the hooks in the background. Either way, list the hooks you ran by
+hand in the report.
+
+### Commit hook outruns the Bash timeout in a warm worktree
+
+Unlike the fresh-worktree case (slow environment build), here the whole `prek` set simply takes
+longer than the Bash tool's 120-second default timeout, so the commit is interrupted. Don't re-run
+it. Run the hooks that apply to what you changed, by name, first:
+`prek run ruff --from-ref upstream/main`, `prek run ruff-format --from-ref upstream/main`,
+`prek run mypy-<project> --files <changed files>` (e.g. `mypy-airflow-ctl`) and any other hook that
+matches the diff. Only when all are green, `git commit --no-verify`, and list the hooks you ran by
+hand in the report. `--no-verify` here is for the timeout situation only, not a general license
+to skip hooks.
+
+### Run one hook by name — a whole `--stage pre-commit` run dirties the tree
+
+`prek run --from-ref <base> --stage pre-commit` also runs the breeze doc
+generators, which rewrite dozens of `dev/breeze/doc/images/*` files (svg/txt),
+and the datamodel-generation hook fails on some machines regardless of your
+change. When you want one check, name it (`prek run mypy-<project> --from-ref
+<base>`, `ruff`, `ruff-format`). Before running a whole stage, make sure
+`git status` is clean, and afterwards `git status --short` for files you did
+not mean to change; revert the generated ones with `git checkout --`.
+
+### Backport (`*-test`) branches: cherry-picks drift in names and imports — run both linters
+
+Cherry-picked code and tests on a `*-test` branch drift from what the branch has: mypy and ruff
+each catch a different batch (name, import, or generated-model field drift). A hand-assembled `mypy` command with a
+different file set or environment than the hook is not a substitute: it can
+return success while the hook fails. Before saying "mypy is fixed" on a
+backport branch, run `prek run mypy-<project> --from-ref <base>` **and**
+`prek run ruff --from-ref <base>`. If an error lands in a file you did not edit,
+find the backport commit that brought it in (`git log -- <file>`) before
+choosing a fix; a missing generated-model field needs the user's decision on
+direction.
+
 ### A stale local `airflow.db` schema breaks a whole provider test suite
 
 Running an entire provider's test directory (as opposed to a single file)
@@ -651,6 +690,27 @@ duration of the commit, then immediately `git update-index
 --no-assume-unchanged uv.lock` and `git checkout -- uv.lock`. Unknown (not
 investigated): which hook does the rewrite, and whether a clean `main`
 behaves the same.
+
+### `uv lock --upgrade` can downgrade other packages to fit a new major of a transitive dep
+
+`uv lock --upgrade` does not give "everything latest": it first takes the latest major of a package
+nobody caps, then pushes packages that major excludes down to older versions. Case (an automated
+CI-environment upgrade PR on a `vX-Y-test` branch): `websockets` 16.1.1 → 17.3 landed, every
+`langgraph-sdk` 0.4.x release requires `websockets<17`, so the resolver fell back to `langgraph-sdk`
+0.3.15 (a version with a published advisory), which in turn left only `langgraph` 1.2.2 and an older
+`langchain`. The rest of the family upgraded normally, so the diff showed just three reversed lines
+and CI's "Reject vulnerable dependency changes" check was what caught it.
+
+- **Tell**: a version *decrease* in a `uv.lock` diff. Look for a new upper bound from a new major,
+  not at the one package alone.
+- **Fix**: re-resolve the downgraded chain with `uv lock --upgrade-package <a> --upgrade-package
+  <b> ...` (here the three langgraph/langchain packages); the offending new major then falls back
+  by itself. Don't hand-edit the lock, and don't add a `[tool.uv.exclude-newer-package]` override
+  for it (the cool-down window passes and the next upgrade converges).
+- **Finding the constraint**: `uv.lock` records `requires-dist` only for workspace packages; for
+  registry packages read `requires_dist` from `https://pypi.org/pypi/<pkg>/<ver>/json`.
+  `uv lock --upgrade-package X --dry-run` only prints "Lockfile changes detected"; to see the
+  result, run it for real and then `git checkout -- uv.lock`.
 
 ### Minimal re-lock: how to verify it, and keeping the venv, the base diff and nested `uv` in line with the lock
 

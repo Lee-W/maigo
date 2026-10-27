@@ -151,6 +151,9 @@ branch 都顯示「沒有對應 PR」），把假結果當成事實回報。
   都沒複製；`mv` 在沒有 tty 時卡在確認提示，整個呼叫 timeout。`cp -f` 擋不住，alias 的
   `-i` 會贏。後果是還原式實驗（改壞 → 測試 → 還原）的「還原」其實沒發生，前後兩次量的是
   同一份檔案，得到一模一樣的假綠；或卡死時檔案停在被改壞的狀態。
+- **`rm` 被換成互動式**（`rm -i`）：印出 `remove …?` 後卡住，或讓 `&&` 鏈中斷。實例：
+  `sed -i.bak … && rm $f.bak` 在 rebase 解衝突途中被提示擋下，`.bak` 檔留在原地。刪檔用
+  `/bin/rm -f <path>`；能避免就避免產生需要清理的檔，例如用 `sed -i ''` 而不是 `-i.bak`。
 - **`cd` 被換成別的導航工具**：目標不在它的資料庫時印出「沒有匹配」，但**不換目錄**。
   `cd X && cmd` 安全（`&&` 短路），單獨一行的 `cd X` 之後接的指令會在原本的目錄執行，輸出
   看起來完全正常——可能對錯的工作樹做 checkout，或量到錯的環境。
@@ -160,7 +163,7 @@ branch 都顯示「沒有對應 PR」），把假結果當成事實回報。
 
 **怎麼套用**：
 
-1. 覆寫／移動檔案用 `/bin/cp -f`、`/bin/mv -f`；看原始位元組用 `/bin/cat -v`；查磁碟用
+1. 覆寫／移動／刪除檔案用 `/bin/cp -f`、`/bin/mv -f`、`/bin/rm -f`；看原始位元組用 `/bin/cat -v`；查磁碟用
    `/bin/df -h`。
 2. 不要用 `cd` 指向工作樹：git 用 `git -C <absolute>`，其他指令用絕對路徑；結論取決於「在
    哪個樹跑」時，前後各印一次 `git rev-parse --short HEAD`。
@@ -183,3 +186,27 @@ harness 丟背景，最後曾觀察到回 `failed to get run log: stream error: 
    （不加旗標會因含終端跳脫字元被拒，exit 1、檔案為空）。
 3. 先 `wc -l` 確認不是單行錯誤，再 grep 失敗行（如 `Z FAILED `、`Failed$|hook id`）並依測試名定位
    traceback。遇到 CANCEL 就換路，不要重試同一條指令。
+
+## 7. zsh 的變數修飾符：`$var:` 後面接字母要用 `${var}` 包住
+
+**規則**：Bash 工具底下是 zsh。凡是 `$var` 後面緊接冒號與字母的寫法——`git show $ref:path`、
+`$host:$port`、`scp f $h:/dst`——一律寫成 `"${var}:..."`。
+
+**理由**：zsh 把 `$var:x` 當成修飾符，不是「變數＋冒號＋字面字串」。實例：
+`git show $ref:uv.lock` 噴 `ambiguous argument 'HEADv.lock'`——`:u`（轉大寫）吃掉了冒號，得到
+一個不存在的路徑。會被吃掉的修飾符有 `:u` `:l` `:h` `:t` `:r` `:e` `:q` `:Q` `:a` `:A` `:P`
+`:s` `:gs` `:&`；後面接數字或其他符號通常沒事，但不要賭，統一加大括號。
+
+相關：第 1 節（glob 字元要加引號）與其「同源」小節（未加引號的變數不做 word splitting）。
+
+## 8. macOS 的 BSD `sed` 不認 `\b` `\s`：要 word boundary 用 `perl`，替換後要對帳
+
+**規則**：這台 macOS 的 `sed` 是 BSD 版，`-E` 下不支援 `\b`、`\s` 這類 GNU/PCRE 擴充。需要
+word boundary 或 lookaround 的批次替換，用 `perl -pi -e 's/(?<!\w)old_name\b/new_name/g'`。
+
+**理由**：不命中的替換 **exit 0 且檔案不變**，看起來像成功。實例：一次函式改名，第一輪 `sed`
+完全沒生效；改用 perl 後，排除 `_` 的 lookbehind 又連 `test_` 前綴的方法名一起跳過，漏了 7
+個，要另外處理。
+
+**怎麼套用**：替換前後各算一次 `shasum`，或看 `git diff --stat`，證明檔案真的變了；批次改名後
+再用獨立的 `grep` 掃舊名殘留，不採信 exit code。

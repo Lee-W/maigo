@@ -35,6 +35,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
    target repo 裡使用者自己有沒有在做同一件事，那條 in-flight 分支的 commit message 往往
    就是新 plan 的立論依據；(4) 對照過程中發現的無關缺陷另外標記、單獨提案，不要混進「補完
    API 支援」這份 plan 的主體裡。
+   **Decisions needed 的預設值**——依賴未 merge 的 feature branch、升版遇重疊的 pending branch、新顯示功能的範圍，這三種形狀的 default 與另一選項成本見 [`references/planning-defaults.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/planning-defaults.md)。
 3. **使用者確認 plan**（如果有 open questions，先回答再往下）
 4. **🎀 愛音 (Anon)** — 按 plan 動手實作。「OK 那我先做這步！」
 
