@@ -102,6 +102,8 @@ class TestIsFlatPreNestedArtifactPath:
             ".maigo/review-board.md",
             ".maigo/plan-main.md",
             ".maigo/review/42/rubric.md",
+            ".maigo/pr/42/rubric.md",
+            ".maigo/pr/42/reply-draft.md",
             ".maigo/review-rubric.md",
         ],
     )
@@ -180,6 +182,25 @@ class TestLegacyArtifactPathHook:
             run_silent_hook(_write_payload(".maigo/i/9201.md"), monkeypatch, capsys)
             == ""
         )
+
+    @pytest.mark.parametrize(
+        "path", [".maigo/pr/42/rubric.md", ".maigo/pr/42/reply-draft.md"]
+    )
+    def test_pr_group_paths_pass(
+        self, path: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        assert run_silent_hook(_write_payload(path), monkeypatch, capsys) == ""
+
+    def test_flat_reply_draft_blocks(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/reply-draft-42.md"), monkeypatch, capsys
+            ).strip()
+        )
+        assert result["decision"] == "block"
+        assert ".maigo/pr/<id>/" in result["reason"]
 
     def test_flat_pre_nested_review_rubric_blocks(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

@@ -12,8 +12,11 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 
 1. **命名**：`<kind>` 分兩種形狀——
    - 巢狀（`review` / `review-rubric` / `review-draft` / `pr-comments` /
-     `triage-rubric`）：`.maigo/<group>/<id>/<stem>[-<attempt>].md`，`<group>`
-     是 `review` 或 `issue`，同一顆 PR/issue 的所有產物收進同一個目錄。
+     `reply-draft` / `triage-rubric`）：`.maigo/<group>/<id>/<stem>[-<attempt>].md`，
+     `<group>` 是 `review`（別人的 PR）、`pr`（自己的 PR）或 `issue`，同一顆
+     PR/issue 的所有產物收進同一個目錄。PR 類 kind 依作者分流：呼叫端傳
+     `owner`（`mine` → `pr/`，`others` → `review/`），`triage-rubric` 固定在
+     `issue/`、不分流。
    - 扁平（`plan`）：`.maigo/plan-<id>[-<attempt>].md`，不動。
    `<id>` 走四級來源鏈（`resolve_identifier()`），每一級都必須是事後可重新
    推導的——不是只要唯一就好。
@@ -28,9 +31,14 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 
 命名層（純函式，不做任何 I/O）：`slugify(text)`、`github_ref(url, home_repo)`
 （重用 `scripts/board_state.py` 既有實作，不重複解析 URL）、
-`artifact_path(kind, identifier, attempt=1)`、`flat_path(kind, identifier)`
+`artifact_path(kind, identifier, attempt=1, *, owner=None)`、
+`nested_locations(kind)`、`flat_path(kind, identifier)`
 （分目錄前的扁平形，只供讀取退路與遷移）、`legacy_path(kind)`、
 `artifact_path_regex(kinds)`（給讀取端動態組比對用 regex）。
+
+作者判斷由呼叫端用 `scripts/pr_owner.py` 取得後傳入（`owner`）；這個模組本身
+不打任何網路請求。會分流的 kind 沒給 `owner` 就 `ValueError`，不會悄悄落在
+`review/`。
 
 `resolve_identifier()` 與 `resolve_for_write()` 會做 I/O（本地 `git` 子行程、
 讀檔案），不是純函式；`resolve_for_write()` 的 I/O 全部是唯讀，不建立、不
@@ -42,20 +50,25 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" plan \
     --topic "<H1 主題>" [--url URL] [--repo owner/name] [--cwd DIR]
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric \
-    --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name
+    --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name \
+    --owner mine|others
 ```
+
+會分流的 kind 帶 `--url` 卻沒給 `--owner` → exit 2（先跑 `scripts/pr_owner.py`）；
+沒有 `--url`（本地 branch / range）時預設 `mine`。
 
 stdout 第 1 行 `status: new|same_topic|conflict`；
 非 conflict 時第 2 行 `path: .maigo/plan-<id>.md`（巢狀 kind 則是
-`path: .maigo/review/<id>/rubric.md` 這類）；
+`path: .maigo/review/<id>/rubric.md` 或 `.maigo/pr/<id>/rubric.md` 這類）；
 conflict 時第 2 行 `conflict_owner: <既有 H1>`、第 3 行
 `suggest: .maigo/plan-<id>-<n>.md`（候選路徑：從第 2 個 attempt 起，第一個
 未被其他主題占用者——不存在、沒有 H1、或 H1 與本次主題相同的既有檔，所以
 `<n>` 可能是 2、3……；status 仍是 conflict，須經使用者同意才可以用），**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可
 寫入的 `path:` 行。舊固定檔名存在時（不論 status）多印一行
 `legacy_exists: .maigo/<kind>.md`；巢狀 kind 若存在分目錄前的扁平檔
-（`.maigo/<kind>-<id>.md`）多印一行 `flat_exists: <path>`——兩者都只供讀取
-退路，不當寫入目標。
+（`.maigo/<kind>-<id>.md`）多印一行 `flat_exists: <path>`；會分流的 kind 若另一組
+（`pr/` ↔ `review/`）同 id 同 stem 已有檔案，多印一行 `other_group_exists: <path>`
+——三者都只供讀取退路，不當寫入目標。
 """
 
 from __future__ import annotations
@@ -78,6 +91,7 @@ _KNOWN_KINDS = (
     "review-draft",
     "triage-rubric",
     "pr-comments",
+    "reply-draft",
 )
 
 # kind → (group 目錄, 檔名 stem)：巢狀佈局 `.maigo/<group>/<id>/<stem>.md`。
@@ -88,8 +102,18 @@ _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "review-rubric": ("review", "rubric"),
     "review-draft": ("review", "draft"),
     "pr-comments": ("review", "pr-comments"),
+    "reply-draft": ("review", "reply-draft"),
     "triage-rubric": ("issue", "rubric"),
 }
+
+# 依 PR 作者分流：owner → group。會分流的 kind，`_NESTED_LAYOUT` 的 value 填
+# `others` 那組（`review`）——value 形狀不能改，hook 只認 `(group, stem)`。
+_OWNER_GROUPS: dict[str, str] = {"mine": "pr", "others": "review"}
+_OWNER_SPLIT_KINDS = frozenset(
+    {"review", "review-rubric", "review-draft", "pr-comments", "reply-draft"}
+)
+# 所有 PR 產物 group 目錄（給 board_sync archive 迭代用）。
+PR_ARTIFACT_GROUPS = ("review", "pr")
 
 _FLAT_NAME_LOOKALIKES = (
     # 找不到 producer 的孤兒檔名；本次只保證不搬、不擋，型錄列為未登記。
@@ -135,10 +159,43 @@ def slugify(text: str) -> str | None:
     return truncated or None
 
 
-def artifact_path(kind: str, identifier: str, attempt: int = 1) -> str:
+def nested_locations(kind: str) -> list[tuple[str, str]]:
+    """
+    *kind* 所有可能的 `(group, stem)`：會分流的 kind 回 `pr` 與 `review` 兩組，
+    其餘巢狀 kind 回一組，非巢狀（`plan`）回空 list。純函式。
+    """
+    if kind not in _NESTED_LAYOUT:
+        return []
+    _group, stem = _NESTED_LAYOUT[kind]
+    if kind in _OWNER_SPLIT_KINDS:
+        return [(group, stem) for group in _OWNER_GROUPS.values()]
+    return [_NESTED_LAYOUT[kind]]
+
+
+def _check_owner(kind: str, owner: str | None) -> None:
+    if owner is not None and owner not in _OWNER_GROUPS:
+        raise ValueError(
+            f"unknown owner: {owner!r}; must be one of {tuple(_OWNER_GROUPS)}"
+        )
+    if kind in _OWNER_SPLIT_KINDS:
+        if owner is None:
+            raise ValueError(
+                f"kind {kind!r} is split by PR author; pass owner='mine' or 'others' "
+                "(resolve it with scripts/pr_owner.py)"
+            )
+    elif owner is not None:
+        raise ValueError(f"kind {kind!r} is not split by owner; do not pass owner")
+
+
+def artifact_path(
+    kind: str, identifier: str, attempt: int = 1, *, owner: str | None = None
+) -> str:
     """
     正典路徑：巢狀 kind → `.maigo/<group>/<id>/<stem>[-<attempt>].md`；
     其餘（目前只有 `plan`）→ `.maigo/<kind>-<id>[-<attempt>].md`。純函式。
+
+    會分流的 kind 必須給 `owner`（`mine` → `pr/`、`others` → `review/`），沒給
+    就 `ValueError`；不分流的 kind 給了 `owner` 也 `ValueError`。
 
     `attempt` 取代舊的 `f"{identifier}-2"` 字串拼接——conflict 後綴要落在
     檔名層，不能落進巢狀佈局的目錄層（那會另開一個 `review/42-2/` 資料夾，
@@ -154,9 +211,12 @@ def artifact_path(kind: str, identifier: str, attempt: int = 1) -> str:
     _validate_identifier(identifier)
     if attempt < 1:
         raise ValueError(f"attempt must be >= 1: {attempt!r}")
+    _check_owner(kind, owner)
     suffix = "" if attempt == 1 else f"-{attempt}"
     if kind in _NESTED_LAYOUT:
         group, stem = _NESTED_LAYOUT[kind]
+        if owner is not None:
+            group = _OWNER_GROUPS[owner]
         return f".maigo/{group}/{identifier}/{stem}{suffix}.md"
     return f".maigo/{kind}-{identifier}{suffix}.md"
 
@@ -198,13 +258,11 @@ def artifact_path_regex(kinds: Iterable[str]) -> str:
 
     parts: list[str] = []
     for kind in kinds_by_len_desc:
-        if kind not in _NESTED_LAYOUT:
-            continue
-        group, stem = _NESTED_LAYOUT[kind]
-        parts.append(
-            rf"\.maigo/{re.escape(group)}/{_IDENTIFIER_CHAR_RE}/"
-            rf"{re.escape(stem)}(?:-\d+)?\.md"
-        )
+        for group, stem in nested_locations(kind):
+            parts.append(
+                rf"\.maigo/{re.escape(group)}/{_IDENTIFIER_CHAR_RE}/"
+                rf"{re.escape(stem)}(?:-\d+)?\.md"
+            )
     parts.append(rf"\.maigo/(?:{kind_alt})-{_IDENTIFIER_CHAR_RE}(?:-\d+)?\.md")
     parts.append(rf"\.maigo/(?:{kind_alt})\.md")
     return "(?:" + "|".join(parts) + ")"
@@ -334,10 +392,17 @@ class Resolution:
     )  # conflict 時的候選（從第 2 attempt 起第一個未被其他主題占用者），須經使用者同意才用
     legacy_path: str | None  # 舊固定檔名存在時填，僅供讀取退路
     flat_path: str | None = None  # 巢狀 kind 的分目錄前扁平檔存在時填，僅供讀取退路
+    other_group_path: str | None = (
+        None  # 會分流的 kind，另一組（pr/ ↔ review/）同 id 同 stem 有檔時填，僅供讀取退路
+    )
 
 
 def _first_available_attempt(
-    kind: str, identifier: str, cwd: str | Path, normalized_topic: str
+    kind: str,
+    identifier: str,
+    cwd: str | Path,
+    normalized_topic: str,
+    owner: str | None = None,
 ) -> str:
     """
     從 attempt 2 起往上找第一個「不存在、沒有 H1、或 H1 與 `normalized_topic` 相同」
@@ -346,7 +411,7 @@ def _first_available_attempt(
     """
     attempt = 2
     while True:
-        candidate = artifact_path(kind, identifier, attempt=attempt)
+        candidate = artifact_path(kind, identifier, attempt=attempt, owner=owner)
         existing = read_topic(Path(cwd) / candidate)
         if existing is None or existing == normalized_topic:
             return candidate
@@ -360,6 +425,7 @@ def resolve_for_write(
     url: str | None = None,
     home_repo: str = "",
     cwd: str | Path = ".",
+    owner: str | None = None,
 ) -> Resolution:
     """
     (c) 歸屬檢查的唯一對外入口。`topic` 必填——沒有申報主題就拿不到路徑。
@@ -370,9 +436,19 @@ def resolve_for_write(
     `suggested_path`——它是從 attempt 2 起第一個不存在、沒有 H1、或 H1 與
     `topic` 相同的路徑（找到 H1 相同的 `-k` 檔也只是候選，不改 status）。
     全程唯讀，不建立、不覆寫任何檔案。
+
+    會分流的 kind：有 `url` 就必須給 `owner`（沒給 `ValueError`）；沒有 `url`
+    （本地 branch / range）沒給 `owner` 時算自己的（`mine`）。
     """
+    if kind in _OWNER_SPLIT_KINDS and owner is None:
+        if url:
+            raise ValueError(
+                f"kind {kind!r} with a url needs owner='mine' or 'others' "
+                "(resolve it with scripts/pr_owner.py)"
+            )
+        owner = "mine"
     identifier = resolve_identifier(cwd, url=url, home_repo=home_repo)
-    path_str = artifact_path(kind, identifier)
+    path_str = artifact_path(kind, identifier, owner=owner)
     existing_topic = read_topic(Path(cwd) / path_str)
 
     legacy_str = legacy_path(kind)
@@ -385,6 +461,13 @@ def resolve_for_write(
         if (Path(cwd) / flat_str).exists():
             flat_result = flat_str
 
+    other_group_result = None
+    if owner is not None:
+        other_owner = "others" if owner == "mine" else "mine"
+        other_str = artifact_path(kind, identifier, owner=other_owner)
+        if (Path(cwd) / other_str).exists():
+            other_group_result = other_str
+
     normalized_incoming = _normalize_topic(topic)
 
     if existing_topic is None:
@@ -396,6 +479,7 @@ def resolve_for_write(
             suggested_path=None,
             legacy_path=legacy_result,
             flat_path=flat_result,
+            other_group_path=other_group_result,
         )
     if existing_topic == normalized_incoming:
         return Resolution(
@@ -406,6 +490,7 @@ def resolve_for_write(
             suggested_path=None,
             legacy_path=legacy_result,
             flat_path=flat_result,
+            other_group_path=other_group_result,
         )
     return Resolution(
         status="conflict",
@@ -413,10 +498,11 @@ def resolve_for_write(
         existing_topic=existing_topic,
         incoming_topic=normalized_incoming,
         suggested_path=_first_available_attempt(
-            kind, identifier, cwd, normalized_incoming
+            kind, identifier, cwd, normalized_incoming, owner
         ),
         legacy_path=legacy_result,
         flat_path=flat_result,
+        other_group_path=other_group_result,
     )
 
 
@@ -431,10 +517,30 @@ def main(argv: list[str] | None = None) -> int:
         "--repo", default="", help="cwd 所屬 repo（owner/name），判斷同 repo/跨 repo"
     )
     parser.add_argument("--cwd", default=".", help="計算識別碼與檢查既有檔案的目錄")
+    parser.add_argument(
+        "--owner",
+        choices=tuple(_OWNER_GROUPS),
+        default=None,
+        help="PR 作者是自己（mine → pr/）還是別人（others → review/）；"
+        "帶 --url 的 PR 類 kind 必填，用 scripts/pr_owner.py 取得",
+    )
     args = parser.parse_args(argv)
 
+    if args.owner is not None and args.kind not in _OWNER_SPLIT_KINDS:
+        parser.error(f"kind {args.kind!r} is not split by owner; drop --owner")
+    if args.kind in _OWNER_SPLIT_KINDS and args.url and args.owner is None:
+        parser.error(
+            "--owner mine|others is required with --url for this kind; "
+            "run scripts/pr_owner.py --url <url> to resolve it"
+        )
+
     resolution = resolve_for_write(
-        args.kind, args.topic, url=args.url, home_repo=args.repo, cwd=args.cwd
+        args.kind,
+        args.topic,
+        url=args.url,
+        home_repo=args.repo,
+        cwd=args.cwd,
+        owner=args.owner,
     )
 
     print(f"status: {resolution.status}")
@@ -452,6 +558,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"legacy_exists: {resolution.legacy_path}")
     if resolution.flat_path:
         print(f"flat_exists: {resolution.flat_path}")
+    if resolution.other_group_path:
+        print(f"other_group_exists: {resolution.other_group_path}")
     return 0
 
 

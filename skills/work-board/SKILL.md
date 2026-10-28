@@ -426,8 +426,9 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
 - **更新**：refresh 或任何寫回 → 重寫事實區，`## 判斷` / `## 筆記` 原樣保留（§1a 硬規則）。
 - **回收**：項目離開 board（✅ 區 7 天老化清除、`--drop` 後也走同一條老化規則）→
   產物**封存而非刪除**，不留孤兒檔：orchestrator 在 `drop --reason closed|aged` 之後，對同一批
-  URL 跑 `board_sync.py archive <url...>`，把 `.maigo/review/<id>/`（整個目錄）搬到
-  `.maigo/_archive/review/<id>/`、`.maigo/i/<id>.md` 搬到 `.maigo/_archive/i/<id>.md`。它不查
+  URL 跑 `board_sync.py archive <url...>`，把 `.maigo/review/<id>/` 與 `.maigo/pr/<id>/`（整個目錄；
+  依作者只會有其中一個或兩個都有）搬到 `.maigo/_archive/review/<id>/`、`.maigo/_archive/pr/<id>/`、
+  `.maigo/i/<id>.md` 搬到 `.maigo/_archive/i/<id>.md`。它不查
   GitHub、不判斷 PR 狀態（哪些已結案由 orchestrator 決定，同 `drop`），目的地已存在就跳過不覆蓋，
   逐 URL 回報 moved／skipped／missing；`_internal/` 不碰。**順序不能顛倒**：只對已經 `drop` 掉、
   board 上已無索引行的項目跑 `archive`；索引行還在就先搬走 `i/<id>.md`，下次 `plan` 會讀不到細節檔，
@@ -436,9 +437,11 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
   （刪前備份到 `_internal/board/backup/`），對它輸出的 `aged` URL 再跑 `archive`，`review/<id>/`
   照樣封存、`i/` 回 missing 屬正常。
   **為什麼**：已結案的 review 留在 `review/` 會混進「目前在審」的產物清單；直接刪又丟掉日後要翻的
-  審查紀錄。封存後 `review/` 與 `i/` 只剩進行中的項目，`plan` 的孤兒偵測與 artifact 對帳也不再看到它們。
+  審查紀錄。封存後 `review/`、`pr/` 與 `i/` 只剩進行中的項目，`plan` 的孤兒偵測與 artifact 對帳也不再看到它們。
   案例：一次 40 顆 PR 的 batch 結束後手動封存了 25 個 review 目錄、10 個細節檔——使用者早已在自己的
   repo 用同一個 `_archive/` 佈局手動執行，規格卻從未寫過。
+  🔀 自己的 PR 產物在 `.maigo/pr/<id>/`，不影響 👀 的 report 對帳（`board_state.py` 的 👀 項目固定讀
+  `review/<id>/`；對帳掃到 `pr/<id>/` 的檔只列入未歸屬，不當成 👀 候選）。
 - **孤兒偵測（dd 語意）**：`/maigo:board` 刷新時比對 `.maigo/i/*.md` 與 board 索引行；沒有任何
   索引行引用的細節檔，代表使用者用 `dd` 刪了那一行——`board_sync.py plan` 把它判成 dd 並寫進排除
   紀錄（§3a）。剛寫好的細節檔有 10 分鐘寬限（delegate 命令先寫細節檔、後 `Edit` 加行，plan 若

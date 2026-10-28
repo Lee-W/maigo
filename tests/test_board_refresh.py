@@ -368,7 +368,9 @@ def _checked_review_setup(tmp_path, gh):
     write_board(tmp_path, board_text(focus=[row(1, "x")]))
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
-    return report.publish(tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE")
+    return report.publish(
+        tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE", owner="others"
+    )
 
 
 def test_t5_board_changed_while_fetching_exits_2_and_writes_nothing(
@@ -617,7 +619,9 @@ def test_t9_closed_artifact_is_not_added_but_logged(tmp_path, gh):
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
     gh.prs[5] = pr_meta(5, state="MERGED", mergedAt=RECENT)
-    report.publish(tmp_path, url(5), REPO, "PR 5", "## A\nx\n", HEAD, "APPROVE")
+    report.publish(
+        tmp_path, url(5), REPO, "PR 5", "## A\nx\n", HEAD, "APPROVE", owner="others"
+    )
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     assert "i/5.md" not in (tmp_path / ".maigo/board.md").read_text()
     assert not (tmp_path / ".maigo/i/5.md").exists()
@@ -961,7 +965,7 @@ def test_s3_a_check_made_during_a_failed_fetch_is_acked_on_recovery(tmp_path, gh
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
     published = report.publish(
-        tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE"
+        tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE", owner="others"
     )
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     board = tmp_path / ".maigo" / "board.md"
@@ -1127,7 +1131,7 @@ def test_s14_locked_ack_keeps_the_check_and_warns_then_acks_on_retry(
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
     published = report.publish(
-        tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE"
+        tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE", owner="others"
     )
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     board = tmp_path / ".maigo" / "board.md"

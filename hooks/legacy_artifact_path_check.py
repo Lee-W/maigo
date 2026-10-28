@@ -6,7 +6,7 @@ Maigo PreToolUse hook：擋下寫入 `.maigo/` 底下舊固定檔名／分目錄
 maigo 的 repo 一查，採用率是 0%——不是規範不好，是散文說「一律呼叫
 `artifact_path.py`」，但沒有任何東西擋著一個趕時間的 agent 直接
 `Write(".maigo/plan.md", ...)`。這支 hook 就是那個「東西」。後續佈局改成
-按 PR/issue 分資料夾（`review/<id>/*.md`、`issue/<id>/*.md`）後，同一問題多
+按 PR/issue 分資料夾（`review/<id>/*.md`、`pr/<id>/*.md`、`issue/<id>/*.md`）後，同一問題多
 了一種新形狀——分目錄前的扁平 `<kind>-<id>.md`（如 `review-rubric-42.md`）
 手寫路徑正是散文漏網的實例——這支 hook 現在同時擋這兩種寫法。
 
@@ -24,7 +24,7 @@ regex 錨定在 `.maigo/` 目錄下：
 
 `board.md`（不在 `_KNOWN_KINDS` 裡）、`local-model-dispatch-plan.md`（stem 不
 等於任何 kind）、`.maigo/i/9201.md`（不在 `.maigo/` 頂層）、
-`.maigo/review/42/rubric.md`（新巢狀路徑本身）都天然不命中——白名單式
+`.maigo/review/42/rubric.md`、`.maigo/pr/42/reply-draft.md`（新巢狀路徑本身）都天然不命中——白名單式
 反向判準，不必為它們特別寫排除規則（呼應
 `deny-by-default-when-tool-generates-paths` 記憶）。
 
@@ -127,11 +127,11 @@ def _block_reason(kind: str, file_path: str) -> str:
 def _flat_pre_nested_block_reason(kind: str, file_path: str) -> str:
     return (
         f"`{file_path}` 是巢狀佈局採用前的分目錄前扁平 `{kind}` 產物，"
-        "只可讀、不可當寫入目標——新路徑收進 `.maigo/review/<id>/` 或 "
-        "`.maigo/issue/<id>/` 底下的資料夾。\n"
+        "只可讀、不可當寫入目標——新路徑收進 `.maigo/review/<id>/`（別人的 PR）、"
+        "`.maigo/pr/<id>/`（自己的 PR）或 `.maigo/issue/<id>/` 底下的資料夾。\n"
         "改用：\n"
         f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" {kind} --topic "<H1 主題>" '
-        "[--url <url> --repo <owner/name>]\n"
+        "[--url <url> --repo <owner/name> --owner mine|others]\n"
         "取得巢狀新路徑（`path:` 那行），寫到那裡；既有舊檔可用 "
         f"`{_SCRIPTS_DIR / 'migrate_legacy_artifacts.py'}` 搬過去，不必手動搬。\n"
         "見 skills/harness-discipline/references/artifact-ownership.md 規則 4："

@@ -24,6 +24,7 @@ def publish(root, **kwargs):
         kwargs.pop("body", BODY),
         kwargs.pop("head_sha", HEAD),
         "APPROVE",
+        owner=kwargs.pop("owner", "others"),
         **kwargs,
     )
 
@@ -45,7 +46,7 @@ def test_publish_adds_timestamp_and_working_toc_ignoring_code_headings(tmp_path)
 
 def test_publish_replaces_same_pr_even_after_title_change_and_clears_ack(tmp_path):
     first = publish(tmp_path)
-    report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer")
+    report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others")
     second = publish(tmp_path, title="Renamed PR")
     assert second["path"] == first["path"]
     assert "acknowledged_at" not in report.metadata(Path(second["path"]).read_text())
@@ -96,7 +97,7 @@ def test_newer_current_report_cannot_be_overwritten(tmp_path):
 
 def test_cross_repo_collision_is_not_mistaken_for_same_review(tmp_path):
     first = report.publish(
-        tmp_path, URL, "home/repo", "First PR", BODY, HEAD, "APPROVE"
+        tmp_path, URL, "home/repo", "First PR", BODY, HEAD, "APPROVE", owner="others"
     )
     assert Path(first["path"]).parent.name == "project-42"
     with pytest.raises(ValueError, match="ownership conflict"):
@@ -108,6 +109,7 @@ def test_cross_repo_collision_is_not_mistaken_for_same_review(tmp_path):
             BODY,
             HEAD,
             "APPROVE",
+            owner="others",
         )
     assert report.metadata(Path(first["path"]).read_text())["source"] == URL
 
@@ -117,6 +119,7 @@ def test_local_source_keeps_one_report_per_branch_or_range(tmp_path, source):
     first = report.publish(tmp_path, source, "", "Local review", BODY, HEAD, "APPROVE")
     second = report.publish(tmp_path, source, "", "Local review", BODY, HEAD, "APPROVE")
     assert first["path"] == second["path"]
+    assert "/pr/" in first["path"]
     assert report.metadata(Path(second["path"]).read_text())["source"] == source
 
 
@@ -181,8 +184,12 @@ def test_acknowledgement_preserves_review_time_rejects_stale_head_and_can_undo(
     first = publish(tmp_path)
     path = Path(first["path"])
     with pytest.raises(ValueError, match="head changed"):
-        report.acknowledge(tmp_path, URL, "owner/project", "b" * 40, "reviewer")
-    result = report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer")
+        report.acknowledge(
+            tmp_path, URL, "owner/project", "b" * 40, "reviewer", owner="others"
+        )
+    result = report.acknowledge(
+        tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others"
+    )
     assert result["reviewed_at"] == first["reviewed_at"]
     assert result["acknowledged_by"] == "reviewer"
     assert "**已看完：** " + result["acknowledged_at"] in path.read_text()
@@ -192,7 +199,7 @@ def test_acknowledgement_preserves_review_time_rejects_stale_head_and_can_undo(
         == first["reviewed_at"]
     )
     result = report.acknowledge(
-        tmp_path, URL, "owner/project", HEAD, "reviewer", undo=True
+        tmp_path, URL, "owner/project", HEAD, "reviewer", undo=True, owner="others"
     )
     assert "acknowledged_at" not in result
     assert "**已看完：** 尚未確認" in path.read_text()
@@ -207,6 +214,8 @@ def test_cli_publish_acknowledge_and_board_review_filter(tmp_path, monkeypatch, 
         str(tmp_path),
         "--source",
         URL,
+        "--owner",
+        "others",
         "--repo",
         "owner/project",
         "--head",
@@ -316,7 +325,7 @@ def test_report_without_author_has_no_author_line(tmp_path):
 
 def test_acknowledge_preserves_author(tmp_path):
     path = Path(publish(tmp_path, author="contributor")["path"])
-    report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer")
+    report.acknowledge(tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others")
     text = path.read_text()
     assert report.metadata(text)["author"] == "contributor"
     assert "**Author:** @contributor" in text
@@ -355,7 +364,16 @@ def test_legacy_report_without_author_still_parses():
 def test_cli_author_only_valid_for_publish(tmp_path, capsys):
     body = tmp_path / "body.md"
     body.write_text(BODY)
-    common = ["--cwd", str(tmp_path), "--source", URL, "--repo", "owner/project"]
+    common = [
+        "--cwd",
+        str(tmp_path),
+        "--source",
+        URL,
+        "--owner",
+        "others",
+        "--repo",
+        "owner/project",
+    ]
     assert (
         report.main(
             [
@@ -383,3 +401,75 @@ def test_cli_author_only_valid_for_publish(tmp_path, capsys):
         == 1
     )
     assert "--author" in capsys.readouterr().err
+
+
+def test_mine_owner_publishes_under_pr_folder(tmp_path):
+    result = publish(tmp_path, owner="mine")
+    assert Path(result["path"]) == tmp_path / ".maigo/pr/42/review.md"
+
+
+def test_pr_source_without_owner_is_rejected_and_points_to_pr_owner(tmp_path):
+    with pytest.raises(ValueError, match="pr_owner.py"):
+        report.publish(tmp_path, URL, "owner/project", "T", BODY, HEAD, "APPROVE")
+    assert not (tmp_path / ".maigo").exists()
+
+
+def test_cli_pr_source_without_owner_fails(tmp_path, capsys):
+    body = tmp_path / "body.md"
+    body.write_text(BODY)
+    assert (
+        report.main(
+            [
+                "publish",
+                "--cwd",
+                str(tmp_path),
+                "--source",
+                URL,
+                "--head",
+                HEAD,
+                "--title",
+                "T",
+                "--body-file",
+                str(body),
+                "--verdict",
+                "APPROVE",
+            ]
+        )
+        == 1
+    )
+    assert "--owner" in capsys.readouterr().err
+
+
+def test_publish_removes_same_source_report_from_other_group(tmp_path):
+    old = Path(publish(tmp_path, owner="others")["path"])
+    assert old.parent.parent.name == "review"
+    result = publish(tmp_path, owner="mine")
+    assert str(old) in result["removed"]
+    assert not old.exists()
+    assert Path(result["path"]).exists()
+
+
+def test_publish_keeps_other_group_report_of_different_source(tmp_path):
+    other = tmp_path / ".maigo/review/42/review.md"
+    other.parent.mkdir(parents=True)
+    other.write_text(
+        Path(publish(tmp_path / "scratch", owner="others")["path"])
+        .read_text()
+        .replace(URL, URL + "0")
+    )
+    result = publish(tmp_path, owner="mine")
+    assert other.exists()
+    assert str(other) in result["retained"]
+    assert str(other) not in result["removed"]
+
+
+def test_acknowledge_finds_report_by_owner(tmp_path):
+    path = Path(publish(tmp_path, owner="mine")["path"])
+    result = report.acknowledge(
+        tmp_path, URL, "owner/project", HEAD, "reviewer", owner="mine"
+    )
+    assert result["path"] == str(path)
+    with pytest.raises(FileNotFoundError):
+        report.acknowledge(
+            tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others"
+        )

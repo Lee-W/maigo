@@ -5,13 +5,16 @@ Fetch-or-restore PR context for /maigo:review (skills/pr-context-cache).
 First run fetches PR context (title / body / diff / CI status / linked issues /
 inline review threads with resolution state / review summaries / conversation
 comments) and caches it into a machine-readable section at the top of the
-per-source rubric file — `.maigo/review/<id>/rubric.md`, resolved via
-`scripts/artifact_path.py` (single source of truth for `.maigo/` artifact
-naming + ownership) unless `--rubric` overrides it. Re-runs with the same
+per-source rubric file — `.maigo/review/<id>/rubric.md` for someone else's PR,
+`.maigo/pr/<id>/rubric.md` for your own PR (and for local branch / range
+sources), resolved via `scripts/artifact_path.py` (single source of truth for
+`.maigo/` artifact naming + ownership) unless `--rubric` overrides it. The PR
+author is looked up with `scripts/pr_owner.py`. Re-runs with the same
 local source and an unchanged diff restore the cache instead of re-fetching.
 PR sources always refresh: CI and discussion can change without a new diff. A
-pre-nested-layout flat file (`.maigo/review-rubric-<id>.md`) is read as a
-fallback when the new path has no cache yet, but is never written to.
+pre-nested-layout flat file (`.maigo/review-rubric-<id>.md`) or the same
+rubric in the other owner group (`pr/` ↔ `review/`) is read as a fallback when
+the new path has no cache yet, but is never written to.
 
 Review threads / review summaries / conversation comments are only fetched
 for a `pr` source (branch / range diffs have no GitHub review thread to
@@ -30,6 +33,9 @@ cache 區段全文（含全部欄位）。若 `resolve_for_write()` 判定同識
 另一個主題占用（`status: conflict`，罕見）→ 印 `status: conflict` /
 `conflict_owner:` / `suggest:` 三行，**exit 3，不寫 cache**——caller 依
 `skills/pr-context-cache/SKILL.md` 的 Fallback 段退回手動抓。
+查不到 PR 作者（`pr_owner.py` 失敗）→ 印 `status: owner_unknown` 與指引，
+**exit 4，不寫 cache**——caller 請使用者確認後以 `--rubric <path>` 指定（路徑用
+`artifact_path.py --owner mine|others` 算）。
 gh / git 失敗 → exit 1 + stderr 一行（caller 改走手動 fetch）。
 """
 
@@ -47,6 +53,7 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from artifact_path import resolve_for_write
+from pr_owner import OwnerUnknownError, resolve_owner
 
 CACHE_START = "<!-- pr-context-cache:start v1 -->"
 CACHE_END = "<!-- pr-context-cache:end -->"
@@ -380,30 +387,50 @@ def _topic_hint(source: str, kind: str) -> str:
     return f"Review rubric: {source}"
 
 
-def _resolve_rubric_path(source: str, kind: str) -> tuple[Path | None, Path | None]:
+def _resolve_rubric_path(
+    source: str, kind: str
+) -> tuple[Path | None, Path | None, Path | None]:
     """
     Resolve the rubric path via `artifact_path.resolve_for_write()`.
 
-    Returns `(rubric_path, flat_fallback)` — `flat_fallback` is the
-    pre-nested-layout path (`.maigo/review-rubric-<id>.md`) when it exists,
-    for read-only cache recovery only; it is never written to. Prints the
-    `status: conflict` lines and returns `(None, None)` on conflict — the
-    caller must stop (exit 3), not pick a path or write cache itself.
+    Returns `(rubric_path, flat_fallback, other_group_fallback)` — the two
+    fallbacks are the pre-nested-layout path (`.maigo/review-rubric-<id>.md`)
+    and the same rubric in the other owner group (`pr/` ↔ `review/`) when they
+    exist, for read-only cache recovery only; they are never written to.
+    Prints the `status: conflict` lines and returns `(None, None, None)` on
+    conflict — the caller must stop (exit 3), not pick a path or write cache
+    itself.
+
+    A `pr` source needs the PR author (`pr_owner.resolve_owner()`); when it
+    cannot be determined this raises `OwnerUnknownError` and the caller stops
+    (exit 4) rather than guessing. Local branch / range sources have no author
+    and are treated as your own (`mine`).
     """
     home_repo = repo_slug()
+    url = _pr_url(source, home_repo) if kind == "pr" else None
+    if kind == "pr":
+        if url is None:
+            raise OwnerUnknownError("無法從 source 組出 PR URL")
+        owner = resolve_owner(url)
+    else:
+        owner = "mine"
     resolution = resolve_for_write(
         "review-rubric",
         _topic_hint(source, kind),
-        url=_pr_url(source, home_repo) if kind == "pr" else None,
+        url=url,
         home_repo=home_repo,
+        owner=owner,
     )
     if resolution.status == "conflict":
         print("status: conflict")
         print(f"conflict_owner: {resolution.existing_topic}")
         print(f"suggest: {resolution.suggested_path}")
-        return None, None
+        return None, None, None
     flat_fallback = Path(resolution.flat_path) if resolution.flat_path else None
-    return Path(resolution.path), flat_fallback
+    other_group = (
+        Path(resolution.other_group_path) if resolution.other_group_path else None
+    )
+    return Path(resolution.path), flat_fallback, other_group
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -421,10 +448,23 @@ def main(argv: list[str] | None = None) -> int:
 
     rubric_path: Path | None
     flat_fallback: Path | None = None
+    other_group: Path | None = None
     if args.rubric is not None:
         rubric_path = Path(args.rubric)
     else:
-        rubric_path, flat_fallback = _resolve_rubric_path(args.source, kind)
+        try:
+            rubric_path, flat_fallback, other_group = _resolve_rubric_path(
+                args.source, kind
+            )
+        except OwnerUnknownError as error:
+            print("status: owner_unknown")
+            print(f"reason: {error}")
+            print(
+                "請向使用者確認 PR 是自己的還是別人的，再用 "
+                "`artifact_path.py review-rubric --owner mine|others` 算出路徑，"
+                "以 `--rubric <path>` 重跑。"
+            )
+            return 4
         if rubric_path is None:
             return 3
 
@@ -432,11 +472,14 @@ def main(argv: list[str] | None = None) -> int:
     read_from_flat_fallback = False
     if rubric_path.exists():
         cached = find_cache_section(rubric_path.read_text(encoding="utf-8"))
-    elif flat_fallback is not None and flat_fallback.exists():
-        # 扁平舊檔只讀，永遠不寫——命中時把 cache 段抄進新路徑
-        # （下方 write_cache(rubric_path, cached)），扁平檔本身不動。
-        cached = find_cache_section(flat_fallback.read_text(encoding="utf-8"))
-        read_from_flat_fallback = True
+    else:
+        # 另一組與扁平舊檔只讀，永遠不寫——順序：另一組 → 扁平；命中時把 cache
+        # 段抄進新路徑（下方 write_cache(rubric_path, cached)），舊檔本身不動。
+        for fallback in (other_group, flat_fallback):
+            if fallback is not None and fallback.exists():
+                cached = find_cache_section(fallback.read_text(encoding="utf-8"))
+                read_from_flat_fallback = True
+                break
 
     # Diff identity cannot establish freshness of PR metadata. Refresh the full
     # PR snapshot every time, fetching its diff only once. Local sources retain

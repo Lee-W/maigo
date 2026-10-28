@@ -180,6 +180,14 @@ class TestCheckTomori:
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
 
+    def test_pr_group_review_rubric_path_approves(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(
+                "## Loaded memory entries\n（無相關 entry）\n.maigo/pr/42/rubric.md\n## Rubric\n"
+            )
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result.get("decision") is None
+
     def test_nested_triage_rubric_path_approves(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
             tqc.check_tomori(
@@ -282,6 +290,7 @@ class TestTomoriArtifactRegex:
                 ".maigo/triage-rubric-airflow-9201.md", id="new-triage-rubric"
             ),
             pytest.param(".maigo/review/58543/rubric.md", id="nested-review-rubric"),
+            pytest.param(".maigo/pr/42/rubric.md", id="pr-group-review-rubric"),
             pytest.param(".maigo/issue/12/rubric-2.md", id="nested-triage-rubric"),
         ],
     )

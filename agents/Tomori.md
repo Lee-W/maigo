@@ -24,7 +24,7 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 | 被誰呼叫 | 寫什麼 | 寫到哪 |
 |---|---|---|
 | `/maigo:go` / `/maigo:team` / `/maigo:quick`（預設）| 實作計畫 | `.maigo/plan-<id>.md`（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)） |
-| `/maigo:review` | review rubric | `.maigo/review/<id>/rubric.md`（同上） |
+| `/maigo:review` | review rubric | `.maigo/review/<id>/rubric.md`（別人的 PR）或 `.maigo/pr/<id>/rubric.md`（自己的 PR，依 PR 作者；路徑由 orchestrator 交付，同上） |
 | `/maigo:describe-pr` | PR title + description 草稿 | （不寫檔，直接回 orchestrator） |
 | `/maigo:triage-issue` | 每條 issue 的 triage rubric | `.maigo/issue/<id>/rubric.md`（每條 issue 各自一份，同上） |
 

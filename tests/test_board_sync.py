@@ -118,7 +118,9 @@ def tree_hash(root: Path) -> dict[str, str]:
 
 
 def publish_report(root: Path, n: int, head: str = HEAD):
-    return report.publish(root, url(n), REPO, f"PR {n}", "## A\nx\n", head, "APPROVE")
+    return report.publish(
+        root, url(n), REPO, f"PR {n}", "## A\nx\n", head, "APPROVE", owner="others"
+    )
 
 
 # --- parse_board -------------------------------------------------------------
@@ -388,7 +390,16 @@ class TestReconcileArtifacts:
     def test_maps_reliable_artifacts_and_flags_the_rest(self, tmp_path):
         publish_report(tmp_path, 11)
         foreign = "https://github.com/x/y/pull/50"
-        report.publish(tmp_path, foreign, REPO, "Foreign", "## A\nx\n", HEAD, "APPROVE")
+        report.publish(
+            tmp_path,
+            foreign,
+            REPO,
+            "Foreign",
+            "## A\nx\n",
+            HEAD,
+            "APPROVE",
+            owner="others",
+        )
         maigo = tmp_path / ".maigo"
         (maigo / "review-42.md").write_text(
             f"# Review: Old\n\n**PR:** {url(42)}\nold\n"
@@ -428,6 +439,18 @@ class TestReconcileArtifacts:
             "review/feature-x/review.md",
             "review/other-5/rubric.md",
         } <= skipped
+
+    def test_own_pr_artifacts_are_not_review_candidates(self, tmp_path):
+        own = report.publish(
+            tmp_path, url(12), REPO, "Mine", "## A\nx\n", HEAD, "APPROVE", owner="mine"
+        )
+        assert "/pr/12/" in own["path"]
+        candidates, unattributed, errors = sync.reconcile_artifacts(
+            tmp_path / ".maigo", REPO
+        )
+        assert errors == []
+        assert candidates == []
+        assert [u["path"] for u in unattributed] == ["pr/12/review.md"]
 
     def test_internal_files_never_show_up(self, tmp_path):
         maigo = tmp_path / ".maigo"
@@ -788,7 +811,7 @@ class TestArchive:
                 "id": "7",
                 "moved": ["review/7", "i/7.md"],
                 "skipped": [],
-                "missing": [],
+                "missing": ["pr/7"],
             }
         ]
         archive = tmp_path / ".maigo" / "_archive"
@@ -798,6 +821,21 @@ class TestArchive:
         assert (archive / "i" / "7.md").is_file()
         assert not (tmp_path / ".maigo" / "review" / "7").exists()
         assert not (tmp_path / ".maigo" / "i" / "7.md").exists()
+
+    def test_moves_own_pr_dir_under_archive(self, tmp_path):
+        own = tmp_path / ".maigo" / "pr" / "7"
+        own.mkdir(parents=True)
+        (own / "reply-draft.md").write_text("# Reply drafts: x (#7)\n")
+        result = sync.archive_urls(tmp_path, [url(7)], REPO)[0]
+        assert result["moved"] == ["pr/7"]
+        assert result["missing"] == ["review/7", "i/7.md"]
+        assert (
+            tmp_path / ".maigo" / "_archive" / "pr" / "7" / "reply-draft.md"
+        ).is_file()
+        assert not own.exists()
+
+    def test_pr_artifact_groups_cover_both_owner_folders(self):
+        assert sync.PR_ARTIFACT_GROUPS == ("review", "pr")
 
     def test_existing_destination_is_never_overwritten(self, tmp_path):
         self.put_review(tmp_path, 7)
@@ -819,7 +857,7 @@ class TestArchive:
             "id": "8",
             "moved": [],
             "skipped": [],
-            "missing": ["review/8", "i/8.md"],
+            "missing": ["review/8", "pr/8", "i/8.md"],
         }
         assert result[1] == {
             "url": "not-a-url",

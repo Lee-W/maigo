@@ -1332,6 +1332,20 @@ class TestMainCheckboxFields:
         assert row["status"] == "↩︎ 回你的球"
         assert row["checked"] is False
 
+    def test_review_pr_item_ignores_report_under_pr_folder(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        self._write_report(tmp_path)
+        review = tmp_path / ".maigo" / "review" / "7" / "review.md"
+        review.rename(tmp_path / ".maigo" / "review" / "7" / "moved.md")
+        own = tmp_path / ".maigo" / "pr" / "7" / "review.md"
+        own.parent.mkdir(parents=True)
+        own.write_text((review.parent / "moved.md").read_text())
+        (review.parent / "moved.md").unlink()
+        row = self._run(monkeypatch, capsys, tmp_path, checked=False)
+        assert row["last_reviewed_at"] is None
+        assert row["acked_current"] is False
+
     def test_acked_current_requires_matching_head(self, tmp_path, monkeypatch, capsys):
         self._write_report(
             tmp_path,

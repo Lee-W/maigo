@@ -111,6 +111,16 @@ class TestCategorize:
         ]
         assert catalog.unregistered == []
 
+    def test_pr_group_nested_paths_are_nested(self):
+        catalog = mdc.categorize(["pr/7/review.md", "pr/7/reply-draft.md"])
+        assert sorted(catalog.nested) == ["pr/7/reply-draft.md", "pr/7/review.md"]
+        assert catalog.unregistered == []
+
+    def test_pr_group_unknown_stem_is_unregistered(self):
+        catalog = mdc.categorize(["pr/7/unknown.md"])
+        assert catalog.unregistered == ["pr/7/unknown.md"]
+        assert catalog.nested == []
+
     def test_nested_unknown_stem_is_unregistered(self):
         catalog = mdc.categorize(["review/58543/notes.md"])
         assert catalog.unregistered == ["review/58543/notes.md"]
@@ -174,6 +184,15 @@ class TestScan:
             "review/58543/rubric-2.md",
         ]
         assert catalog.unregistered == ["review/58543/notes.md"]
+
+    def test_scan_collects_pr_group(self, tmp_path: Path):
+        pr_dir = tmp_path / ".maigo" / "pr" / "7"
+        pr_dir.mkdir(parents=True)
+        (pr_dir / "reply-draft.md").write_text("# Reply drafts: x\n", encoding="utf-8")
+
+        catalog = mdc.scan(tmp_path / ".maigo")
+
+        assert catalog.nested == ["pr/7/reply-draft.md"]
 
     def test_does_not_descend_past_two_levels(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"

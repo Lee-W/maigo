@@ -56,9 +56,23 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 
 ## 流程
 
+**先判斷這顆 PR 是自己的還是別人的（owner）**——產物依作者分流：別人的 PR 放
+`.maigo/review/<id>/`，自己的 PR（含本地 branch / commit range，沒有作者，視為自己的變更）放
+`.maigo/pr/<id>/`。GitHub PR 來源在動工前跑一次：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_owner.py" --url <PR url>
+```
+
+多 PR 批次**每顆 PR 各跑一次**（逐一對各自的 URL），查不到作者時只針對那一顆問使用者，其餘照常。
+stdout 第 1 行 `owner: mine|others`，記下來——下面所有 `artifact_path.py` 與 `review_report.py publish`
+呼叫都帶 `--owner <owner>`，步驟 4.5 的選項分流也用同一個結果。exit 1（查不到作者）→ **不猜**，
+AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答案當 `--owner`。本地 branch / range
+省略 `--owner`（預設 `mine`）。
+
 ### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
-**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。
+**先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。`status: owner_unknown`（exit 4，查不到 PR 作者）→ 依上面「判斷 owner」問使用者後，用 `--rubric <path>`（路徑由 `artifact_path.py review-rubric --owner …` 算出）重跑。
 **`status: conflict` 時 rubric 檔裡既有的 cache 區塊是舊 head 的過期快取，不是現況**——現 head 的 diff 以 `gh pr diff` 另存為準，並交代燈／爽世不要引用該區塊。
 常見成因：重審時舊 rubric 的 H1 被加上 `(re-review, head <sha>)` 之類的註記，與快取要的標題不一致；重審 rubric 的 H1 保持首次的原標題，head 與重審註記寫進本體第一段，不寫進 H1。
 
@@ -72,8 +86,8 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 ### 2. 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
 
 派 🩵 燈前，**orchestrator** 取 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時由 orchestrator 呼叫
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name>` 並處理 ownership 結果，
-`--repo` 取值見「## 輸出」段的 `pr_context_cache.repo_slug()`；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo` 即可），
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name> --owner <owner>` 並處理 ownership 結果，
+`--repo` 取值見「## 輸出」段的 `pr_context_cache.repo_slug()`；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo`/`--owner` 即可，路徑落在 `.maigo/pr/<id>/rubric.md`；有 PR 時自己的 PR 是 `.maigo/pr/<id>/rubric.md`、別人的是 `.maigo/review/<id>/rubric.md`），
 歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
 （目錄不存在由 orchestrator 先建立該路徑的父目錄），再把絕對路徑、原樣 H1 與 ownership status 交給 🩵 燈。她沒有 Bash，不執行 helper 或 `mkdir`。
 
@@ -116,7 +130,7 @@ Mode 對照表（checklist subset、Taki 是否跑）與 `--bilingual` 正交關
 ### 4.5 裁決 gate（有 Soyo findings 才觸發）
 
 report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表態。選項依「PR 作者是不是使用者本人」分流
-（GitHub PR 比對 `gh pr view --json author` 與 `gh api user`；本地 branch / commit range 視為自己的變更）：
+（用上面「判斷 owner」的結果：`mine` ＝ 自己的變更、`others` ＝ 別人的 PR，不再另外比對一次；本地 branch / commit range 視為自己的變更）：
 
 **自己的變更**——要決定的是「這次修不修」：
 
@@ -133,8 +147,8 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 
 選完後 orchestrator 依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
 起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號）,呼叫
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --topic "Review draft: <PR title>"`
-取得落檔路徑（`.maigo/review/<id>/draft.md`），把草稿逐字寫進那個路徑，並寫進 board 細節檔的
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Review draft: <PR title>"`
+取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並寫進 board 細節檔的
 `## 筆記`。只起草、不送出。
 board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
@@ -197,7 +211,7 @@ board 判為需要重審，不把新 head 冒充已審。
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
   --cwd <repo-root> --repo <owner/name> --source <canonical-PR-url-or-branch-or-range> \
-  --head <reviewed-full-commit-sha> --title <title> --verdict <verdict> \
+  --owner <owner> --head <reviewed-full-commit-sha> --title <title> --verdict <verdict> \
   --author <login-or-git-author> --body-file <scratchpad/report-body.md>
 ```
 
@@ -207,16 +221,17 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
 
 `verdict` 使用 `APPROVE` / `APPROVE_WITH_NITS` / `NEEDS_CHANGES` / `BLOCKED`；
 🟡 爽世的 `REQUEST_CHANGES` 對應 `NEEDS_CHANGES`，`APPROVED` 對應 `APPROVE`。PR URL 用 `gh pr view --json url`
-的 canonical 值，`--repo` 是 board 所在 repo；跨 repo 不拿目標 repo 冒充 home repo。
+的 canonical 值，`--repo` 是 board 所在 repo；跨 repo 不拿目標 repo 冒充 home repo。PR URL source 必須帶 `--owner`
+（沒帶會失敗並指向 `scripts/pr_owner.py`）；本地 branch / range 省略即為 `mine`。
 
 [`scripts/review_report.py`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
-重用 artifact_path 的命名，生成 `.maigo/review/<id>/review.md`，並統一提供：
+重用 artifact_path 的命名，生成 `.maigo/review/<id>/review.md`（自己的 PR 與本地 source 是 `.maigo/pr/<id>/review.md`），並統一提供：
 
 - H1、來源、原作者（`**Author:**`）、**最後 review 時間（含時區）**、實際 reviewed commit、verdict。
 - **TOC**：所有 H2/H3 的可跳轉目錄，不把 fenced code 範例誤當章節。
 - 同 source 重審直接換成最新完整報告；PR 改標題仍是同一個 source。
-- 新版原子寫入成功後，刪除同目錄 `review-N.md` 與舊扁平 `review-<id>.md` 中
-  能確認同 source 的過期報告；草稿、rubric、手寫筆記、別顆 PR、無法確認歸屬的檔案保留。
+- 新版原子寫入成功後，刪除同目錄 `review-N.md`、舊扁平 `review-<id>.md` 與**另一組**（`pr/` ↔ `review/`）
+  同 id 的 `review.md` 中能確認同 source 的過期報告；草稿、rubric、手寫筆記、別顆 PR、無法確認歸屬的檔案保留。
   stdout 列出 `removed` / `retained`；清除不依賴 mtime 猜「同一份」。
 - 新報告清除上一輪「已看完」標記；要由使用者看完這一版再標記。
 
@@ -229,11 +244,14 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
-成最新 `review/<id>/review.md`，保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+成最新的 publisher 回傳 `path`（`review/<id>/review.md` 或 `pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
 時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
 
+只有別人的 PR（`owner: others`）會有 👀 行；自己的 PR 與本地 source 的報告在 `pr/<id>/`，不進 👀 對帳，
+所以 `owner: mine` 時略過下面 👀 專屬的列（`待送出`、⏳、`↩︎ 回你的球` 等狀態轉移）；若該 PR 在 board 上有其他行，
+publisher 回傳的 `path`（`pr/<id>/review.md`）照樣寫進對應細節檔 `## 筆記`。
 GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
@@ -250,7 +268,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 使用者以 `/maigo:board --reviewed <n>` 或在 board 勾 `[x]` 標記本地已看完 → ⏳；不代表已送 GitHub。
   新 head 或作者新留言會回 🎯 `↩︎ 回你的球`。
 - 上面 publisher 回傳的 `path`（即
-  `review/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
+  `review/<id>/review.md` 或 `pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
   的 `## 筆記` 區，一行裸相對路徑連結（相對 `.maigo/`，例如 `review/9301/review.md`）——
   不再寫進索引行
@@ -263,7 +281,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 | 項目 | `/maigo:go` | `/maigo:review` |
 |------|---------|---------------|
 | Anon 上場 | 是（核心） | 不上場 |
-| 燈的產出 | 實作計畫 (`plan-<id>.md`) | review rubric (`review/<id>/rubric.md`) |
+| 燈的產出 | 實作計畫 (`plan-<id>.md`) | review rubric (`review/<id>/rubric.md`；自己的 PR 是 `pr/<id>/rubric.md`) |
 | 終態 | 變更落地 + 全綠 | review 報告 |
 | 適用 | 開發新功能、修 bug | PR review、code audit |
 

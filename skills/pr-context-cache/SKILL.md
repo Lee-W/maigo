@@ -17,7 +17,10 @@ description: This skill should be used during /maigo:review to persist current P
 因此 **PR 每次重新抓取**；只有本地 branch／range 在同 source 且 diff sha 未變時還原快取。
 **rubric 檔路徑不再固定**：省略 `--rubric` 時 script 會依 source
 呼叫 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)
-算出 `.maigo/review/<id>/rubric.md`（分目錄前的扁平 `.maigo/review-rubric-<id>.md`
+算出 `.maigo/review/<id>/rubric.md`（自己的 PR 與本地 branch／range 是 `.maigo/pr/<id>/rubric.md`；
+PR 作者由 [`scripts/pr_owner.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_owner.py) 查，
+查不到時印 `status: owner_unknown` 並 **exit 4**、不寫 cache，caller 問使用者後以 `--rubric <path>` 重跑）。
+分目錄前的扁平 `.maigo/review-rubric-<id>.md` 與另一組資料夾（`pr/` ↔ `review/`）的同名 rubric
 只在新路徑沒有 cache 時當唯讀退路，永遠不寫；歸屬規則見
 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
