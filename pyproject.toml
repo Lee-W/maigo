@@ -30,6 +30,7 @@ module = [
   "board_state",
   "board_sync",
   "maigo_dir_catalog",
+  "pr_context_cache",
   "pr_owner",
   "review_report",
 ]

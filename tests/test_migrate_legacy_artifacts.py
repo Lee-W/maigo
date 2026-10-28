@@ -9,6 +9,8 @@ repo——這條規則寫在這裡是提醒之後有人為了「更真實」而�
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -1066,3 +1068,316 @@ class TestCli:
         # nothing to print a skip line for; they are absent from the output
         # by construction, not via the skip-reporting path.
         assert "session-head.json" not in captured.out
+
+
+# ---------------------------------------------------------------------------
+# 階段三：--split-own-prs（巢狀 review/<id>/ → pr/<id>/）
+# ---------------------------------------------------------------------------
+
+_YOU = "Lee-W"
+
+
+def _review_text(source: str, *, author: str | None = None) -> str:
+    record = {
+        "version": 1,
+        "source": source,
+        "head_sha": "a" * 40,
+        "verdict": "APPROVE",
+        "reviewed_at": "2026-01-01T00:00:00+00:00",
+    }
+    if author is not None:
+        record["author"] = author
+    return f"# Review: x\n\n<!-- maigo-review: {json.dumps(record)} -->\n\nbody\n"
+
+
+def _put(repo: Path, rel: str, text: str) -> Path:
+    path = repo / ".maigo" / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _plan_split(repo: Path, **kwargs):
+    kwargs.setdefault("you", _YOU)
+    notes: list[str] = []
+    actions = mla.plan_migration(
+        repo, scan(repo / ".maigo"), split_own_prs=True, notes=notes, **kwargs
+    )
+    return actions, notes
+
+
+def _no_lookup(url: str) -> str:
+    raise AssertionError(f"author_lookup must not be called: {url}")
+
+
+class TestSplitOwnPrs:
+    def test_metadata_author_equal_to_you_moves_whole_dir_and_removes_empty_dir(
+        self, tmp_path: Path
+    ):
+        repo = _make_repo(tmp_path)
+        url = "https://github.com/o/r/pull/9301"
+        _put(repo, "review/9301/review.md", _review_text(url, author="lee-w"))
+        _put(repo, "review/9301/draft.md", "# draft\n")
+
+        actions, notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert {(a.old_path, a.new_path) for a in actions} == {
+            (".maigo/review/9301/review.md", ".maigo/pr/9301/review.md"),
+            (".maigo/review/9301/draft.md", ".maigo/pr/9301/draft.md"),
+        }
+        assert notes == []
+
+        mla.apply_migration(repo, actions)
+        assert (repo / ".maigo/pr/9301/review.md").is_file()
+        assert (repo / ".maigo/pr/9301/draft.md").is_file()
+        assert not (repo / ".maigo/review/9301").exists()
+
+    def test_metadata_author_with_at_prefix_and_case_difference_matches_you(
+        self, tmp_path: Path
+    ):
+        repo = _make_repo(tmp_path)
+        _put(
+            repo,
+            "review/7/review.md",
+            _review_text("https://github.com/o/r/pull/7", author="@Lee-W"),
+        )
+        actions, _notes = _plan_split(repo, you="lee-w", author_lookup=_no_lookup)
+        assert [a.new_path for a in actions] == [".maigo/pr/7/review.md"]
+
+    def test_other_author_is_left_untouched(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(
+            repo,
+            "review/7/review.md",
+            _review_text("https://github.com/o/r/pull/7", author="someone"),
+        )
+        before = _snapshot(repo / ".maigo")
+        actions, notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert actions == []
+        assert notes == []
+        assert _snapshot(repo / ".maigo") == before
+
+    def test_rubric_cache_source_calls_injected_lookup(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        url = "https://github.com/o/r/pull/8"
+        _put(
+            repo,
+            "review/8/rubric.md",
+            f"<!-- pr-context-cache:start v1 -->\n- **Source**: {url}\n"
+            "<!-- pr-context-cache:end -->\n\n# Review rubric: x\n",
+        )
+        seen: list[str] = []
+
+        def lookup(source: str) -> str:
+            seen.append(source)
+            return _YOU
+
+        actions, _notes = _plan_split(repo, author_lookup=lookup)
+        assert seen == [url]
+        assert [a.new_path for a in actions] == [".maigo/pr/8/rubric.md"]
+
+    def test_pr_line_and_numeric_id_with_home_slug_are_source_fallbacks(
+        self, tmp_path: Path
+    ):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/11/notes.md", "**PR:** https://github.com/o/r/pull/11\n")
+        _put(repo, "review/12/notes.md", "no url here\n")
+        seen: list[str] = []
+
+        def lookup(source: str) -> str:
+            seen.append(source)
+            return _YOU
+
+        actions, _notes = _plan_split(repo, author_lookup=lookup, home_slug="o/r")
+        assert seen == [
+            "https://github.com/o/r/pull/11",
+            "https://github.com/o/r/pull/12",
+        ]
+        assert len(actions) == 2
+
+    def test_lookup_failure_skips_and_leaves_files_in_place(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/8/notes.md", "**PR:** https://github.com/o/r/pull/8\n")
+        before = _snapshot(repo / ".maigo")
+
+        def lookup(source: str) -> str:
+            raise mla.OwnerUnknownError("rate limited")
+
+        actions, notes = _plan_split(repo, author_lookup=lookup)
+        assert actions == []
+        assert any(
+            "skipped review/8/ (author unknown: rate limited)" in n for n in notes
+        )
+        assert _snapshot(repo / ".maigo") == before
+
+    def test_no_source_at_all_is_skipped_as_author_unknown(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/other-5/notes.md", "nothing\n")
+        actions, notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert actions == []
+        assert any("skipped review/other-5/ (author unknown" in n for n in notes)
+
+    def test_local_branch_source_counts_as_mine_without_lookup(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/feature-x/review.md", _review_text("feature/x"))
+        actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert [a.new_path for a in actions] == [".maigo/pr/feature-x/review.md"]
+
+    def test_flat_files_gate_phase_three(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review-rubric-42.md", "# Review rubric: x\n")
+        _put(repo, "review/9/review.md", _review_text("feature/x"))
+        actions, notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert [a.old_path for a in actions] == [".maigo/review-rubric-42.md"]
+        assert any("先跑一次不帶 --split-own-prs" in n for n in notes)
+
+    def test_existing_target_is_auto_disambiguated(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9/review.md", _review_text("feature/x"))
+        _put(repo, "pr/9/review.md", "# already here\n")
+        actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert [(a.new_path, a.disambiguated) for a in actions] == [
+            (".maigo/pr/9/review-2.md", True)
+        ]
+        mla.apply_migration(repo, actions)
+        assert (repo / ".maigo/pr/9/review.md").read_text() == "# already here\n"
+        assert (repo / ".maigo/pr/9/review-2.md").is_file()
+
+    def test_lock_dir_is_skipped_listed_and_keeps_source_dir(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9/review.md", _review_text("feature/x"))
+        (repo / ".maigo/review/9/.review-write-lock").mkdir()
+        actions, notes = _plan_split(repo, author_lookup=_no_lookup)
+        assert [a.old_path for a in actions] == [".maigo/review/9/review.md"]
+        assert any(".review-write-lock" in n for n in notes)
+        mla.apply_migration(repo, actions)
+        assert (repo / ".maigo/review/9/.review-write-lock").is_dir()
+
+    def test_notes_links_are_rewritten_by_relpath_and_judgment_untouched(
+        self, tmp_path: Path
+    ):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9301/review.md", _review_text("feature/x"))
+        detail = _put(
+            repo,
+            "i/9301.md",
+            "# 🔀 x\n\n## 判斷\n\nsee review/9301/review.md and review.md\n\n"
+            "## 筆記\n\n- review/9301/review.md\n- plain review.md stays\n",
+        )
+        actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
+        rewrites = mla.plan_link_rewrites(repo, actions)
+        assert [(r.old_token, r.new_token) for r in rewrites] == [
+            ("review/9301/review.md", "pr/9301/review.md")
+        ]
+        assert mla.find_path_qualified_mentions(repo, actions) == []
+        mla.apply_migration(repo, actions)
+        mla.apply_link_rewrites(repo, rewrites)
+        text = detail.read_text()
+        assert "## 判斷\n\nsee review/9301/review.md and review.md" in text
+        assert "- pr/9301/review.md\n- plain review.md stays" in text
+
+    def test_without_flag_output_matches_current_behaviour(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9/review.md", _review_text("feature/x"))
+        _put(repo, "plan.md", "# Fix DAG run stall\n")
+        catalog = scan(repo / ".maigo")
+        assert [a.old_path for a in mla.plan_migration(repo, catalog)] == [
+            ".maigo/plan.md"
+        ]
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "git@github.com:Lee-W/maigo.git",
+            "https://github.com/Lee-W/maigo.git",
+            "https://github.com/Lee-W/maigo",
+            "ssh://git@github.com/Lee-W/maigo.git",
+        ],
+    )
+    def test_parse_repo_slug_handles_ssh_and_https(self, url: str):
+        assert mla._parse_repo_slug(url) == "Lee-W/maigo"
+
+    def test_parse_repo_slug_returns_empty_when_unparseable(self):
+        assert mla._parse_repo_slug("/some/local/path") == ""
+
+    def test_infer_home_repo_slug_reads_origin(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:o/r.git"],
+            cwd=repo,
+            check=True,
+        )
+        assert mla._infer_home_repo_slug(repo) == "o/r"
+        assert mla._infer_home_repo_slug(tmp_path / "missing") == ""
+
+
+class TestSplitOwnPrsCli:
+    def _build(self, tmp_path: Path) -> Path:
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9/review.md", _review_text("feature/x"))
+        _put(repo, "review/10/review.md", _review_text("feature/y"))
+        return repo
+
+    def test_dry_run_without_apply_writes_nothing(self, tmp_path: Path, capsys):
+        repo = self._build(tmp_path)
+        before = _snapshot(repo / ".maigo")
+        assert mla.main([str(repo), "--split-own-prs", "--you", _YOU]) == 0
+        assert ".maigo/review/9/review.md -> .maigo/pr/9/review.md" in (
+            capsys.readouterr().out
+        )
+        assert _snapshot(repo / ".maigo") == before
+
+    def test_apply_moves_and_removes_manifest(self, tmp_path: Path):
+        repo = self._build(tmp_path)
+        assert mla.main([str(repo), "--split-own-prs", "--you", _YOU, "--apply"]) == 0
+        assert (repo / ".maigo/pr/9/review.md").is_file()
+        assert not (repo / ".maigo/review").exists() or not any(
+            (repo / ".maigo/review").iterdir()
+        )
+        assert not mla.manifest_path(repo).exists()
+
+    def test_without_you_and_gh_failure_exits_1(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    ):
+        repo = self._build(tmp_path)
+
+        def boom(explicit=None):
+            raise mla.OwnerUnknownError("gh not logged in")
+
+        monkeypatch.setattr(mla, "current_login", boom)
+        before = _snapshot(repo / ".maigo")
+        assert mla.main([str(repo), "--split-own-prs", "--apply"]) == 1
+        assert "--you" in capsys.readouterr().err
+        assert _snapshot(repo / ".maigo") == before
+
+    def test_interrupted_apply_resumes_from_manifest(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    ):
+        repo = self._build(tmp_path)
+
+        class _Interrupted(Exception):
+            pass
+
+        real_rename = Path.rename
+        done = 0
+
+        def _rename_then_interrupt(self: Path, target):
+            nonlocal done
+            result = real_rename(self, target)
+            done += 1
+            if done == 1:
+                raise _Interrupted
+            return result
+
+        args = [str(repo), "--split-own-prs", "--you", _YOU, "--apply"]
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "rename", _rename_then_interrupt)
+            with pytest.raises(_Interrupted):
+                mla.main(args)
+        assert mla.manifest_path(repo).is_file()
+
+        capsys.readouterr()
+        assert mla.main(args) == 0
+        assert (repo / ".maigo/pr/9/review.md").is_file()
+        assert (repo / ".maigo/pr/10/review.md").is_file()
+        assert not mla.manifest_path(repo).exists()
