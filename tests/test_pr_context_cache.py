@@ -150,7 +150,7 @@ class TestMainCacheFlow:
         monkeypatch.setattr(
             pcc,
             "_resolve_rubric_path",
-            lambda *a: (rubric, old_path if legacy else None),
+            lambda *a: (rubric, old_path if legacy else None, None),
         )
 
         assert pcc.main([source]) == 0
@@ -244,7 +244,7 @@ class TestMainCacheFlow:
         capsys: pytest.CaptureFixture,
     ):
         monkeypatch.setattr(
-            pcc, "_resolve_rubric_path", lambda source, kind: (None, None)
+            pcc, "_resolve_rubric_path", lambda source, kind: (None, None, None)
         )
         monkeypatch.setattr(
             pcc,
@@ -267,7 +267,7 @@ class TestMainCacheFlow:
 
         new_path = tmp_path / "review" / "42" / "rubric.md"
         monkeypatch.setattr(
-            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat)
+            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat, None)
         )
         monkeypatch.setattr(
             pcc,
@@ -301,7 +301,7 @@ class TestMainCacheFlow:
 
         new_path = tmp_path / "review" / "42" / "rubric.md"
         monkeypatch.setattr(
-            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat)
+            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, flat, None)
         )
         monkeypatch.setattr(pcc, "current_diff_sha", lambda *a: "different-sha")
         monkeypatch.setattr(pcc, "fetch_context", lambda *a: _fields(diff="new diff"))
@@ -321,6 +321,7 @@ def _stub_resolution(**overrides) -> SimpleNamespace:
         "suggested_path": None,
         "legacy_path": None,
         "flat_path": None,
+        "other_group_path": None,
     }
     fields.update(overrides)
     return SimpleNamespace(**fields)
@@ -330,7 +331,8 @@ class TestResolveRubricPath:
     """
     `_resolve_rubric_path()` calls `artifact_path.resolve_for_write()` per
     kind (pr/branch/range) and translates its Resolution into either a
-    `(rubric_path, flat_fallback)` tuple or the conflict stdout + `(None, None)`.
+    `(rubric_path, flat_fallback, other_group)` tuple or the conflict stdout +
+    `(None, None, None)`.
     `resolve_for_write()` itself is tested in `tests/test_artifact_path.py` —
     these tests only check the plumbing.
     """
@@ -338,59 +340,66 @@ class TestResolveRubricPath:
     def test_pr_kind_builds_url_and_title_topic(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
         monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(pcc, "resolve_owner", lambda url: "others")
         captured: dict = {}
 
-        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
-            captured.update(kind=kind, topic=topic, url=url, home_repo=home_repo)
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo="", owner=None):
+            captured.update(
+                kind=kind, topic=topic, url=url, home_repo=home_repo, owner=owner
+            )
             return _stub_resolution(path=".maigo/review/42/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("42", "pr")
-        assert result == (Path(".maigo/review/42/rubric.md"), None)
+        assert result == (Path(".maigo/review/42/rubric.md"), None, None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: Fix the thing",
             "url": "https://github.com/o/r/pull/42",
             "home_repo": "o/r",
+            "owner": "others",
         }
 
     def test_branch_kind_has_no_url(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
         captured: dict = {}
 
-        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
-            captured.update(kind=kind, topic=topic, url=url)
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo="", owner=None):
+            captured.update(kind=kind, topic=topic, url=url, owner=owner)
             return _stub_resolution(path=".maigo/review/my-branch/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("my-branch", "branch")
-        assert result == (Path(".maigo/review/my-branch/rubric.md"), None)
+        assert result == (Path(".maigo/review/my-branch/rubric.md"), None, None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: my-branch",
             "url": None,
+            "owner": "mine",
         }
 
     def test_range_kind_has_no_url(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
         captured: dict = {}
 
-        def fake_resolve_for_write(kind, topic, *, url=None, home_repo=""):
-            captured.update(kind=kind, topic=topic, url=url)
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo="", owner=None):
+            captured.update(kind=kind, topic=topic, url=url, owner=owner)
             return _stub_resolution(path=".maigo/review/main-feature/rubric.md")
 
         monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
         result = pcc._resolve_rubric_path("main..feature", "range")
-        assert result == (Path(".maigo/review/main-feature/rubric.md"), None)
+        assert result == (Path(".maigo/review/main-feature/rubric.md"), None, None)
         assert captured == {
             "kind": "review-rubric",
             "topic": "Review rubric: main..feature",
             "url": None,
+            "owner": "mine",
         }
 
     def test_returns_flat_fallback_when_present(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
         monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(pcc, "resolve_owner", lambda url: "others")
         monkeypatch.setattr(
             pcc,
             "resolve_for_write",
@@ -403,12 +412,14 @@ class TestResolveRubricPath:
         assert result == (
             Path(".maigo/review/42/rubric.md"),
             Path(".maigo/review-rubric-42.md"),
+            None,
         )
 
     def test_conflict_prints_owner_and_suggestion_and_returns_none(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ):
         monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "resolve_owner", lambda url: "others")
         monkeypatch.setattr(
             pcc,
             "resolve_for_write",
@@ -420,11 +431,96 @@ class TestResolveRubricPath:
             ),
         )
         result = pcc._resolve_rubric_path("42", "pr")
-        assert result == (None, None)
+        assert result == (None, None, None)
         out = capsys.readouterr().out
         assert "status: conflict" in out
         assert "conflict_owner: Review rubric: Some other PR" in out
         assert "suggest: .maigo/review/42/rubric-2.md" in out
+
+
+class TestResolveRubricPathOwner:
+    def test_mine_pr_gets_owner_mine(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(pcc, "resolve_owner", lambda url: "mine")
+        owners: list = []
+
+        def fake_resolve_for_write(kind, topic, *, url=None, home_repo="", owner=None):
+            owners.append(owner)
+            return _stub_resolution(path=".maigo/pr/42/rubric.md")
+
+        monkeypatch.setattr(pcc, "resolve_for_write", fake_resolve_for_write)
+        assert pcc._resolve_rubric_path("42", "pr")[0] == Path(".maigo/pr/42/rubric.md")
+        assert owners == ["mine"]
+
+    def test_other_group_path_is_returned(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(pcc, "resolve_owner", lambda url: "mine")
+        monkeypatch.setattr(
+            pcc,
+            "resolve_for_write",
+            lambda *a, **kw: _stub_resolution(
+                path=".maigo/pr/42/rubric.md",
+                other_group_path=".maigo/review/42/rubric.md",
+            ),
+        )
+        assert pcc._resolve_rubric_path("42", "pr") == (
+            Path(".maigo/pr/42/rubric.md"),
+            None,
+            Path(".maigo/review/42/rubric.md"),
+        )
+
+    def test_owner_unknown_exits_4_without_writing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        def boom(url):
+            raise pcc.OwnerUnknownError("gh api user 失敗")
+
+        monkeypatch.setattr(pcc, "repo_slug", lambda: "o/r")
+        monkeypatch.setattr(pcc, "run", lambda *a, **kw: "Fix the thing")
+        monkeypatch.setattr(pcc, "resolve_owner", boom)
+        monkeypatch.setattr(
+            pcc,
+            "fetch_context",
+            lambda *a: pytest.fail("fetch_context called despite unknown owner"),
+        )
+        monkeypatch.chdir(tmp_path)
+        assert pcc.main(["https://github.com/o/r/pull/42"]) == 4
+        out = capsys.readouterr().out
+        assert "status: owner_unknown" in out
+        assert not (tmp_path / ".maigo").exists()
+
+    def test_other_group_cache_copied_to_new_path_and_old_untouched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        diff = "the diff"
+        other = tmp_path / "review" / "my-branch" / "rubric.md"
+        other.parent.mkdir(parents=True)
+        other.write_text(pcc.render_cache(_fields(diff=diff)) + "\n", encoding="utf-8")
+        before = hashlib.sha256(other.read_bytes()).hexdigest()
+        new_path = tmp_path / "pr" / "my-branch" / "rubric.md"
+        monkeypatch.setattr(
+            pcc, "_resolve_rubric_path", lambda source, kind: (new_path, None, other)
+        )
+        monkeypatch.setattr(
+            pcc,
+            "current_diff_sha",
+            lambda *a: hashlib.sha256(diff.encode()).hexdigest(),
+        )
+        monkeypatch.setattr(
+            pcc, "fetch_context", lambda *a: pytest.fail("fetch_context called on hit")
+        )
+        assert pcc.main(["my-branch"]) == 0
+        assert capsys.readouterr().out.startswith("cache_hit: true")
+        assert pcc.find_cache_section(new_path.read_text(encoding="utf-8")) is not None
+        assert hashlib.sha256(other.read_bytes()).hexdigest() == before
 
 
 class TestRenderReviewThreads:

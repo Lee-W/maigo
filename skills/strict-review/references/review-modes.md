@@ -26,7 +26,7 @@ output trigger + Taiwanese Mandarin prose rules. Read this file when parsing `--
 ## Mode 旗標處理
 
 Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode` 與 `--bilingual`：
-- 把 mode 名稱寫進 review rubric 檔（`.maigo/review/<id>/rubric.md`）開頭 `<!-- mode: <mode-name> -->` 註解，讓 Soyo / Taki 啟動時讀得到
+- 把 mode 名稱寫進 review rubric 檔（`.maigo/review/<id>/rubric.md`，自己的 PR 是 `.maigo/pr/<id>/rubric.md`）開頭 `<!-- mode: <mode-name> -->` 註解，讓 Soyo / Taki 啟動時讀得到
 - 🟡 Soyo 收到 prompt 時被明確告知 checklist subset，依共用 mode 資料保留完整 9 項，使用 `## Checklist (mode=<name>)`；不在 subset 的項標 `[—]` 且逐項附 `skipped by mode=<name>`。
 - mode = `design-preview` → 不啟動 Taki stage；最終報告 Verification 段註記「Skipped (mode=design-preview)」
 - mode = `compliance-only` → 正常啟動 Taki stage（與 full mode 相同）

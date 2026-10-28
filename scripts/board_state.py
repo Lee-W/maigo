@@ -22,7 +22,8 @@ stdin：JSON 陣列 `[{type, gh_meta, prior_status, url, local_verdict_at}]`
 issue/PR URL，用來算 `detail_path`；`local_verdict_at` 是 optional 的 ISO 8601
 時間戳，只對 👀 型別有意義——本地產出這次 review verdict 的時間。顯式給了就
 直接用；省略且帶了 `--maigo-root` 時，`main()` 自動用 `github_ref()` 算出的
-`<id>` 找 `.maigo/review/<id>/review.md`。新版優先取 metadata `reviewed_at`；
+`<id>` 找 `.maigo/review/<id>/review.md`（👀 項目＝別人的 PR，固定讀 `review/`，
+不讀自己 PR 的 `pr/<id>/`）。新版優先取 metadata `reviewed_at`；
 舊檔沒有 metadata 才取 UTC mtime（明確標為推估）。report 的 `head_sha` 用來偵測新 push，
 `acknowledged_at` / `acknowledged_by` 記使用者本地已看完，不表示 GitHub 已送出。
 檔案不存在時退回 GitHub reviews 與 prior_status。
@@ -52,7 +53,7 @@ stdlib-only；`classify()` 與 `compute_badges()` 皆為純函式——`classify
 `待送出`（`UNPOSTED_VERDICT`）的 `next_action` 模板含佔位字
 `_REVIEW_DRAFT_PLACEHOLDER`；`main()` 在 `url` 可解析出識別碼時，用
 function-level import 把它換成 `artifact_path("review-draft", ref)` 算出的
-真實路徑（見 `main()` 內註解說明為何不能在模組頂層 import `artifact_path`）；
+真實路徑（👀 項目固定是別人的 PR，傳 `owner="others"`；見 `main()` 內註解說明為何不能在模組頂層 import `artifact_path`）；
 `url` 缺失或無法解析時保留佔位字，不假造路徑。有給 `--maigo-root` 而該草稿檔不存在時，
 `next_action` 改為「尚無草稿：先起草 …」提示，不給一條照跑會失敗的 `gh pr review` 指令。
 """
@@ -658,6 +659,7 @@ def _auto_local_verdict_at(url: str, home_repo: str, maigo_root: str) -> str | N
     自動算 `local_verdict_at`：`url` 解析不出 `<id>`，或
     `<maigo_root>/.maigo/review/<id>/review.md` 不存在（含 `maigo_root` 為空
     字串——`--maigo-root` 省略時），一律回 `None`，呼叫端據此退回舊行為。
+    只服務 👀 項目（別人的 PR），固定讀 `review/`，不做 `pr/` 兩處都找。
 
     新報告優先使用不受 touch/複製/acknowledge 影響的 `reviewed_at`。
     舊報告 mtime 用 `tz=timezone.utc` 明確轉換——這是 POSIX 時間戳轉 aware datetime，
@@ -670,7 +672,7 @@ def _auto_local_verdict_at(url: str, home_repo: str, maigo_root: str) -> str | N
     if ref is None:
         return None
     artifact_path = _import_artifact_path()
-    review_path = Path(maigo_root) / artifact_path("review", ref)
+    review_path = Path(maigo_root) / artifact_path("review", ref, owner="others")
     record = _load_review(url, home_repo, maigo_root)
     if record.get("reviewed_at"):
         return record["reviewed_at"]
@@ -687,7 +689,9 @@ def _load_review(url: str, home_repo: str, maigo_root: str) -> dict:
     artifact_path = _import_artifact_path()
     from review_report import metadata
 
-    path = Path(maigo_root) / artifact_path("review", github_ref(url, home_repo))
+    path = Path(maigo_root) / artifact_path(
+        "review", github_ref(url, home_repo), owner="others"
+    )
     try:
         record = metadata(path.read_text())
     except FileNotFoundError:
@@ -794,7 +798,7 @@ def evaluate_items(
             ref = github_ref(item_url, repo)
             if ref is not None:
                 artifact_path = _import_artifact_path()
-                draft = artifact_path("review-draft", ref)
+                draft = artifact_path("review-draft", ref, owner="others")
                 if maigo_root and not (Path(maigo_root) / draft).is_file():
                     next_action = _missing_draft_action(draft)
                 else:

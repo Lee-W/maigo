@@ -60,7 +60,10 @@ class TestNaming:
         assert ap.legacy_path("plan") == ".maigo/plan.md"
 
     def test_review_artifact_path_format(self):
-        assert ap.artifact_path("review", "x") == ".maigo/review/x/review.md"
+        assert (
+            ap.artifact_path("review", "x", owner="others")
+            == ".maigo/review/x/review.md"
+        )
 
     def test_review_legacy_path_format(self):
         assert ap.legacy_path("review") == ".maigo/review.md"
@@ -85,16 +88,62 @@ class TestNaming:
             ("review-rubric", ".maigo/review/58543/rubric.md"),
             ("review-draft", ".maigo/review/58543/draft.md"),
             ("pr-comments", ".maigo/review/58543/pr-comments.md"),
+            ("reply-draft", ".maigo/review/58543/reply-draft.md"),
             ("triage-rubric", ".maigo/issue/58543/rubric.md"),
         ],
     )
     def test_artifact_path_per_kind_nested_or_flat(self, kind, expected):
-        assert ap.artifact_path(kind, "58543") == expected
+        owner = "others" if kind in ap._OWNER_SPLIT_KINDS else None
+        assert ap.artifact_path(kind, "58543", owner=owner) == expected
+
+    @pytest.mark.parametrize("kind", sorted(ap._OWNER_SPLIT_KINDS))
+    def test_split_kind_routes_mine_to_pr_and_others_to_review(self, kind):
+        stem = ap._NESTED_LAYOUT[kind][1]
+        assert ap.artifact_path(kind, "7", owner="mine") == f".maigo/pr/7/{stem}.md"
+        assert (
+            ap.artifact_path(kind, "7", owner="others") == f".maigo/review/7/{stem}.md"
+        )
+
+    @pytest.mark.parametrize("kind", sorted(ap._OWNER_SPLIT_KINDS))
+    def test_split_kind_without_owner_raises(self, kind):
+        with pytest.raises(ValueError, match="owner"):
+            ap.artifact_path(kind, "7")
+
+    @pytest.mark.parametrize("kind", ["plan", "triage-rubric"])
+    def test_non_split_kind_with_owner_raises(self, kind):
+        with pytest.raises(ValueError, match="owner"):
+            ap.artifact_path(kind, "7", owner="mine")
+
+    def test_unknown_owner_raises(self):
+        with pytest.raises(ValueError, match="owner"):
+            ap.artifact_path("review", "7", owner="nobody")
+
+    def test_reply_draft_path(self):
+        assert (
+            ap.artifact_path("reply-draft", "7", owner="mine")
+            == ".maigo/pr/7/reply-draft.md"
+        )
+
+    def test_nested_locations(self):
+        assert ap.nested_locations("review") == [("pr", "review"), ("review", "review")]
+        assert ap.nested_locations("reply-draft") == [
+            ("pr", "reply-draft"),
+            ("review", "reply-draft"),
+        ]
+        assert ap.nested_locations("triage-rubric") == [("issue", "rubric")]
+        assert ap.nested_locations("plan") == []
+
+    def test_nested_layout_values_keep_group_stem_shape(self):
+        # legacy hook / catalog destructure `(group, stem)`; a different shape
+        # would make the hook fail open.
+        for group, stem in ap._NESTED_LAYOUT.values():
+            assert isinstance(group, str) and isinstance(stem, str)
+        assert ap._NESTED_LAYOUT["review"] == ("review", "review")
 
     def test_attempt_2_suffix_is_on_filename_not_directory(self):
-        assert ap.artifact_path("review-rubric", "58543", attempt=2) == (
-            ".maigo/review/58543/rubric-2.md"
-        )
+        assert ap.artifact_path(
+            "review-rubric", "58543", attempt=2, owner="others"
+        ) == (".maigo/review/58543/rubric-2.md")
 
     def test_plan_attempt_2_suffix(self):
         assert ap.artifact_path("plan", "58543", attempt=2) == ".maigo/plan-58543-2.md"
@@ -113,8 +162,8 @@ class TestNaming:
             ap.artifact_path("plan", "")
 
     def test_same_pr_review_and_rubric_share_parent_directory(self):
-        review_path = Path(ap.artifact_path("review", "58543"))
-        rubric_path = Path(ap.artifact_path("review-rubric", "58543"))
+        review_path = Path(ap.artifact_path("review", "58543", owner="others"))
+        rubric_path = Path(ap.artifact_path("review-rubric", "58543", owner="others"))
         assert review_path.parent == rubric_path.parent == Path(".maigo/review/58543")
 
     def test_nested_layout_is_subset_of_known_kinds_and_excludes_plan(self):
@@ -173,6 +222,26 @@ class TestArtifactPathRegex:
     def test_does_not_match_other_kinds_or_stems(self, path):
         pattern = ap.artifact_path_regex(self._KINDS)
         assert not re.search(pattern, path)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/pr/58543/rubric.md",
+            ".maigo/pr/58543/rubric-2.md",
+            ".maigo/review/58543/rubric.md",
+        ],
+    )
+    def test_split_kind_matches_both_groups(self, path):
+        assert re.search(ap.artifact_path_regex(self._KINDS), path)
+
+    def test_does_not_match_unknown_stem_under_pr(self):
+        pattern = ap.artifact_path_regex(self._KINDS + ("review",))
+        assert not re.search(pattern, ".maigo/pr/58543/unknown.md")
+
+    def test_non_split_kind_does_not_match_under_pr(self):
+        assert not re.search(
+            ap.artifact_path_regex(("triage-rubric",)), ".maigo/pr/12/rubric.md"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +399,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert result.status == "new"
         assert result.path == ".maigo/review/42/review.md"
@@ -344,6 +414,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         rubric = ap.resolve_for_write(
             "review-rubric",
@@ -351,6 +422,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert Path(review.path).parent == Path(rubric.path).parent
         assert Path(review.path).parent == Path(".maigo/review/42")
@@ -363,6 +435,7 @@ class TestResolveForWrite:
             url=cross_repo_url,
             home_repo="",
             cwd=tmp_path,
+            owner="others",
         )
         rubric = ap.resolve_for_write(
             "review-rubric",
@@ -370,6 +443,7 @@ class TestResolveForWrite:
             url=cross_repo_url,
             home_repo="",
             cwd=tmp_path,
+            owner="others",
         )
         assert Path(review.path).parent == Path(rubric.path).parent
         assert Path(review.path).parent == Path(".maigo/review/airflow-58543")
@@ -387,6 +461,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert result.status == "conflict"
         assert result.path is None
@@ -402,6 +477,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert result.status == "new"
         assert result.path == ".maigo/review/42/rubric.md"
@@ -414,6 +490,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert result.flat_path is None
 
@@ -520,6 +597,7 @@ class TestResolveForWrite:
             url=_URL,
             home_repo=_HOME_REPO,
             cwd=tmp_path,
+            owner="others",
         )
         assert result.status == "conflict"
         assert result.suggested_path == ".maigo/review/42/rubric-3.md"
@@ -737,6 +815,8 @@ class TestCli:
                 _URL,
                 "--repo",
                 _HOME_REPO,
+                "--owner",
+                "others",
                 "--cwd",
                 str(tmp_path),
             ]
@@ -748,3 +828,123 @@ class TestCli:
             "path: .maigo/review/42/rubric.md",
             "flat_exists: .maigo/review-rubric-42.md",
         ]
+
+    def test_missing_owner_with_url_exits_2_and_points_to_pr_owner(
+        self, tmp_path: Path, capsys
+    ):
+        with pytest.raises(SystemExit) as exc:
+            ap.main(
+                [
+                    "review",
+                    "--topic",
+                    "Review: X",
+                    "--url",
+                    _URL,
+                    "--repo",
+                    _HOME_REPO,
+                    "--cwd",
+                    str(tmp_path),
+                ]
+            )
+        assert exc.value.code == 2
+        assert "pr_owner.py" in capsys.readouterr().err
+
+    def test_owner_on_non_split_kind_exits_2(self, tmp_path: Path):
+        with pytest.raises(SystemExit) as exc:
+            ap.main(["plan", "--topic", "P", "--owner", "mine", "--cwd", str(tmp_path)])
+        assert exc.value.code == 2
+
+    @pytest.mark.parametrize(
+        "owner, expected",
+        [("mine", ".maigo/pr/7/review.md"), ("others", ".maigo/review/7/review.md")],
+    )
+    def test_owner_selects_group(self, tmp_path: Path, capsys, owner, expected):
+        exit_code = ap.main(
+            [
+                "review",
+                "--topic",
+                "T",
+                "--url",
+                "https://github.com/o/r/pull/7",
+                "--repo",
+                "o/r",
+                "--owner",
+                owner,
+                "--cwd",
+                str(tmp_path),
+            ]
+        )
+        assert exit_code == 0
+        assert capsys.readouterr().out.splitlines()[1] == f"path: {expected}"
+
+    def test_other_group_exists_line_appended(self, tmp_path: Path, capsys):
+        other = tmp_path / ".maigo" / "review" / "7" / "review.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("# Review: old\n", encoding="utf-8")
+        exit_code = ap.main(
+            [
+                "review",
+                "--topic",
+                "Review: new",
+                "--url",
+                "https://github.com/o/r/pull/7",
+                "--repo",
+                "o/r",
+                "--owner",
+                "mine",
+                "--cwd",
+                str(tmp_path),
+            ]
+        )
+        assert exit_code == 0
+        assert capsys.readouterr().out.splitlines() == [
+            "status: new",
+            "path: .maigo/pr/7/review.md",
+            "other_group_exists: .maigo/review/7/review.md",
+        ]
+
+
+class TestOwnerResolution:
+    _PR = "https://github.com/o/r/pull/7"
+
+    def test_url_without_owner_raises_for_split_kind(self, tmp_path: Path):
+        with pytest.raises(ValueError, match="owner"):
+            ap.resolve_for_write(
+                "review", "T", url=self._PR, home_repo="o/r", cwd=tmp_path
+            )
+
+    def test_no_url_defaults_to_mine(self, tmp_path: Path):
+        _init_git_repo(tmp_path)
+        subprocess.run(
+            ["git", "checkout", "-q", "-b", "feat-x"], cwd=tmp_path, check=True
+        )
+        result = ap.resolve_for_write("review", "T", cwd=tmp_path)
+        assert result.path == ".maigo/pr/feat-x/review.md"
+
+    def test_other_group_path_set_only_when_other_group_has_file(self, tmp_path: Path):
+        kwargs = dict(url=self._PR, home_repo="o/r", cwd=tmp_path)
+        assert (
+            ap.resolve_for_write("review", "T", owner="mine", **kwargs).other_group_path
+            is None
+        )
+        other = tmp_path / ".maigo" / "review" / "7" / "review.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("# T\n", encoding="utf-8")
+        result = ap.resolve_for_write("review", "T", owner="mine", **kwargs)
+        assert result.other_group_path == ".maigo/review/7/review.md"
+        assert result.path == ".maigo/pr/7/review.md"
+
+    def test_conflict_suggestion_stays_in_owner_group(self, tmp_path: Path):
+        target = tmp_path / ".maigo" / "pr" / "7" / "reply-draft.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("# Reply drafts: A\n", encoding="utf-8")
+        result = ap.resolve_for_write(
+            "reply-draft",
+            "Reply drafts: B",
+            url=self._PR,
+            home_repo="o/r",
+            cwd=tmp_path,
+            owner="mine",
+        )
+        assert result.status == "conflict"
+        assert result.suggested_path == ".maigo/pr/7/reply-draft-2.md"

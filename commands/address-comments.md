@@ -49,6 +49,16 @@ orchestrator 親自跑步驟 1–4（含 1.5）：
 過關後記下 `number` / `title` / `url` / `headRefName` / `baseRefName`，往下走。
 PR 若是 `MERGED` / `CLOSED` 狀態——不擋，但在列表時標出狀態提醒使用者。
 
+接著判斷這顆 PR 是自己的還是別人的（產物放哪個資料夾取決於它）：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_owner.py" --url <url>
+```
+
+stdout 第 1 行 `owner: mine|others`，記下來，步驟 4、6 的 `artifact_path.py` 都要帶 `--owner <owner>`。
+exit 1（查不到作者）→ **不猜**，用 AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，
+用答案當 `--owner`。
+
 ### 1.5 Conflict 偵測 — 有衝突先解，再處理意見
 
 在讀意見、挑項目**之前**，先確認 branch 與 PR base 能乾淨合併（意見的 `file:line` 與「現狀驗證」
@@ -157,8 +167,8 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 ### 4. 寫 triage + 提路由計畫，確認
 
-呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" pr-comments --url <PR url> --repo <owner/name> --topic "PR comments: <PR title> (#<number>)"`
-取得路徑（`.maigo/review/<id>/pr-comments.md`；`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
+呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" pr-comments --url <PR url> --repo <owner/name> --topic "PR comments: <PR title> (#<number>)" --owner <owner>`
+取得路徑（自己的 PR 是 `.maigo/pr/<id>/pr-comments.md`，別人的是 `.maigo/review/<id>/pr-comments.md`；`--topic` 逐字對應下方模板的 H1，兩者必須一致才能讓 `same_topic` 續跑判斷成立；
 目錄不存在先 `mkdir -p` 該路徑的父目錄，不是只建 `.maigo`），把被選中的意見寫進去，並擬路由計畫。
 
 **歸屬判斷依 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)**（不要自己讀檔頭比對）：

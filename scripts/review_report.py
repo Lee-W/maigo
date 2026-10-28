@@ -3,6 +3,10 @@
 
 Standalone stdlib CLI; never posts to GitHub or rewrites the shared work board.
 Only superseded reports with the same source identity are removed after publishing.
+
+Reports live in `.maigo/review/<id>/` (someone else's PR) or `.maigo/pr/<id>/`
+(your own PR, and local branch / range reviews). A PR URL source needs an
+explicit `--owner mine|others`; resolve it with `scripts/pr_owner.py`.
 """
 
 from __future__ import annotations
@@ -67,11 +71,27 @@ def same_source(text: str, source: str) -> bool:
     )
 
 
-def report_path(root: Path, source: str, home_repo: str) -> Path:
+def resolve_owner(source: str, owner: str | None) -> str:
+    """A PR URL needs an explicit owner; a local branch/range has no author → `mine`."""
+    if owner is not None:
+        return owner
+    if source.startswith("https://"):
+        raise ValueError(
+            "PR source needs --owner mine|others; "
+            "run scripts/pr_owner.py --url <url> to resolve it"
+        )
+    return "mine"
+
+
+def report_path(
+    root: Path, source: str, home_repo: str, owner: str | None = None
+) -> Path:
     # artifact_path imports board_state; defer this import to avoid a cycle.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from artifact_path import artifact_path, slugify
     from board_state import github_ref
+
+    owner = resolve_owner(source, owner)
 
     identifier = (
         github_ref(source, home_repo)
@@ -80,7 +100,7 @@ def report_path(root: Path, source: str, home_repo: str) -> Path:
     )
     if not identifier:
         raise ValueError("Review source must have a stable identifier")
-    path = root / artifact_path("review", identifier)
+    path = root / artifact_path("review", identifier, owner=owner)
     if any(
         part.is_symlink()
         for part in (root / ".maigo", path.parent.parent, path.parent, path)
@@ -164,6 +184,16 @@ def render_report(title: str, body: str, record: dict) -> str:
     )
 
 
+def _other_group_report(path: Path, owner: str) -> Path:
+    """Same id's `review.md` in the other owner group (`pr/` ↔ `review/`)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from artifact_path import _OWNER_GROUPS
+
+    other_owner = "others" if owner == "mine" else "mine"
+    maigo_dir = path.parent.parent.parent
+    return maigo_dir / _OWNER_GROUPS[other_owner] / path.parent.name / path.name
+
+
 def publish(
     root: Path,
     source: str,
@@ -173,8 +203,10 @@ def publish(
     head_sha: str,
     verdict: str,
     author: str | None = None,
+    owner: str | None = None,
 ) -> dict:
-    path = report_path(root, source, home_repo)
+    owner = resolve_owner(source, owner)
+    path = report_path(root, source, home_repo, owner)
     record: dict = {
         "version": 1,
         "source": source,
@@ -206,6 +238,7 @@ def publish(
         candidates = [
             *path.parent.glob("review-[0-9]*.md"),
             root / ".maigo" / f"review-{path.parent.name}.md",
+            _other_group_report(path, owner),
         ]
         for old in candidates:
             if not old.exists():
@@ -242,8 +275,9 @@ def acknowledge(
     head_sha: str,
     you: str,
     undo: bool = False,
+    owner: str | None = None,
 ) -> dict:
-    path = report_path(root, source, home_repo)
+    path = report_path(root, source, home_repo, owner)
     with report_lock(path):
         text = path.read_text()
         record = metadata(text)
@@ -296,6 +330,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--author", help="Original author (publish only)")
     parser.add_argument("--you")
     parser.add_argument("--undo", action="store_true")
+    parser.add_argument(
+        "--owner",
+        choices=("mine", "others"),
+        help="PR author is you (mine → pr/) or someone else (others → review/); "
+        "required for a PR URL source, see scripts/pr_owner.py",
+    )
     args = parser.parse_args(argv)
     try:
         if not re.fullmatch(r"[0-9a-fA-F]{40,64}", args.head):
@@ -313,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.head,
                 args.verdict,
                 args.author,
+                args.owner,
             )
         else:
             if args.author is not None:
@@ -320,7 +361,13 @@ def main(argv: list[str] | None = None) -> int:
             if not args.you:
                 raise ValueError("acknowledge requires --you")
             result = acknowledge(
-                args.cwd.resolve(), source, args.repo, args.head, args.you, args.undo
+                args.cwd.resolve(),
+                source,
+                args.repo,
+                args.head,
+                args.you,
+                args.undo,
+                args.owner,
             )
     except (OSError, ValueError) as error:
         print(f"review_report: {error}", file=sys.stderr)

@@ -108,6 +108,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from artifact_path import (
     _FLAT_NAME_LOOKALIKES,
     _KNOWN_KINDS,
+    _OWNER_SPLIT_KINDS,
     _SLUG_MAX_LEN,
     artifact_path,
     read_topic,
@@ -232,6 +233,15 @@ def _infer_identifier(maigo_dir: Path, kind: str, legacy_name: str) -> str:
     return _strip_kind_stutter(kind, stem_slug) or "unnamed"
 
 
+def _target_path(kind: str, identifier: str, attempt: int) -> str:
+    """
+    搬移目標。會依 PR 作者分流的 kind 一律落在 `review/`（別人的 PR 那組，
+    沿用搬遷前的行為）。
+    """
+    owner = "others" if kind in _OWNER_SPLIT_KINDS else None
+    return artifact_path(kind, identifier, attempt, owner=owner)
+
+
 def _plan_legacy_fixed_name_actions(
     repo_root: Path,
     catalog: Catalog,
@@ -245,12 +255,12 @@ def _plan_legacy_fixed_name_actions(
 
         base_identifier = _infer_identifier(maigo_dir, kind, legacy_name)
         attempt = 1
-        candidate_path = artifact_path(kind, base_identifier, attempt)
+        candidate_path = _target_path(kind, base_identifier, attempt)
 
         disambiguated = False
         while candidate_path in reserved:
             attempt += 1
-            candidate_path = artifact_path(kind, base_identifier, attempt)
+            candidate_path = _target_path(kind, base_identifier, attempt)
             disambiguated = True
 
         reserved.add(candidate_path)
@@ -387,11 +397,11 @@ def _plan_flat_identifier_actions(
             kind, raw_id, home_repo_name, canonical_targets
         )
 
-        candidate_path = artifact_path(kind, base_id, attempt)
+        candidate_path = _target_path(kind, base_id, attempt)
         disambiguated = False
         while candidate_path in reserved:
             attempt += 1
-            candidate_path = artifact_path(kind, base_id, attempt)
+            candidate_path = _target_path(kind, base_id, attempt)
             disambiguated = True
 
         reserved.add(candidate_path)

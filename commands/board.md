@@ -227,7 +227,7 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。
 只處理 👀 PR；兩者都走完整刷新（§3），不是只改單行，結束時寫 snapshot。做法：先把目標行的
 checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`，用 `Edit`），再跑
 `refresh --apply`（取代再跑 §3 的規劃）——它依 snapshot 偵測到 `[ ]→[x]`（或 `[x]→[ ]`），經 `ack` 呼叫
-`review_report.py acknowledge`（`--unreviewed` 對應 `--undo`），不改最後 review 時間、不送 GitHub。
+`review_report.py acknowledge --owner others`（`--unreviewed` 對應 `--undo`；👀 項目都是別人的 PR，報告固定在 `review/<id>/`），不改最後 review 時間、不送 GitHub。
 需要已有新版 report，且 head 必須與報告一致；舊報告先重新 review，head 已變則請先重審
 （回 `no_report` / `head_changed`，待看的行取消勾並警告）。錯誤逐項列出，不把失敗項目標成已看完。
 

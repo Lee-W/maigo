@@ -17,7 +17,7 @@ compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見
 - `backup/<UTC ts>/`：`refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份。
 
 另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記；`archive` 子命令
-把已結案項目的 `review/<id>/` 與 `i/<id>.md` 搬進 `.maigo/_archive/` 同名路徑（目的地已存在就跳過，
+把已結案項目的 `review/<id>/`、`pr/<id>/` 與 `i/<id>.md` 搬進 `.maigo/_archive/` 同名路徑（目的地已存在就跳過，
 絕不覆蓋；不改 `board.md`，索引行仍由 orchestrator 處理）。
 
 子命令（都要 `--maigo-root <repo root> --repo <owner/name> --you <login>`）：
@@ -66,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import board_state  # noqa: E402
 import maigo_dir_catalog  # noqa: E402
 import review_report  # noqa: E402
+from artifact_path import PR_ARTIFACT_GROUPS  # noqa: E402
 
 INTERNAL_BOARD_DIR = Path("_internal") / "board"
 ARCHIVE_DIR = "_archive"
@@ -502,6 +503,10 @@ def reconcile_artifacts(
             group, identifier, _file = name.split("/")
             nested_dirs.setdefault((group, identifier), []).append(name)
     for (group, identifier), names in sorted(nested_dirs.items()):
+        if group == "pr":
+            for name in names:
+                skip(name, "nested", "自己的 PR 產物，不是 👀 候選")
+            continue
         review = f"{group}/{identifier}/review.md"
         if review in names:
             try:
@@ -779,7 +784,8 @@ def ack_items(
             if change not in ("checked", "unchecked") or ref_key(url) is None:
                 results.append(result)
                 continue
-            path = review_report.report_path(maigo_root, url, repo)
+            # `ack` 只服務 👀 項目（別人的 PR），報告固定在 `review/`。
+            path = review_report.report_path(maigo_root, url, repo, "others")
             try:
                 record = review_report.metadata(path.read_text())
             except FileNotFoundError:
@@ -801,7 +807,7 @@ def ack_items(
                         }
                     else:
                         review_report.acknowledge(
-                            maigo_root, source, repo, head, you, True
+                            maigo_root, source, repo, head, you, True, "others"
                         )
                     result["result"] = "unacked"
                 elif record["head_sha"] != head:
@@ -818,7 +824,9 @@ def ack_items(
                             "acknowledged_by": you,
                         }
                     else:
-                        review_report.acknowledge(maigo_root, source, repo, head, you)
+                        review_report.acknowledge(
+                            maigo_root, source, repo, head, you, owner="others"
+                        )
                     result["result"] = "acked"
         except (OSError, ValueError, KeyError) as error:
             locked = "being updated" in str(error)
@@ -846,7 +854,7 @@ def drop_urls(
 
 
 def archive_urls(maigo_root: Path, urls: list[str], repo: str) -> list[dict]:
-    """Move each URL's `review/<id>/` and `i/<id>.md` under `_archive/`; never overwrite.
+    """Move each URL's `review/<id>/`, `pr/<id>/` and `i/<id>.md` under `_archive/`; never overwrite.
 
     No GitHub call: the orchestrator decides which URLs are settled (same as `drop`)."""
     maigo_dir = maigo_root / ".maigo"
@@ -867,7 +875,10 @@ def archive_urls(maigo_root: Path, urls: list[str], repo: str) -> list[dict]:
             "skipped": [],
             "missing": [],
         }
-        for rel in (f"review/{identifier}", f"i/{identifier}.md"):
+        for rel in (
+            *(f"{group}/{identifier}" for group in PR_ARTIFACT_GROUPS),
+            f"i/{identifier}.md",
+        ):
             source, destination = maigo_dir / rel, archive_dir / rel
             if not source.exists():
                 result["missing"].append(rel)

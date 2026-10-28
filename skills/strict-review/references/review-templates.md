@@ -7,7 +7,7 @@ file when writing the rubric or assembling the final report.
 
 ---
 
-## Review rubric 骨架（`.maigo/review/<id>/rubric.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
+## Review rubric 骨架（`.maigo/review/<id>/rubric.md`，自己的 PR 是 `.maigo/pr/<id>/rubric.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
 
 ```markdown
 # Review rubric: <PR title>
@@ -32,7 +32,7 @@ file when writing the rubric or assembling the final report.
 
 報告正文先寫到 scratchpad，再交
 [`scripts/review_report.py publish`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
-產生最新 `.maigo/review/<id>/review.md`。所有版型共用檔頭與 TOC；不是讓每個模型自行
+產生最新 `.maigo/review/<id>/review.md`（自己的 PR 是 `.maigo/pr/<id>/review.md`）。所有版型共用檔頭與 TOC；不是讓每個模型自行
 猜 anchor 或 review 時間。orchestrator 讀回最終檔案呈現，檔案與對話使用同一份內容。
 
 共用檔頭由 publisher 產生：
