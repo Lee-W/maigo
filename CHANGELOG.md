@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.70.0 (2026-10-28)
+
+### Feat
+
+- **skills**: make .maigo human-readable artifacts vim friendly
+
 ## v0.69.0 (2026-10-28)
 
 ### Feat
