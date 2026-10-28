@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the latest review with a TOC, timestamp and explicit local acknowledgement.
+"""Publish the latest review with a metadata header and explicit local acknowledgement.
 
 Standalone stdlib CLI; never posts to GitHub or rewrites the shared work board.
 Only superseded reports with the same source identity are removed after publishing.
@@ -140,11 +140,15 @@ def atomic_write(path: Path, text: str) -> None:
 
 
 def render_report(title: str, body: str, record: dict) -> str:
-    """Add explicit anchors for every H2/H3 outside fenced examples."""
+    """Prepend the managed header; reject bodies without H2/H3, with H1 or open fences.
+
+    The body is kept verbatim: no anchors or TOC are added, so the file reads
+    cleanly in a plain editor (see skills/vim-friendly-artifacts).
+    """
     if _METADATA.search(body):
         raise ValueError("Supply the review body, not an already published report")
     lines = []
-    toc: list[str] = []
+    headings = 0
     fence = None
     for line in body.strip().splitlines():
         marker = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
@@ -154,18 +158,12 @@ def render_report(title: str, body: str, record: dict) -> str:
                 fence = token
             elif token[0] == fence[0] and len(token) >= len(fence):
                 fence = None
-        heading = (
-            re.match(r"^(#{2,3})\s+(.+?)(?:\s+#+)?$", line) if fence is None else None
-        )
-        if heading:
-            anchor = f"review-section-{len(toc) + 1}"
-            label = heading[2].replace("[", r"\[").replace("]", r"\]")
-            toc.append(f"{'  ' if len(heading[1]) == 3 else ''}- [{label}](#{anchor})")
-            lines.append(f'<a id="{anchor}"></a>\n')
+        if fence is None and re.match(r"^#{2,3}\s+(.+?)(?:\s+#+)?$", line):
+            headings += 1
         if fence is None and line.startswith("# "):
             raise ValueError("Body must use H2/H3; the publisher supplies the H1")
         lines.append(line)
-    if fence is not None or not toc:
+    if fence is not None or not headings:
         raise ValueError("Review body needs headings and closed code fences")
     author = record.get("author")
     if author and record["source"].startswith("https://github.com/"):
@@ -179,8 +177,7 @@ def render_report(title: str, body: str, record: dict) -> str:
         f"**最後 review：** {record['reviewed_at']}\n\n"
         f"**Reviewed commit:** `{record['head_sha']}`\n\n"
         f"**Verdict:** {record['verdict']}\n\n"
-        "**已看完：** 尚未確認\n\n"
-        "## TOC\n\n" + "\n".join(toc) + "\n\n" + "\n".join(lines) + "\n"
+        "**已看完：** 尚未確認\n\n" + "\n".join(lines) + "\n"
     )
 
 

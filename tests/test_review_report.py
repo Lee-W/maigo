@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 
 import pytest
 
@@ -29,19 +30,57 @@ def publish(root, **kwargs):
     )
 
 
-def test_publish_adds_timestamp_and_working_toc_ignoring_code_headings(tmp_path):
-    result = publish(
-        tmp_path, body=BODY + "\n```md\n## Example only\n```\n\n## Context\nRepeated.\n"
-    )
+def _outside_fences(text):
+    fence = None
+    for line in text.splitlines():
+        marker = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+        if marker:
+            fence = None if fence == marker[1][0] else marker[1][0]
+            continue
+        if fence is None:
+            yield line
+
+
+def test_publish_keeps_body_headings_verbatim_without_anchors_or_toc(tmp_path):
+    body = BODY + "\n```md\n## Example only\n```\n\n## Context\nRepeated.\n"
+    result = publish(tmp_path, body=body)
     text = Path(result["path"]).read_text()
     assert text.startswith("# Review: Fix ranges\n")
     assert "**最後 review：** " + result["reviewed_at"] in text
-    assert text.count("](#review-section-") == 4
-    for index in range(1, 5):
-        assert f'<a id="review-section-{index}"></a>' in text
-        assert f"](#review-section-{index})" in text
-    assert "[Example only]" not in text
+    assert text.endswith("\n" + body.strip() + "\n")
+    prose = list(_outside_fences(text))
+    assert [line for line in prose if line.startswith("## ")] == [
+        "## Context",
+        "## Verdict",
+        "## Context",
+    ]
     assert report.metadata(text)["head_sha"] == HEAD
+    assert "TOC" not in text and "review-section" not in text
+    html_lines = [line for line in prose if line.lstrip().startswith("<")]
+    assert len(html_lines) == 1 and report._METADATA.match(html_lines[0])
+
+
+def test_legacy_report_with_anchors_and_toc_still_parses_and_acknowledges(tmp_path):
+    path = Path(publish(tmp_path)["path"])
+    record = report.metadata(path.read_text())
+    legacy = (
+        "# Review: Fix ranges\n\n"
+        f"<!-- maigo-review: {json.dumps(record, ensure_ascii=False)} -->\n\n"
+        f"**Source:** {URL}\n\n"
+        "**已看完：** 尚未確認\n\n"
+        "## TOC\n\n- [Context](#review-section-1)\n\n"
+        '<a id="review-section-1"></a>\n\n## Context\nA fix.\n'
+    )
+    path.write_text(legacy)
+    assert report.same_source(legacy, URL)
+    result = report.acknowledge(
+        tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others"
+    )
+    updated = path.read_text()
+    assert result["acknowledged_by"] == "reviewer"
+    assert "**已看完：** " + result["acknowledged_at"] in updated
+    assert '<a id="review-section-1"></a>' in updated
+    assert report.metadata(updated)["acknowledged_by"] == "reviewer"
 
 
 def test_publish_replaces_same_pr_even_after_title_change_and_clears_ack(tmp_path):

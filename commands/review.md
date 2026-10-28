@@ -152,7 +152,7 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 `## 筆記`。只起草、不送出。
 board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
-工作筆記不要混進去，否則會原樣貼上 GitHub。
+工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
 
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
@@ -199,7 +199,7 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal rule 再接英文 detail。
 三種版型的完整骨架見
 [`skills/strict-review/references/review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)「輸出」——
-正文套用這份骨架；publisher 補上共用檔頭／TOC 後，讀回檔案呈現，不另外維護對話版。
+正文套用這份骨架；publisher 補上共用檔頭後，讀回檔案呈現，不另外維護對話版。
 
 報告正文先寫到 scratchpad（只含 H2/H3，雙語快結也從 H2 開始）。記下本次實際審查的
 commit：PR 用 context cache 的 `Reviewed head`；本地 branch / range 用 reviewed tip 的
@@ -228,7 +228,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
 重用 artifact_path 的命名，生成 `.maigo/review/<id>/review.md`（自己的 PR 與本地 source 是 `.maigo/pr/<id>/review.md`），並統一提供：
 
 - H1、來源、原作者（`**Author:**`）、**最後 review 時間（含時區）**、實際 reviewed commit、verdict。
-- **TOC**：所有 H2/H3 的可跳轉目錄，不把 fenced code 範例誤當章節。
+- 正文原樣保留，不插入目錄或 anchor；驗證只擋沒有 H2/H3、正文含 H1、fenced code 沒閉合三種壞輸入（fenced code 範例裡的 `## ` 不算章節）。
 - 同 source 重審直接換成最新完整報告；PR 改標題仍是同一個 source。
 - 新版原子寫入成功後，刪除同目錄 `review-N.md`、舊扁平 `review-<id>.md` 與**另一組**（`pr/` ↔ `review/`）
   同 id 的 `review.md` 中能確認同 source 的過期報告；草稿、rubric、手寫筆記、別顆 PR、無法確認歸屬的檔案保留。
@@ -244,14 +244,14 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
-成最新的 publisher 回傳 `path`（`review/<id>/review.md` 或 `pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
 時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
 
 只有別人的 PR（`owner: others`）會有 👀 行；自己的 PR 與本地 source 的報告在 `pr/<id>/`，不進 👀 對帳，
 所以 `owner: mine` 時略過下面 👀 專屬的列（`待送出`、⏳、`↩︎ 回你的球` 等狀態轉移）；若該 PR 在 board 上有其他行，
-publisher 回傳的 `path`（`pr/<id>/review.md`）照樣寫進對應細節檔 `## 筆記`。
+publisher 回傳的 `path`（`.maigo/pr/<id>/review.md`）照樣寫進對應細節檔 `## 筆記`。
 GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
@@ -268,9 +268,9 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 使用者以 `/maigo:board --reviewed <n>` 或在 board 勾 `[x]` 標記本地已看完 → ⏳；不代表已送 GitHub。
   新 head 或作者新留言會回 🎯 `↩︎ 回你的球`。
 - 上面 publisher 回傳的 `path`（即
-  `review/<id>/review.md` 或 `pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
+  `.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
-  的 `## 筆記` 區，一行裸相對路徑連結（相對 `.maigo/`，例如 `review/9301/review.md`）——
+  的 `## 筆記` 區，一行路徑連結（repo root 相對，例如 `.maigo/review/9301/review.md`；為什麼用這個基準見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
   不再寫進索引行
 
 回寫時必須保留原 checkbox 與 `🧠` / `🔖` 標記。刷新 / 查看 board 用 `/maigo:board`；

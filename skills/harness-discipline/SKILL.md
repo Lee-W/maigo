@@ -57,7 +57,7 @@ PR 類產物依作者分流（別人的 PR 在 `review/<id>/`、自己的在 `pr
 
 最終 review 報告透過
 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
-的專用 publisher，按 source 取代舊版並產生 TOC／審查時間；其他產物仍依 H1 歸屬合約。
+的專用 publisher，按 source 取代舊版並產生檔頭／審查時間；其他產物仍依 H1 歸屬合約。
 
 ## 委派份量
 

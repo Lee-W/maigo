@@ -173,7 +173,7 @@ APPROVED | NEEDS_CHANGES | BLOCKED
 
 `/maigo:review` 的持久報告另依
 [`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)
-產生共用 TOC、最後 review 時間與 reviewed commit；只保留同 source 最新完整報告。
+產生共用檔頭、最後 review 時間與 reviewed commit；只保留同 source 最新完整報告。
 本地「已看完」與 GitHub 已送出分開記錄，不改變審查 verdict。
 
 

@@ -316,14 +316,11 @@ def render_cache(f: dict[str, str]) -> str:
         "\n"
         f"{f['comments']}\n"
         "\n"
-        "<details>\n"
-        f"<summary>Full diff (cached, first {DIFF_LINE_LIMIT} lines)</summary>\n"
+        f"### Full diff (cached, first {DIFF_LINE_LIMIT} lines)\n"
         "\n"
         "```diff\n"
         f"{f['diff']}\n"
         "```\n"
-        "\n"
-        "</details>\n"
         f"{CACHE_END}"
     )
 

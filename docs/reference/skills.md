@@ -49,6 +49,7 @@ agent 收到指引時，skill 內容會 on-demand 被拉進來，訊號明確（
 | [`maigo-self-check`](../skills/maigo-self-check.md) | Taki | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:crystallize` | diff 動到 agents/commands/skills/docs/mkdocs.yml 時，以 validate_plugin + mkdocs --strict 取代純 pytest 作為驗證標準 |
 | [`strict-triage`](../skills/strict-triage.md) | Soyo | `/maigo:triage-issue` step 3 | 預設 NEEDS_INFO + 9 項 issue triage checklist + 4 verdict（READY / NEEDS_INFO / DUP / CLOSE）+ 草擬 gh 指令 |
 | [`copyable-deliverable`](../skills/copyable-deliverable.md) | orchestrator | `/maigo:review`、`/maigo:triage-issue`、`/maigo:describe-pr` 的 deliverable 輸出 + `github-title-description` / `commit-message` skill | deliverable（PR comment / reply draft / commit message / gh 指令草稿）放單一 fenced code block，給 raw markdown 可一鍵複製 |
+| [`vim-friendly-artifacts`](../skills/vim-friendly-artifacts.md) | orchestrator | 🩵 Tomori（plan、triage rubric）、`/maigo:review`、`strict-review` 模板、`github-reply-draft` 模板、`work-board` | 寫入任何 `.maigo/` 人讀產物時的版面規範：一段一行、不用表格、HTML 只留 parser marker 白名單、repo root 相對路徑、裸 URL；每條附 nvim 實測理由 |
 | [`orchestrator-voice`](../skills/orchestrator-voice.md) | orchestrator、五位 agent（交棒 reference） | 全部 `/maigo:*` 命令（與 `narration` 並用） | 對話互動、台灣漢語口語選詞、保留角色聲音的交棒摘要；附四情境盲評規則 |
 | [`github-reply-draft`](../skills/github-reply-draft.md) | — (orchestrator/agent 草稿時引用) | `/maigo:address-comments`（逐 thread 回覆）、`/maigo:review` | 草擬 GitHub PR review thread 回覆的 6 條慣例：預設簡短、不引 SHA、只提最終 diff 裡的 symbol、一 thread 一則、不過度宣稱已解決、保留 attribution footer |
 | [`git-workflow`](../skills/git-workflow.md) | — (orchestrator 直跑) | `/maigo:go`、`/maigo:quick`、`/maigo:team`、`/maigo:address-comments`（commit-assembly 步驟） | Git commit 組裝慣例：明確 stage 檔案（不用 `-A`）、不 `cd`（用絕對路徑 / `git -C`）、unreleased commit 的 polish 用 amend（含 tangled-hunk 例外）、CI 分支上修 CI 失敗、對正確 baseline（merge target）量 diff 大小 |
@@ -102,6 +103,7 @@ graph LR
         commit_message["commit-message"]
         gtd["github-title-description"]
         copyable["copyable-deliverable"]
+        vim_friendly["vim-friendly-artifacts"]
         pr_cache["pr-context-cache"]
         doc_link["doc-link-convention"]
         airflow_aware["airflow-aware"]
@@ -162,6 +164,7 @@ graph LR
 
     review --> pr_cache
     review --> copyable
+    review --> vim_friendly
     board --> work_board
     review --> work_board
     describe --> gtd
@@ -189,6 +192,7 @@ graph LR
     soyo --> memory_loading
     raana --> pr_cache
     tomori --> gtd
+    tomori --> vim_friendly
     soyo --> strict_review
     soyo --> strict_triage
     soyo --> doc_link
@@ -212,6 +216,10 @@ graph LR
     strict_review -.->|case studies| airflow_refs
 
     commit_message --> copyable
+    work_board --> vim_friendly
+    strict_review --> vim_friendly
+    github_reply_draft --> vim_friendly
+    vim_friendly --> copyable
     gtd --> commit_message
     gtd --> copyable
     pr_cache --> pr_cache_script

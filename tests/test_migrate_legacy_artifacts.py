@@ -676,8 +676,8 @@ class TestLinkRewrites:
         rewrites = mla.plan_link_rewrites(repo, actions)
 
         tokens = {(r.old_token, r.new_token) for r in rewrites}
-        assert ("review-airflow-58543.md", "review/58543/review.md") in tokens
-        assert ("review-rubric-58543.md", "review/58543/rubric.md") in tokens
+        assert ("review-airflow-58543.md", ".maigo/review/58543/review.md") in tokens
+        assert ("review-rubric-58543.md", ".maigo/review/58543/rubric.md") in tokens
         assert len(rewrites) == 2
         for rewrite in rewrites:
             assert rewrite.line_no >= 10  # 只在 ## 筆記 段內（該段從第 10 行左右開始）
@@ -714,8 +714,8 @@ class TestLinkRewrites:
         assert old_line == (
             "review-airflow-58543.md 與 review-rubric-58543.md 都寫過摘要。"
         )
-        assert (
-            new_line == "review/58543/review.md 與 review/58543/rubric.md 都寫過摘要。"
+        assert new_line == (
+            ".maigo/review/58543/review.md 與 .maigo/review/58543/rubric.md 都寫過摘要。"
         )
         # 事實區與 ## 判斷 逐行不變
         assert "review-airflow-58543.md 提到過這裡，不應該被改。" in new_lines
@@ -757,15 +757,18 @@ class TestLinkRewrites:
         tokens = {(r.old_token, r.new_token) for r in rewrites}
         assert (
             "review-rubric-airflow-58543.md",
-            "review/58543/rubric.md",
+            ".maigo/review/58543/rubric.md",
         ) in tokens
         assert (
             "review-rubric-airflow-58543-2.md",
-            "review/58543/rubric-2.md",
+            ".maigo/review/58543/rubric-2.md",
         ) in tokens
 
         text = detail.read_text(encoding="utf-8")
-        assert "review/58543/rubric.md 與 review/58543/rubric-2.md 都寫過摘要。" in text
+        assert (
+            ".maigo/review/58543/rubric.md 與 .maigo/review/58543/rubric-2.md 都寫過摘要。"
+            in text
+        )
 
     def test_path_qualified_mentions_are_reported_not_rewritten(self, tmp_path: Path):
         repo = _make_repo(tmp_path)
@@ -900,7 +903,7 @@ class TestInterruptedApply:
             assert (repo / planned[name]).read_text(encoding="utf-8") == body
         notes = (maigo_dir / "i" / "58543.md").read_text(encoding="utf-8")
         for name in self._FILES:
-            assert f"- {planned[name].removeprefix('.maigo/')}\n" in notes
+            assert f"- {planned[name]}\n" in notes
             assert f"- {name}\n" not in notes
 
 
@@ -1266,14 +1269,45 @@ class TestSplitOwnPrs:
         actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
         rewrites = mla.plan_link_rewrites(repo, actions)
         assert [(r.old_token, r.new_token) for r in rewrites] == [
-            ("review/9301/review.md", "pr/9301/review.md")
+            ("review/9301/review.md", ".maigo/pr/9301/review.md")
         ]
         assert mla.find_path_qualified_mentions(repo, actions) == []
         mla.apply_migration(repo, actions)
         mla.apply_link_rewrites(repo, rewrites)
         text = detail.read_text()
         assert "## 判斷\n\nsee review/9301/review.md and review.md" in text
-        assert "- pr/9301/review.md\n- plain review.md stays" in text
+        assert "- .maigo/pr/9301/review.md\n- plain review.md stays" in text
+
+    def test_old_and_new_link_forms_mixed_new_form_not_rewritten_twice(
+        self, tmp_path: Path
+    ):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9301/review.md", _review_text("feature/x"))
+        detail = _put(
+            repo,
+            "i/9301.md",
+            "# 🔀 x\n\n## 筆記\n\n"
+            "- review/9301/review.md\n"
+            "- .maigo/review/9301/review.md\n"
+            "- .maigo/pr/9301/review.md\n"
+            "- .maigo/review/4242/review.md\n",
+        )
+        actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
+        rewrites = mla.plan_link_rewrites(repo, actions)
+        assert [(r.line_no, r.old_token, r.new_token) for r in rewrites] == [
+            (5, "review/9301/review.md", ".maigo/pr/9301/review.md"),
+            (6, ".maigo/review/9301/review.md", ".maigo/pr/9301/review.md"),
+        ]
+        mla.apply_migration(repo, actions)
+        mla.apply_link_rewrites(repo, rewrites)
+        text = detail.read_text()
+        assert text.endswith(
+            "- .maigo/pr/9301/review.md\n"
+            "- .maigo/pr/9301/review.md\n"
+            "- .maigo/pr/9301/review.md\n"
+            "- .maigo/review/4242/review.md\n"
+        )
+        assert mla.plan_link_rewrites(repo, actions) == []
 
     def test_without_flag_output_matches_current_behaviour(self, tmp_path: Path):
         repo = _make_repo(tmp_path)

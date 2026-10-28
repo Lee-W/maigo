@@ -7,8 +7,8 @@
 背景：13 個實際安裝 maigo 的 repo 一查，命名規範（`<kind>-<id>.md`）的採用率
 是 0%——這支腳本原本只搬舊固定檔名；`scripts/artifact_path.py` 改成按
 PR/issue 分資料夾後，同一批舊檔又多了一種要搬的形狀，這支腳本擴充成兩階段都
-處理，並順手把 `.maigo/i/*.md` 的 `## 筆記` 段裡指到舊檔名的連結改成新相對
-路徑。跟 `hooks/legacy_artifact_path_check.py`（擋新的寫入）是同一問題的兩端。
+處理，並順手把 `.maigo/i/*.md` 的 `## 筆記` 段裡指到舊檔名的連結改成新的
+repo root 相對路徑（`.maigo/…`，nvim 在 repo root 開檔時 `gf` 解得到）。跟 `hooks/legacy_artifact_path_check.py`（擋新的寫入）是同一問題的兩端。
 
 **只在 `tmp_path` 假 repo 上跑過 `--apply` 測試——不對任何真實 repo 執行
 `--apply`**，那是跨出本 repo 範圍的不可逆操作，需要使用者逐一確認範圍與
@@ -75,8 +75,10 @@ repo slug。source 不是 URL（本地 branch / range）算自己的，直接搬
 （`.review-write-lock`）跳過並列出；搬完空的 `review/<id>/` 用 `rmdir` 收掉。
 前置閘門：該 repo 仍有 `legacy_fixed_name` / `flat_identifier` 或殘留 manifest
 時不跑階段三，請先不帶 `--split-own-prs` 跑一次 `--apply`。連結改寫的對應表
-以 `.maigo/` 相對路徑為 key（`review/<id>/<f>` → `pr/<id>/<f>`），與階段一、二
-以檔名為 key 的對應表分開。階段三的測試同樣只在 `tmp_path` 操作 `--apply`。
+以去掉 `.maigo/` 前綴的舊路徑為 key（`review/<id>/<f>` →
+`.maigo/pr/<id>/<f>`；筆記裡寫 `review/<id>/<f>` 或 `.maigo/review/<id>/<f>`
+兩種舊位置都辨識），與階段一、二以檔名為 key 的對應表分開。輸出一律是 repo
+root 相對形，所以已經改好的 `.maigo/pr/<id>/<f>` 不會再被命中、重跑冪等。階段三的測試同樣只在 `tmp_path` 操作 `--apply`。
 
 預設 dry-run：只印計畫與連結改寫預覽，不動任何檔案（也不寫 manifest）。
 `--apply` 在第一個 rename 之前，先把完整的 old→new 對應表（含自動消歧結果）
@@ -159,9 +161,10 @@ _PATH_QUALIFIED_OLD_ARTIFACT_TOKEN_RE = re.compile(
     + r")(?:-[A-Za-z0-9][\w.-]*)?\.md"
 )
 
-# 階段三的連結 token：`review/<id>/<f>.md`，key 是 `.maigo/` 相對路徑（不是檔名）。
+# 階段三的連結 token：`review/<id>/<f>.md`（舊形，相對 `.maigo/`）或帶前綴的
+# `.maigo/review/<id>/<f>.md`（repo root 相對）；key 是去前綴後的路徑（不是檔名）。
 _NESTED_ARTIFACT_TOKEN_RE = re.compile(
-    r"(?<![\w./-])review/[A-Za-z0-9][\w.-]*/[\w-][\w.-]*\.md(?![\w./-])"
+    r"(?<![\w./-])(?:\.maigo/)?review/[A-Za-z0-9][\w.-]*/[\w-][\w.-]*\.md(?![\w./-])"
 )
 # 階段三的搬移來源：`.maigo/review/<id>/<f>`。
 _NESTED_OLD_PATH_RE = re.compile(r"\.maigo/review/[^/]+/[^/]+")
@@ -194,7 +197,7 @@ class LinkRewrite:
     detail_path: str  # repo-relative，例：".maigo/i/58543.md"
     line_no: int
     old_token: str
-    new_token: str  # 相對 .maigo/ 的新 relpath，例："review/58543/review.md"
+    new_token: str  # repo root 相對的新路徑，例：".maigo/review/58543/review.md"
 
 
 def _existing_repo_relpaths(maigo_dir: Path) -> set[str]:
@@ -771,18 +774,18 @@ def _is_nested_old(action: MigrationAction) -> bool:
 
 
 def _link_mapping(actions: list[MigrationAction]) -> dict[str, str]:
-    """舊檔名 → 相對 `.maigo/` 的新 relpath，只取自遷移紀錄（本次規劃或 manifest）。"""
+    """舊檔名 → repo root 相對的新路徑，只取自遷移紀錄（本次規劃或 manifest）。"""
     return {
-        Path(action.old_path).name: action.new_path.removeprefix(".maigo/")
+        Path(action.old_path).name: action.new_path
         for action in actions
         if not _is_nested_old(action)
     }
 
 
 def _nested_link_mapping(actions: list[MigrationAction]) -> dict[str, str]:
-    """階段三：`review/<id>/<f>` → `pr/<id>/<f>`，key 是相對 `.maigo/` 的路徑。"""
+    """階段三：`review/<id>/<f>` → `.maigo/pr/<id>/<f>`，key 是去掉 `.maigo/` 前綴的舊路徑。"""
     return {
-        action.old_path.removeprefix(".maigo/"): action.new_path.removeprefix(".maigo/")
+        action.old_path.removeprefix(".maigo/"): action.new_path
         for action in actions
         if _is_nested_old(action)
     }
@@ -819,7 +822,7 @@ def plan_link_rewrites(
             )
         for match in _NESTED_ARTIFACT_TOKEN_RE.finditer(line):
             name = match.group(0)
-            new_token = nested_mapping.get(name)
+            new_token = nested_mapping.get(name.removeprefix(".maigo/"))
             if new_token is None or new_token == name:
                 continue
             rewrites.append(
@@ -865,7 +868,8 @@ def find_path_qualified_mentions(
     不產生任何 rewrite、不做任何寫入。回傳 `(detail_path, line_no, token)`。
     被階段三改寫的 `review/<id>/<f>.md` token（見 *actions*）不再列入。
     """
-    rewritten = set(_nested_link_mapping(actions or []))
+    nested_keys = _nested_link_mapping(actions or [])
+    rewritten = nested_keys.keys() | {f".maigo/{key}" for key in nested_keys}
     return [
         (detail_path, line_no, match.group(0))
         for detail_path, line_no, line in _iter_notes_lines(Path(repo_root))

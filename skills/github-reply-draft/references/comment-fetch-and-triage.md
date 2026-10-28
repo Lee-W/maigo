@@ -63,6 +63,8 @@ or writing the triage file.
 
 ## Triage 檔模板（自己的 PR 是 `.maigo/pr/<id>/pr-comments.md`，別人的是 `.maigo/review/<id>/pr-comments.md`，路徑由 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py) 算出，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）
 
+版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
+
 ```markdown
 # PR comments: <PR title> (#<number>)
 
@@ -94,6 +96,8 @@ or writing the triage file.
 路徑 `.maigo/pr/<id>/reply-draft.md`（別人的 PR 是 `.maigo/review/<id>/reply-draft.md`），
 由 `scripts/artifact_path.py reply-draft --owner mine|others` 算出。`status: same_topic` 時整份依本輪
 重抓的結果重寫，不累加。
+
+版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)；回覆內文放在 `text` fenced block 裡，一段一行。
 
 ````markdown
 # Reply drafts: <PR title> (#<number>)

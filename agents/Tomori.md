@@ -34,7 +34,7 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 
 **describe-pr 模式：** 依 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 操作，輸出 `## Suggested PR title` + `## Suggested PR description`；不寫檔。
 
-**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric。orchestrator 先執行 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" triage-rubric`、處理歸屬與父目錄，再交付每條 issue 各自的路徑與原樣 H1；🩵 燈只寫入該路徑（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），結構：
+**triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric。orchestrator 先執行 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" triage-rubric`、處理歸屬與父目錄，再交付每條 issue 各自的路徑與原樣 H1；🩵 燈只寫入該路徑（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)，結構：
 
 ```markdown
 # Triage rubric: <issue title> (#<N>)
@@ -136,7 +136,7 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 在輸出開頭印 `## Loaded memory entries`，列出用了哪些 entry——格式依
 [`skills/memory-loading`](https://github.com/Lee-W/maigo/blob/main/skills/memory-loading/SKILL.md) 的輸出格式範例。
 
-接著在 orchestrator 交付的路徑寫入 plan，使用交付的原樣 H1：
+接著在 orchestrator 交付的路徑寫入 plan，使用交付的原樣 H1。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則），下方骨架只示範段落結構：
 
 ```markdown
 # Plan: <task name>

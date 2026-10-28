@@ -5,6 +5,8 @@
 邏輯（哪個檔案屬於哪一類）由 `scripts/maigo_dir_catalog.py` 執行，不是散文
 自己判斷——見 [`/maigo:doctor`](../commands/doctor.md) 的「`.maigo/` 型錄」段。
 
+`.maigo/` 人讀產物（plan、review 報告、rubric、草稿、board 與 i/ 細節檔）的版面規範見 [`vim-friendly-artifacts`](../skills/vim-friendly-artifacts.md)。
+
 ## 帶識別碼命名的產物
 
 所有 kind 全部由 `scripts/artifact_path.py` 的 `_KNOWN_KINDS` 單一正典定義，
@@ -34,7 +36,7 @@
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | `review-rubric` | `.maigo/review/<id>/rubric.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 對照基準，review 全程比對用；review 結束後留存 |
-| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記 |
+| `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記 |
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |

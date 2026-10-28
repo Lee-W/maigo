@@ -85,6 +85,22 @@ class TestRenderAndParse:
     def test_find_cache_section_absent(self):
         assert pcc.find_cache_section("# rubric without cache\n") is None
 
+    def test_rendered_cache_has_no_html_and_keeps_diff_in_fenced_block(self):
+        diff = "+<details>kept as diff content</details>\n-old"
+        section = pcc.render_cache(_fields(diff=diff))
+        before_diff, _, after_start = section.partition("```diff\n")
+        fenced, _, after_fence = after_start.partition("\n```\n")
+        assert fenced == diff
+        assert f"### Full diff (cached, first {pcc.DIFF_LINE_LIMIT} lines)\n\n" in (
+            before_diff
+        )
+        html_lines = [
+            line
+            for line in (before_diff + after_fence).splitlines()
+            if line.lstrip().startswith("<")
+        ]
+        assert html_lines == [pcc.CACHE_START, pcc.CACHE_END]
+
 
 class TestWriteCache:
     def test_create_when_file_missing(self, tmp_path: Path):
@@ -113,6 +129,27 @@ class TestWriteCache:
         assert "new diff" in text
         assert "old diff" not in text
         assert text.endswith("# Rubric body\n")
+
+    def test_refresh_replaces_legacy_details_cache_and_keeps_handwritten_rubric(
+        self, tmp_path: Path
+    ):
+        rubric = tmp_path / "review-rubric.md"
+        legacy = pcc.render_cache(_fields(diff="old diff")).replace(
+            "### Full diff (cached, first 2000 lines)",
+            "<details>\n<summary>Full diff (cached, first 2000 lines)</summary>",
+        )
+        legacy = legacy.replace(
+            f"```\n{pcc.CACHE_END}", f"```\n\n</details>\n{pcc.CACHE_END}"
+        )
+        assert "<details>" in legacy and "</details>" in legacy
+        handwritten = "\n\n# Review rubric: mine\n\n## Acceptance\n1. keep me\n"
+        rubric.write_text(legacy + handwritten, encoding="utf-8")
+        pcc.write_cache(rubric, pcc.render_cache(_fields(diff="new diff")))
+        text = rubric.read_text(encoding="utf-8")
+        assert "<details>" not in text and "<summary>" not in text
+        assert "### Full diff (cached, first" in text
+        assert "old diff" not in text and "new diff" in text
+        assert text.endswith(handwritten)
 
 
 class TestMainCacheFlow:

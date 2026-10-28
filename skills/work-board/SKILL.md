@@ -34,7 +34,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ## 1. `.maigo/board.md` 格式規格
 
-### Sections（固定順序，三個 section 即 treesitter fold 邊界）
+### Sections（固定順序，三個 `## ` section）
 
 ```markdown
 # Work Board — Lee-W/maigo
@@ -56,7 +56,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 - [x] 👀 APPROVE（merged 07-12） @contributor 🧠 i/9303.md — Add structured review verdicts
 ```
 
-`i/9201.md` 對應的細節檔（相對 `.maigo/`）：
+索引行裡的 `i/9201.md` 對應 `.maigo/i/9201.md` 這份細節檔（索引行的路徑相對 board.md 所在的 `.maigo/`）：
 
 ```markdown
 # 🔀 CHANGES_REQUESTED — Redesign Work Board reading view
@@ -112,10 +112,12 @@ description: This skill should be used when reading, writing, or migrating `.mai
   舊行沒有作者仍可讀；下次刷新補回。
 - **badges**（`🧠`/`💤`/`🔖`，optional）：緊接在貢獻者（缺值時為旁註）之後、細節檔路徑之前，用一個空格分隔；
   §2 vocabulary 表下方有各自的觸發規則。
-- **細節檔路徑（必填、裸相對路徑、不加反引號）**：相對 `.maigo/`，由
+- **細節檔路徑（必填、裸相對路徑、不加反引號）**：相對 board.md 所在的 `.maigo/`，由
   [`detail_path()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
-  算出——同 repo 是 `i/<n>.md`，跨 repo 是 `i/<repo>-<n>.md`。**不加反引號**：反引號會擋住
-  nvim `gf`；游標停在路徑上 `gf` 直接開對應細節檔（格式見 §1a、操作見 §6）。
+  算出——同 repo 是 `i/<n>.md`，跨 repo 是 `i/<repo>-<n>.md`。**不加反引號**：這是行文法的
+  格式慣例，`board_sync.py` 的 `_BODY_RE` 的細節檔欄位文法是緊接在 badges 後的裸 `i/…md`，不含反引號；
+  不是 `gf` 的限制（實測反引號不擋 `gf`，見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）。
+  游標停在路徑上 `gf` 直接開對應細節檔（格式見 §1a、操作見 §6）。
 - **`— <title>` 的 `—` 分隔符是強制的，parser 不會用啟發式猜**：title 前面那個 `—`
   一定要打；title **不再加引號**（title 已是行尾最後一欄，引號在舊文法是為了跟後續欄位
   切開，現在只是純雜訊）。漏打分隔符一律回報格式壞掉，寫回命令**大聲失敗**，不靜默留空
@@ -180,7 +182,8 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
   的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
 - **舊 `📄 <產物路徑>`**（`review/<n>/review.md` / triage 筆記等本地產物）：改寫進 `## 筆記`
-  區裡的一行裸相對路徑連結（相對 `.maigo/`，例：`review/9301/review.md`），不佔事實區欄位。
+  區裡的一行路徑連結（repo root 相對，例：`.maigo/review/9301/review.md`；細節檔在 `.maigo/i/` 底下，
+  相對 `.maigo/` 的寫法 `gf` 解不到，原因見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)），不佔事實區欄位。
 - **資料缺失時的降級**（與上面三條「刻意省略」不同）：某欄位該有值但當下拿不到
   （例：遷移進來的 👀 項目沒有 `Δ+A/-D`，因為舊格式本來就沒記），就**只寫拿得到的部分**
   ——`- 規模：` 整行只剩作者時退化成 `- 作者：<author>`，不要填 `?` 或 `N/A` 佔位。
@@ -471,7 +474,7 @@ worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree
 `artifact_path.py` 落在**執行命令所在 worktree** 的 `.maigo/` 下；`board_state.py` 的
 `--maigo-root` 只讀該根底下的 `.maigo/review/<id>/review.md`（`_auto_local_verdict_at`），
 找不到就退回 GitHub reviews 與 `prior_status`。在 board 以外的 worktree 跑 `/maigo:review`
-時，細節檔 `## 筆記` 裡以 `.maigo/` 為基準的相對路徑會開不起來，本地 verdict 也可能不被
+時，細節檔 `## 筆記` 裡 repo root 相對的路徑（`.maigo/review/<id>/review.md`）在 board 所在根會開不起來，本地 verdict 也可能不被
 `board_state.py` 看見。回寫時把筆記改寫成絕對路徑，或把 `review/<id>/` 複製到 board 所在根的
 `.maigo/review/`；不要因為路徑相對就假設報告在 board 旁邊（2026-10-14 實例：6 顆 PR 在 topic
 worktree 審完、board 在別的 worktree，筆記改用絕對路徑）。
@@ -569,7 +572,7 @@ head 已變 → `head_changed`；`unchecked` → `acknowledge --undo`。最終 �
 
 新報告會清除上一版的確認；新 commit／作者留言也會重新排入待看（👀 行自動取消勾）。單純碰檔案
 mtime 或刷新 board 不會改最後 review 時間。cleanup 刪掉同 source 舊報告後，細節檔的舊 report
-連結要用 Edit 換成 canonical `review/<id>/review.md`；只改路徑，保留其餘手寫內容。
+連結要用 Edit 換成 canonical `.maigo/review/<id>/review.md`（自己的 PR 為 `.maigo/pr/<id>/review.md`）；只改路徑，保留其餘手寫內容。
 
 ## 5. 學習閘門（checkbox → `--learn` → 記憶層）
 
@@ -598,19 +601,26 @@ mtime 或刷新 board 不會改最後 review 時間。cleanup 刪掉同 source �
 混入 HTML wrapper。**maigo 不提供任何呈現層，也不會建議你裝 nvim plugin**：
 `.maigo/board.md` 就是最終產物，`:e` 開檔即讀即改。
 
-1. **三個 fold**：三個 `## ` section 標題就是 treesitter markdown fold 的邊界，`zM`
-   收合後只剩三行標題 ＋ 計數，`za`/`zo` 逐一展開想看的區。
+本節是 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 在 board.md 與 i/ 細節檔上的具體應用；
+nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）都在那份規範。
+
+1. **用 `/` 與 `gO` 在三個區之間移動**：三個 `## ` section 標題是純文字，`/下一件`、`/等別人`
+   直接命中；filetype plugin 開啟時（一般預設）`gO` 會列出標題大綱。Neovim 預設**沒有** fold
+   （實測 markdown 的 `foldmethod=manual`），所以 board 不依賴收合；自己設了 treesitter fold
+   的人，三個 `## ` 標題會是邊界，那是你的設定，不是 maigo 的承諾。
 2. **`/狀態詞` 搜尋**：狀態詞是純文字（`待 triage`、`CHANGES_REQUESTED`……），
    `/待送出` 之類直接命中；細節檔路徑內含編號（`i/9201.md`），`/9201` 一樣命中對應行。
 3. **只找現在要看的 PR**：`/maigo:board --reviews`，看完報告後直接在 board 勾 `[x]`
    （或 `/maigo:board --reviewed <n>`），下次刷新就從待看清單移除；`--check` 只翻 checkbox，
    效果等同手勾。🐛/🔀 行的 `[x]` 仍只作學習訊號。
-4. **細節檔路徑用 `gf` 跳過去**：裸相對路徑（不加反引號）就是 nvim `gf` 吃得下的形式，
-   游標停在 `i/<slug>.md` 上 `gf`（Neovim 核心內建，不需 plugin）直接開那份細節檔
-   （格式見 §1a）；看完 `<C-o>` 跳回 board.md 原本的位置。
+4. **細節檔路徑用 `gf` 跳過去**：索引行的 `i/<slug>.md` 相對 board.md 所在目錄，
+   游標停在路徑上 `gf`（Neovim 核心內建，不需 plugin）直接開那份細節檔，不受 cwd 影響
+   （格式見 §1a）；看完 `<C-o>` 跳回 board.md 原本的位置。索引行不加反引號是行文法的
+   格式慣例（§1），不是 `gf` 的限制。
 5. **細節檔內 `gx` 開 GitHub**：真 URL 搬進了細節檔的「連結」那一行，游標移到該行 `gx`
-   直接開瀏覽器到該 issue/PR；「筆記」段落裡的裸相對路徑（例：`review/9301/review.md`）同樣
-   `gf` 可跳。
+   直接開瀏覽器到該 issue/PR（裸 URL，實測 `--clean`＋treesitter、`-u NONE` 兩種情境都解得到）；「筆記」段落裡 repo root 相對的路徑
+   （例：`.maigo/review/9301/review.md`）在 cwd 為 repo root 時同樣 `gf` 可跳；舊寫法
+   `review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔。
 6. **勾 `[x]` 觸發 ack 與 `--learn`**：把 `- [ ]` 或 `1. [ ]` 改成 `[x]` 存檔即完成（見 §4a、§5），
    不需要額外命令；下次 `/maigo:board` 刷新會 ack 該 report，並列出「(`[x]` 或 `🔖`) 且沒有 `🧠`」的項目。
 7. **一行一項**：`/` 搜尋與 `dd` 刪除都以行為單位，board.md 的每一行對應一個 item，

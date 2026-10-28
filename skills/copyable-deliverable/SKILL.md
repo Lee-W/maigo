@@ -81,7 +81,7 @@ email、另一個 repo），且含多個區塊（多則回覆草稿、報告、�
   [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
   §4.5 的 `.maigo/review/<id>/draft.md`，自己的 PR 則是 `.maigo/pr/<id>/draft.md`），不要落到目標 repo 自己的 output
   convention——maigo 的產物本來就集中在 `.maigo/`（review、rubric、board、`i/`
-  細節檔），同時把新產物的路徑記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
+  細節檔），同時把新產物的路徑（repo root 相對，例 `.maigo/review/<id>/draft.md`）記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
 - 沒有成文慣例的情境用 scratchpad。
 
 對話裡給：檔案路徑、它包含哪幾節、以及**最該先看的那一節是哪一節**。
@@ -114,6 +114,10 @@ Deliverable 內**不要用 markdown 表格**——欄位式的內容改寫成條
 
 適用範圍同上面的 When to apply——對話裡的狀態表、review checklist、queue 表不受
 影響，那些本來就不是 deliverable。
+
+以上兩條（一段一行、不用表格）在 `.maigo/` 的所有人讀產物也適用，理由是 nvim 裡讀改；
+延伸範圍與 nvim 側的理由見
+[`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)，規則本文仍只存在於本 skill。
 
 ## What this skill does NOT cover
 

@@ -9,6 +9,8 @@ file when writing the rubric or assembling the final report.
 
 ## Review rubric 骨架（`.maigo/review/<id>/rubric.md`，自己的 PR 是 `.maigo/pr/<id>/rubric.md`，路徑見 [`pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md) 或 `scripts/artifact_path.py`）
 
+版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
+
 ```markdown
 # Review rubric: <PR title>
 
@@ -32,26 +34,31 @@ file when writing the rubric or assembling the final report.
 
 報告正文先寫到 scratchpad，再交
 [`scripts/review_report.py publish`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
-產生最新 `.maigo/review/<id>/review.md`（自己的 PR 是 `.maigo/pr/<id>/review.md`）。所有版型共用檔頭與 TOC；不是讓每個模型自行
-猜 anchor 或 review 時間。orchestrator 讀回最終檔案呈現，檔案與對話使用同一份內容。
+產生最新 `.maigo/review/<id>/review.md`（自己的 PR 是 `.maigo/pr/<id>/review.md`）。所有版型共用檔頭；不是讓每個模型自行
+猜 review 時間。報告正文不放 HTML、不手寫目錄或 anchor，版面規範見
+[`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)。orchestrator 讀回最終檔案呈現，檔案與對話使用同一份內容。
 
-共用檔頭由 publisher 產生：
+共用檔頭由 publisher 產生，鍵值行之間各隔一個空行；`Author` 只在有 `--author` 時出現，`已看完` 一開始是「尚未確認」：
 
 ```markdown
 # Review: <title>
 
+<!-- maigo-review: {...} -->
+
 **Source:** <canonical PR URL / branch / range>
+
 **Author:** <@login / git author>
+
 **最後 review：** <ISO 8601，含時區>
-**Reviewed commit:** <full SHA>
+
+**Reviewed commit:** `<full SHA>`
+
 **Verdict:** <verdict>
 
-## TOC
-
-- [Context（🐱 樂奈）](#review-section-1)
-- [Rubric（🩵 燈）](#review-section-2)
-- ...（依實際 H2/H3 自動產生）
+**已看完：** 尚未確認
 ```
+
+第二行的 `maigo-review` 註解是 parser 依賴的 marker（白名單見 `vim-friendly-artifacts`），後面接一行 JSON，不要手改。檔頭之後直接是正文的第一個 H2，沒有目錄。
 
 同一 source 只保留最新完整 report。舊的同 source report 在新檔寫入成功後清除；
 歸屬不明、其他 PR、草稿與手寫筆記不刪。最後 review 時間在重審才改，刷新 board、
@@ -145,12 +152,12 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 
 ### 雙語版（`--bilingual` 或 repo-detect 觸發）
 
-正文最前面加 Taiwanese Mandarin 快結（位於共用檔頭與 TOC 之後） + horizontal rule，後面接既有英文 detail：
+正文最前面加 Taiwanese Mandarin 快結（位於共用檔頭之後） + horizontal rule，後面接既有英文 detail：
 
 ```markdown
 ## 台灣漢語快速結論
 
-**PR:** <url>   <!-- 硬性：原 PR 完整 URL 另由共用檔頭 Source 提供 -->
+**PR:** <url>
 
 **PR #<N> — <short title>** <APPROVE / REQUEST_CHANGES / BLOCKED>
 <1-3 句：做什麼、能不能上、最大一個 concern>
@@ -165,3 +172,5 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 
 <Queue / next-step line | batch 結束的 roll-up>
 ```
+
+`**PR:**` 這行放原 PR 的完整 URL，與共用檔頭的 `Source` 同值（快結段落獨立可讀，所以再寫一次）。這類給作者看的提示一律寫在 code block 外，不要放進骨架裡的 HTML 註解，否則會被照抄進產物。
