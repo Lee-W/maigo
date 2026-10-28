@@ -28,6 +28,8 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 ## The rule
 
 **Deliverable 一律放進單一 fenced code block，內含 raw markdown。**
+（例外：`/maigo:address-comments` 步驟 6 的回覆草稿以 `reply-draft.md` 檔為正本，block 放在檔案裡，
+對話只印路徑與「在哪裡回」對照表，不重貼內文。）
 
 - 外層 fence 用**四個 backtick**（```` ```` ````）——deliverable 內部若有三-backtick
   code block（例：Test Plan 的指令）才不會把外層截斷。
@@ -77,7 +79,7 @@ email、另一個 repo），且含多個區塊（多則回覆草稿、報告、�
 - **maigo 流程自己的草稿**（`/maigo:review` 等命令產生、要貼到 GitHub 的 review
   草稿等）：放 `.maigo/`，命名比照同一次任務的產物（例：
   [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
-  §4.5 的 `.maigo/review/<id>/draft.md`），不要落到目標 repo 自己的 output
+  §4.5 的 `.maigo/review/<id>/draft.md`，自己的 PR 則是 `.maigo/pr/<id>/draft.md`），不要落到目標 repo 自己的 output
   convention——maigo 的產物本來就集中在 `.maigo/`（review、rubric、board、`i/`
   細節檔），同時把新產物的路徑記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
 - 沒有成文慣例的情境用 scratchpad。

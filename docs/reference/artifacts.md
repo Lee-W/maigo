@@ -18,10 +18,16 @@
 |------|----------|--------|----------|----------|
 | `plan` | `.maigo/plan-<id>.md` | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 單次任務的實作計畫，任務結束後仍留存供追溯 |
 
-### `review` / `issue`（巢狀，`<group>/<id>/<stem>.md`）——按 PR/issue 分資料夾
+### `review` / `pr` / `issue`（巢狀，`<group>/<id>/<stem>.md`）——按 PR/issue 分資料夾
 
-同一顆 PR 的 `review` / `review-rubric` / `review-draft` / `pr-comments` 收進同一個
-`.maigo/review/<id>/` 目錄；同一條 issue 的 `triage-rubric` 收進
+同一顆 PR 的 `review` / `review-rubric` / `review-draft` / `pr-comments` / `reply-draft`
+收進同一個目錄，並依 PR 作者分流：**別人的 PR** 放 `.maigo/review/<id>/`，**自己的 PR**
+（含本地 branch / commit range）放 `.maigo/pr/<id>/`，下表檔名規則裡的 `review/` 都適用這兩組。
+作者由 [`scripts/pr_owner.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_owner.py)
+查，以 `--owner mine|others` 傳給 `scripts/artifact_path.py`；另一組已有同 id 同名檔時，
+`artifact_path.py` 多印 `other_group_exists:` 供讀取。既有的 `review/<id>/` 可用
+`scripts/migrate_legacy_artifacts.py --split-own-prs` 把自己的 PR 搬進 `pr/<id>/`。
+同一條 issue 的 `triage-rubric` 收進
 `.maigo/issue/<id>/`；conflict 後綴（第 2 個 attempt 起）落在檔名層
 （`rubric-2.md`），不落在目錄層。
 
@@ -31,6 +37,7 @@
 | `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含 TOC、原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記 |
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
+| `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
 
 `review_report.py publish` 先原子寫入最新 `review.md`，才清理同目錄 `review-N.md` 與
@@ -60,7 +67,7 @@
 |------|----------|--------|----------|----------|
 | Work Board 索引 | `.maigo/board.md` | orchestrator（`/maigo:board` / `/maigo:review`） | `scripts/board_state.py` + [work-board skill](../skills/work-board.md) | 跨 session 常駐，不隨單次任務結束而收檔 |
 | Work Board 細節檔 | `.maigo/i/<slug>.md` | 同上 | 同上 | 跟著對應 issue/PR 的追蹤狀態走；沒有索引行引用的孤兒細節檔視為 `dd`（使用者刪了那一行），見 [work-board skill](../skills/work-board.md) §3a |
-| 已結案封存 | `.maigo/_archive/review/<id>/`、`.maigo/_archive/i/<id>.md` | orchestrator（`board_sync.py archive`） | `scripts/board_sync.py` + [work-board skill](../skills/work-board.md) §3「細節檔生命週期」 | merged／closed／老化項目的 review 目錄與細節檔從 `review/`、`i/` 搬來這裡留存；不覆蓋既有封存，不被 board 對帳讀取 |
+| 已結案封存 | `.maigo/_archive/review/<id>/`、`.maigo/_archive/pr/<id>/`、`.maigo/_archive/i/<id>.md` | orchestrator（`board_sync.py archive`） | `scripts/board_sync.py` + [work-board skill](../skills/work-board.md) §3「細節檔生命週期」 | merged／closed／老化項目的 review／pr 目錄與細節檔從 `review/`、`pr/`、`i/` 搬來這裡留存；不覆蓋既有封存，不被 board 對帳讀取 |
 
 board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`）、skill 鏡射
 人讀版本（`work-board`）、test 守一致（`tests/test_board_state.py`），三方鎖住，
