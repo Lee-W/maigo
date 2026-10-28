@@ -64,6 +64,20 @@ id=base；否則整串當 id（例：孤立的 `review-rubric-99-2.md` 無 base 
 對手搬去的。紀錄裡沒有、形狀又像待遷移舊檔名的 token 原封不動，印成
 `link-unchanged (no migration record)`。
 
+**階段三（opt-in，`--split-own-prs`）**：把巢狀 `review/<id>/` 底下**自己的
+PR** 產物搬到 `pr/<id>/`（別人的 PR 留在 `review/<id>/`）。作者判斷先看
+`review.md` metadata 的 `author`，沒有就用 `gh` 查（`pr_owner.pr_author`，測試
+注入 `author_lookup`）；source URL 依序取 `review.md` metadata 的 `source`、
+rubric cache 段的 `Source:`、任一檔裡的 `**PR:** <url>`、純數字 id 加 home
+repo slug。source 不是 URL（本地 branch / range）算自己的，直接搬；作者不明
+就印 `skipped review/<id>/ (author unknown: ...)`、不搬。`--you` 省略時用
+`gh api user`，查不到就 exit 1，不猜。目錄裡每個一般檔各一筆搬移，鎖目錄
+（`.review-write-lock`）跳過並列出；搬完空的 `review/<id>/` 用 `rmdir` 收掉。
+前置閘門：該 repo 仍有 `legacy_fixed_name` / `flat_identifier` 或殘留 manifest
+時不跑階段三，請先不帶 `--split-own-prs` 跑一次 `--apply`。連結改寫的對應表
+以 `.maigo/` 相對路徑為 key（`review/<id>/<f>` → `pr/<id>/<f>`），與階段一、二
+以檔名為 key 的對應表分開。階段三的測試同樣只在 `tmp_path` 操作 `--apply`。
+
 預設 dry-run：只印計畫與連結改寫預覽，不動任何檔案（也不寫 manifest）。
 `--apply` 在第一個 rename 之前，先把完整的 old→new 對應表（含自動消歧結果）
 原子寫入 `.maigo/migrate-legacy-artifacts.manifest.json`，接著搬檔
@@ -85,7 +99,7 @@ manifest 的 repo，印 `(nothing to migrate)`，重跑不出錯、不重複改�
 ```
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/migrate_legacy_artifacts.py" \
     [--repo-list ~/.config/maigo/repos.txt] [--home-repo-name NAME] [--apply] \
-    [<repo>...]
+    [--split-own-prs [--you LOGIN] [--home-repo OWNER/NAME]] [<repo>...]
 ```
 
 核心邏輯 `plan_migration()` / `plan_link_rewrites()` / `read_manifest()` 皆為
@@ -115,6 +129,9 @@ from artifact_path import (
     slugify,
 )
 from maigo_dir_catalog import Catalog, categorize, scan, split_flat_name
+from pr_context_cache import find_cache_section, parse_cached_field
+from pr_owner import OwnerUnknownError, current_login, pr_author
+from review_report import metadata as review_metadata
 
 _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
 
@@ -141,6 +158,17 @@ _PATH_QUALIFIED_OLD_ARTIFACT_TOKEN_RE = re.compile(
     + "|".join(re.escape(k) for k in _KINDS_BY_LENGTH_DESC)
     + r")(?:-[A-Za-z0-9][\w.-]*)?\.md"
 )
+
+# 階段三的連結 token：`review/<id>/<f>.md`，key 是 `.maigo/` 相對路徑（不是檔名）。
+_NESTED_ARTIFACT_TOKEN_RE = re.compile(
+    r"(?<![\w./-])review/[A-Za-z0-9][\w.-]*/[\w-][\w.-]*\.md(?![\w./-])"
+)
+# 階段三的搬移來源：`.maigo/review/<id>/<f>`。
+_NESTED_OLD_PATH_RE = re.compile(r"\.maigo/review/[^/]+/[^/]+")
+_PR_URL_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/\d+")
+_LEGACY_PR_LINE_RE = re.compile(r"^\*\*PR:\*\*\s*(https://\S+)", re.MULTILINE)
+_BARE_PR_NUMBER_RE = re.compile(r"^#?\d+$")
+_REVIEW_WRITE_LOCK = ".review-write-lock"
 
 _NOTES_HEADING_RE = re.compile(r"^## 筆記[ \t]*\n", re.MULTILINE)
 _NEXT_HEADING_RE = re.compile(r"^##[ \t]+\S", re.MULTILINE)
@@ -235,8 +263,9 @@ def _infer_identifier(maigo_dir: Path, kind: str, legacy_name: str) -> str:
 
 def _target_path(kind: str, identifier: str, attempt: int) -> str:
     """
-    搬移目標。會依 PR 作者分流的 kind 一律落在 `review/`（別人的 PR 那組，
-    沿用搬遷前的行為）。
+    階段一、二的搬移目標。會依 PR 作者分流的 kind 一律先落在 `review/`
+    （別人的 PR 那組，沿用搬遷前的行為）；自己的 PR 由階段三（`--split-own-prs`）
+    再搬進 `pr/`。
     """
     owner = "others" if kind in _OWNER_SPLIT_KINDS else None
     return artifact_path(kind, identifier, attempt, owner=owner)
@@ -419,8 +448,152 @@ def _plan_flat_identifier_actions(
     return actions
 
 
+def _read_text_or_empty(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _find_review_dir_source(
+    review_dir: Path, home_slug: str
+) -> tuple[str | None, dict]:
+    """
+    判斷 `review/<id>/` 的 source，回傳 `(source, review.md 的 metadata)`。
+    依序：review.md metadata 的 `source` → rubric cache 段的 `Source:` →
+    任一檔裡的 `**PR:** <url>` → 純數字 id 加 home repo slug。
+    純數字／`#數字` 的 source 不是可用的 URL，往下一級。
+    """
+    record: dict = {}
+    review_text = _read_text_or_empty(review_dir / "review.md")
+    if review_text:
+        try:
+            record = review_metadata(review_text)
+        except (ValueError, TypeError):
+            record = {}
+
+    def usable(source: str | None) -> str | None:
+        if source and not _BARE_PR_NUMBER_RE.match(source):
+            return source.rstrip("/")
+        return None
+
+    source = usable(record.get("source"))
+    if source:
+        return source, record
+
+    cache = find_cache_section(_read_text_or_empty(review_dir / "rubric.md"))
+    if cache:
+        source = usable(parse_cached_field(cache, "Source"))
+        if source:
+            return source, record
+
+    for candidate in sorted(review_dir.iterdir()):
+        if not candidate.is_file():
+            continue
+        match = _LEGACY_PR_LINE_RE.search(_read_text_or_empty(candidate))
+        if match:
+            return match.group(1).rstrip("/"), record
+
+    if review_dir.name.isdigit() and home_slug:
+        return f"https://github.com/{home_slug}/pull/{review_dir.name}", record
+    return None, record
+
+
+def _disambiguated_target(new_rel: str, reserved: set[str]) -> tuple[str, bool]:
+    """目標已存在就在檔名（副檔名前）加 `-2`/`-3`…，直到不衝突。"""
+    candidate = new_rel
+    disambiguated = False
+    attempt = 1
+    target = Path(new_rel)
+    while candidate in reserved:
+        attempt += 1
+        candidate = target.with_name(
+            f"{target.stem}-{attempt}{target.suffix}"
+        ).as_posix()
+        disambiguated = True
+    return candidate, disambiguated
+
+
+def _plan_split_own_pr_actions(
+    repo_root: Path,
+    maigo_dir: Path,
+    reserved: set[str],
+    *,
+    you: str,
+    author_lookup,
+    home_slug: str,
+    notes: list[str],
+) -> list[MigrationAction]:
+    """
+    階段三：自己的 PR 的 `review/<id>/` 檔案 → `pr/<id>/`。作者不明、非自己
+    的目錄都不動；跳過的原因寫進 *notes*（每行已含 repo 前綴）。
+    """
+    review_root = maigo_dir / "review"
+    if not review_root.is_dir():
+        return []
+    actions: list[MigrationAction] = []
+    for review_dir in sorted(p for p in review_root.iterdir() if p.is_dir()):
+        identifier = review_dir.name
+        files = sorted(p for p in review_dir.iterdir() if p.is_file())
+        for entry in sorted(review_dir.iterdir()):
+            if entry.is_dir() or entry.name == _REVIEW_WRITE_LOCK:
+                notes.append(
+                    f"{repo_root} :: skipped review/{identifier}/{entry.name} "
+                    "(lock or directory, not moved)"
+                )
+        if not files:
+            continue
+
+        source, record = _find_review_dir_source(review_dir, home_slug)
+        if source is None:
+            notes.append(
+                f"{repo_root} :: skipped review/{identifier}/ "
+                "(author unknown: no PR url found in the files)"
+            )
+            continue
+        if source.startswith(("http://", "https://")):
+            author = record.get("author")
+            if not author:
+                try:
+                    author = author_lookup(source)
+                except OwnerUnknownError as error:
+                    notes.append(
+                        f"{repo_root} :: skipped review/{identifier}/ "
+                        f"(author unknown: {error})"
+                    )
+                    continue
+            if author.lstrip("@").lower() != you.lower():
+                continue
+        # 非 URL 的 source（本地 branch / range）沒有作者，算自己的（D3）。
+
+        for file in files:
+            old_rel = f".maigo/review/{identifier}/{file.name}"
+            new_rel, disambiguated = _disambiguated_target(
+                f".maigo/pr/{identifier}/{file.name}", reserved
+            )
+            reserved.add(new_rel)
+            actions.append(
+                MigrationAction(
+                    repo=str(repo_root),
+                    old_path=old_rel,
+                    new_path=new_rel,
+                    disambiguated=disambiguated,
+                    h1=read_topic(file) if file.suffix == ".md" else None,
+                )
+            )
+    return actions
+
+
 def plan_migration(
-    repo_root: str | Path, catalog: Catalog, *, home_repo_name: str = ""
+    repo_root: str | Path,
+    catalog: Catalog,
+    *,
+    home_repo_name: str = "",
+    split_own_prs: bool = False,
+    you: str = "",
+    author_lookup=None,
+    home_slug: str = "",
+    notes: list[str] | None = None,
 ) -> list[MigrationAction]:
     """
     算出這個 repo 該搬哪些檔、搬去哪——純函式，只做唯讀 I/O（讀 H1、列既存檔名）。
@@ -428,10 +601,17 @@ def plan_migration(
     `catalog` 由呼叫端先 `scan()` 好傳進來，這支函式不自己重掃。兩階段共用
     同一份 reserved set（見模組 docstring）：先搬舊固定檔名，再搬分目錄前
     扁平檔——順序本身不影響正確性，只是讓 CLI 輸出裡舊資料形狀靠前。
+
+    `split_own_prs=True` 才規劃階段三（需要 `you`；`author_lookup(url) -> login`
+    預設 `pr_owner.pr_author`，測試注入以免打網路）。階段一、二還有東西沒搬
+    （`legacy_fixed_name` / `flat_identifier`）時跳過階段三。跳過原因與人工
+    處理提示寫進 *notes*。
     """
     repo_root = Path(repo_root)
     maigo_dir = repo_root / ".maigo"
     reserved = _existing_repo_relpaths(maigo_dir)
+    if notes is None:
+        notes = []
 
     actions = _plan_legacy_fixed_name_actions(repo_root, catalog, maigo_dir, reserved)
     actions.extend(
@@ -439,6 +619,24 @@ def plan_migration(
             repo_root, catalog, maigo_dir, reserved, home_repo_name
         )
     )
+    if split_own_prs:
+        if catalog.legacy_fixed_name or catalog.flat_identifier:
+            notes.append(
+                f"{repo_root} :: skipped --split-own-prs "
+                "(先跑一次不帶 --split-own-prs 的 --apply，搬完舊檔名再分流)"
+            )
+        else:
+            actions.extend(
+                _plan_split_own_pr_actions(
+                    repo_root,
+                    maigo_dir,
+                    reserved,
+                    you=you,
+                    author_lookup=author_lookup or pr_author,
+                    home_slug=home_slug,
+                    notes=notes,
+                )
+            )
     return actions
 
 
@@ -472,6 +670,17 @@ def apply_migration(repo_root: str | Path, actions: list[MigrationAction]) -> No
                 f"migration target already exists, refusing to overwrite: {old} -> {new}"
             )
         old.rename(new)
+
+    # 階段三搬空的 `review/<id>/` 收掉；非空（例如鎖目錄）就不動。
+    for parent in {
+        (Path(repo_root) / action.old_path).parent
+        for action in actions
+        if _is_nested_old(action)
+    }:
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
 
 
 def manifest_path(repo_root: str | Path) -> Path:
@@ -556,11 +765,26 @@ def _iter_notes_lines(repo_root: Path):
             yield f".maigo/i/{detail_file.name}", line_no, line
 
 
+def _is_nested_old(action: MigrationAction) -> bool:
+    """階段三的搬移（來源是 `.maigo/review/<id>/<f>`），與階段一、二的頂層舊檔區分。"""
+    return _NESTED_OLD_PATH_RE.fullmatch(action.old_path) is not None
+
+
 def _link_mapping(actions: list[MigrationAction]) -> dict[str, str]:
     """舊檔名 → 相對 `.maigo/` 的新 relpath，只取自遷移紀錄（本次規劃或 manifest）。"""
     return {
         Path(action.old_path).name: action.new_path.removeprefix(".maigo/")
         for action in actions
+        if not _is_nested_old(action)
+    }
+
+
+def _nested_link_mapping(actions: list[MigrationAction]) -> dict[str, str]:
+    """階段三：`review/<id>/<f>` → `pr/<id>/<f>`，key 是相對 `.maigo/` 的路徑。"""
+    return {
+        action.old_path.removeprefix(".maigo/"): action.new_path.removeprefix(".maigo/")
+        for action in actions
+        if _is_nested_old(action)
     }
 
 
@@ -577,11 +801,25 @@ def plan_link_rewrites(
     對應表裡沒有的舊檔名交給 `find_unmapped_mentions()` 回報，不改。
     """
     mapping = _link_mapping(actions)
+    nested_mapping = _nested_link_mapping(actions)
     rewrites: list[LinkRewrite] = []
     for detail_path, line_no, line in _iter_notes_lines(Path(repo_root)):
         for match in _OLD_ARTIFACT_TOKEN_RE.finditer(line):
             name = match.group(0)
             new_token = mapping.get(name)
+            if new_token is None or new_token == name:
+                continue
+            rewrites.append(
+                LinkRewrite(
+                    detail_path=detail_path,
+                    line_no=line_no,
+                    old_token=name,
+                    new_token=new_token,
+                )
+            )
+        for match in _NESTED_ARTIFACT_TOKEN_RE.finditer(line):
+            name = match.group(0)
+            new_token = nested_mapping.get(name)
             if new_token is None or new_token == name:
                 continue
             rewrites.append(
@@ -618,16 +856,21 @@ def find_unmapped_mentions(
     return mentions
 
 
-def find_path_qualified_mentions(repo_root: str | Path) -> list[tuple[str, int, str]]:
+def find_path_qualified_mentions(
+    repo_root: str | Path, actions: list[MigrationAction] | None = None
+) -> list[tuple[str, int, str]]:
     """
     `## 筆記` 段裡帶目錄前綴、因此天然不被 `plan_link_rewrites()` 改寫的
     舊產物引用——只供 CLI 印 `link-unchanged (path-qualified)` 讓人看見，
     不產生任何 rewrite、不做任何寫入。回傳 `(detail_path, line_no, token)`。
+    被階段三改寫的 `review/<id>/<f>.md` token（見 *actions*）不再列入。
     """
+    rewritten = set(_nested_link_mapping(actions or []))
     return [
         (detail_path, line_no, match.group(0))
         for detail_path, line_no, line in _iter_notes_lines(Path(repo_root))
         for match in _PATH_QUALIFIED_OLD_ARTIFACT_TOKEN_RE.finditer(line)
+        if match.group(0) not in rewritten
     ]
 
 
@@ -678,6 +921,36 @@ def _infer_home_repo_name(repo_root: str | Path) -> str:
         return ""
     last_segment = url.rstrip("/").rsplit("/", 1)[-1]
     return last_segment.removesuffix(".git")
+
+
+def _parse_repo_slug(url: str) -> str:
+    """
+    `git@github.com:owner/name.git`、`https://github.com/owner/name(.git)`、
+    `ssh://git@github.com/owner/name.git` → `owner/name`；解析不出來回空字串。
+    """
+    match = re.search(
+        r"github\.com[:/](?P<owner>[^/\s:]+)/(?P<name>[^/\s]+?)(?:\.git)?/?$",
+        url.strip(),
+    )
+    if match is None:
+        return ""
+    return f"{match.group('owner')}/{match.group('name')}"
+
+
+def _infer_home_repo_slug(repo_root: str | Path) -> str:
+    """`git -C <repo> remote get-url origin` 解析成 `owner/name`；抓不到回空字串。"""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return _parse_repo_slug(result.stdout)
 
 
 def _skip_reason(name: str, category: str) -> str:
@@ -773,7 +1046,34 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="真的執行搬檔與連結改寫；預設只 dry-run 印清單",
     )
+    parser.add_argument(
+        "--split-own-prs",
+        action="store_true",
+        help="階段三：把自己的 PR 產物從 review/<id>/ 搬進 pr/<id>/",
+    )
+    parser.add_argument(
+        "--you",
+        default=None,
+        help="目前使用者 GitHub login（--split-own-prs 用；省略則查 gh，查不到 exit 1）",
+    )
+    parser.add_argument(
+        "--home-repo",
+        default=None,
+        help="覆寫每個 repo 的 owner/name（純數字 id 還原 PR URL 用）；省略則由 origin 推導",
+    )
     args = parser.parse_args(argv)
+
+    you = ""
+    if args.split_own_prs:
+        try:
+            you = current_login(args.you)
+        except OwnerUnknownError as error:
+            print(
+                f"error: cannot determine the current GitHub user ({error}); "
+                "pass --you <login>",
+                file=sys.stderr,
+            )
+            return 1
 
     if args.repos:
         repos = args.repos
@@ -814,14 +1114,32 @@ def main(argv: list[str] | None = None) -> int:
         # 上一輪 `--apply` 沒跑完：照它當初寫下的對應表續跑，不重新規劃——
         # 已搬走的檔案不在批次裡了，重新規劃會改變 sibling／撞名判斷。
         resuming = resumed_actions is not None
-        actions = (
-            resumed_actions
-            if resumed_actions is not None
-            else plan_migration(repo, catalog, home_repo_name=home_repo_name)
-        )
+        notes: list[str] = []
+        if resumed_actions is not None:
+            actions = resumed_actions
+            if args.split_own_prs:
+                notes.append(
+                    f"{repo} :: skipped --split-own-prs "
+                    "(殘留 manifest，先不帶 --split-own-prs 跑一次 --apply 續完)"
+                )
+        else:
+            home_slug = (
+                args.home_repo
+                if args.home_repo is not None
+                else _infer_home_repo_slug(repo_path)
+            )
+            actions = plan_migration(
+                repo,
+                catalog,
+                home_repo_name=home_repo_name,
+                split_own_prs=args.split_own_prs,
+                you=you,
+                home_slug=home_slug,
+                notes=notes,
+            )
         link_rewrites = plan_link_rewrites(repo, actions)
         unmapped = find_unmapped_mentions(repo, actions)
-        path_qualified = find_path_qualified_mentions(repo)
+        path_qualified = find_path_qualified_mentions(repo, actions)
         skip_lines = list(_iter_skip_lines(repo, catalog))
 
         if resuming:
@@ -846,6 +1164,8 @@ def main(argv: list[str] | None = None) -> int:
         for detail_path, line_no, token in path_qualified:
             print(_format_path_qualified_line(repo, detail_path, line_no, token))
         for line in skip_lines:
+            print(line)
+        for line in notes:
             print(line)
 
         if args.apply and (actions or resuming):
