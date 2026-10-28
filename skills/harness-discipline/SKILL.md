@@ -47,7 +47,8 @@ description: This skill should be used when the maigo orchestrator, running in t
 ## `.maigo/` 產物歸屬
 
 `.maigo/` 底下 agent 寫的 markdown 產物（plan / review-rubric / review / review-draft /
-triage-rubric / pr-comments 這類）由 `scripts/artifact_path.py` 統一命名；
+triage-rubric / pr-comments / reply-draft 這類）由 `scripts/artifact_path.py` 統一命名；
+PR 類產物依作者分流（別人的 PR 在 `review/<id>/`、自己的在 `pr/<id>/`，帶 `--owner mine|others`）；
 除下述最終 review publisher 外，一律呼叫它取路徑，不要自己組檔名、
 也不要自己記得比對 H1——判斷邏輯在有測試把關的程式碼裡，散文只提醒你呼叫它。
 沒有 Bash 的寫手由 orchestrator 代跑 helper、準備父目錄並交付路徑／H1／ownership status。

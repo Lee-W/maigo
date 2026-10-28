@@ -108,7 +108,7 @@ Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真�
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
 | 1 | Raana | 抓 diff + 周邊 context（用 `gh pr view`、`gh pr diff` 或 `git diff`） |
-| 2 | Tomori | **寫 `.maigo/review/<id>/rubric.md`**（不是實作計畫，是 reviewer 對照基準） |
+| 2 | Tomori | **寫 `.maigo/review/<id>/rubric.md`**（自己的 PR 是 `.maigo/pr/<id>/rubric.md`；不是實作計畫，是 reviewer 對照基準） |
 | 3 | Soyo | 拿 rubric 對 diff 嚴格 review |
 | 4 | Taki | checkout 變更，跑 test / lint / type check |
 | 4.5 | Orchestrator | 裁決 gate——有 findings 才觸發，逐條表態；只有「不適用+理由」才寫記憶 |
@@ -286,9 +286,9 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | 1 | Orchestrator | Pre-flight gate——不在 git repo / 沒 `gh` / 當前 branch 無 PR → 擋下、非 0 退出 |
 | 2 | Orchestrator | 抓 inline review threads + review 摘要 + conversation comments |
 | 3 | Orchestrator | 列出意見，使用者挑哪些要處理 |
-| 4 | Orchestrator | 寫 `.maigo/review/<id>/pr-comments.md`，分組 work item + 提路由計畫，AskUserQuestion 確認 |
+| 4 | Orchestrator | 寫 `.maigo/pr/<id>/pr-comments.md`（別人的 PR 是 `review/<id>/`），分組 work item + 提路由計畫，AskUserQuestion 確認 |
 | 5 | (route) | 逐 work item 跑 `/maigo:quick` / `/maigo:go` / `/maigo:team` 的完整流程 |
-| 6 | Orchestrator | finale——處理對照 + 回覆草稿（不送出）+ commit message 草稿 |
+| 6 | Orchestrator | finale——處理對照 + 回覆草稿寫進 `reply-draft.md`（不送出，每則標明在哪裡回）+ commit message 草稿 |
 | 7 | Orchestrator | 學習收尾——萃取 convention 形狀 comment → 確認 → 寫 type:project 記憶 |
 
 **路由原則：** 單檔機械性修正 → `quick`；跨檔 / 動行為 → `go`；大且低風險想省牆鐘 → `team`。**預設盡量走 `quick`**，不確定偏 `go`。

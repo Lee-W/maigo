@@ -34,7 +34,7 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 
 不分 project，每次 SessionStart 都跑（在 rule 偵測之前）。maigo 的所有 command
 （go / quick / team / review / address-comments）都把 plan（扁平
-`plan-<id>.md`）、review rubric、review 報告（`review/<id>/review.md`）、
+`plan-<id>.md`）、review rubric、review 報告（`review/<id>/review.md` 或 `pr/<id>/review.md`）、
 pr-comments、retry log 等 artefact 寫進 repo root 的 `.maigo/`，這些絕不該被
 commit。
 
@@ -167,7 +167,7 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 匹配 `Write` / `Edit` 兩種工具。擋下寫入 `.maigo/` 底下兩種舊形狀的產物：
 
 1. **舊固定檔名**（`plan.md` / `review-rubric.md` / `review.md` / `review-draft.md` /
-   `triage-rubric.md` / `pr-comments.md`）
+   `triage-rubric.md` / `pr-comments.md` / `reply-draft.md`）
 2. **巢狀 kind 的分目錄前扁平檔**（`review-rubric-42.md` 這類，`kind` 屬於
    `_NESTED_LAYOUT`；`review-batch-state.md` / `review-board.md` 這兩個字面
    上像但不是的檔名先排除，不會被誤擋）
@@ -178,7 +178,7 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 反向判準：`kind` 清單動態組自 `from artifact_path import _KNOWN_KINDS`
 （不重複列一份 kind 清單字面值），regex 錨定 `.maigo/` 目錄下——第一種
 regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<kind>-<id>.md`
-且 `kind` 屬於巢狀 kind——`plan-main.md`、`.maigo/review/42/rubric.md` 這類
+且 `kind` 屬於巢狀 kind——`plan-main.md`、`.maigo/review/42/rubric.md`、`.maigo/pr/42/reply-draft.md` 這類
 已在新（扁平或巢狀）命名、`board.md`、`local-model-dispatch-plan.md`、
 `.maigo/i/9201.md` 都天然不命中，不必特別寫排除規則。
 
@@ -261,7 +261,7 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 |-------|---------|----------------------|
 | **Raana** | `## Loaded memory entries` 段（即使無相關 entry 也要明寫「（無相關 entry）」）| 「缺 memory 載入回報」 |
 | **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
-| **Tomori** | 提到 `.maigo/plan-<id>.md`、`.maigo/review/<id>/rubric.md` 或 `.maigo/issue/<id>/rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
+| **Tomori** | 提到 `.maigo/plan-<id>.md`、`.maigo/review/<id>/rubric.md`、`.maigo/pr/<id>/rubric.md` 或 `.maigo/issue/<id>/rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
 | **Tomori** | `.maigo/plan(-<id>).md` 的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
