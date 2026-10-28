@@ -2,11 +2,14 @@
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
 `.maigo/` 底下 agent 寫的 markdown 產物（`plan` / `review` / `review-rubric` /
-`review-draft` / `triage-rubric` / `pr-comments` 這類）曾經被兩個並行
+`review-draft` / `triage-rubric` / `pr-comments` / `reply-draft` 這類）曾經被兩個並行
 session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻該有各自一份；後續
-又改成按 PR/issue 分資料夾（`.maigo/review/<id>/{review,rubric,draft,
-pr-comments}.md`、`.maigo/issue/<id>/rubric.md`；`plan` 例外，維持扁平
-`.maigo/plan-<id>.md`）。
+又改成按 PR/issue 分資料夾，PR 類產物再依 PR 作者分流：別人的 PR 在
+`.maigo/review/<id>/{review,rubric,draft,pr-comments,reply-draft}.md`，自己的 PR 在
+`.maigo/pr/<id>/` 同名檔，issue 在 `.maigo/issue/<id>/rubric.md`；作者判斷用
+[`scripts/pr_owner.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_owner.py)
+取得後以 `--owner mine|others` 傳給 `artifact_path.py`；`plan` 例外，維持扁平
+`.maigo/plan-<id>.md`。
 Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要幫它取
 路徑之前。`.maigo/` 全貌型錄（含非 markdown 機器狀態檔、Work Board、舊固定
 檔名、分目錄前扁平檔與未登記檔案）見
@@ -18,7 +21,8 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
 
 1. **每份這類 markdown 必須以能識別主題的 H1 開頭**（例：`# Plan: <task>`、
    `# Review rubric: <PR title>`、`# Review: <PR title / branch / range>`、
-   `# Triage rubric: <issue title> (#<N>)`、`# PR comments: <PR title> (#<number>)`）。
+   `# Triage rubric: <issue title> (#<N>)`、`# PR comments: <PR title> (#<number>)`、
+   `# Reply drafts: <PR title> (#<number>)`）。
 
    這些範例**必須與各自模板實際寫出的 H1 逐字相同** —— `--topic` 與 H1 對不上，
    `same_topic` 就不成立，續跑會被誤判成 `conflict`。pr-comments 的權威模板在
@@ -30,9 +34,14 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
 
    ```
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" <kind> --topic "<H1 主題>" \
-       [--url <issue/PR URL>] [--repo <owner/name>]
+       [--url <issue/PR URL>] [--repo <owner/name>] [--owner mine|others]
    ```
 
+   PR 類 kind（`review` / `review-rubric` / `review-draft` / `pr-comments` / `reply-draft`）
+   帶 `--url` 時 `--owner` 必填，沒給 exit 2；先跑
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_owner.py" --url <PR url>` 取得。另一組資料夾
+   已有同 id 的同名檔案時，stdout 多一行 `other_group_exists: <path>`，同 `flat_exists:`
+   只供讀取退路，不當寫入目標。
    **不要自己組檔名，也不要自己記得比對 H1**——命名的四級識別碼鏈與歸屬比對
    全部在這支 script 裡，有測試把關；散文只負責提醒你呼叫它。
 
@@ -51,7 +60,7 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    同一個 branch/PR 跑過多輪 `/maigo:go`、`/maigo:quick` 留下 `-2`、`-3`……
    不同主題的產物時，候選會自動跳過它們——非巢狀 kind（`plan`）長成
    `plan-<id>-3.md` 這類；巢狀 kind（`review` / `review-rubric` /
-   `review-draft` / `pr-comments` / `triage-rubric`）後綴落在檔名層、不是目錄
+   `review-draft` / `pr-comments` / `reply-draft` / `triage-rubric`）後綴落在檔名層、不是目錄
    層，長成 `review/<id>/rubric-3.md` 這類，不是另開 `review/<id>-3/` 資料夾。
    候選若剛好是 H1 與本次主題相同的既有檔，代表以前已經用同一個主題續寫過，
    status 仍是 `conflict`，只是在 `suggest:` 提示可以接著用那一份。

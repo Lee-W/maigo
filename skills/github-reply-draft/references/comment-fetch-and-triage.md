@@ -22,7 +22,7 @@ or writing the triage file.
       pullRequest(number:$number){
         reviewThreads(first:100){ nodes{
           isResolved isOutdated
-          comments(first:50){ nodes{ author{login} body path line url } }
+          comments(first:50){ nodes{ author{login} body path line originalLine url } }
         }}
       }
     }
@@ -30,6 +30,10 @@ or writing the triage file.
   ```
 
   `<owner>` / `<repo>`：`gh repo view --json owner,name -q '.owner.login+" "+.name'`。
+
+  `line` 在 outdated thread 上是 `null`（diff 已變動、舊錨點不在了），`originalLine` 仍保有留言當時的行號
+  （實測 apache/airflow#74026：outdated 25 條裡 `line` 為 null 22 條、`originalLine` 為 null 0 條）。
+  寫位置欄時見下方「回覆草稿檔模板」的 outdated 規則，**不要把 `null` 印成 `:None`**。
 
 - **Review 摘要**（APPROVE / REQUEST_CHANGES / COMMENT + 整體留言）：
   `gh pr view --json reviews`
@@ -57,7 +61,7 @@ or writing the triage file.
 
 ---
 
-## Triage 檔模板（`.maigo/review/<id>/pr-comments.md`，路徑由 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py) 算出，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）
+## Triage 檔模板（自己的 PR 是 `.maigo/pr/<id>/pr-comments.md`，別人的是 `.maigo/review/<id>/pr-comments.md`，路徑由 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py) 算出，見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）
 
 ```markdown
 # PR comments: <PR title> (#<number>)
@@ -81,6 +85,79 @@ or writing the triage file.
 - **Comments**: C2
 - **Route**: /maigo:go  ← rationale: 跨檔、要先看既有 test 結構
 - **Status**: pending
+```
+
+## 回覆草稿檔模板
+
+[`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
+步驟 6 把每條已處理 comment 的回覆草稿**寫成檔案**（檔案是正本；對話只印路徑與「在哪裡回」對照表）。
+路徑 `.maigo/pr/<id>/reply-draft.md`（別人的 PR 是 `.maigo/review/<id>/reply-draft.md`），
+由 `scripts/artifact_path.py reply-draft --owner mine|others` 算出。`status: same_topic` 時整份依本輪
+重抓的結果重寫，不累加。
+
+````markdown
+# Reply drafts: <PR title> (#<number>)
+
+- **PR**: <url>
+- **Drafted at**: <ISO8601 UTC>  ·  **Local HEAD**: <sha>  ·  **Pushed head**: <headRefOid>
+
+## C1 — inline · `src/auth.py:42` · @reviewer
+- **在哪裡回**：inline thread——開下方連結，在該 thread 底下的回覆框貼上（不要開新的 review comment）
+- **連結**：<thread 第一則 comment 的 url>
+- **位置**：`src/auth.py:42`
+- **前置條件**：先 push 再貼（修正只在本機）／無
+- **Thread 狀態**：unresolved（產稿時重抓）
+
+```text
+<回覆內文＋attribution footer>
+```
+
+## C2 — review 摘要 · REQUEST_CHANGES · @reviewer
+- **在哪裡回**：PR conversation 底部——review 摘要沒有獨立的回覆串，開頭寫 `@reviewer`，並引用要回應的那段
+- **連結**：<review 的 url>
+- **位置**：（整體 review，無行號）
+- **前置條件**：無
+- **Thread 狀態**：n/a
+
+```text
+@reviewer 關於「error path 缺測試」——…
+```
+
+## C3 — conversation · @reviewer
+- **在哪裡回**：PR conversation 底部，可用該留言的 Quote reply
+- **連結**：<conversation comment 的 url>
+- **位置**：（對話串，無行號）
+- **前置條件**：無
+- **Thread 狀態**：n/a
+
+```text
+<回覆內文＋attribution footer>
+```
+````
+
+「在哪裡回」依來源寫死，不換說法：
+
+| 來源 | 在哪裡回 |
+|------|----------|
+| inline | 回在該 inline thread（開連結，在 thread 底下的回覆框貼） |
+| review 摘要 | GitHub 的 review 摘要沒有獨立的回覆串，回在 PR conversation 底部，開頭 `@reviewer`，並引用要回應的那段 |
+| conversation | 回在 PR conversation 底部，可用 Quote reply |
+
+**位置欄的規則**：先看 `isOutdated`。`isOutdated=false` 且 `line` 為 `null`（檔案層級 thread，
+`line` 與 `originalLine` 皆 null）→ **位置**寫成 `<path>（整份檔案層級 comment，無行號）`，**不可**標成 outdated。
+
+每節標題（`## C1 — inline · <path:line>`）裡的 `path:line` 與**位置**欄用同一個值（outdated 用 `originalLine`，檔案層級只寫 `<path>`）。
+
+thread `isOutdated=true` 且 `line` 為 `null` 時，**位置**寫成
+`<path>:<originalLine>（outdated，原本的行號）`；`originalLine` 也拿不到才寫
+`<path>`（outdated，行號不可得）。**在哪裡回**補一句「該 thread 收在 Files changed 的 outdated 摺疊下，
+直接開連結最快」。不准把 `null` 寫成 `:None`。範例：
+
+```markdown
+## C4 — inline · `providers/common/ai/docs/frameworks/index.rst:82` · @reviewer
+- **在哪裡回**：inline thread——開下方連結，在該 thread 底下的回覆框貼上（不要開新的 review comment）；該 thread 收在 Files changed 的 outdated 摺疊下，直接開連結最快
+- **位置**：`providers/common/ai/docs/frameworks/index.rst:82`（outdated，原本的行號）
+- **Thread 狀態**：unresolved（產稿時重抓）
 ```
 
 ## 路由判斷

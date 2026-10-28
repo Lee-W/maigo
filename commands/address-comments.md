@@ -232,23 +232,35 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 全部 work item 走完後，orchestrator 給一份 summary：
 
 1. **處理對照**：每條選中的 comment → 對應 work item → `done` / `blocked` + 改了哪些檔。
-2. **回覆草稿（不自動送出）**：為每條已處理的 comment 擬一段建議回覆——address-comments **不替使用者回覆、不 resolve thread、不 push**。呈現方式：每條給**原始 comment 連結**（取自步驟 4 triage 檔的 `url`），其下接一個可一鍵複製的 fenced code block，內含純回覆內文，使用者在 GitHub 網頁直接貼上送出：
+2. **回覆草稿（不自動送出）**：為每條已處理的 comment 擬一段建議回覆——address-comments **不替使用者回覆、不 resolve thread、不 push**。草稿**寫成檔案**，檔案是正本，不是只印在對話裡：
 
-   C1 原始 comment：<url>
+   - **產草稿前重抓一次 thread 狀態，已 resolve 的不列**：步驟 2 的抓取到這裡已隔了整個實作階段
+     （可能數小時、數個 work item、一次 rebase），reviewer 很可能在期間按了 resolve。重跑步驟 2 的
+     inline thread 查詢，`isResolved` 為 true 的**不列入草稿清單**，只在 summary 裡一行帶過
+     「另有 N 條已在期間被 resolve」。沿用開工時的快照，會讓使用者拿到一份含已關閉 thread 的草稿，
+     逐條貼上時才發現貼不進去。
+   - 呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" reply-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Reply drafts: <PR title> (#<number>)"`
+     取得路徑（自己的 PR 是 `.maigo/pr/<id>/reply-draft.md`，別人的是 `.maigo/review/<id>/reply-draft.md`）；
+     歸屬判斷同步驟 4（`status: new` 直接寫、`conflict` 停下問、`same_topic` 續寫）。
+     `same_topic` 時**整份依本輪重抓的結果重寫**——草稿是從 triage 檔加現況重新產生的，不是累加的。
+     目錄不存在先 `mkdir -p` 父目錄。
+   - 檔案內容依
+     `skills/github-reply-draft/references/comment-fetch-and-triage.md`「回覆草稿檔模板」：
+     每則 comment 一節，寫明**在哪裡回**（inline thread / PR conversation 底部）、原始 comment 連結、
+     位置、前置條件（例如「先 push 再貼」）與 thread 狀態，其下接一個可一鍵複製的 fenced code block，內含純回覆內文。
+     fenced block 規則依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)
+     （內文若可能含三個 backtick 就用四個 backtick 外層，不加 `>` blockquote）。
+   - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
+   - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**：
 
-   ````
-   已補上 None 檢查並加了對應測試，見 <commit>。
-   ````
+     ```
+     回覆草稿：.maigo/pr/72049/reply-draft.md
 
-   依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)：回覆內文放單一 fenced block（內文若可能含三個 backtick 就用四個 backtick 外層）。不加 `>` blockquote。
-
-   每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
-
-   **產草稿前重抓一次 thread 狀態，已 resolve 的不列**：步驟 2 的抓取到這裡已隔了整個實作階段
-   （可能數小時、數個 work item、一次 rebase），reviewer 很可能在期間按了 resolve。重跑步驟 2 的
-   inline thread 查詢，`isResolved` 為 true 的**不列入草稿清單**，只在 summary 裡一行帶過
-   「另有 N 條已在期間被 resolve」。沿用開工時的快照，會讓使用者拿到一份含已關閉 thread 的草稿，
-   逐條貼上時才發現貼不進去。
+     | # | 在哪裡回 | 連結 | 前置條件 |
+     |---|----------|------|----------|
+     | C1 | inline thread（src/auth.py:42） | <url> | 先 push 再貼 |
+     | C2 | PR conversation 底部（@reviewer，引用該段） | <url> | 無 |
+     ```
 
 3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
 4. **PR title/description 核對**：這裡已知 PR 存在（步驟 1 pre-flight gate 已核過），依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對現有 title/description 是否仍符合上面落地的改動，脫鉤就草擬更新交給使用者複製貼上。
@@ -302,12 +314,12 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
 
-### 收場總結重貼回覆草稿
+### 收場總結重印回覆草稿的位置
 
-步驟 7、8 會跟使用者多輪互動並寫檔，步驟 6 的回覆草稿因此被推出視線。全部步驟走完後，**最後一則總結要把
-步驟 6 的回覆草稿（每條的原始 comment 連結 ＋ fenced block）原樣再貼一次**，不要寫「草稿在上一則訊息」——
-回覆草稿是這個命令唯一要使用者拿去貼的交付物，不能只留在中途的訊息裡。重貼前沿用步驟 6 的規則：草稿若
-已隔過 rebase 或新 commit，先重驗其中點名的符號與全稱陳述。
+步驟 7、8 會跟使用者多輪互動並寫檔，步驟 6 的回覆草稿路徑因此被推出視線。全部步驟走完後，**最後一則總結要再印一次
+回覆草稿檔的路徑與步驟 6 的「在哪裡回」對照表**（不重貼回覆內文——檔案是正本），不要寫「草稿在上一則訊息」。
+回覆草稿是這個命令唯一要使用者拿去貼的交付物，路徑與對照表不能只留在中途的訊息裡。草稿若已隔過 rebase 或新
+commit，先重驗檔案裡點名的符號與全稱陳述，過期就整份重寫（`same_topic`）再印。
 
 ## Memory propose confirm flow
 
@@ -325,8 +337,8 @@ address-comments 步驟 1–4 是 orchestrator 直跑、沒有 Soyo / Anon，不
 - **路由要被確認**——步驟 4 的計畫（分組 + route）必須經 AskUserQuestion 同意才進步驟 5。
 - **不自己實作 / 不自己 review**——步驟 5 一律走 quick / go / team 的 agent 流程。
 - **不碰 GitHub 寫入**——不回覆 comment、不 resolve thread、不 push、不開 / 關 PR；只產草稿。
-- **repo 內唯一寫的 artefact 是本次 pr-comments 檔**（`.maigo/review/<id>/pr-comments.md`，路徑由
-  `scripts/artifact_path.py` 算出）——triage / 進度追蹤用；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
+- **repo 內寫的 artefact 是本次 pr-comments 檔與 reply-draft 檔**（`.maigo/pr/<id>/` 或 `.maigo/review/<id>/`，
+  依 PR 作者；路徑由 `scripts/artifact_path.py` 算出）——前者 triage / 進度追蹤用、後者是回覆草稿正本；步驟 7 的學習收尾另會（經使用者確認後）寫 `~/.config/maigo/memory/`，reuse [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 的寫入。
 
 ## 與其他命令的差異
 
