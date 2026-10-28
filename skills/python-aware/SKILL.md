@@ -65,13 +65,14 @@ A repo-aware skill that wants to change a default here must say so explicitly
   worker-isolation path, (4) a deferred-execution callback (a body not called at module import
   time). Say which case it is in a comment.
   Self-check: "does this function run on every public touch of the class?" If yes, top-level.
+  Never re-import, inside a function, a name the module already imports at top level; a test
+  file is not an exception (`references/code-style.md` → Imports).
 
 ## Testing
 
 - **pytest only** — do not subclass `unittest.TestCase`.
-- **Every mock carries `spec=` or `autospec=True`** — a bare `MagicMock()` is not acceptable;
-  `autospec=True` additionally checks call signatures at call time (a wrong call raises
-  `TypeError`); bare `spec=` only restricts attribute access.
+- **Every mock carries `spec=` or `autospec=True`** — a bare `MagicMock()` is allowed only for a
+  logger attribute (`instance._log = mock.MagicMock()`); exact rule in `references/test-conventions.md`.
 - **Time-dependent tests use the repo's existing time-travel library** (`time_machine`,
   `freezegun`, …) — do not monkey-patch `datetime.now` by hand.
 - **Mock assertions: prefer `.mock_calls` equality** — `m.method.mock_calls == [mock.call(...)]`

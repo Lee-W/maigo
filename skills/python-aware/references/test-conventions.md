@@ -65,6 +65,19 @@ reset pattern sibling tests in the same file already use.
 
 ---
 
+## Every mock for a typed collaborator carries `spec=` / `autospec=True`
+
+A mock standing in for a class the repo defines (including one passed as an
+argument to the code under test) is built as `MagicMock(spec=RunContext)` or
+`mock.patch(..., autospec=True)`; a bare `MagicMock()` accepts any attribute
+and any call signature, so a typo or wrong call still passes. A bare
+`MagicMock()` is acceptable only for a logger attribute replaced via
+`instance._log = mock.MagicMock()`; asserting its `.mock_calls` is fine, as in
+the logger pattern below. Every other mock the test configures or asserts
+against needs `spec` / `autospec`.
+
+---
+
 ## Prefer `.mock_calls` equality over `assert_called_once_with`
 
 Default to comparing `.mock_calls` against a list of `mock.call(...)` objects

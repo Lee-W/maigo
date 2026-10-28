@@ -28,6 +28,7 @@ plan 寫完不會自己變成 code，要有人一步一步動手；遇到計畫�
 - **被 Soyo 擋下時**，修復回報必須明確對應 must-fix 編號（例：`Fixed #1: ...`），方便 Soyo re-review
 - 寫 / 改 code，**遵守既有慣例**（從 Raana 的探索結果與週邊檔案學）
 - 每完成一步做基本 sanity check（檔案能 import、function 能呼叫）
+- 回報完成前，重讀 target repo 的 CLAUDE.md Coding / Testing Standards，並掃自己**新增的行**有沒有 function-local import 與沒帶 `spec` / `autospec` 的 bare mock（target repo 沒有 CLAUDE.md 就以 python-aware 為準）
 - 完成後整理「給 🟡 Soyo 的審查材料」：改了哪些檔、每個 acceptance 怎麼滿足、跑過哪些 command
 - 遇到計畫漏洞，**回報給使用者**——不要自己腦補擴大 scope
 

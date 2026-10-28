@@ -31,6 +31,10 @@ block unless a real exception (circular cycle, worker isolation, deferred
 callback) applies. An inline import inside a test method that exists only out
 of habit/locality is not such an exception.
 
+A function-local import that re-imports a name the module already imports at
+top level is never allowed — it is pure duplication, with no exception case.
+Delete the local line and use the top-level name.
+
 ### Annotation-only imports belong under `TYPE_CHECKING`
 
 In a module with `from __future__ import annotations`, an import used

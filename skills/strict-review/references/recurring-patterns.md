@@ -128,6 +128,32 @@ every match including nested ones, and attach the judgment list to the
 review output so the enumeration itself is auditable, not just the
 conclusion.
 
+## Python diffs: grep added lines for local imports and bare mocks
+
+Reviewers of a Python PR repeatedly flag two things by eye that a mechanical
+pass catches: a function-local import that duplicates a top-of-file import, and
+a bare `MagicMock()` where the repo says `spec` / `autospec`. Reading the diff
+misses them for the same reason it misses nested helpers.
+
+How to apply: run these two greps over the diff's added lines, then judge every hit.
+
+```bash
+# (i) indented added imports (leading whitespace excludes top-level `+import os`;
+#     `+++ b/x.py` headers don't match because the char after the first `+` is `+`, not whitespace)
+git diff <base>...HEAD -- '*.py' | grep -E '^\+[[:space:]]+(import |from [^ ]+ import )'
+# (ii) bare mocks / patches (drop the `+++` file headers first)
+git diff <base>...HEAD -- '*.py' | grep -E '^\+' | grep -v '^+++' | grep -E 'Mock\(\)|patch\('
+```
+
+`patch(..., autospec=True)` also matches (ii) and needs human reading; so does
+`mock.patch(...)` carrying `spec`. Judge each hit against the target repo's CLAUDE.md
+(Coding / Testing Standards) and `python-aware`: a local import is a finding except
+the cases `python-aware`'s Coding rules (`skills/python-aware/SKILL.md`) allow, and
+never to re-import a name already imported at top level; a bare mock is valid only
+for a logger attribute (`instance._log = mock.MagicMock()`), per `python-aware`'s
+test conventions. Attach the hit list to the review output so the enumeration is
+auditable.
+
 ## Naming: name by what it is, not by its first caller's use case
 
 Flag a name that encodes the calling context rather than the operation it
