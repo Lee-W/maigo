@@ -5,6 +5,14 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.69.0 (2026-10-28)
+
+### Feat
+
+- **migrate**: move own-PR review folders into pr/
+- **address-comments**: write reply drafts with where-to-comment hints
+- **artifact-path**: route PR artifacts by author into pr/ and review/
+
 ## v0.68.0 (2026-10-24)
 
 ### Feat
