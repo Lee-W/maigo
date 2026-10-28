@@ -207,6 +207,14 @@ candidate branch's commit subjects (`git log upstream/main..<branch>
 --oneline`) against a PR's commit list (`gh pr view <n> --json commits`) to
 confirm which branch corresponds to which merged PR.
 
+**Rebase-and-merge repos are the exception where plain git is enough.**
+Rebasing keeps each commit's patch-id (only the hash changes), so
+`git cherry upstream/main <branch>` answers locally: every line prefixed `-`
+means that patch already exists on `upstream/main`, and a branch whose lines
+are all `-` is safe to delete. Any `+` line is a commit whose patch is not on
+main — stop and look at it before deleting. Only squash-and-merge needs the
+`gh` cross-check above, because squashing throws the patch-ids away.
+
 ### `gh` CLI blocked by organization SSO enforcement
 
 A `gh` command against a repo under an organization with SAML SSO
