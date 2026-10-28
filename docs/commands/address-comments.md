@@ -6,7 +6,7 @@ flowchart TD
     Fetch --> HasComments{有意見?}
     HasComments -- 沒有 --> NoOp([結束: 無意見可處理])
     HasComments -- 有 --> List[Orchestrator 列出<br/>使用者挑哪些要處理]
-    List --> Plan[Orchestrator 寫 review/&lt;id&gt;/pr-comments.md<br/>分組 work item + 提路由計畫]
+    List --> Plan[Orchestrator 寫 pr/&lt;id&gt;/pr-comments.md<br/>分組 work item + 提路由計畫]
     Plan --> Confirm{使用者確認<br/>分組 + 路由?}
     Confirm -- 要調整 --> Plan
     Confirm -- OK --> Route[逐 work item 跑指定 route]
@@ -16,7 +16,9 @@ flowchart TD
     Quick --> Finale[Orchestrator finale<br/>處理對照 + 回覆草稿 + commit msg]
     Go --> Finale
     Team --> Finale
-    Finale --> Learn[Orchestrator step 7<br/>靜默萃取 convention 候選]
+    Finale --> Draft[寫 pr/&lt;id&gt;/reply-draft.md<br/>每則標明在哪裡回]
+    Draft --> Learn
+    Learn[Orchestrator step 7<br/>靜默萃取 convention 候選]
     Learn -- 0 候選 --> Done([完成])
     Learn -- 有候選 --> Ask{使用者勾選<br/>multiSelect}
     Ask -- 全不勾 --> Done

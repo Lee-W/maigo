@@ -10,6 +10,11 @@ description: This skill should be used when drafting reply text for GitHub PR re
 **Owner**: — (orchestrator/agent drafting GitHub replies)
 **Consumers**: `/maigo:address-comments` (per-thread replies at Finale), `/maigo:review` (reply drafts at criti gate)
 
+Delivery form: `/maigo:address-comments` writes the drafts to a `reply-draft.md` file with a
+where-to-comment hint per reply — template in
+[`references/comment-fetch-and-triage.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md)
+("回覆草稿檔模板").
+
 ## Overview
 
 Drafting GitHub PR replies badly is a recurring source of reviewer friction.
