@@ -56,6 +56,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -902,7 +903,7 @@ def archive_relpaths(
 ) -> tuple[list[str], list[dict], list[str]]:
     """Move each `.maigo/`-relative path under `_archive/<same relpath>`; never overwrite.
 
-    Returns `(moved, skipped, missing)`. Any group works (`review/<id>`, `issue/<id>`,
+    Returns `(moved, skipped, missing)`; a moved path whose mtime reset failed also gets a `警告` entry in `skipped`. Any group works (`review/<id>`, `issue/<id>`,
     `topic/<slug>`, `i/<id>.md`); `/maigo:tidy` reuses it for the groups the board does not own."""
     maigo_dir = maigo_root / ".maigo"
     archive_dir = maigo_dir / ARCHIVE_DIR
@@ -919,6 +920,17 @@ def archive_relpaths(
             destination.parent.mkdir(parents=True, exist_ok=True)
             source.rename(destination)
             moved.append(rel)
+            # rename 沿用原 mtime，而 /maigo:tidy 的保留期從封存時間起算：搬完重設。
+            # 搬移已完成，重設失敗不能讓整輪中斷——警告記進 skipped（路徑同時在 moved）。
+            try:
+                os.utime(destination)
+            except OSError as exc:
+                skipped.append(
+                    {
+                        "path": rel,
+                        "reason": f"警告：已封存但無法重設封存時間（{exc}），保留期可能提早到期",
+                    }
+                )
     return moved, skipped, missing
 
 

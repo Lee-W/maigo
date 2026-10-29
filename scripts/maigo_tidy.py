@@ -514,10 +514,14 @@ def _apply_move_internal_log(action: TidyAction, maigo_dir: Path) -> str:
     return f"move-internal-log：{action.target} 已存在，以新檔為準，刪 {action.path}"
 
 
-def _stamp_archive_time(maigo_dir: Path, moved: list[str]) -> None:
-    """rename 會沿用原 mtime；保留期從封存時間起算，所以搬完把目標 mtime 設成現在。"""
-    for rel in moved:
-        os.utime(maigo_dir / board_sync.ARCHIVE_DIR / rel)
+def _stamp_warnings(skipped: list[dict], moved: list[str]) -> str:
+    """archive_relpaths 搬完但無法重設封存時間的警告，附在成功訊息後。"""
+    notes = [
+        f"（{entry['reason']}：{entry['path']}）"
+        for entry in skipped
+        if entry["path"] in moved
+    ]
+    return "".join(notes)
 
 
 def _apply_archive(action: TidyAction, maigo_dir: Path) -> str:
@@ -525,8 +529,9 @@ def _apply_archive(action: TidyAction, maigo_dir: Path) -> str:
         maigo_dir.parent, [_rel(action.path)]
     )
     if moved:
-        _stamp_archive_time(maigo_dir, moved)
-        return f"archive：{action.path} → {action.target}"
+        return (
+            f"archive：{action.path} → {action.target}{_stamp_warnings(skipped, moved)}"
+        )
     if skipped:
         return f"archive 略過：{action.path}（目的地已存在，不覆蓋）"
     return f"archive 略過：{action.path}（來源已不存在）"
@@ -538,8 +543,10 @@ def _apply_archive_confirmed(action: TidyAction, maigo_dir: Path) -> str:
     )
     target = _display(f"{board_sync.ARCHIVE_DIR}/{_rel(action.path)}")
     if moved:
-        _stamp_archive_time(maigo_dir, moved)
-        return f"{action.kind}：已封存 {action.path} → {target}"
+        return (
+            f"{action.kind}：已封存 {action.path} → {target}"
+            f"{_stamp_warnings(skipped, moved)}"
+        )
     if skipped:
         return f"{action.kind} 略過：{action.path}（{target} 已存在，不覆蓋）"
     return f"{action.kind} 略過：{action.path}（來源已不存在）"

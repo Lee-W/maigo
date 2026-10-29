@@ -536,3 +536,32 @@ def test_archived_old_file_is_not_a_candidate_until_90_days_after_archiving(tmp_
     backdated = NOW.timestamp() - 100 * 86400
     os.utime(archived, (backdated, backdated))
     assert ".maigo/_archive/local-model-dispatch-plan.md" in candidates()
+
+
+def test_rule_archive_resets_mtime_of_moved_dir(tmp_path):
+    maigo = make_maigo(tmp_path)
+    os.utime(maigo / "pr" / "11", (OLD, OLD))
+    run_apply(maigo, build(maigo))
+    moved = maigo / "_archive" / "pr" / "11"
+    assert moved.stat().st_mtime > OLD + 199 * 86400
+    paths = [a.path for a in build(maigo) if a.kind == "delete-candidate"]
+    assert ".maigo/_archive/pr/11" not in paths
+
+
+def test_utime_failure_does_not_fail_a_finished_archive(tmp_path, monkeypatch):
+    maigo = make_maigo(tmp_path)
+    actions = build(maigo)
+
+    real_utime = os.utime
+
+    def deny(path, *args, **kwargs):
+        if "_archive" in Path(path).parts:
+            raise PermissionError("denied")
+        return real_utime(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "utime", deny)
+    results = run_apply(maigo, actions)
+    assert (maigo / "_archive" / "pr" / "11" / "reply-draft.md").is_file()
+    assert any("警告" in r and ".maigo/pr/11" in r for r in results)
+    # 同批後面的動作照常執行
+    assert (maigo / "_archive" / "review" / "13" / "review.md").is_file()
