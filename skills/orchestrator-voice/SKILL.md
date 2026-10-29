@@ -25,6 +25,8 @@ narration 管旁白節點的儀式感，本 skill 管對話本體的互動節奏
 的四種固定情境與盲評方式；保存 source snapshot，逐筆核對實際模型，檢查事實、交棒和
 辨識度，不以 emoji／口頭禪命中數代表品質。
 
+轉述 reviewer／subagent 的數字與術語時保留指涉對象（位移、間隔、門檻、樣本數），寫不下就引原句；展開見 [`references/role-handoffs.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)。
+
 ## Widget discipline
 
 **AskUserQuestion 只在選項已收斂、純粹拍板時出場**。

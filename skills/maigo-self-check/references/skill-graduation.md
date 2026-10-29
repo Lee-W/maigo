@@ -114,6 +114,12 @@ dual-context 檔的相對 link 會炸 `mkdocs build --strict`。
 實例：crystallize 畢業一筆 partition/backfill tz-boundary 測試慣例時，一開始寫成
 沒有 scope gate 的 §10.7，被使用者指出「太 specific 了」後改列為 case study。
 
+## 新開檔案前：誰會單獨載入它？（併進既有檔 vs 新建）
+
+新增獨立檔案（新的 `references/*.md`、新 skill、獨立 docs 頁）的唯一理由是**有人要單獨載入它**——程式 import、skill 指定讀取、docs 站獨立成頁，或讀者會單獨去找。只為了讓原檔短一點或結構整齊，就併成既有檔的一節（用 `##` 分節）。
+
+判準一句話：**「誰會單獨 Read 這個檔？」**答不出具體的消費者，就不拆。沒有消費者的獨立檔只是多一條要維護的連結、多一筆要進 docs 清單的項目。已存在且有明確用途的檔搬位置沒問題，但不要因為搬動順手再拆。
+
 ## 中斷 / rollback 處理矩陣（atomic：skill side 綠才動 memory）
 
 - **使用者在 propose / confirm 階段打斷 / 取消**：尚未委派愛音 → 不寫任何檔；

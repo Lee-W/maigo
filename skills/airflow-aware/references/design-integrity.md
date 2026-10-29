@@ -39,6 +39,10 @@ than a comment. Don't assume closing one axis buys safety on the other — a
 closed subclass surface doesn't stop a builtin method from being slow, and a
 fast builtin method doesn't stop a user subclass from adding an N+1 query.
 
+### A change on a per-call scheduler hot path ships with timing in the PR
+
+When a PR changes code the scheduler calls on every evaluation (for example `CronMixin._get_next` / `_get_prev`, or a timetable's next-dagrun computation), the PR attaches before/after microseconds measured on the same machine with the same method (`timeit`), and says whether the new branch is reached on an ordinary day. A branch that looks rare can be the common case: in #75847 a maintainer measured `_get_next` at 2.6x slower because an hourly cron (delta exactly 1h) took the slow path all year; the fix had to bring it back to main's order of magnitude (about 40 µs).
+
 ---
 
 ## New `Window` subclass or direction: default to uniform semantics, not calendar special-casing

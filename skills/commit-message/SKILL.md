@@ -93,6 +93,10 @@ The body is for the **future bisecting engineer**, not the current reviewer:
 | Restating the subject as the body | Adds bytes without adding signal |
 | Citing an exact commit sha (`reverts a8910e8`, `see 306feea`) | Shas go stale after rebase / squash and carry no meaning for readers; describe the change instead. **Never include one**, no exceptions |
 
+## Stay tool-neutral in provider-neutral projects
+
+In a project that is deliberately provider-neutral, the commit message and any user-visible string or code comment do not name a specific external or competing tool. Describe the behavior generically ("detect another notifier", "an external binary"), and leave the concrete tool name to runtime detection (`shutil.which(...)`), not core logic. Test fixtures use a neutral stand-in (`other-notifier`), not a real product name. Naming a competitor in the commit blurs the decoupled boundary and ties that tool into the project's semantics.
+
 ## Amend vs new commit
 
 When polishing review-driven changes on an **unreleased local-branch** commit, default to `git commit --amend` rather than stacking a "address review" follow-up commit. After amending, rewrite the subject + body in line with this skill — do not let the original "draft" message survive into the squash-merge just because nobody looked at it again.

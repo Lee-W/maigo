@@ -48,6 +48,7 @@ prek run --all-files   # prek, not pre-commit: the runner upstream specifies
 - Never use `--project` at the **worktree root** (full-workspace resolve → `jpype1` needs Java); a sub-project *name* is fine.
 - Reproduce a prek/CI hook failure from the **repo root** (only exception: `providers/`, to dodge an unrelated lychee failure — `references/verification-tooling.md` §1). Scratch scripts go in `dev/`.
 - Before trusting a `prek` / `pytest` "Passed", local false reds, `verify_completion` / `jpype1` handling, `uv.lock` rebase handling: `references/verification-tooling.md`.
+- Host `uv run` tests need a per-worktree `UV_PROJECT_ENVIRONMENT` and `LC_ALL=C.UTF-8` (a non-English locale turns cron-description tests red) — `references/verification-tooling.md`, "Host `uv run` tests".
 - A `uv.lock` diff you did not cause is usually drift on `main` — keep the re-lock out of a feature PR (`references/review-checks.md`, "uv.lock drift diagnostic").
 - The commit hook runs the whole prek set and can outrun the Bash tool's timeout: run `ruff` / `ruff-format` / `mypy-<project>` by name on your changes first, then `--no-verify`; on a backport branch run both linters; a `uv.lock` diff that *downgrades* a package is a transitive-cap side effect — `references/verification-tooling.md`.
 
@@ -69,12 +70,14 @@ A user-facing feature (new public class / SDK symbol / scheduling behaviour) shi
 **existing** example file, reusing its block style and objects — no new example file or bare new `with DAG(...)` block; (3) a **docs update** to the relevant `.rst`
 (prose uses "Dag"; known limits are constraints, not `# TODO`). Adding or removing a public symbol also updates `task-sdk/docs/api.rst` and the `airflow-core/docs/` autoapi entries
 together with `__init__.py` / `__all__` / the lazy-import table — both the removal and the addition. QA-plan and status-doc conventions: `references/delivery.md`.
+A PR that changes a per-call scheduler hot path (cron `_get_next` / `_get_prev`, next-dagrun computation) also attaches same-machine before/after µs and says whether the new branch runs on ordinary days — `references/design-integrity.md`.
 
 ### 7. Testing
 
 - **Airflow override**: **do not use `caplog`** — see the "Testing" section of `AGENTS.md` for the prescribed pattern (typically a mock log handler asserted directly).
 - **DB-touching tests must be marked `@pytest.mark.db_test`**.
 - **Test paths mirror source paths**: `airflow-core/src/airflow/foo/bar.py` ↔ `airflow-core/tests/unit/foo/test_bar.py`.
+- **Timetable / DST / fold changes**: DST tests must include a non-whole-hour-shift zone and a 2-hour fold zone, not only Berlin / Chicago — `references/test-cases.md`.
 - pytest-only, `spec=`/`autospec=True`, time-travel library, mock-assertion style: `python-aware`.
 
 ### 8. PR / commit / newsfragment

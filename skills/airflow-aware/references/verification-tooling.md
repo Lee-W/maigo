@@ -214,6 +214,15 @@ runs**. Tell a real regression apart from this pollution by running the
 suspect file alone with its own fresh store file: pollution passes in
 isolation, a real regression still fails.
 
+### Host `uv run` tests: one venv per worktree, and a locale-independent environment
+
+Running `uv run --frozen --project airflow-core pytest ...` on the host has two environment traps that make unmodified code look broken or look green when it should not:
+
+- **Per-worktree venv.** Set `UV_PROJECT_ENVIRONMENT` to a separate directory per worktree. The `airflow-core` editable install inside an environment points at the `src/` of the worktree it was synced from, so reusing that environment in another worktree silently runs the other worktree's code. Before first use, confirm the path is the current worktree: `python -c "import airflow.timetables._cron as c; print(c.__file__)"`.
+- **Non-English host locale.** A host with a non-English `LANG` (for example `LANG=zh_TW.UTF-8`) makes `cron_descriptor` emit localized text, which turns `test_valid_cron_expression` and `test_dom_and_dow_conflict` red. Always run with `LC_ALL=C.UTF-8`.
+
+Put the per-worktree `UV_PROJECT_ENVIRONMENT`, `LC_ALL=C.UTF-8`, an isolated `AIRFLOW_HOME` and `PYTHONDONTWRITEBYTECODE=1` together in `.claude/test-command`, so every verifier runs the same environment. Found via #75847, where the first verification round was red on the host and green once isolated.
+
 ### A fresh worktree has no UI `node_modules`, and naive install can destroy an existing one
 
 A freshly `git worktree add`-ed checkout has no

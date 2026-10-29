@@ -908,3 +908,11 @@ a short directory with `tempfile.mkdtemp()` (it lives directly under the system 
 put the socket there, and clean the directory up yourself (a fixture with `yield` plus
 `shutil.rmtree`). If a socket-based test hangs or can't connect only on some machines, check the
 path length first.
+
+## A reviewer's concrete repro case becomes a named parametrize case, even if it already passes
+
+When a review thread gives a concrete repro (input and expected value), add it as a parametrize case named for the scenario (for example `<zone>-<direction>-<scenario>`) even if the current head already handles it, and name the case id in the reply. First derive the expected value with your own oracle instead of copying the reviewer's. Then check the case goes red on the base branch; if it does not, it is a guard test, and the reply says which mutation it blocks.
+
+## A `# type: ignore[arg-type]` needed to feed a documented value means the signature promise is wrong
+
+When a test needs `# type: ignore[arg-type]` to pass a value that the docstring, the docs or the changelog promises is accepted (for example a docstring saying `None` is accepted while the annotation is `str`), the defect is the signature and its documentation disagreeing, not the test. Make the annotation, the docstring and the docs state the same promise: either widen the type, or drop the promise and record it in the changelog. Do not leave the `ignore` in place so the test passes.

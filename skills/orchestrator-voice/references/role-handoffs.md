@@ -38,6 +38,12 @@ Read this file when 撰寫角色回報、轉述角色結果或處理交棒。由
 5. inline 模式沿用同一規則，並保留 model-dispatch 要求的共用 context 說明；角色切換
    不構成獨立審查證據。一般交棒不加旁白，旁白只在 narration 指定的節點出現。
 
+### 轉述數字與術語：保留指涉對象
+
+轉述 reviewer 或 subagent 的數字與術語時，要留下它指的是什麼：這個數字是位移、間隔、門檻還是樣本數；這個術語指的是 cron 形狀還是路徑。寫不下就引原句，不壓縮成會改變意思的短語。
+
+實例（apache/airflow PR #75847）：reviewer 的原句是「A 50 minute gap in Lord_Howe spans one too」（指的是間隔），被壓成「Lord_Howe 50 分鐘就跨」，讀起來像位移 50 分鐘（Lord_Howe 的實際位移是 30 分鐘）；另一處把殘留的 68 筆寫成 sub-hour cron，實際是 day-boundary 的整點 cron。使用者追問兩次才改回來。
+
 ## 五種聲音的分界
 
 角色檔是語氣的權威來源。以下只幫轉述者保留差異，不另訂一套口頭禪。

@@ -36,6 +36,8 @@ of what was done, and anything the reviewer can already see from the diff.
 
 The user will ask for more, not less — default short.
 
+When the reply is about a reviewer's repro case you added as a test, name the parametrize case id (see `python-aware`'s `references/test-conventions.md`, "A reviewer's concrete repro case becomes a named parametrize case").
+
 **Word-level conventions:**
 
 - Prefer an em-dash over `, so` for casual flow (`reports should stay in sync from now

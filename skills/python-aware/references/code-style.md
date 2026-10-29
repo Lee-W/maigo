@@ -117,6 +117,12 @@ the same directory (cross-file-called vs. purely-internal) before deciding,
 rather than defaulting toward a leading underscore because the call sites
 are nearby.
 
+### Name a threshold constant for why it has that value, and cite the source
+
+Name a threshold-style duration constant after the bound it encodes, not the place it is used: `_MAX_DST_SHIFT = timedelta(hours=2)` says why the value is 2 hours; `_FOLD_DELTA_LIMIT` only says where it is read. Next to it, comment where the number comes from and its known exceptions (here: the largest pure DST shift in tzdata 2020–2030 is Antarctica/Troll's 2 hours; Casey's 3 hours is a standard-time change, not DST).
+
+One constant must not be the threshold for two different things. In apache/airflow #75847 the first version used one 1-hour constant both as a shortcut gate and as the look-back width, and both meanings were wrong. Two meanings, two constants, each named for its own bound.
+
 ## Validation and error handling
 
 ### Raise at construction instead of documenting a structural footgun

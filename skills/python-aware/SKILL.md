@@ -67,6 +67,7 @@ A repo-aware skill that wants to change a default here must say so explicitly
   Self-check: "does this function run on every public touch of the class?" If yes, top-level.
   Never re-import, inside a function, a name the module already imports at top level; a test
   file is not an exception (`references/code-style.md` → Imports).
+- **Name threshold constants for the bound they encode**, not the use site, cite the value's source in a comment, and never reuse one constant as two thresholds — `references/code-style.md`.
 
 ## Testing
 
@@ -96,6 +97,7 @@ A repo-aware skill that wants to change a default here must say so explicitly
   a downstream function performs.
 - **Log assertion when the log IS the observable** — a repo rule against `caplog` targets
   scraping raw log text, not asserting an operator-visible log call via a mocked logger.
+- **A reviewer's concrete repro becomes a named parametrize case** even if it already passes (check it goes red on the base, else say which mutation it guards), and **a test that needs `# type: ignore[arg-type]` to feed a documented value means the signature and docs disagree** — fix annotation, docstring and docs together; both in `references/test-conventions.md`.
 
 Worked examples and the rest of the named patterns (parametrize + shared fixtures,
 reject-path shapes, prose-guard windows) are in `references/test-conventions.md`.

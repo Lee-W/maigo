@@ -70,6 +70,8 @@ pytest 測的是 Python 行為；上述問題都在 plugin 結構層——pytest
 但 SKILL.md 本體的條數摘要（如「Three cross-cutting patterns」）沒跟著改成新的數字。這條檢查
 不限 crystallize；`/maigo:quick`、`/maigo:go` 只要動到 `skills/` 都算。
 
+**新開獨立檔案前**先問「誰會單獨 Read 這個檔？」——答不出具體消費者就併成既有檔的一節；判準與例子見 `references/skill-graduation.md`「新開檔案前」。
+
 ## 兩條都必須綠才算完成
 
 任何一條紅 → 驗證未通過，不算 Taki PASS。回報實際錯誤，不跳過、不假裝綠。

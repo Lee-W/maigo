@@ -178,3 +178,16 @@ Why: Airflow 3.1 / 3.2 task-sdk has `airflow.sdk.serde` but **no deserialization
 Do not over-gate: a **top-level** model is still `model_dump()`ed there because `_serialize_model_output=True`, so a test expecting a dict for it is correct without the gate.
 
 apache/airflow #74695: Compat 3.1.8 / 3.2.2 went red on the `list-in-output-marker` parameter of the HITL tests in `test_agent.py`, which expected a dict for a nested model.
+
+---
+
+## DST / fold tests must include non-whole-hour zones (Lord_Howe, Troll)
+
+Scope gate: only when the diff touches `airflow-core/src/airflow/timetables/` or other DST / fold logic.
+
+A DST test suite built only from whole-hour-shift zones (Europe/Berlin, America/Chicago) cannot catch a threshold written as "a wall-clock gap under one hour never crosses a DST change". Add at least:
+
+- `Australia/Lord_Howe` — a 30-minute DST shift, so sub-hour gaps do cross it.
+- `Antarctica/Troll` — a 2-hour fold; per tzdata 2020–2030 it is the largest pure DST shift (Casey's 3-hour change is a standard-time re-definition, not DST).
+
+apache/airflow #75847: a maintainer review caught the "gap under one hour never crosses DST" threshold with Lord_Howe, which the existing whole-hour zones had all passed.

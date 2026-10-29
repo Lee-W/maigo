@@ -241,6 +241,12 @@ session last fetched it, so the two branches' bases can differ. Confirm with
 `git merge-base --is-ancestor <old-base> <remote>/main` and report it — don't
 assume the bases match.
 
+### Branches from one audit or improvement batch close out as one PR
+
+Separate branches or worktrees for one audit/improvement round (even independently reviewed ones) are an isolation device for development and review, not the delivery unit. At wrap-up, cut a new branch from the lowest branch and cherry-pick the other branches' commits onto it in order (no squash, no merge commit), keeping each original message, then open one PR. Verify with a fresh agent: a three-way `git merge-tree` of the branches is the reference, and the integrated tree must match it byte for byte (binary build artifacts such as `.mo` files excepted: rebuilt from source, equivalent content is enough).
+
+Ask before splitting into several PRs, and split only when the user says so; this reconciles with a preference for more PRs by making splitting an explicit user choice, not the default.
+
 ## After `rebase --continue` / `cherry-pick`: a shrinking file count means the message is now stale
 
 After `git rebase --continue` or `cherry-pick` finishes, **reconcile `git

@@ -887,6 +887,8 @@ blocker" (airflow-aware `review-checks.md` 10.6): the missing file alone is
 not a blocker, but a newsfragment whose *content* would mislead users can
 still be a must-fix.
 
+Calibration (someone else's PR; this narrows §32 item 1, it does not replace it): every **evidenced** finding goes into the review (item 2 still applies to nits, and the "collapse nits" rule above still holds), but Request changes is reserved for an error the PR **newly introduces**. A pre-existing problem the PR merely exposes, a rare risk, or a convention-style improvement is submitted as a comment / suggestion and does not block, because gradual improvement is worth having. The severity in your report and the submitted verdict can differ; do not drop an evidenced suggestion just because the verdict is Approve.
+
 ---
 
 ## §33. A reviewer's performance claim: measure what it actually buys before applying it
