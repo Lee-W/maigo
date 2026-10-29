@@ -60,6 +60,7 @@ Known commands:
 | `maigo:review` | `commands/review.md` |
 | `maigo:take-issue` | `commands/take-issue.md` |
 | `maigo:team` | `commands/team.md` |
+| `maigo:tidy` | `commands/tidy.md` |
 | `maigo:triage-issue` | `commands/triage-issue.md` |
 
 If `../../commands/<name>.md` does not exist, state that the command is not implemented and stop. Do not invent behavior.

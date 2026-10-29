@@ -62,7 +62,7 @@ claude --plugin-dir /path/to/maigo
 /maigo:board              # 跨 session 看現在球在誰手上
 ```
 
-完整 15 個命令（含 `/maigo:quick`、`/maigo:board`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`）詳見 [Commands reference](reference/commands.md)。
+完整 16 個命令（含 `/maigo:quick`、`/maigo:board`、`/maigo:remember`、`/maigo:memory`、`/maigo:retro`、`/maigo:crystallize`、`/maigo:describe-pr`、`/maigo:address-comments`、`/maigo:triage-issue`、`/maigo:take-issue`、`/maigo:doctor`、`/maigo:repo-audit`、`/maigo:tidy`）詳見 [Commands reference](reference/commands.md)。
 
 ## 文件導覽
 

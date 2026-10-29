@@ -360,6 +360,27 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 
 → Source: [`commands/repo-audit.md`](../commands/repo-audit.md)
 
+## `/maigo:tidy` — 整理 `.maigo/`
+
+`.maigo/` 的唯一清理入口。Orchestrator 直跑（不 delegate 五人），預設 dry-run：逐項列出
+「判定依據 ＋ 預定動作」，一段一行、不用表格。`--apply` 只執行規則型動作（舊檔遷移成巢狀佈局、
+頂層機器日誌歸進 `_internal/log/`、merged／closed 的 `pr/`、`review/`、`issue/`、`i/` 項目鏡射封存到
+`_archive/`、超過 2,000 行的 jsonl 輪替只留一代）；刪除、未登記檔、`topic/` 封存、
+`_archive/` 中超過 90 天的項目、`.maigo/.maigo/` 永遠由使用者逐項勾選，以 `--confirm <path>` 點名才動。
+動手前先備份到 `.maigo/_internal/tidy/backup/<UTC ts>/`。🌑 Mortis 一句結算。
+
+```
+/maigo:tidy                          # dry-run
+/maigo:tidy --no-gh                  # dry-run，跳過結案判定（不打 gh）
+/maigo:tidy --apply                  # 執行規則型動作
+/maigo:tidy --apply --confirm <path> # 另外執行點名的那一筆需要勾選的動作
+```
+
+結案判定走 `gh pr view` / `gh issue view`；狀態查不到的項目一律不動。各類產物的 owner 與結案條件見
+[`.maigo/` Artifacts Reference](artifacts.md)。
+
+→ Source: [`commands/tidy.md`](../commands/tidy.md)
+
 ## 場景對照
 
 | 想做什麼 | 用哪個 |
@@ -377,6 +398,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 | 批次分類 / 標記 GitHub issue | `/maigo:triage-issue` |
 | 把 triage 判定 READY 的 issue 接進實作 | `/maigo:take-issue` |
 | 定期清 repo（已合併 branch / 未關 PR / TODO 積壓 / skill 健診） | `/maigo:repo-audit` |
+| 整理 `.maigo/`（舊檔遷移、已結案封存、機器日誌歸位、未登記檔） | `/maigo:tidy` |
 | 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
 | 重構評估（不實作） | `/maigo:go` 跑到燈寫完 plan 後喊停 |

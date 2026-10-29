@@ -51,6 +51,7 @@ nav:
       - /maigo:take-issue: commands/take-issue.md
       - /maigo:doctor: commands/doctor.md
       - /maigo:repo-audit: commands/repo-audit.md
+      - /maigo:tidy: commands/tidy.md
   - Skills (source):
       - command-router: skills/command-router.md
       - strict-review: skills/strict-review.md

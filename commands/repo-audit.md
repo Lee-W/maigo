@@ -165,6 +165,7 @@ git branch -D <branch-name>
 
 - 全乾淨：「這次是乾淨的。就這樣。」
 - 有積壓：靜靜指出剩幾件，不催促（1 句、克制）。
+- 報告結尾固定補一句靜態提示：`.maigo/` 有遷移、封存或未登記項目時，用 `/maigo:tidy` 處理。本命令維持唯讀，不呼叫 `maigo_tidy.py`。
 
 ## Orchestrator 守則
 

@@ -17,8 +17,8 @@
 ├── review/<id>/                別人的 PR：review.md、rubric.md、draft.md、pr-comments.md …
 ├── issue/<id>/                 issue：plan.md、rubric.md
 ├── topic/<slug>/               沒有 PR / issue 的任務：plan[-n].md
-├── _archive/<原相對路徑>        已結案項目，鏡射上面的相對路徑（review/、pr/、i/ 現況；issue/、topic/ 由日後的 /maigo:tidy 封存）
-└── _internal/                  只給機器讀：board/、log/
+├── _archive/<原相對路徑>        已結案項目，鏡射上面的相對路徑（review/、pr/、i/ 由 /maigo:board 與 /maigo:tidy 封存；issue/、topic/ 由 /maigo:tidy 封存）
+└── _internal/                  只給機器讀：board/、log/、tidy/backup/
 ```
 
 - `plan` 的 group 依 URL 決定：PR URL → `pr/`、issue URL → `issue/`，其餘 → `topic/`。
@@ -112,7 +112,29 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 | `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目與勾選狀態，用來偵測 `dd` 與 `[x]` 變化 |
 | `_internal/log/*` | hook 寫的機器 log（見下節「非 markdown 機器狀態檔」） |
 | `_internal/migrate-legacy-artifacts.manifest.json` | `migrate_legacy_artifacts.py --apply` 中斷時留存的搬移對應表，跑完即刪 |
+| `_internal/tidy/backup/<UTC ts>/` | `/maigo:tidy --apply` 動手前複製的備份，路徑是相對 `.maigo/` 的原路徑；還原＝複製回 `.maigo/`；不自動清，要刪由你自己決定 |
 | `_internal/board/backup/<UTC ts>/` | `refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份；寫入失敗時用來還原 |
+
+## 生命週期與 `/maigo:tidy`
+
+每一類產物有一個 owner、一個結案條件、一個去向。結案之後的搬移與清理都走
+[`/maigo:tidy`](../commands/tidy.md)（預設 dry-run，`--apply` 只做規則型動作）；下面的門檻數字是
+`scripts/maigo_tidy.py` 裡的常數，可以調整。
+
+| 產物 | owner | 結案條件 | 去向 |
+|------|-------|----------|------|
+| `pr/<id>/`、`review/<id>/`、`issue/<id>/` | 該 PR／issue 的處理者（orchestrator 與 agent 寫入） | GitHub 狀態是 merged 或 closed（`gh pr view`／`gh issue view`）；查不到就不動 | 鏡射搬到 `_archive/<原相對路徑>`（規則型，`--apply` 會做） |
+| `i/<id>.md` | `/maigo:board` | 對應 PR／issue merged 或 closed | 同上 |
+| `topic/<slug>/` | 寫 plan 的人 | 沒有外部訊號可查，只能由你勾選 | 勾選後封存到 `_archive/topic/<slug>/` |
+| 頂層舊檔（`plan.md`、`plan-<id>.md`、`<kind>-<id>.md` …） | 升級前的 maigo | 一律視為待遷移 | 遷移成巢狀佈局（規則型） |
+| 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時逐行 append 到新檔（規則型） |
+| `_internal/log/*.jsonl` | hook | 超過 2,000 行 | 舊的搬成 `<name>.1.jsonl`，只留一代（規則型，門檻 `LOG_ROTATE_MAX_LINES`） |
+| `_archive/` 的項目 | `/maigo:board`、`/maigo:tidy` | mtime 超過 90 天（`ARCHIVE_RETENTION`） | 列為 delete-candidate，**一律要你逐項勾選**；確認＝備份後刪除 |
+| 未登記檔（`evals/`、`__titles.json`、`local-model-dispatch-plan.md` 這類） | 不明 | catalog 判為 `unregistered` | 只列不動；勾選確認＝備份後刪除 |
+| `.maigo/.maigo/` | hook 在子目錄 cwd 下的殘留 | 一律視為殘留 | 勾選確認＝備份後刪除；要合併回上層請手動處理 |
+
+規則型動作之外沒有「全部同意」的開關：刪除類與 `topic/` 封存只對 `--confirm` 點名的那一筆動手。
+每個動作前都先備份到 `_internal/tidy/backup/<UTC ts>/`。
 
 ## 非 markdown 機器狀態檔
 
@@ -133,7 +155,7 @@ git 不可用時退回 payload cwd），不管 session 的 cwd 在哪個子目�
 
 升級前留下的舊固定檔名（`.maigo/plan.md` 這類，`legacy_fixed_name`）、分目錄前的
 扁平檔（`flat_identifier`，見上一節）與不屬於上述任何種類的未登記檔案
-（`unregistered`），一律**只列不刪**——正典邏輯見 `scripts/maigo_dir_catalog.py`
+（`unregistered`），預設**只列不刪**（要處理走 [`/maigo:tidy`](../commands/tidy.md)，刪除只對你勾選的那一筆動手）——正典邏輯見 `scripts/maigo_dir_catalog.py`
 （六類：`nested` / `identifier_named` / `flat_identifier` / `legacy_fixed_name` /
 `registered_non_artifact` / `unregistered`），人讀報告見
 [`/maigo:doctor`](../commands/doctor.md)。要不要清由使用者自己決定，這份型錄與

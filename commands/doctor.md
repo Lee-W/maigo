@@ -117,6 +117,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 
 ## 📢 建議
 - ...
+- `.maigo/` 有遷移、封存或未登記項目時，用 `/maigo:tidy` 處理。
 ```
 
 ## Orchestrator 守則
