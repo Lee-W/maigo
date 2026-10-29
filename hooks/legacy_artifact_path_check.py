@@ -14,17 +14,17 @@ maigo 的 repo 一查，採用率是 0%——不是規範不好，是散文說�
 `from artifact_path import _KNOWN_KINDS`（不重複列一份 kind 清單字面值），
 regex 錨定在 `.maigo/` 目錄下：
 
-1. **舊固定檔名**（`<kind>.md`）——`plan-main.md` 這類已含識別碼的新命名不
-   命中，因為 regex 要求 `<kind>.md` 前面沒有 `-<id>` 尾巴（stem 必須整個
-   等於某個 kind）。
-2. **巢狀 kind 的分目錄前扁平檔**（`<kind>-<id>.md`，`kind` 屬於
-   `_NESTED_LAYOUT`）——`_FLAT_NAME_LOOKALIKES`（`review-batch-state.md` /
-   `review-board.md`）字面上符合這個形狀但不是 review kind 的產物，先排除
-   才不會誤擋。
+1. **舊固定檔名**（`<kind>.md`）——regex 要求 `<kind>.md` 前面沒有 `-<id>`
+   尾巴（stem 必須整個等於某個 kind）。
+2. **巢狀 kind 的分目錄前扁平檔**（`<kind>-<id>[-<n>].md`，`kind` 是
+   `artifact_path.nested_locations(kind)` 非空的 kind——`plan` 也在內，頂層
+   `plan-<id>.md` 已淘汰，plan 改放 `pr/` / `issue/` / `topic/`）——
+   `_FLAT_NAME_LOOKALIKES`（`review-batch-state.md` / `review-board.md`）字面上
+   符合這個形狀但不是 review kind 的產物，先排除才不會誤擋。
 
 `board.md`（不在 `_KNOWN_KINDS` 裡）、`local-model-dispatch-plan.md`（stem 不
 等於任何 kind）、`.maigo/i/9201.md`（不在 `.maigo/` 頂層）、
-`.maigo/review/42/rubric.md`、`.maigo/pr/42/reply-draft.md`（新巢狀路徑本身）都天然不命中——白名單式
+`.maigo/review/42/rubric.md`、`.maigo/pr/42/reply-draft.md`、`.maigo/topic/x/plan.md`（新巢狀路徑本身）都天然不命中——白名單式
 反向判準，不必為它們特別寫排除規則（呼應
 `deny-by-default-when-tool-generates-paths` 記憶）。
 
@@ -52,7 +52,12 @@ from _hook_io import emit
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
 try:
-    from artifact_path import _FLAT_NAME_LOOKALIKES, _KNOWN_KINDS, _NESTED_LAYOUT
+    from artifact_path import (
+        _FLAT_NAME_LOOKALIKES,
+        _KNOWN_KINDS,
+        _NESTED_LAYOUT,
+        nested_locations,
+    )
 except Exception:
     # fail-open: `scripts/artifact_path.py` is still evolving (kinds get added,
     # syntax can momentarily break). Empty containers make both alternations
@@ -63,6 +68,10 @@ except Exception:
     _NESTED_LAYOUT = {}
     _FLAT_NAME_LOOKALIKES = ()
 
+    def nested_locations(kind: str) -> list[tuple[str, str]]:
+        return []
+
+
 # 比對時先試最長的 kind，理由同 `scripts/maigo_dir_catalog.py`：避免短 kind
 # （如 "review"）搶先吃掉長 kind 的檔名（如 "review-rubric.md"）。regex 本身
 # 靠 `\.md$` 錨定與整體回溯就不會誤判，這裡沿用同一慣例只是為了可讀性一致。
@@ -70,9 +79,15 @@ _KINDS_BY_LENGTH_DESC = sorted(_KNOWN_KINDS, key=len, reverse=True)
 _KIND_ALTERNATION = "|".join(re.escape(kind) for kind in _KINDS_BY_LENGTH_DESC)
 _LEGACY_ARTIFACT_RE = re.compile(rf"(^|/)\.maigo/({_KIND_ALTERNATION})\.md$")
 
-# 巢狀 kind 的分目錄前扁平檔（`<kind>-<id>.md`，`kind` 屬於 `_NESTED_LAYOUT`）
-# ——決策 3：這也要擋，`.maigo/` 命名規範曾經只靠散文、採用率 0%。
-_NESTED_KINDS_BY_LENGTH_DESC = sorted(_NESTED_LAYOUT, key=len, reverse=True)
+# 巢狀 kind 的分目錄前扁平檔（`<kind>-<id>.md`）——決策 3：這也要擋，`.maigo/`
+# 命名規範曾經只靠散文、採用率 0%。kind 取自 `nested_locations()`（`plan` 的
+# group 取決於 URL，不在 `_NESTED_LAYOUT`，但同樣有巢狀位置），`_NESTED_LAYOUT`
+# 的 kind 一併保留，匯入失敗時兩者皆空。
+_NESTED_KINDS_BY_LENGTH_DESC = sorted(
+    {*_NESTED_LAYOUT, *(kind for kind in _KNOWN_KINDS if nested_locations(kind))},
+    key=len,
+    reverse=True,
+)
 _NESTED_KIND_ALTERNATION = "|".join(
     re.escape(kind) for kind in _NESTED_KINDS_BY_LENGTH_DESC
 )
@@ -124,7 +139,24 @@ def _block_reason(kind: str, file_path: str) -> str:
     )
 
 
+def _flat_plan_block_reason(file_path: str) -> str:
+    return (
+        f"`{file_path}` 是頂層 `plan-<id>.md`——這個形狀已淘汰，plan 改收進 "
+        "`.maigo/pr/<id>/plan.md`（PR URL）、`.maigo/issue/<id>/plan.md`"
+        "（issue URL）或 `.maigo/topic/<slug>/plan.md`（其餘）。\n"
+        "改用：\n"
+        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" plan --topic "<H1 主題>" '
+        "[--url <url> --repo <owner/name>] [--slug <topic-slug>]\n"
+        "取得巢狀新路徑（`path:` 那行），寫到那裡（在 main 等預設分支上要給 `--slug`）；"
+        f"既有的頂層 plan 可用 `{_SCRIPTS_DIR / 'migrate_legacy_artifacts.py'}` "
+        "搬進 `topic/<id>/`，不必手動搬。\n"
+        "見 skills/harness-discipline/references/artifact-ownership.md 規則 4。"
+    )
+
+
 def _flat_pre_nested_block_reason(kind: str, file_path: str) -> str:
+    if kind == "plan":
+        return _flat_plan_block_reason(file_path)
     return (
         f"`{file_path}` 是巢狀佈局採用前的分目錄前扁平 `{kind}` 產物，"
         "只可讀、不可當寫入目標——新路徑收進 `.maigo/review/<id>/`（別人的 PR）、"

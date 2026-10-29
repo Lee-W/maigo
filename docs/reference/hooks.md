@@ -168,9 +168,10 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 
 1. **舊固定檔名**（`plan.md` / `review-rubric.md` / `review.md` / `review-draft.md` /
    `triage-rubric.md` / `pr-comments.md` / `reply-draft.md`）
-2. **巢狀 kind 的分目錄前扁平檔**（`review-rubric-42.md` 這類，`kind` 屬於
-   `_NESTED_LAYOUT`；`review-batch-state.md` / `review-board.md` 這兩個字面
-   上像但不是的檔名先排除，不會被誤擋）
+2. **巢狀 kind 的分目錄前扁平檔**（`review-rubric-42.md` 這類，`kind` 是
+   `nested_locations(kind)` 非空的 kind，**頂層 `plan-<id>[-<n>].md` 也在內**——
+   plan 已改收進 `pr/` / `issue/` / `topic/`；`review-batch-state.md` /
+   `review-board.md` 這兩個字面上像但不是的檔名先排除，不會被誤擋）
 
 ——跨 13 個實際安裝 maigo 的 repo 實測，散文說「一律呼叫
 `scripts/artifact_path.py`」的採用率是 0%，這支 hook 改用程式碼擋。
@@ -178,9 +179,11 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 反向判準：`kind` 清單動態組自 `from artifact_path import _KNOWN_KINDS`
 （不重複列一份 kind 清單字面值），regex 錨定 `.maigo/` 目錄下——第一種
 regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<kind>-<id>.md`
-且 `kind` 屬於巢狀 kind——`plan-main.md`、`.maigo/review/42/rubric.md`、`.maigo/pr/42/reply-draft.md` 這類
-已在新（扁平或巢狀）命名、`board.md`、`local-model-dispatch-plan.md`、
-`.maigo/i/9201.md` 都天然不命中，不必特別寫排除規則。
+且 `kind` 屬於巢狀 kind（含 plan）——`.maigo/review/42/rubric.md`、
+`.maigo/pr/42/reply-draft.md`、`.maigo/topic/x/plan.md` 這類巢狀路徑、`board.md`、
+`local-model-dispatch-plan.md`、`.maigo/i/9201.md` 都天然不命中，不必特別寫排除規則。
+擋下頂層 `plan-<id>.md` 時，訊息改列 `pr/` / `issue/` / `topic/` 三種新形狀，並提示
+`migrate_legacy_artifacts.py` 可把既有的頂層 plan 搬進 `topic/<id>/`。
 
 命中時 block，訊息附上正確的 `artifact_path.py` 呼叫指令範例，分目錄前扁平
 檔另提 `scripts/migrate_legacy_artifacts.py` 可搬既有檔，以及

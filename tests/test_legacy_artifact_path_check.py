@@ -65,7 +65,6 @@ class TestIsLegacyArtifactPath:
     @pytest.mark.parametrize(
         "path",
         [
-            ".maigo/plan-main.md",
             ".maigo/board.md",
             ".maigo/local-model-dispatch-plan.md",
             ".maigo/i/9201.md",
@@ -90,6 +89,8 @@ class TestIsFlatPreNestedArtifactPath:
             ".maigo/review-draft-airflow-73559.md",
             ".maigo/pr-comments-42.md",
             "/Users/x/repo/.maigo/review-rubric-42.md",
+            ".maigo/plan-main.md",
+            ".maigo/plan-main-2.md",
         ],
     )
     def test_flat_pre_nested_names_are_flagged(self, path: str):
@@ -100,8 +101,10 @@ class TestIsFlatPreNestedArtifactPath:
         [
             ".maigo/review-batch-state.md",
             ".maigo/review-board.md",
-            ".maigo/plan-main.md",
             ".maigo/review/42/rubric.md",
+            ".maigo/pr/42/plan.md",
+            ".maigo/issue/42/plan-2.md",
+            ".maigo/topic/main/plan.md",
             ".maigo/pr/42/rubric.md",
             ".maigo/pr/42/reply-draft.md",
             ".maigo/review-rubric.md",
@@ -147,13 +150,46 @@ class TestLegacyArtifactPathHook:
         )
         assert result["decision"] == "block"
 
-    def test_new_identifier_named_path_passes(
+    def test_top_level_identifier_named_plan_is_flagged(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ):
-        assert (
-            run_silent_hook(_write_payload(".maigo/plan-main.md"), monkeypatch, capsys)
-            == ""
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/plan-main.md"), monkeypatch, capsys
+            ).strip()
         )
+        assert result["decision"] == "block"
+        for shape in (".maigo/pr/<id>/plan.md", ".maigo/issue/<id>/plan.md"):
+            assert shape in result["reason"]
+        assert ".maigo/topic/<slug>/plan.md" in result["reason"]
+        assert "migrate_legacy_artifacts.py" in result["reason"]
+        _assert_script_paths_absolute_and_exist(result["reason"])
+
+    def test_top_level_plan_attempt_suffix_is_flagged(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/plan-fix-dag-3.md"), monkeypatch, capsys
+            ).strip()
+        )
+        assert result["decision"] == "block"
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ".maigo/pr/42/plan.md",
+            ".maigo/issue/42/plan-2.md",
+            ".maigo/topic/some-slug/plan.md",
+        ],
+    )
+    def test_nested_plan_paths_pass(
+        self,
+        path: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        assert run_silent_hook(_write_payload(path), monkeypatch, capsys) == ""
 
     def test_board_md_passes(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
