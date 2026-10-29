@@ -33,6 +33,7 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 
 - 外層 fence 用**四個 backtick**（```` ```` ````）——deliverable 內部若有三-backtick
   code block（例：Test Plan 的指令）才不會把外層截斷。
+- 外層 fence 至少四個 backtick，且比內部**最長**的 fence 多一個：deliverable 內若已有四-backtick 區塊（例如使用者草稿內含巢狀 code block），外層改用五個，否則內層會截斷外層、無法一次複製。
 - 整份 deliverable 在同一個 block 裡，不要拆成多塊。
 - block 外可以有說明文字（「可整段複製貼到 GitHub：」），但 deliverable 本身要在 block 內。
 

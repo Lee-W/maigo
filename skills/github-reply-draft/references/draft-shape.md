@@ -60,3 +60,28 @@ had it rewritten as the proposal's difference from the existing approach.
 
 How to apply: internal analysis may discuss the current version's problems; the outward reply uses
 a positive positioning such as a three-way comparison — where the loop runs, what it can touch.
+
+---
+
+## When the user brings their own draft to confirm, fix correctness only
+
+If the user pastes a draft they wrote and asks "is this right?" or "give me a copyable version", treat it as a **confirmation**, not a rewrite. Change only three things: factual errors, typos, and points the draft never answers from the other side's question. List what changed. Keep the wording, paragraph order, bullet layout and tone as they wrote them.
+
+Why: a user twice objected to "don't change my format so much" after the draft was rewritten wholesale in the assistant's style.
+
+How to apply: decide first whether the user wants confirmation or a rewrite; if they did not say rewrite, it is confirmation. If the draft has hard line breaks mid-paragraph, point out that GitHub joins them while Slack does not. Wrap the returned text per [`copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md).
+
+---
+
+## Technical assessments to colleagues or the community stay conservative
+
+When drafting an outward technical assessment (a reply to a colleague or a community thread — Slack, GitHub, mailing list):
+
+- **No effort-size labels** ("medium effort", "doable in a week"). Describe which layers the change touches and how many kinds of change it needs.
+- **Do not mention processes or artifacts not yet decided** (an AIP, a design doc, a roadmap) unless the user asks.
+- **Do not decide for the asker whether it is worth doing.** State facts, the blast radius and the existing alternatives; the judgment stays with them.
+- If asked whether the effort is proportionate to the problem, answer with the facts about the problem's size (is there an alternative today, which scenarios it covers), not "worth it" or "not worth it".
+
+Why: once a label or a process name is in an outward reply it reads as a commitment the user must then own; in one thread the user corrected the draft three times on exactly these points.
+
+How to apply: before handing the draft over, scan for effort labels, process names and value judgments, and rewrite each as a statement of fact.
