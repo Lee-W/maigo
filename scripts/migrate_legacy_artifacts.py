@@ -37,6 +37,12 @@ branch 名**：遷移當下的 git branch 未必是當初寫檔時的 branch，
 `resolve_identifier()` 的四級鏈第 2 級（當前 branch）在「事後遷移一份不知道
 何時寫的舊檔」這個情境下不成立——這是刻意的取捨，不是漏做了。
 
+**階段一之二（頂層識別碼命名的 plan，`catalog.identifier_named`）**：
+`plan-<id>.md` → `.maigo/topic/<id>/plan.md`，`plan-<id>-<n>.md` →
+`.maigo/topic/<id>/plan-<n>.md`（`-<n>` 只在同批有 `plan-<id>.md` 同伴時才當
+attempt，判準同階段二的 conflict 後綴）。一律進 `topic/`，不推測 PR／issue
+歸屬；`<id>` 沿用階段一的去疊字。
+
 **階段二（分目錄前扁平檔，`catalog.flat_identifier`）**：`split_flat_name()`
 拆成 `(kind, raw_id)`。(a) id 正規化：`home_repo_name` 非空且 `raw_id` 形如
 `<home_repo_name>-<數字>` → 收成 `<數字>`，記 `normalized_from`（例：airflow
@@ -82,7 +88,8 @@ root 相對形，所以已經改好的 `.maigo/pr/<id>/<f>` 不會再被命中�
 
 預設 dry-run：只印計畫與連結改寫預覽，不動任何檔案（也不寫 manifest）。
 `--apply` 在第一個 rename 之前，先把完整的 old→new 對應表（含自動消歧結果）
-原子寫入 `.maigo/migrate-legacy-artifacts.manifest.json`，接著搬檔
+原子寫入 `.maigo/_internal/migrate-legacy-artifacts.manifest.json`（舊位置
+`.maigo/migrate-legacy-artifacts.manifest.json` 讀取時也認），接著搬檔
 （`Path.rename()`，純檔案系統操作，`.maigo/` 不受版控，不用 `git mv`）、
 改連結，全部完成才刪 manifest。目標路徑存在就拋 `FileExistsError`，不靜默
 覆蓋，已搬的部分與 manifest 都保留。
@@ -139,8 +146,10 @@ _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
 
 # `--apply` 在第一個 rename 之前寫下的完整 old→new 對應表，全部搬完、連結
 # 改完才刪。`.json` 不進 `maigo_dir_catalog.scan()`（只收 `*.md`），也不命中
-# `hooks/legacy_artifact_path_check.py`（regex 錨定 `\.md$`）。
+# `hooks/legacy_artifact_path_check.py`（regex 錨定 `\.md$`）。現在放在
+# `.maigo/_internal/`（機器狀態不混在人讀檔旁）；舊的頂層位置只供讀取與清理。
 _MANIFEST_NAME = "migrate-legacy-artifacts.manifest.json"
+_INTERNAL_DIRNAME = "_internal"
 _MANIFEST_VERSION = 1
 
 _KINDS_BY_LENGTH_DESC = sorted(_KNOWN_KINDS, key=len, reverse=True)
@@ -186,7 +195,7 @@ _CONFLICT_SUFFIX_RE = re.compile(r"^(?P<base>.+)-(?P<k>\d{1,2})$")
 class MigrationAction:
     repo: str
     old_path: str  # repo-relative，例：".maigo/plan.md" 或 ".maigo/review-42.md"
-    new_path: str  # repo-relative，例：".maigo/plan-fix-dag-run.md" 或 ".maigo/review/42/review.md"
+    new_path: str  # repo-relative，例：".maigo/topic/fix-dag-run/plan.md" 或 ".maigo/review/42/review.md"
     disambiguated: bool  # True＝目標撞名，自動加了 attempt 尾碼
     h1: str | None = None
     normalized_from: str | None = None  # 正規化前的 raw id（僅階段二、有正規化時填）
@@ -306,6 +315,63 @@ def _plan_legacy_fixed_name_actions(
             )
         )
 
+    return actions
+
+
+def _plan_identifier_named_actions(
+    repo_root: Path,
+    catalog: Catalog,
+    maigo_dir: Path,
+    reserved: set[str],
+) -> list[MigrationAction]:
+    """
+    頂層 `plan-<id>.md` / `plan-<id>-<n>.md` → `.maigo/topic/<id>/plan[-<n>].md`。
+
+    不推測 PR／issue 歸屬（一律 `topic/`）。`-<n>` 只在同批有 `plan-<id>.md`
+    同伴時才當 attempt（`plan-fix-3.md` 單獨存在時 `fix-3` 是識別碼本身）。
+    目標已存在（reserved）就沿用 attempt 遞增消歧，不覆寫。
+    """
+    plan_names = [
+        name
+        for name in catalog.identifier_named
+        if (split := split_flat_name(name)) is not None and split[0] == "plan"
+    ]
+    base_ids: set[str] = set()
+    for name in plan_names:
+        split = split_flat_name(name)
+        assert split is not None
+        base_ids.add(split[1])
+
+    planned: list[tuple[int, str, str, int]] = []
+    for name in plan_names:
+        split = split_flat_name(name)
+        assert split is not None
+        raw_id = split[1]
+        identifier, attempt = raw_id, 1
+        suffix = _split_conflict_suffix(raw_id)
+        if suffix is not None and suffix[0] in base_ids:
+            identifier, attempt = suffix
+        identifier = _strip_kind_stutter("plan", identifier) or "unnamed"
+        planned.append((1 if attempt > 1 else 0, name, identifier, attempt))
+
+    actions: list[MigrationAction] = []
+    for _order, name, identifier, attempt in sorted(planned):
+        candidate = artifact_path("plan", identifier, attempt, group="topic")
+        disambiguated = False
+        while candidate in reserved:
+            attempt += 1
+            candidate = artifact_path("plan", identifier, attempt, group="topic")
+            disambiguated = True
+        reserved.add(candidate)
+        actions.append(
+            MigrationAction(
+                repo=str(repo_root),
+                old_path=f".maigo/{name}",
+                new_path=candidate,
+                disambiguated=disambiguated,
+                h1=read_topic(maigo_dir / name),
+            )
+        )
     return actions
 
 
@@ -618,6 +684,9 @@ def plan_migration(
 
     actions = _plan_legacy_fixed_name_actions(repo_root, catalog, maigo_dir, reserved)
     actions.extend(
+        _plan_identifier_named_actions(repo_root, catalog, maigo_dir, reserved)
+    )
+    actions.extend(
         _plan_flat_identifier_actions(
             repo_root, catalog, maigo_dir, reserved, home_repo_name
         )
@@ -687,7 +756,18 @@ def apply_migration(repo_root: str | Path, actions: list[MigrationAction]) -> No
 
 
 def manifest_path(repo_root: str | Path) -> Path:
+    return Path(repo_root) / ".maigo" / _INTERNAL_DIRNAME / _MANIFEST_NAME
+
+
+def legacy_manifest_path(repo_root: str | Path) -> Path:
+    """升級前的頂層位置：只讀、只清，不再寫。"""
     return Path(repo_root) / ".maigo" / _MANIFEST_NAME
+
+
+def remove_manifest(repo_root: str | Path) -> None:
+    """搬完後清掉 manifest（新位置與舊位置都清，存在才刪）。"""
+    for path in (manifest_path(repo_root), legacy_manifest_path(repo_root)):
+        path.unlink(missing_ok=True)
 
 
 def write_manifest(repo_root: str | Path, actions: list[MigrationAction]) -> None:
@@ -697,6 +777,7 @@ def write_manifest(repo_root: str | Path, actions: list[MigrationAction]) -> Non
     「不存在」，不會是半份。
     """
     path = manifest_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "version": _MANIFEST_VERSION,
         "actions": [
@@ -717,6 +798,8 @@ def read_manifest(repo_root: str | Path) -> list[MigrationAction] | None:
     `ValueError`——壞掉的 manifest 不能退回重新規劃，那正是它要取代的猜測。
     """
     path = manifest_path(repo_root)
+    if not path.is_file():
+        path = legacy_manifest_path(repo_root)
     if not path.is_file():
         return None
     try:
@@ -958,8 +1041,6 @@ def _infer_home_repo_slug(repo_root: str | Path) -> str:
 
 
 def _skip_reason(name: str, category: str) -> str:
-    if category == "identifier_named":
-        return "already using canonical naming"
     if category == "registered_non_artifact":
         return "registered non-artifact file, not migrated"
     if name in _FLAT_NAME_LOOKALIKES:
@@ -970,8 +1051,6 @@ def _skip_reason(name: str, category: str) -> str:
 
 
 def _iter_skip_lines(repo: str, catalog: Catalog):
-    for name in catalog.identifier_named:
-        yield f"{repo} :: skipped {name} ({_skip_reason(name, 'identifier_named')})"
     for name in catalog.registered_non_artifact:
         yield (
             f"{repo} :: skipped {name} ({_skip_reason(name, 'registered_non_artifact')})"
@@ -1148,7 +1227,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if resuming:
             print(
-                f"{repo} :: resuming interrupted --apply from .maigo/{_MANIFEST_NAME}"
+                f"{repo} :: resuming interrupted --apply from .maigo/{_INTERNAL_DIRNAME}/{_MANIFEST_NAME}"
             )
         if not actions and not link_rewrites:
             print(f"{repo} :: (nothing to migrate)")
@@ -1181,7 +1260,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"error: {error}", file=sys.stderr)
                 return 2
             apply_link_rewrites(repo, link_rewrites)
-            manifest_path(repo_path).unlink()
+            remove_manifest(repo_path)
 
     return 0
 

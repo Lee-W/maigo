@@ -71,14 +71,61 @@ class TestPlanMigration:
         # 新路徑落在巢狀資料夾底下，不是扁平檔名。
         assert actions[0].new_path == ".maigo/review/unnamed/rubric.md"
 
-    def test_new_style_named_file_is_not_migrated(self, tmp_path: Path):
+    def test_top_level_identifier_named_plan_is_migrated_to_topic(self, tmp_path: Path):
         repo = _make_repo(tmp_path)
         (repo / ".maigo" / "plan-x.md").write_text("# Plan: X\n", encoding="utf-8")
 
         catalog = scan(repo / ".maigo")
         actions = mla.plan_migration(repo, catalog)
 
-        assert actions == []
+        assert [(a.old_path, a.new_path) for a in actions] == [
+            (".maigo/plan-x.md", ".maigo/topic/x/plan.md")
+        ]
+
+    def test_top_level_plan_moves_into_topic_dir(self, tmp_path: Path, capsys):
+        repo = _make_repo(tmp_path)
+        old = repo / ".maigo" / "plan-fix-dag-run-stall.md"
+        old.write_text("# Plan: Fix DAG run stall\n\nbody\n", encoding="utf-8")
+        digest = _sha(old)
+
+        assert mla.main([str(repo), "--apply"]) == 0
+
+        new = repo / ".maigo" / "topic" / "fix-dag-run-stall" / "plan.md"
+        assert not old.exists()
+        assert _sha(new) == digest
+        assert not mla.manifest_path(repo).exists()
+
+    def test_plan_attempt_suffix_maps_to_plan_n_in_topic(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        for name in ("plan-x.md", "plan-x-2.md", "plan-x-3.md", "plan-solo-7.md"):
+            (repo / ".maigo" / name).write_text(f"# {name}\n", encoding="utf-8")
+
+        actions = mla.plan_migration(repo, scan(repo / ".maigo"))
+
+        assert {a.old_path: a.new_path for a in actions} == {
+            ".maigo/plan-x.md": ".maigo/topic/x/plan.md",
+            ".maigo/plan-x-2.md": ".maigo/topic/x/plan-2.md",
+            ".maigo/plan-x-3.md": ".maigo/topic/x/plan-3.md",
+            # no `plan-solo.md` sibling: `solo-7` is the identifier, not an attempt
+            ".maigo/plan-solo-7.md": ".maigo/topic/solo-7/plan.md",
+        }
+        assert not any(a.disambiguated for a in actions)
+
+    def test_plan_migration_never_overwrites_existing_topic_plan(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        taken = repo / ".maigo" / "topic" / "x" / "plan.md"
+        taken.parent.mkdir(parents=True)
+        taken.write_text("# someone else's plan\n", encoding="utf-8")
+        (repo / ".maigo" / "plan-x.md").write_text("# Plan: X\n", encoding="utf-8")
+
+        actions = mla.plan_migration(repo, scan(repo / ".maigo"))
+
+        assert [(a.new_path, a.disambiguated) for a in actions] == [
+            (".maigo/topic/x/plan-2.md", True)
+        ]
+        mla.apply_migration(repo, actions)
+        assert taken.read_text(encoding="utf-8") == "# someone else's plan\n"
+        assert (repo / ".maigo" / "topic" / "x" / "plan-2.md").is_file()
 
     def test_ad_hoc_named_file_is_not_migrated(self, tmp_path: Path):
         repo = _make_repo(tmp_path)
@@ -1055,9 +1102,6 @@ class TestCli:
 
     def test_skipped_categories_are_reported_with_reasons(self, tmp_path: Path, capsys):
         repo = _make_repo(tmp_path)
-        (repo / ".maigo" / "plan-already-canonical.md").write_text(
-            "# Plan: already\n", encoding="utf-8"
-        )
         (repo / ".maigo" / "board.md").write_text("# Work Board\n", encoding="utf-8")
         (repo / ".maigo" / "review-batch-state.md").write_text(
             "# whatever\n", encoding="utf-8"
@@ -1067,7 +1111,6 @@ class TestCli:
         captured = capsys.readouterr()
 
         assert exit_code == 0
-        assert f"{repo} :: skipped plan-already-canonical.md" in captured.out
         assert f"{repo} :: skipped board.md" in captured.out
         assert f"{repo} :: skipped review-batch-state.md" in captured.out
         # `maigo_dir_catalog.scan()` only lists `*.md` files in the first
@@ -1420,3 +1463,58 @@ class TestSplitOwnPrsCli:
         assert (repo / ".maigo/pr/9/review.md").is_file()
         assert (repo / ".maigo/pr/10/review.md").is_file()
         assert not mla.manifest_path(repo).exists()
+
+
+class TestManifestLocation:
+    def _interrupt_after_first_rename(
+        self, repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _Interrupted(Exception):
+            pass
+
+        real_rename = Path.rename
+
+        def _rename_then_interrupt(self: Path, target):
+            real_rename(self, target)
+            raise _Interrupted
+
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "rename", _rename_then_interrupt)
+            with pytest.raises(_Interrupted):
+                mla.main([str(repo), "--apply"])
+
+    def _two_plans(self, tmp_path: Path) -> Path:
+        repo = _make_repo(tmp_path)
+        (repo / ".maigo" / "plan-a.md").write_text("# Plan: A\n", encoding="utf-8")
+        (repo / ".maigo" / "plan-b.md").write_text("# Plan: B\n", encoding="utf-8")
+        return repo
+
+    def test_manifest_written_under_internal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        repo = self._two_plans(tmp_path)
+
+        self._interrupt_after_first_rename(repo, monkeypatch)
+
+        assert mla.manifest_path(repo) == (
+            repo / ".maigo" / "_internal" / "migrate-legacy-artifacts.manifest.json"
+        )
+        assert mla.manifest_path(repo).is_file()
+        assert not mla.legacy_manifest_path(repo).exists()
+
+    def test_manifest_legacy_location_still_read(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        repo = self._two_plans(tmp_path)
+        self._interrupt_after_first_rename(repo, monkeypatch)
+        # simulate a manifest left by the pre-_internal version of the script
+        mla.legacy_manifest_path(repo).write_bytes(mla.manifest_path(repo).read_bytes())
+        mla.manifest_path(repo).unlink()
+
+        assert mla.read_manifest(repo) is not None
+        assert mla.main([str(repo), "--apply"]) == 0
+
+        assert (repo / ".maigo" / "topic" / "a" / "plan.md").is_file()
+        assert (repo / ".maigo" / "topic" / "b" / "plan.md").is_file()
+        assert not mla.manifest_path(repo).exists()
+        assert not mla.legacy_manifest_path(repo).exists()

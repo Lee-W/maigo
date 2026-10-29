@@ -27,7 +27,8 @@
 - 同一個 group 目錄收同一顆 PR / issue / topic 的所有產物；conflict 的第 2 個 attempt
   起落在檔名層（`plan-2.md`），不另開目錄。
 - 頂層 `plan-<id>[-n].md` 是舊形狀，只可讀；`scripts/migrate_legacy_artifacts.py`
-  會把它搬到 `topic/<id>/plan[-n].md`。
+  會把它搬到 `topic/<id>/plan[-n].md`（不推測 PR / issue 歸屬）；`-n` 只在同批有
+  `plan-<id>.md` 同伴時才當 attempt 後綴。
 
 ## 帶識別碼命名的產物
 
@@ -101,13 +102,15 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 ### `_internal/`：只給機器讀
 
 `.maigo/_internal/` 底下的所有內容都只給機器讀，使用者在 `.maigo/` 根目錄只會看到給人讀的檔案。
-型錄（`maigo_dir_catalog`）與 `/maigo:doctor` 永遠不列這個目錄。目前只有 board 使用，
-由 [`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py) 自行建立與寫入：
+型錄（`maigo_dir_catalog` 的 `scan()`）與 `/maigo:doctor` 不列這個目錄（`--tree` 只計檔數）。board 部分
+由 [`scripts/board_sync.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py) 自行建立與寫入；其餘列在同一張表：
 
 | 檔案 | 用途 |
 |------|------|
 | `_internal/board/dropped.jsonl` | 排除紀錄：每行一個 `drop` / `revive` 事件，只 append；`dd` 掉的項目之後不會被 discovery 補回，除非重新被指名 |
 | `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目與勾選狀態，用來偵測 `dd` 與 `[x]` 變化 |
+| `_internal/log/*` | hook 寫的機器 log（見下節「非 markdown 機器狀態檔」） |
+| `_internal/migrate-legacy-artifacts.manifest.json` | `migrate_legacy_artifacts.py --apply` 中斷時留存的搬移對應表，跑完即刪 |
 | `_internal/board/backup/<UTC ts>/` | `refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份；寫入失敗時用來還原 |
 
 ## 非 markdown 機器狀態檔
@@ -120,9 +123,10 @@ hook 一律寫到 repo 根目錄的 `.maigo/`（`hooks/_maigo_root.py`：git top
 git 不可用時退回 payload cwd），不管 session 的 cwd 在哪個子目錄，也不會再長出
 `.maigo/.maigo/`。讀取端先讀 `_internal/log/` 的新檔，沒有才讀舊的頂層同名檔
 （新舊都在時只讀新的、不合併）；舊檔不由 hook 搬，留給 `/maigo:tidy` 處理。
-其餘：`__titles.json`（內部快取）、`migrate-legacy-artifacts.manifest.json`
+其餘：`__titles.json`（內部快取）、`_internal/migrate-legacy-artifacts.manifest.json`
 （`scripts/migrate_legacy_artifacts.py --apply` 的搬移對應表，只在一次 apply
-沒跑完時留存，重跑時照它續跑，跑完即刪）。
+沒跑完時留存，重跑時照它續跑，跑完即刪；升級前放在 `.maigo/` 頂層的舊位置
+讀取時也認、清理時一併刪）。
 
 ## 舊固定檔名與未登記檔案
 
