@@ -48,6 +48,8 @@ URL 若指到其他 repo，行內保留 `owner/repo#n` 全稱。
 若 `board.md` 存在但仍是球權三分區時代的舊格式（讀到舊版 section 標題），刷新時取每行的
 checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不做逐行 in-place 遷移。
 
+讀到 `作者待補` 或缺 `@` 的 warning／error 時，先跑一輪 refresh（它會從 GitHub 補回作者）再繼續。
+
 ### 2. 加入 targets（有參數時）
 
 targets 直接交給 script：`refresh --apply --add <targets>`（§3）。型別偵測（URL 解析、裸編號查

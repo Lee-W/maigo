@@ -87,17 +87,19 @@ description: This skill should be used when reading, writing, or migrating `.mai
 ### 行文法
 
 **設計原則：索引直接回答「哪顆 PR、誰貢獻、現在要做什麼」。**
-狀態詞後保留 `@貢獻者`，裸細節檔路徑供 `gf`，完整 title 放最後、不截斷。
+狀態詞後必填 `@貢獻者`（GitHub `author.login`），裸細節檔路徑供 `gf`，完整 title 放最後、不截斷。
 不再為 60 欄限制隱藏貢獻者；URL、規模、完整下一步與判斷句仍放細節檔。
 `board_state.py` 回傳 `index_entry` 是可重用的行內容；orchestrator 加原 checkbox、badges
-與編號，既有缺作者的行在刷新取得 GitHub author 後補上，不臆造作者。
+與編號；缺作者的行在刷新取得 GitHub author 後補上，拿不到就標 `作者待補`，不臆造作者。
 完整刷新的行與整檔由 `scripts/board_refresh.py` 的 `render_line` / `render_board` 渲染——這兩個函式是
 本節文法的程式鏡像，由 `tests/test_board_refresh.py` 的 round-trip 測試守著；改文法時兩邊一起改。
 
 ```text
-🎯 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）][ @<contributor>][ <badges>] <細節檔路徑> — <title>
-⏳/✅ 區：- [ ] <型別emoji> <狀態詞>[（旁註）][ @<contributor>][ <badges>] <細節檔路徑> — <title>
+🎯 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
+⏳/✅ 區：- [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
 ```
+
+作者待補時省略 `@login`，改在旁註寫 `作者待補`（併進同一個旁註：`（<原旁註>；作者待補）`）。
 
 - **一行一項、絕不換行**：`/` 搜尋與 `dd` 刪除都以行為單位；換行會讓兩者都失準。
 - **型別 emoji**：🐛 issue ｜ 🔀 你的 PR ｜ 👀 在審的 PR
@@ -108,8 +110,10 @@ description: This skill should be used when reading, writing, or migrating `.mai
   （例：`IN_PROGRESS（分支 fix/xxx）`）——旁註記事實，判斷句記決定，兩者不是同一件事；
   判斷句本身已搬進細節檔（§1a）。`（gh 失敗：…）` 開頭的旁註是 `refresh` 專用的抓料錯誤標記，恢復時
   會被清掉；手寫旁註請勿用這個開頭。
-- **貢獻者**：從 GitHub `author.login` 取得，包含自己的 PR；放狀態詞／旁註後、badges 前。
-  舊行沒有作者仍可讀；下次刷新補回。
+- **貢獻者（必填）**：從 GitHub `author.login` 取得，包含自己的 PR；放狀態詞／旁註後、badges 前。
+  舊行缺作者視為待遷移，刷新時必補；補不到（gh 沒給、前一輪也沒有）就標 `作者待補`，不臆造 login、
+  不留光禿的 `@`。其餘消費者（`plan`／`snapshot` 等）讀到缺 `@` 又沒標 `作者待補` 的行會報錯；只有 `refresh`
+  讀現檔時放寬，好把作者補回去。作者補到後，下一輪刷新會拿掉 `作者待補`。
 - **badges**（`🧠`/`💤`/`🔖`，optional）：緊接在貢獻者（缺值時為旁註）之後、細節檔路徑之前，用一個空格分隔；
   §2 vocabulary 表下方有各自的觸發規則。
 - **細節檔路徑（必填、裸相對路徑、不加反引號）**：相對 board.md 所在的 `.maigo/`，由
@@ -174,7 +178,7 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
 
 欄位省略規則：
 
-- **作者**：索引行一律顯示取得的 `@login`；細節檔可重複完整 login，不寫含糊的「你」。
+- **作者**：索引行必填 `@login`（拿不到時標 `作者待補`）；細節檔可重複完整 login，不寫含糊的「你」。
 - **最後 review / 已看完**：使用 report 的 `reviewed_at` / `acknowledged_at`，不能用
   board 刷新時間取代。沒有 report 時寫「尚未 review」；舊檔 mtime fallback 註明「舊檔時間推估」。
 - **規模**：issue 省略整行（沒有 additions/deletions 可言）。

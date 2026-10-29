@@ -96,7 +96,8 @@
 
 board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`）、skill 鏡射
 人讀版本（`work-board`）、test 守一致（`tests/test_board_state.py`），三方鎖住，
-本頁不重寫它的行文法，只在型錄裡佔一個位置。board 的內部狀態（排除紀錄、快照）放在
+本頁不重寫它的行文法，只在型錄裡佔一個位置。索引行的 `@<login>`（GitHub `author.login`）是必填：缺作者的行，
+`board_sync.py` 的嚴格解析會報錯，`refresh` 讀現檔時放寬並補回；補不到就在旁註標 `作者待補`（警告，不是錯誤）。board 的內部狀態（排除紀錄、快照）放在
 `.maigo/_internal/board/`，對帳、discovery 與排除規則見 [work-board skill](../skills/work-board.md) §3a。
 
 ### `_internal/`：只給機器讀
