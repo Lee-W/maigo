@@ -322,6 +322,20 @@ class TestScanTree:
         assert tree["archive"][0].startswith("_archive/i/42.md (mtime 20")
         assert tree["archive"][1].startswith("_archive/review/42 (mtime 20")
 
+    def test_scan_tree_lists_non_group_archive_entry_as_one_unit(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "_archive" / "x" / "old.md")
+        _write(maigo_dir / "_archive" / "x" / "sub" / "deep.md")
+        _write(maigo_dir / "_archive" / "topic" / "t" / "plan.md")
+        _write(maigo_dir / "_archive" / "loose.md")
+
+        paths = [
+            entry.partition(" (mtime ")[0]
+            for entry in mdc.scan_tree(maigo_dir)["archive"]
+        ]
+
+        assert paths == ["_archive/loose.md", "_archive/topic/t", "_archive/x"]
+
     def test_scan_tree_flags_nested_dot_maigo(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
         _write(maigo_dir / ".maigo" / "_internal" / "log" / "session-head.json")

@@ -14,7 +14,7 @@
 
 下列項目一律 `needs_confirm=True`，只有 `--apply --confirm <path>` 點名的那一筆才動
 （沒有「全部同意」的開關）：`topic/<slug>/` 封存（沒有外部訊號可判結案）、`_archive/`
-中封存（mtime，tidy 封存時會重設成封存當下）超過 `ARCHIVE_RETENTION` 的項目（delete-candidate）、`scan_tree` 判為
+中封存（以封存單位的 mtime 計，封存時會重設成封存當下）超過 `ARCHIVE_RETENTION` 的項目（delete-candidate）、`scan_tree` 判為
 unregistered 的項目（`--confirm`＝備份後刪除，`--confirm-archive`＝備份後封存）、`.maigo/.maigo/`（同左）、
 以及 GitHub 狀態查不到的 `pr/`／`review/`／`issue/` 項目（確認＝封存）。
 

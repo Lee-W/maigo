@@ -37,7 +37,8 @@ import _KNOWN_KINDS`，這是唯一正典來源；平行維護第二份清單正
 `_internal/board/dropped.jsonl`），型錄永遠不列。
 
 全樹模式 `scan_tree(maigo_dir)`（CLI `--tree`）另外看得到 `scan()` 刻意不看的
-東西：非 `.md` 檔、`evals/` 這類未知頂層目錄（整個目錄只算一筆）、`_archive/`、
+東西：非 `.md` 檔、`evals/` 這類未知頂層目錄（整個目錄只算一筆）、`_archive/`
+（每個封存單位一筆，記錄該單位的 mtime）、
 `topic/`、`_internal/`（只計數）、`.maigo/.maigo/`（hook 在子目錄 cwd 下長出的
 巢狀殘留）、頂層的舊機器 log。分類與 `scan()` 的六類互不影響——`scan()` 的語意
 和既有測試不變。
@@ -95,6 +96,8 @@ _TREE_GROUP_NAMES = frozenset(group for group, _stem in _TREE_LOCATIONS)
 ARCHIVE_DIR = "_archive"
 NESTED_DOT_MAIGO_DIR = ".maigo"
 BOARD_DETAIL_DIR = "i"
+# `_archive/` 底下以 `<group>/<id>` 為封存單位的 group；其餘頂層名稱本身是一個單位。
+_ARCHIVE_UNIT_GROUPS = _TREE_GROUP_NAMES | {BOARD_DETAIL_DIR}
 # 升級前 hook 直接寫在 `.maigo/` 頂層的機器 log；新位置是 `_internal/log/`。
 LEGACY_INTERNAL_LOG_NAMES = frozenset(
     {
@@ -258,11 +261,18 @@ def _tree_group_dir(root: Path, group: str, tree: dict[str, list[str]]) -> None:
 
 
 def _tree_archive(root: Path, tree: dict[str, list[str]]) -> None:
-    """`_archive/` 鏡射原相對路徑：往下兩層，每筆記錄 mtime（供保留期判斷）。"""
+    """
+    `_archive/` 鏡射原相對路徑，每筆是一個封存單位，記錄該單位自身的 mtime
+    （供保留期判斷；封存時只重設搬動單位的 mtime，內部檔保留原 mtime）。
+
+    封存單位＝`board_sync.archive_relpaths` 搬動的單位：`_archive/<group>/<id>`
+    （group 屬於 `_ARCHIVE_UNIT_GROUPS`；`i/` 的 id 是 `<slug>.md` 檔），其餘
+    `_archive/<name>`（檔或目錄）本身就是一個單位，不往下列它的子項。
+    """
     archive_dir = root / ARCHIVE_DIR
     for group_entry in sorted(archive_dir.iterdir()):
         group_rel = f"{ARCHIVE_DIR}/{group_entry.name}"
-        if _real_dir(group_entry):
+        if _real_dir(group_entry) and group_entry.name in _ARCHIVE_UNIT_GROUPS:
             children = sorted(group_entry.iterdir())
             if not children:
                 tree["archive"].append(
@@ -303,7 +313,7 @@ def scan_tree(maigo_dir: str | Path) -> dict[str, list[str]]:
     路徑相對 `maigo_dir`。
 
     與 `scan()` 的差別：看得到非 `.md` 檔；未知頂層目錄整個算一筆（`evals/`
-    只出現一次，不逐檔列）；`_archive/`（記錄 mtime）、`topic/`、`_internal/`
+    只出現一次，不逐檔列）；`_archive/`（每個封存單位一筆，記錄該單位的 mtime）、`topic/`、`_internal/`
     （只計數）、`.maigo/.maigo/` 與頂層舊機器 log 各有自己的類別。
     `_archive/` 以外的項目不記 mtime。不跟隨 symlink，不建立、不覆寫任何檔案。
     目錄不存在時回傳全空的 dict。

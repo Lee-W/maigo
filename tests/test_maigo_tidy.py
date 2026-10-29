@@ -565,3 +565,59 @@ def test_utime_failure_does_not_fail_a_finished_archive(tmp_path, monkeypatch):
     assert any("警告" in r and ".maigo/pr/11" in r for r in results)
     # 同批後面的動作照常執行
     assert (maigo / "_archive" / "review" / "13" / "review.md").is_file()
+
+
+def _archive_candidates(maigo: Path, prefix: str) -> list[str]:
+    return [
+        a.path
+        for a in build(maigo)
+        if a.kind == "delete-candidate" and a.path.startswith(prefix)
+    ]
+
+
+def test_archived_unregistered_dir_is_judged_by_its_own_mtime_not_nested_files(
+    tmp_path,
+):
+    maigo = make_maigo(tmp_path)
+    old = write(maigo / "x" / "old.md")
+    long_ago = NOW.timestamp() - 200 * 86400
+    os.utime(old, (long_ago, long_ago))
+    run_apply(maigo, build(maigo), archive_confirmed={".maigo/x"})
+    archived = maigo / "_archive" / "x"
+    assert (archived / "old.md").stat().st_mtime == long_ago
+    assert _archive_candidates(maigo, ".maigo/_archive/x") == []
+
+    backdated = NOW.timestamp() - 100 * 86400
+    os.utime(archived, (backdated, backdated))
+    assert _archive_candidates(maigo, ".maigo/_archive/x") == [".maigo/_archive/x"]
+
+    run_apply(maigo, build(maigo), confirmed={".maigo/_archive/x"})
+    assert not archived.exists()
+    assert (backup_of(maigo) / "_archive" / "x" / "old.md").is_file()
+
+
+def test_archived_topic_dir_is_judged_by_its_own_mtime_not_nested_plan(tmp_path):
+    maigo = make_maigo(tmp_path)
+    plan = maigo / "topic" / "foo" / "plan.md"
+    long_ago = NOW.timestamp() - 200 * 86400
+    os.utime(plan, (long_ago, long_ago))
+    run_apply(maigo, build(maigo), confirmed={".maigo/topic/foo"})
+    archived = maigo / "_archive" / "topic" / "foo"
+    assert (archived / "plan.md").stat().st_mtime == long_ago
+    assert _archive_candidates(maigo, ".maigo/_archive/topic") == []
+
+    backdated = NOW.timestamp() - 100 * 86400
+    os.utime(archived, (backdated, backdated))
+    assert _archive_candidates(maigo, ".maigo/_archive/topic") == [
+        ".maigo/_archive/topic/foo"
+    ]
+
+
+def test_archived_board_detail_file_is_its_own_unit(tmp_path):
+    maigo = make_maigo(tmp_path)
+    stale = write(maigo / "_archive" / "i" / "old-slug.md")
+    write(maigo / "_archive" / "i" / "new-slug.md")
+    os.utime(stale, (OLD, OLD))
+    assert _archive_candidates(maigo, ".maigo/_archive/i") == [
+        ".maigo/_archive/i/old-slug.md"
+    ]
