@@ -31,6 +31,7 @@ module = [
   "board_state",
   "board_sync",
   "maigo_dir_catalog",
+  "migrate_legacy_artifacts",
   "pr_context_cache",
   "pr_owner",
   "review_report",

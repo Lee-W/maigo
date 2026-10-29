@@ -877,6 +877,22 @@ class TestArchive:
         ).is_file()
         assert not own.exists()
 
+    def test_archive_relpaths_mirrors_any_group_and_never_overwrites(self, tmp_path):
+        maigo = tmp_path / ".maigo"
+        (maigo / "issue" / "3").mkdir(parents=True)
+        (maigo / "issue" / "3" / "rubric.md").write_text("r\n")
+        (maigo / "topic" / "t").mkdir(parents=True)
+        (maigo / "topic" / "t" / "plan.md").write_text("p\n")
+        (maigo / "_archive" / "topic" / "t").mkdir(parents=True)
+        moved, skipped, missing = sync.archive_relpaths(
+            tmp_path, ["issue/3", "topic/t", "pr/9"]
+        )
+        assert moved == ["issue/3"]
+        assert skipped == [{"path": "topic/t", "reason": "destination exists"}]
+        assert missing == ["pr/9"]
+        assert (maigo / "_archive" / "issue" / "3" / "rubric.md").is_file()
+        assert (maigo / "topic" / "t" / "plan.md").is_file()
+
     def test_pr_artifact_groups_cover_both_owner_folders(self):
         assert sync.PR_ARTIFACT_GROUPS == ("review", "pr")
 

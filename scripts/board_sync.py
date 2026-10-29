@@ -897,12 +897,35 @@ def drop_urls(
     return results
 
 
+def archive_relpaths(
+    maigo_root: Path, rels: list[str]
+) -> tuple[list[str], list[dict], list[str]]:
+    """Move each `.maigo/`-relative path under `_archive/<same relpath>`; never overwrite.
+
+    Returns `(moved, skipped, missing)`. Any group works (`review/<id>`, `issue/<id>`,
+    `topic/<slug>`, `i/<id>.md`); `/maigo:tidy` reuses it for the groups the board does not own."""
+    maigo_dir = maigo_root / ".maigo"
+    archive_dir = maigo_dir / ARCHIVE_DIR
+    moved: list[str] = []
+    skipped: list[dict] = []
+    missing: list[str] = []
+    for rel in rels:
+        source, destination = maigo_dir / rel, archive_dir / rel
+        if not source.exists():
+            missing.append(rel)
+        elif destination.exists():
+            skipped.append({"path": rel, "reason": "destination exists"})
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            source.rename(destination)
+            moved.append(rel)
+    return moved, skipped, missing
+
+
 def archive_urls(maigo_root: Path, urls: list[str], repo: str) -> list[dict]:
     """Move each URL's `review/<id>/`, `pr/<id>/` and `i/<id>.md` under `_archive/`; never overwrite.
 
     No GitHub call: the orchestrator decides which URLs are settled (same as `drop`)."""
-    maigo_dir = maigo_root / ".maigo"
-    archive_dir = maigo_dir / ARCHIVE_DIR
     results = []
     for url in urls:
         url = url.strip()
@@ -912,26 +935,20 @@ def archive_urls(maigo_root: Path, urls: list[str], repo: str) -> list[dict]:
                 {"url": url, "result": "error", "message": "不是 issue/PR URL"}
             )
             continue
+        moved, skipped, missing = archive_relpaths(
+            maigo_root,
+            [
+                *(f"{group}/{identifier}" for group in PR_ARTIFACT_GROUPS),
+                f"i/{identifier}.md",
+            ],
+        )
         result: dict = {
             "url": url,
             "id": identifier,
-            "moved": [],
-            "skipped": [],
-            "missing": [],
+            "moved": moved,
+            "skipped": skipped,
+            "missing": missing,
         }
-        for rel in (
-            *(f"{group}/{identifier}" for group in PR_ARTIFACT_GROUPS),
-            f"i/{identifier}.md",
-        ):
-            source, destination = maigo_dir / rel, archive_dir / rel
-            if not source.exists():
-                result["missing"].append(rel)
-            elif destination.exists():
-                result["skipped"].append({"path": rel, "reason": "destination exists"})
-            else:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                source.rename(destination)
-                result["moved"].append(rel)
         results.append(result)
     return results
 
