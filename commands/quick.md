@@ -63,7 +63,7 @@ python3 <maigo-root>/scripts/verify_task.py --cwd <project-cwd>
 | `passed` | 0 | 可進步驟 4；仍須 🟡 爽世 APPROVED |
 | `failed` | 1 | 把實際 output 給 🎀 愛音修復，再 review／驗證 |
 | `unavailable` | 2 | 回報缺少 runner、設定或環境；補齊後重跑，不宣稱驗證通過 |
-| `skipped` | 3 | 附既有設定的 skip reason；標示未驗證 |
+| `skipped` | 3 | 附既有設定的 skip reason；標示未驗證。**先讀 reason**：`.claude/skip-test-verification` 的優先序高於 `.claude/test-command`，review-only 時期或 `repo_detect` 種下的標記會讓之後在同一 worktree 落地的 code 全部靜音；這個 worktree 現在要落地 code，就把該檔改名／刪除（告知使用者）後重跑，不能把 `skipped` 當 `passed` |
 | `known_failures` | 4 | 附已知失敗與實際非零 exit code；不標示全綠 |
 
 後兩者只能依使用者**已授權**的例外政策收尾；沒有對應授權時回報待決定，不能自行把狀態改成 `passed`。

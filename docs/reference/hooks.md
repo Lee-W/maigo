@@ -75,7 +75,7 @@ Rule dict 的可選欄位。偵測命中時，hook 在 user project 的 `.claude
 
 目前只有 `apache-airflow` rule 使用此機制：偵測命中時自動寫 `.claude/skip-test-verification`，讓 Stop hook 跳過 `uv run pytest`。原因是 Airflow 的 test suite 必須跑在 Breeze container 或透過 `uv run --project <PROJECT> pytest <PATH>`；在 host 端直接跑會因 `jpype1` / cmake FindJava 失敗，且 hook 的 90s timeout 也不夠任何 Airflow subproject 的 test suite 跑完。詳見 [`skills/airflow-aware/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/SKILL.md)。
 
-如需停用自動跳過，刪除或替換 `.claude/skip-test-verification`（例：改為 `.claude/test-command`，指向一個可在 host 跑的子集）。
+如需停用自動跳過，**刪除** `.claude/skip-test-verification`，再視需要加 `.claude/test-command` 指向一個可在 host 跑的子集。注意優先序：Stop hook 與 `verify_task.py` 先讀 `skip-test-verification`，有非空原因就整個跳過——只加 `test-command` 而不刪 skip 檔，驗證仍然是 `skipped`（2026-10-29 apache/airflow 某 worktree 的實例：review-only 時期留下的 skip 檔讓後來的 address-comments 落地差點在未驗證狀態下 commit）。這個標記是 per-worktree、無期限的，worktree 從「只做 review」轉成「要落地 code」時要主動清掉。
 
 ### Detector 類型
 
