@@ -158,6 +158,28 @@ def load_weights(root: Path, explicit: Path | None = None) -> list[WeightRule]:
 # --- pure rendering (no I/O) ---------------------------------------------------
 
 
+def _merge_author_pending(note: str | None, has_author: bool) -> str | None:
+    """
+    Fold `作者待補` into the one allowed `（旁註）`; drop it once an author is known.
+
+    The body grammar admits a single note group, so the marker joins the existing
+    note with `；` instead of sitting next to it. Idempotent.
+    """
+    parts = [
+        part
+        for part in (note[1:-1].split("；") if note else [])
+        if part != sync.AUTHOR_PENDING
+    ]
+    if not has_author:
+        parts.append(sync.AUTHOR_PENDING)
+    return f"（{'；'.join(parts)}）" if parts else None
+
+
+def author_token(author: str | None) -> str:
+    """`@login` when known, else the pending marker; never a bare `@`."""
+    return f"@{author}" if author else f"（{sync.AUTHOR_PENDING}）"
+
+
 def render_line(
     *,
     number: int | None,
@@ -172,6 +194,7 @@ def render_line(
 ) -> str:
     """One board line per SKILL.md §1「行文法」."""
     prefix = f"{number}. " if number is not None else "- "
+    note = _merge_author_pending(note, bool(author))
     line = f"{prefix}[{'x' if checked else ' '}] {type} {status}{note or ''}"
     if author:
         line += f" @{author}"
@@ -519,7 +542,7 @@ def gather(
         text = raw.decode("utf-8")
     except UnicodeDecodeError as error:
         raise RefreshError(1, f"board.md 不是合法 UTF-8：{error}") from error
-    parsed = sync.parse_board(text)
+    parsed = sync.parse_board(text, allow_missing_author=True)
     if parsed["legacy"]:
         raise RefreshError(
             1, "board.md 是舊版格式；refresh 不遷移，請在 Claude 裡跑 `/maigo:board`"
@@ -559,6 +582,7 @@ def gather(
         discovery=discovery,
         dry_run=True,
         board_text=text,
+        allow_missing_author=True,
     )
     plan_lines = {p["line_no"]: p for p in plan["lines"]}
 
@@ -983,6 +1007,10 @@ def build(
                 if row.get("error")
                 else f"#{n['number'] if n else '?'} 抓不到"
             )
+    for row in all_rows:
+        if not row.get("author"):
+            n = _URL_RE.match(row["url"])
+            warnings.append(f"#{n['number'] if n else '?'} {sync.AUTHOR_PENDING}")
     pending = []
     for row in all_rows:
         verdict = row.get("r")
@@ -1302,7 +1330,7 @@ def format_summary(summary: dict) -> str:
         out.append(f"\noverflow（{len(summary['overflow'])}，下次刷新接著補）")
         for o in summary["overflow"]:
             out.append(
-                f"- {o.get('title', o['url'])} @{o.get('author', '')} {o['url']}"
+                f"- {o.get('title', o['url'])} {author_token(o.get('author'))} {o['url']}"
             )
     if summary["unattributed"]:
         out.append(f"\nunattributed（{len(summary['unattributed'])}）")

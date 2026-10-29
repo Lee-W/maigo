@@ -132,7 +132,7 @@ class TestParseBoard:
             "# Work Board\n\n## 🎯 下一件（1）\n\n"
             "1. [x] 👀 APPROVE_WITH_NITS（merged 07-12） @bot[bot] 🧠💤🔖 i/9.md — A — B\n\n"
             "## ⏳ 等別人（1）\n\n- [ ] 🔀 等 review @me i/2.md — T2\n\n"
-            "## ✅ 最近結案（1）\n\n- [x] 🐛 已放棄 i/3.md — T3\n"
+            "## ✅ 最近結案（1）\n\n- [x] 🐛 已放棄 @octocat i/3.md — T3\n"
         )
         parsed = sync.parse_board(text)
         assert parsed["errors"] == [] and not parsed["legacy"]
@@ -149,7 +149,7 @@ class TestParseBoard:
             "## 🎯 下一件\n"
             "1. [ ] 👀 ↩︎ 回你的球 @a i/1.md — x\n"
             "2. [ ] 👀 APPROVE @a i/2.md — x\n"
-            "3. [ ] 🐛 抓不到 i/3.md — x\n"
+            "3. [ ] 🐛 抓不到 @a i/3.md — x\n"
         )
         statuses = [line["status"] for line in sync.parse_board(text)["lines"]]
         assert statuses == ["↩︎ 回你的球", "APPROVE", "抓不到"]
@@ -217,6 +217,26 @@ class TestParseBoard:
         assert parsed["lines"] == []
         assert len(parsed["errors"]) == 1 and needle in parsed["errors"][0]
         assert parsed["unparsed"][0]["raw"] == bad
+
+    def test_missing_author_is_an_error_in_strict_mode(self):
+        bad = "1. [ ] 👀 待 review i/1.md — t"
+        parsed = sync.parse_board("## 🎯 下一件\n" + bad + "\n")
+        assert parsed["lines"] == [] and parsed["warnings"] == []
+        assert len(parsed["errors"]) == 1 and "缺 @作者" in parsed["errors"][0]
+        assert parsed["unparsed"][0]["raw"] == bad
+
+    def test_author_pending_note_is_a_warning_not_error(self):
+        text = "## 🎯 下一件\n1. [ ] 👀 待 review（作者待補） i/1.md — t\n"
+        parsed = sync.parse_board(text)
+        assert parsed["errors"] == [] and len(parsed["warnings"]) == 1
+        assert "作者待補" in parsed["warnings"][0]
+        assert parsed["lines"][0]["author"] is None
+
+    def test_allow_missing_author_downgrades_to_warning(self):
+        text = "## 🎯 下一件\n1. [ ] 👀 待 review i/1.md — t\n"
+        parsed = sync.parse_board(text, allow_missing_author=True)
+        assert parsed["errors"] == [] and len(parsed["warnings"]) == 1
+        assert parsed["lines"][0]["author"] is None
 
     def test_old_section_heading_is_legacy(self):
         assert sync.parse_board("## 🎯 你的球\n- [ ] x\n")["legacy"] is True

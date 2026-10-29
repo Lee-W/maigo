@@ -93,6 +93,7 @@ _BODY_RE = re.compile(
     r"(?P<detail>i/\S+?\.md)?"
     r"\s*—\s?(?P<title>.*)$"
 )
+AUTHOR_PENDING = "作者待補"
 _DETAIL_ANYWHERE_RE = re.compile(r"i/\S+?\.md")
 _LINK_RE = re.compile(r"^- 連結：(\S+)", re.MULTILINE)
 _LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*(\S+)", re.MULTILINE)
@@ -140,11 +141,19 @@ def _utc(ts: str) -> datetime:
 # --- board parsing ---------------------------------------------------------
 
 
-def parse_board(text: str) -> dict:
-    """Parse board.md lines per the work-board grammar; never skip bad lines silently."""
+def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
+    """
+    Parse board.md lines per the work-board grammar; never skip bad lines silently.
+
+    `@login` is mandatory (the regex keeps it optional so the failure stays
+    pointed). A line without it is an error unless its note carries `作者待補`
+    (then a warning). `allow_missing_author` is for `board_refresh` reading the
+    current file: it downgrades the error to a warning so the author gets backfilled.
+    """
     lines: list[dict] = []
     unparsed: list[dict] = []
     errors: list[str] = []
+    warnings: list[str] = []
     legacy = False
     section: str | None = None
     for line_no, raw in enumerate(text.splitlines(), start=1):
@@ -188,6 +197,13 @@ def parse_board(text: str) -> dict:
             problem = "缺 `— ` 分隔符或欄位格式壞掉"
         if problem is None and not parsed["detail"]:  # type: ignore[index]
             problem = "缺細節檔路徑"
+        if problem is None and not parsed["author"]:  # type: ignore[index]
+            if AUTHOR_PENDING in (parsed["note"] or ""):  # type: ignore[index]
+                warnings.append(f"board.md:{line_no}: {AUTHOR_PENDING}：{raw}")
+            elif allow_missing_author:
+                warnings.append(f"board.md:{line_no}: 缺 @作者：{raw}")
+            else:
+                problem = "缺 @作者"
         if problem is not None or parsed is None:
             errors.append(f"board.md:{line_no}: {problem}：{raw}")
             found = _DETAIL_ANYWHERE_RE.search(raw)
@@ -216,7 +232,13 @@ def parse_board(text: str) -> dict:
                 "raw": raw,
             }
         )
-    return {"lines": lines, "unparsed": unparsed, "errors": errors, "legacy": legacy}
+    return {
+        "lines": lines,
+        "unparsed": unparsed,
+        "errors": errors,
+        "warnings": warnings,
+        "legacy": legacy,
+    }
 
 
 def detail_url(
@@ -575,16 +597,20 @@ def parse_header(text: str) -> dict:
     return {"repo": match[1] if match else None, "raw": raw}
 
 
-def _read_board(maigo_root: Path, text: str | None = None) -> dict:
+def _read_board(
+    maigo_root: Path, text: str | None = None, *, allow_missing_author: bool = False
+) -> dict:
     if text is None:
         board = maigo_root / ".maigo" / "board.md"
         try:
             text = board.read_text(encoding="utf-8")
         except FileNotFoundError:
             text = ""
-    parsed = parse_board(text)
+    parsed = parse_board(text, allow_missing_author=allow_missing_author)
     if parsed["legacy"]:
         raise BoardLegacyError("board.md 是舊版格式；請先跑整檔正規化再執行 plan")
+    for warning in parsed["warnings"]:
+        print(f"warning: {warning}", file=sys.stderr)
     return parsed
 
 
@@ -609,13 +635,16 @@ def plan_refresh(
     discovery: bool = True,
     dry_run: bool = False,
     board_text: str | None = None,
+    allow_missing_author: bool = False,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
     at = now.isoformat()
     maigo_dir = maigo_root / ".maigo"
     state_dir = _state_dir(maigo_root)
     ledger = state_dir / LEDGER_NAME
-    parsed = _read_board(maigo_root, board_text)
+    parsed = _read_board(
+        maigo_root, board_text, allow_missing_author=allow_missing_author
+    )
     errors = list(parsed["errors"]) + _resolve_lines(parsed, maigo_dir, repo)
     lines = parsed["lines"]
 

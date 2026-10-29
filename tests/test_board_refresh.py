@@ -210,8 +210,8 @@ SKILL_BOARD = """\
 """
 
 EXTRA_LINES = [
-    "1. [ ] 🔀 CI 紅 i/airflow-70724.md — Run CI on release-branch pull requests",
-    "2. [ ] 👀 抓不到（GraphQL: Could not resolve） i/foo-3.md — owner/foo#3",
+    "1. [ ] 🔀 CI 紅 @octocat i/airflow-70724.md — Run CI on release-branch pull requests",
+    "2. [ ] 👀 抓不到（GraphQL: Could not resolve） @octocat i/foo-3.md — owner/foo#3",
     "3. [x] 👀 已看完 @dev 🧠🔖💤 i/55.md — All three badges",
 ]
 
@@ -244,6 +244,19 @@ def test_t1_every_line_shape_round_trips():
         assert _render(parsed["lines"][0]) == line
 
 
+def test_t1_author_pending_line_round_trips():
+    lines = [
+        "1. [ ] 🔀 CI 紅（作者待補） i/airflow-70724.md — No note, no author",
+        "2. [ ] 👀 抓不到（GraphQL: x；作者待補） i/foo-3.md — owner/foo#3",
+        "- [ ] 🔀 等 review（作者待補） 💤 i/13.md — Pending with badge",
+    ]
+    for line in lines:
+        parsed = sync.parse_board(_as_board(line))
+        assert parsed["errors"] == [] and len(parsed["warnings"]) == 1, line
+        assert parsed["lines"][0]["author"] is None
+        assert _render(parsed["lines"][0]) == line
+
+
 def test_t2_whole_file_round_trip_is_byte_identical():
     parsed = sync.parse_board(SKILL_BOARD)
     rows = {s: [ln for ln in parsed["lines"] if ln["section"] == s] for s in "🎯⏳✅"}
@@ -260,15 +273,15 @@ def test_t2_whole_file_round_trip_is_byte_identical():
 
 def test_t3_real_board_shape_survives_parse_render_parse():
     # Shape of a real board: no blank after the section title, date-only header,
-    # no 🧠 section, no @author. Content is invented.
+    # no 🧠 section. Content is invented.
     text = (
         "# Work Board — o/r\n"
         "> 最後刷新：2026-08-19 ｜ 🎯 2 ｜ ⏳ 1 ｜ ✅ 0\n\n"
         "## 🎯 下一件（2）\n"
-        "1. [ ] 🔀 CI 紅 i/other-11.md — First invented title\n"
-        "2. [ ] 👀 待 review 💤 i/12.md — Second invented title\n\n"
+        "1. [ ] 🔀 CI 紅 @octocat i/other-11.md — First invented title\n"
+        "2. [ ] 👀 待 review @octocat 💤 i/12.md — Second invented title\n\n"
         "## ⏳ 等別人（1）\n"
-        "- [ ] 🔀 等 review i/13.md — Third invented title\n\n"
+        "- [ ] 🔀 等 review @octocat i/13.md — Third invented title\n\n"
         "## ✅ 最近結案（0）\n"
     )
     first = sync.parse_board(text)
@@ -280,10 +293,54 @@ def test_t3_real_board_shape_survives_parse_render_parse():
     second = sync.parse_board(rendered)
     keys = ("section", "checked", "type", "status", "note", "author", "badges",
             "detail", "title")  # fmt: skip
-    assert second["errors"] == []
+    assert first["errors"] == [] and second["errors"] == []
+    assert len(first["lines"]) == 3
     assert [{k: ln[k] for k in keys} for ln in second["lines"]] == [
         {k: ln[k] for k in keys} for ln in first["lines"]
     ]
+
+
+def _line_args(**over):
+    base = dict(number=None, checked=False, type="👀", status="待 review", note=None,
+                author=None, badges=[], detail="i/1.md", title="t")  # fmt: skip
+    base.update(over)
+    return base
+
+
+def test_render_line_writes_author_pending_note_when_no_note():
+    line = refresh.render_line(**_line_args())
+    assert line == "- [ ] 👀 待 review（作者待補） i/1.md — t"
+
+
+def test_render_line_merges_author_pending_into_existing_note():
+    line = refresh.render_line(**_line_args(note="（手寫旁註）"))
+    assert line == "- [ ] 👀 待 review（手寫旁註；作者待補） i/1.md — t"
+    assert line.count("（") == 1
+
+
+def test_render_line_drops_pending_marker_once_author_is_known():
+    only = refresh.render_line(**_line_args(note="（作者待補）", author="octocat"))
+    assert only == "- [ ] 👀 待 review @octocat i/1.md — t"
+    merged = refresh.render_line(
+        **_line_args(note="（手寫旁註；作者待補）", author="octocat")
+    )
+    assert merged == "- [ ] 👀 待 review（手寫旁註） @octocat i/1.md — t"
+
+
+def test_overflow_never_prints_bare_at():
+    assert refresh.author_token("") == "（作者待補）"
+    assert refresh.author_token(None) == "（作者待補）"
+    assert refresh.author_token("octocat") == "@octocat"
+    summary = {
+        "applied": False, "board_path": "b", "pending_reviews": [], "top": [],
+        "counts": {"🎯": 0, "⏳": 0, "✅": 0}, "warnings": [], "errors": [],
+        "pending_orphans": [], "removed": [], "revived": [], "unattributed": [],
+        "excluded_detail_files": [], "detail_writes": [], "detail_deletes": [],
+        "ledger_events": [], "learn_pending": 0,
+        "overflow": [{"url": "u", "title": "T", "author": ""}],
+    }  # fmt: skip
+    out = refresh.format_summary(summary)
+    assert "- T （作者待補） u" in out and " @ " not in out
 
 
 # --- small pure pieces ----------------------------------------------------------
@@ -887,6 +944,44 @@ def test_summary_lists_pending_reviews_with_their_own_fields(tmp_path, gh, capsy
         ("PR 1", "carol"),
         ("PR 2", "dave"),
     }
+
+
+def test_refresh_backfills_author_from_gh_and_drops_pending_note(tmp_path, gh):
+    legacy = row(1, author=None, extra="（手寫旁註）")  # no @ at all: legacy shape
+    marked = row(2, author=None, extra="（作者待補）")
+    write_board(tmp_path, board_text(focus=[legacy, marked]))
+    put_detail(tmp_path, 1)
+    put_detail(tmp_path, 2)
+    gh.prs[1] = pr_meta(1, author="octocat")
+    gh.prs[2] = pr_meta(2, author="hubot")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    lines = board_lines(tmp_path)
+    first = [ln for ln in lines if "i/1.md" in ln][0]
+    second = [ln for ln in lines if "i/2.md" in ln][0]
+    assert "@octocat" in first and "作者待補" not in first
+    assert "@hubot" in second and "作者待補" not in second and "（" not in second
+    assert sync.parse_board((tmp_path / ".maigo/board.md").read_text())["errors"] == []
+
+
+def test_refresh_keeps_previous_author_when_gh_has_none(tmp_path, gh):
+    write_board(tmp_path, board_text(focus=[row(1, author="octocat")]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1, author="")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = [ln for ln in board_lines(tmp_path) if "i/1.md" in ln][0]
+    assert "@octocat" in line and "作者待補" not in line
+
+
+def test_summary_lists_author_pending_as_problem(tmp_path, gh, capsys):
+    write_board(tmp_path, board_text(focus=[row(1, author=None)]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1, author="")
+    assert run_cli(tmp_path, "--apply", "--no-discovery", "--json") == 0
+    out = json.loads(capsys.readouterr().out)
+    assert any("作者待補" in w for w in out["warnings"])
+    line = [ln for ln in board_lines(tmp_path) if "i/1.md" in ln][0]
+    assert "（作者待補）" in line and "@ " not in line and not line.endswith("@")
+    assert " @ " not in line
 
 
 # --- Soyo review #1 regressions ---------------------------------------------------------
