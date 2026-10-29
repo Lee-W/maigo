@@ -437,7 +437,8 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
   依作者只會有其中一個或兩個都有）搬到 `.maigo/_archive/review/<id>/`、`.maigo/_archive/pr/<id>/`、
   `.maigo/i/<id>.md` 搬到 `.maigo/_archive/i/<id>.md`。它不查
   GitHub、不判斷 PR 狀態（哪些已結案由 orchestrator 決定，同 `drop`），目的地已存在就跳過不覆蓋，
-  逐 URL 回報 moved／skipped／missing；`_internal/` 不碰。**順序不能顛倒**：只對已經 `drop` 掉、
+  逐 URL 回報 moved／skipped／missing；同一路徑同時出現在 moved 與 skipped、且 skipped 的 reason
+  以「警告」開頭，表示已封存但重設封存時間失敗，不是略過；`_internal/` 不碰。**順序不能顛倒**：只對已經 `drop` 掉、
   board 上已無索引行的項目跑 `archive`；索引行還在就先搬走 `i/<id>.md`，下次 `plan` 會讀不到細節檔，
   `review/<id>/review.md` 一消失，artifact 對帳也可能把項目當新項目補回——`archive` 本身沒有這層防呆。
   `refresh --apply` 目前仍直接刪老化的細節檔

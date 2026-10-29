@@ -903,8 +903,9 @@ def archive_relpaths(
 ) -> tuple[list[str], list[dict], list[str]]:
     """Move each `.maigo/`-relative path under `_archive/<same relpath>`; never overwrite.
 
-    Returns `(moved, skipped, missing)`; a moved path whose mtime reset failed also gets a `警告` entry in `skipped`. Any group works (`review/<id>`, `issue/<id>`,
-    `topic/<slug>`, `i/<id>.md`); `/maigo:tidy` reuses it for the groups the board does not own."""
+    Returns `(moved, skipped, missing)`; a moved path whose mtime reset failed also gets a
+    `警告` entry in `skipped`. Any group works (`review/<id>`, `issue/<id>`, `topic/<slug>`,
+    `i/<id>.md`); `/maigo:tidy` reuses it for the groups the board does not own."""
     maigo_dir = maigo_root / ".maigo"
     archive_dir = maigo_dir / ARCHIVE_DIR
     moved: list[str] = []
