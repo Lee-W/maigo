@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.71.1 (2026-10-29)
+
+### Fix
+
+- **commands**: skip the selection widget when address-comments finds a single comment
+
 ## v0.71.0 (2026-10-29)
 
 ### Feat
