@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -454,15 +455,17 @@ class TestMain:
 
 class TestRetryLogPath:
     def test_path_structure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", Path(".maigo"))
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", None)
         cwd = tmp_path
         result = verify_completion._retry_log_path(cwd)
-        assert result == tmp_path / ".maigo" / "test-failures.jsonl"
+        assert (
+            result == tmp_path / ".maigo" / "_internal" / "log" / "test-failures.jsonl"
+        )
 
     def test_path_lookup_does_not_create_directory(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", Path(".maigo"))
+        monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", None)
         cwd = tmp_path
         result = verify_completion._retry_log_path(cwd)
         assert not result.parent.exists()
@@ -567,6 +570,30 @@ class TestMainRetryWarning:
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result["decision"] == "block"
         assert "⚠️ RETRY LIMIT REACHED:" not in result["reason"]
+
+
+def test_test_failures_log_lands_under_internal_log_from_subdir_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+):
+    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
+    sub = tmp_path / "scripts"
+    sub.mkdir()
+    (sub / "uv.lock").touch()
+    monkeypatch.setattr(
+        verify_completion,
+        "run_command",
+        lambda cmd, cwd: (1, "FAILED tests/x.py::test_y"),
+    )
+    monkeypatch.setattr(verify_completion, "has_git_modifications", lambda cwd: True)
+
+    run_hook_main(verify_completion, {"cwd": str(sub)}, monkeypatch, capsys)
+
+    log = tmp_path / ".maigo" / "_internal" / "log" / "test-failures.jsonl"
+    assert log.is_file()
+    assert not (tmp_path / ".maigo" / ".maigo").exists()
+    assert not (sub / ".maigo").exists()
 
 
 # ---------------------------------------------------------------------------

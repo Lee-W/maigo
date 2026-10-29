@@ -409,6 +409,26 @@ class TestCheckSoyo:
 
 # ---------------------------------------------------------------------------
 # Soyo retry count (must-fix persistence)
+
+
+def test_must_fix_log_lands_under_internal_log_from_subdir_cwd(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
+    sub = tmp_path / "scripts"
+    sub.mkdir()
+    monkeypatch.setattr(tqc, "_RETRY_LOG_BASE", None)
+    monkeypatch.chdir(sub)
+
+    with pytest.raises(SystemExit):
+        tqc.check_soyo(TestSoyoRetryCount._BLOCKED_OUTPUT)
+
+    log = tmp_path / ".maigo" / "_internal" / "log" / "soyo-must-fix.jsonl"
+    assert log.is_file()
+    assert not (tmp_path / ".maigo" / ".maigo").exists()
+    assert not (sub / ".maigo").exists()
+
+
 # ---------------------------------------------------------------------------
 
 

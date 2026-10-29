@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import datetime
+import subprocess
 from pathlib import Path
 
 from hooks import _token_usage as usage
@@ -75,7 +76,7 @@ def test_background_or_missing_usage_is_ignored(tmp_path: Path):
 
 def test_summary_filters_session_and_reports_malformed_lines(tmp_path: Path):
     log = tmp_path / usage.LOG_PATH
-    log.parent.mkdir()
+    log.parent.mkdir(parents=True)
     rows = [
         {
             "session_id": "session-1",
@@ -117,7 +118,7 @@ def test_empty_summary_states_metadata_is_unavailable(tmp_path: Path):
 
 def test_summary_lookback_and_breakdown(tmp_path: Path):
     log = tmp_path / usage.LOG_PATH
-    log.parent.mkdir()
+    log.parent.mkdir(parents=True)
     now = datetime.datetime.now(datetime.UTC)
     rows = [
         {
@@ -264,3 +265,16 @@ def test_hooks_json_registers_unmatched_token_usage_group():
     assert quality["hooks"][0]["command"].endswith('teammate_quality_check.py"')
     assert "matcher" not in tokens
     assert tokens["hooks"][0]["command"].endswith('token_usage.py"')
+
+
+def test_writes_under_internal_log_from_subdir_cwd(tmp_path: Path):
+    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
+    sub = tmp_path / "scripts"
+    sub.mkdir()
+
+    assert usage.record_agent_usage(agent_event(sub))
+
+    target = tmp_path / ".maigo" / "_internal" / "log" / "token-usage.jsonl"
+    assert len(usage.read_entries(target)[0]) == 1
+    assert not (tmp_path / ".maigo" / ".maigo").exists()
+    assert not (sub / ".maigo").exists()

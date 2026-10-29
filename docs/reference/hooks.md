@@ -52,7 +52,7 @@ commit。
 
 ### Session-start HEAD 記錄
 
-把「session 開始時的 HEAD SHA」寫進 `.maigo/session-head.json`（`{session_id: sha}`），
+把「session 開始時的 HEAD SHA」寫進 `<repo root>/.maigo/_internal/log/session-head.json`（`{session_id: sha}`），
 供 Stop hook 判斷這個 session 有沒有 commit 過東西。**必須在 rule loop 之前執行**——
 命中 rule 會 emit 並結束 process。
 
@@ -204,7 +204,7 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 
 ## PostToolUse／SubagentStop — `hooks/token_usage.py`
 
-兩條路徑都寫入目前 repo 的 `.maigo/token-usage.jsonl`，不重新送內容給模型、不跑 tokenizer，也不自行估算：
+兩條路徑都寫入目前 repo 根目錄的 `.maigo/_internal/log/token-usage.jsonl`，不重新送內容給模型、不跑 tokenizer，也不自行估算：
 
 - **PostToolUse**（matcher `Agent`）：foreground subagent 完成時，直接讀 Claude Code
   `tool_response.usage` 提供的 metadata。
@@ -285,7 +285,7 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 backtick 內的 file path（去掉 `:line`）當 key；沒有檔案引用時用 normalized 文字。
 這是格式層的近似 key；是否為同一個語意問題仍由 orchestrator 依 failure-handling 判斷。
 
-`.maigo/soyo-must-fix.jsonl` 每行記錄 `ts`、`scope` 與 `must_fix_keys`。
+`.maigo/_internal/log/soyo-must-fix.jsonl` 每行記錄 `ts`、`scope` 與 `must_fix_keys`。
 SubagentStop 用真實事件的 `session_id` / `agent_id` 作為 run / task 範圍：
 同一 agent 的相鄰結果都含同一 key、達 `SOYO_RETRY_LIMIT`（預設 2）時，
 block reason 加上 `⚠️ RETRY LIMIT REACHED (Soyo):`。APPROVED 寫入空 keys，清除該範圍的連續計數。

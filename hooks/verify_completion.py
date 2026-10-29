@@ -28,15 +28,17 @@ from typing import Literal, NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit_stop as emit  # noqa: E402
+from _maigo_root import internal_log_dir, readable_log_path  # noqa: E402
 from _retry_log import RetryScope, record_and_count  # noqa: E402
 from _session_head import head_moved  # noqa: E402
-from _token_usage import LOG_PATH, format_one_line, summarize  # noqa: E402
+from _token_usage import LOG_NAME, format_one_line, summarize  # noqa: E402
 
 TEST_TIMEOUT_SEC = 90
 GIT_TIMEOUT_SEC = 5
 OUTPUT_TAIL_CHARS = 500  # chars to include in block message
 RETRY_LIMIT = 2
-_RETRY_LOG_BASE = Path(".maigo")
+# None → `<repo root>/.maigo/_internal/log/`; tests point it at a tmp dir.
+_RETRY_LOG_BASE: Path | None = None
 # Match `Foo:` with a colon to reduce false positives from incidental mentions
 FATAL_MARKER_RE = re.compile(r"\b(ImportError|ModuleNotFoundError|SyntaxError):")
 # Host-environment build failures (toolchain / native deps / system libs)
@@ -260,7 +262,9 @@ def read_known_failures(path: Path) -> set[str]:
 
 
 def _retry_log_path(cwd: Path) -> Path:
-    log_dir = cwd / _RETRY_LOG_BASE
+    log_dir = (
+        internal_log_dir(cwd) if _RETRY_LOG_BASE is None else cwd / _RETRY_LOG_BASE
+    )
     return log_dir / "test-failures.jsonl"
 
 
@@ -289,7 +293,7 @@ def _retry_warning(counts: dict[str, int], keys: set[str], label: str) -> str:
 def approve_with_usage(reason: str, cwd: Path, session_id: object) -> NoReturn:
     """Approve and append local usage metadata when the hook can correlate it."""
     if isinstance(session_id, str) and session_id:
-        usage = summarize(cwd / LOG_PATH, session_id=session_id)
+        usage = summarize(readable_log_path(cwd, LOG_NAME), session_id=session_id)
         reason = f"{reason}\n{format_one_line(usage)}"
     emit("approve", reason)
     raise AssertionError("emit() must exit")

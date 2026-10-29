@@ -53,8 +53,8 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 ## `/maigo:doctor` — 環境與配置診斷
 
 檢查外部依賴（gh, python, git）、記憶層目錄、當前專案的 Taki (Verifier) 是否能正確跑起測試，
-以及 retry / failure log 統計（`.maigo/soyo-must-fix.jsonl` / `.maigo/test-failures.jsonl`
-各 key 觸發次數 + 最近 3 筆）與 `.maigo/token-usage.jsonl` 的 metadata-only 摘要，全部 read-only。
+以及 retry / failure log 統計（`.maigo/_internal/log/soyo-must-fix.jsonl` / `.maigo/_internal/log/test-failures.jsonl`
+各 key 觸發次數 + 最近 3 筆）與 `.maigo/_internal/log/token-usage.jsonl` 的 metadata-only 摘要，全部 read-only。
 
 ```
 /maigo:doctor

@@ -11,9 +11,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = (
-    ("soyo", ".maigo/soyo-must-fix.jsonl", "must_fix_keys"),
-    ("taki", ".maigo/test-failures.jsonl", "failures"),
+    ("soyo", "soyo-must-fix.jsonl", "must_fix_keys"),
+    ("taki", "test-failures.jsonl", "failures"),
 )
+# New home first; the legacy top-level path is only read when the new one is absent.
+LOG_DIRS = (".maigo/_internal/log", ".maigo")
+
+
+def resolve_log_path(root: Path, name: str) -> Path:
+    for log_dir in LOG_DIRS:
+        candidate = root / log_dir / name
+        if candidate.exists():
+            return candidate
+    return root / LOG_DIRS[0] / name
 
 
 @dataclass(frozen=True)
@@ -76,8 +86,8 @@ def summarize_log(label: str, path: Path, field: str) -> LogSummary:
 
 def summarize_repo(root: Path) -> list[LogSummary]:
     return [
-        summarize_log(label, root / rel_path, field)
-        for label, rel_path, field in SOURCES
+        summarize_log(label, resolve_log_path(root, name), field)
+        for label, name, field in SOURCES
     ]
 
 

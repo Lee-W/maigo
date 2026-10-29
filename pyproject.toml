@@ -22,6 +22,7 @@ module = [
   "_frontmatter",
   "_grep_criteria",
   "_hook_io",
+  "_maigo_root",
   "_retry_log",
   "_session_head",
   "_token_usage",

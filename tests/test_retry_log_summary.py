@@ -72,3 +72,32 @@ def test_summarize_repo_uses_maigo_sources(tmp_path: Path):
     assert [summary.label for summary in summaries] == ["soyo", "taki"]
     assert summaries[0].total_entries == 0
     assert summaries[1].counts == {"tests/x.py::test_y": 1}
+
+
+def _line(key: str) -> str:
+    return json.dumps({"ts": "2026-01-01T00:00:00Z", "failures": [key]}) + "\n"
+
+
+def test_reads_internal_log_path_first(tmp_path: Path):
+    maigo = tmp_path / ".maigo"
+    (maigo / "_internal" / "log").mkdir(parents=True)
+    (maigo / "_internal" / "log" / "test-failures.jsonl").write_text(
+        _line("new"), encoding="utf-8"
+    )
+    (maigo / "test-failures.jsonl").write_text(_line("legacy"), encoding="utf-8")
+
+    taki = rls.summarize_repo(tmp_path)[1]
+
+    assert taki.counts == {"new": 1}
+    assert taki.path == maigo / "_internal" / "log" / "test-failures.jsonl"
+
+
+def test_falls_back_to_legacy_top_level_path(tmp_path: Path):
+    maigo = tmp_path / ".maigo"
+    maigo.mkdir()
+    (maigo / "test-failures.jsonl").write_text(_line("legacy"), encoding="utf-8")
+
+    taki = rls.summarize_repo(tmp_path)[1]
+
+    assert taki.counts == {"legacy": 1}
+    assert taki.path == maigo / "test-failures.jsonl"

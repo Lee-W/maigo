@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _maigo_root import readable_log_path  # noqa: E402
 from _token_usage import (  # noqa: E402
-    LOG_PATH,
+    LOG_NAME,
     breakdown,
     format_breakdown,
     format_one_line,
@@ -34,7 +35,7 @@ def main() -> int:
     if args.days <= 0:
         parser.error("--days must be positive")
 
-    path = args.root.resolve() / LOG_PATH
+    path = readable_log_path(args.root, LOG_NAME)
     since = None
     if args.session_id is None:
         since = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=args.days)

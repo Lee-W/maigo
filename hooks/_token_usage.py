@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _maigo_root import maigo_root  # noqa: E402
 from _transcript import USAGE_FIELDS, read_with_retry, sum_usage  # noqa: E402
 
-LOG_PATH = Path(".maigo/token-usage.jsonl")
+LOG_NAME = "token-usage.jsonl"
+LOG_PATH = Path(".maigo/_internal/log") / LOG_NAME
 
 
 def _token_count(value: Any) -> int:
@@ -127,7 +129,7 @@ def record_subagent_usage(data: dict[str, Any]) -> bool:
 
 def _append_record(cwd: str, fields: dict[str, Any]) -> bool:
     """Append a record unless session_id + agent_id is already logged."""
-    log_path = Path(cwd) / LOG_PATH
+    log_path = maigo_root(cwd) / LOG_PATH
     entries, _ = read_entries(log_path)
     if any(
         entry.get("session_id") == fields["session_id"]

@@ -6,8 +6,10 @@ work leaves the tree clean — and that is exactly the moment verification
 matters most (the work is now in history, unverified). Comparing HEAD against
 the SHA recorded by `repo_detect.py` at SessionStart closes that gap.
 
-The record lives in `.maigo/`, which `repo_detect.ensure_maigo_ignored` keeps
-out of `git status`, so writing it cannot itself make the tree look dirty.
+The record lives in `.maigo/_internal/log/` (a legacy top-level
+`.maigo/session-head.json` is still read when the new file is absent), which
+`repo_detect.ensure_maigo_ignored` keeps out of `git status`, so writing it
+cannot itself make the tree look dirty.
 
 Failures (not a git repo, git missing, OSError) → no record / no signal
 (fail-quiet). Callers must treat "no record" as "unknown", never as "changed";
@@ -20,9 +22,14 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
-LOG_PATH = Path(".maigo/session-head.json")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _maigo_root import maigo_root, readable_log_path  # noqa: E402
+
+LOG_NAME = "session-head.json"
+LOG_PATH = Path(".maigo/_internal/log") / LOG_NAME
 GIT_TIMEOUT_SEC = 5
 # Cap the record so a long-lived checkout does not accumulate one entry per
 # session forever. Only the current session's entry is ever read.
@@ -70,7 +77,7 @@ def record(cwd: Path, session_id: object) -> bool:
     if head is None:
         return False
 
-    path = cwd / LOG_PATH
+    path = maigo_root(cwd) / LOG_PATH
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         # Re-read at the last possible moment. Another session may have added
@@ -108,7 +115,7 @@ def head_moved(cwd: Path, session_id: object) -> bool:
     """
     if not isinstance(session_id, str) or not session_id:
         return False
-    start = read_records(cwd / LOG_PATH).get(session_id)
+    start = read_records(readable_log_path(cwd, LOG_NAME)).get(session_id)
     if not start:
         return False
     head = current_head(cwd)

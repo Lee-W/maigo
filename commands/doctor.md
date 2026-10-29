@@ -27,12 +27,12 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
    - `.claude/test-command`：是否有自定義測試指令。
    - `.claude/skip-test-verification`：是否被標記跳過。
    - **Taki 試跑**：嘗試偵測當前專案類型並跑一個最小化的檢查（例如 `ruff --version` 或嘗試跑一個不存在的 test 來確認 test runner 有反應）。
-4. **Retry / failure 統計**（read-only，只讀不清）：讀 `.maigo/soyo-must-fix.jsonl`
-   （🟡 爽世 must-fix 觸發，`teammate_quality_check.py` 寫入）與 `.maigo/test-failures.jsonl`
+4. **Retry / failure 統計**（read-only，只讀不清）：讀 `.maigo/_internal/log/soyo-must-fix.jsonl`
+   （🟡 爽世 must-fix 觸發，`teammate_quality_check.py` 寫入）與 `.maigo/_internal/log/test-failures.jsonl`
    （🟣 立希 test failure 觸發，`verify_completion.py` 寫入），彙整各 key 的觸發次數 + 最近
-   3 筆摘要。**兩個 log 都是相對當前 repo 的 `.maigo/` 底下**，不存在或是空的 → 印正常訊息
+   3 筆摘要。**兩個 log 都在當前 repo 根目錄的 `.maigo/_internal/log/` 底下**；新路徑沒有檔時退回讀舊的頂層 `.maigo/<name>`（新舊都在時只讀新的，舊檔由 `/maigo:tidy` 搬）。不存在或是空的 → 印正常訊息
    （新環境 / 還沒觸發過 retry 本來就不該有），不算 error。
-5. **Token usage**（read-only）：讀 `.maigo/token-usage.jsonl`，彙整最近 7 天總量並依角色／model
+5. **Token usage**（read-only）：讀 `.maigo/_internal/log/token-usage.jsonl`（同樣退回舊的頂層路徑），彙整最近 7 天總量並依角色／model
    分組。只採用 harness 已提供的 foreground subagent metadata；背景 agent、Codex 或舊版 harness
    沒資料時標示 unavailable，不自行估算、不算 error。
 6. **`.maigo/` 型錄**（read-only，只列不刪）：呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_dir_catalog.py"`
@@ -101,8 +101,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_usage_summary.py" --root "$PWD"
 - Test command: `<cmd>`
 
 ## 🔁 Retry / Failure 統計
-- `.maigo/soyo-must-fix.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
-- `.maigo/test-failures.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
+- `.maigo/_internal/log/soyo-must-fix.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
+- `.maigo/_internal/log/test-failures.jsonl`：<N 筆，或「無紀錄（正常）」> — <key×次數 摘要>
 - 最近 3 筆：<ts — key>
 
 ## 🪙 Token Usage

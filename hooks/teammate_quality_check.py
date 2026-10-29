@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _grep_criteria import block_reason, find_literal_grep_criteria
 from _hook_io import emit_stop as emit
+from _maigo_root import internal_log_dir, maigo_root
 from _retry_log import RetryScope, record_and_count
 from _transcript import final_report, read_with_retry
 
@@ -23,7 +24,8 @@ SOYO_RETRY_LIMIT = 2
 REVIEW_MODE_ITEMS = json.loads(
     Path(__file__).with_name("review_modes.json").read_text(encoding="utf-8")
 )
-_RETRY_LOG_BASE = Path(".maigo")
+# None → `<repo root>/.maigo/_internal/log/`; tests point it at a tmp dir.
+_RETRY_LOG_BASE: Path | None = None
 _MUST_FIX_FILE_RE = re.compile(r"`([\w./-]+\.\w+)(?::\d+)?`")
 _MUST_FIX_LINE_RE = re.compile(
     r"^\s*(?:[-*]|\d+\.)\s+(.+)$",
@@ -81,7 +83,9 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
 
 
 def _soyo_log_path(cwd: Path) -> Path:
-    log_dir = cwd / _RETRY_LOG_BASE
+    log_dir = (
+        internal_log_dir(cwd) if _RETRY_LOG_BASE is None else cwd / _RETRY_LOG_BASE
+    )
     return log_dir / "soyo-must-fix.jsonl"
 
 
@@ -151,7 +155,7 @@ def _plan_criteria_hits(out: str) -> list[str]:
     match = _TOMORI_ARTIFACT_RE.search(out)
     if not match:
         return []
-    path = Path(os.getcwd()).resolve() / match.group(0)
+    path = maigo_root(os.getcwd()) / match.group(0)
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -272,7 +276,7 @@ def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
                 f"爽世 (Soyo) 給出 {verdict} 卻沒列 must-fix 或 evidence 待補。要擋就要說擋什麼、怎麼改。",
             )
 
-        cwd = Path(os.getcwd()).resolve()
+        cwd = maigo_root(os.getcwd())
         keys = _extract_soyo_must_fix_keys(out)
         counts = _soyo_record_and_count(_soyo_log_path(cwd), keys, retry_scope)
         if keys:
@@ -292,7 +296,9 @@ def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
                 )
 
     if not triage and verdict == "APPROVED":
-        _soyo_record_and_count(_soyo_log_path(Path.cwd()), set(), retry_scope)
+        _soyo_record_and_count(
+            _soyo_log_path(maigo_root(os.getcwd())), set(), retry_scope
+        )
     emit("approve", f"爽世 (Soyo) 輸出符合規格 (verdict={verdict})")
 
 

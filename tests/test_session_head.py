@@ -141,8 +141,11 @@ class TestRecord:
         path = tmp_path / _session_head.LOG_PATH
         real_mkdir = Path.mkdir
 
-        def mkdir_then_other_session_writes(self: Path, **kwargs: object) -> None:
-            real_mkdir(self, **kwargs)  # type: ignore[arg-type]
+        def mkdir_then_other_session_writes(
+            self: Path, *args: object, **kwargs: object
+        ) -> None:
+            # parents=True recurses into parent.mkdir(...) with positional args
+            real_mkdir(self, *args, **kwargs)  # type: ignore[arg-type]
             if self == path.parent and not path.exists():
                 path.write_text(json.dumps({"other-sess": "beef"}), encoding="utf-8")
 
@@ -208,3 +211,26 @@ class TestHeadMoved:
         _session_head.record(tmp_path, "sess-1")
         monkeypatch.setattr(_session_head, "current_head", lambda cwd: None)
         assert _session_head.head_moved(tmp_path, "sess-1") is False
+
+
+def test_writes_under_internal_log_from_subdir_cwd(tmp_path: Path):
+    head = init_repo(tmp_path)
+    sub = tmp_path / "scripts"
+    sub.mkdir()
+
+    assert _session_head.record(sub, "sess-1") is True
+
+    target = tmp_path / ".maigo" / "_internal" / "log" / "session-head.json"
+    assert _session_head.read_records(target) == {"sess-1": head}
+    assert not (tmp_path / ".maigo" / ".maigo").exists()
+    assert not (sub / ".maigo").exists()
+
+
+def test_reads_legacy_top_level_head_when_internal_missing(tmp_path: Path):
+    head = init_repo(tmp_path)
+    legacy = tmp_path / ".maigo" / "session-head.json"
+    legacy.parent.mkdir()
+    legacy.write_text(json.dumps({"sess-1": head}), encoding="utf-8")
+    commit_empty(tmp_path, "moves HEAD")
+
+    assert _session_head.head_moved(tmp_path, "sess-1") is True

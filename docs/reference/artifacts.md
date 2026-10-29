@@ -90,12 +90,17 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 
 ## 非 markdown 機器狀態檔
 
-一行帶過，內部用，非 agent 面向格式：`session-head.json`（session 開始時的
-HEAD SHA）、`token-usage.jsonl`（token usage metadata）、
-`test-failures.jsonl` / `soyo-must-fix.jsonl`（retry / failure log）、
-`__titles.json`（內部快取）、`migrate-legacy-artifacts.manifest.json`
+一行帶過，內部用，非 agent 面向格式。四個 hook 寫的機器 log 在
+`.maigo/_internal/log/`：`session-head.json`（session 開始時的 HEAD SHA）、
+`token-usage.jsonl`（token usage metadata）、
+`test-failures.jsonl` / `soyo-must-fix.jsonl`（retry / failure log）。
+hook 一律寫到 repo 根目錄的 `.maigo/`（`hooks/_maigo_root.py`：git toplevel，
+git 不可用時退回 payload cwd），不管 session 的 cwd 在哪個子目錄，也不會再長出
+`.maigo/.maigo/`。讀取端先讀 `_internal/log/` 的新檔，沒有才讀舊的頂層同名檔
+（新舊都在時只讀新的、不合併）；舊檔不由 hook 搬，留給 `/maigo:tidy` 處理。
+其餘：`__titles.json`（內部快取）、`migrate-legacy-artifacts.manifest.json`
 （`scripts/migrate_legacy_artifacts.py --apply` 的搬移對應表，只在一次 apply
-沒跑完時留存，重跑時照它續跑，跑完即刪）。這些檔日後可能搬進 `_internal/`。
+沒跑完時留存，重跑時照它續跑，跑完即刪）。
 
 ## 舊固定檔名與未登記檔案
 
