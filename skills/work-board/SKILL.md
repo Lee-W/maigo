@@ -523,7 +523,7 @@ snapshot 有項目但 board.md 不存在或沒有任何項目行時略過整個 
 **對帳 `.maigo/` 產物**（建在 `maigo_dir_catalog.scan()` 之上）：`review/<id>/review.md` 的 metadata
 `source`（GitHub PR URL，可跨 repo）、舊扁平 `review-<id>.md` 的 `**PR:**` 行、以及純數字 id 的
 `review/<n>/*` / `issue/<n>/*`（推導成 board repo 的 URL）是可靠對應，會補進 board；
-`plan-*`、舊固定檔名、`unregistered` 的 `.md`、metadata `source` 不是 URL 的本地 review、
+頂層 `plan-*`、`topic/<slug>/plan.md`、舊固定檔名、`unregistered` 的 `.md`、metadata `source` 不是 URL 的本地 review、
 `<repo>-<n>` 形式的 id 沒有可靠對應，只列入 `unattributed`。孤兒 i/ 檔是 `dd` 訊號，不是補行來源。
 
 **Discovery**：在 board repo 跑兩次 `gh search prs --state open`（`user-review-requested:@me`、
@@ -633,13 +633,13 @@ nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）
 消失了不代表工作內容跟著消失。**先查 `.maigo/board.md` 有沒有這個 issue/PR 的 `IN_PROGRESS`
 行**（`/maigo:take-issue` 開工時會旁註 branch 名，見 `commands/take-issue.md` 步驟 4），有的話
 直接用旁註的 branch 名定位 worktree；board 沒記到，才退而找對應 worktree 本身（該任務的
-`.maigo/plan-<id>.md`——或遷移前留下的舊 `.maigo/plan.md`——是否存在、`git log`/`git status`
+`.maigo/pr/<id>/plan.md` / `.maigo/issue/<id>/plan.md` / `.maigo/topic/<slug>/plan.md`——或遷移前留下的頂層 `.maigo/plan-<id>.md` / 舊 `.maigo/plan.md`——是否存在、`git log`/`git status`
 做到哪一步）——兩者都能讓 orchestrator 從既有進度接著跑，不必
 等原 session 復活，也不必整個重新走一次 Raana 探索 + Tomori 規劃。
 
 **不確定該任務在哪個 repo時**：這台機器裝了 maigo 的 repo 不只一個，先查
 `~/.config/maigo/board-index.md`（沒有就先跑一次 `/maigo:board --cross-repo`
-產生）縮小範圍，再進到命中的那個 repo 查 `board.md` / `plan-<id>.md`，比逐一
+產生）縮小範圍，再進到命中的那個 repo 查 `board.md` 與各 plan（`pr/` / `issue/` / `topic/` 底下的 `plan.md`），比逐一
 `cd` 進每個 repo 問一輪快。
 
 ## What this skill does NOT cover

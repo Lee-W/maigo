@@ -175,8 +175,8 @@ def ensure_maigo_ignored(cwd: str) -> None:
     """
     Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
 
-    maigo writes working artefacts into ``.maigo/`` at the repo root — flat
-    ``plan-<id>.md``, and per-PR/issue folders ``review/<id>/{review,rubric,
+    maigo writes working artefacts into ``.maigo/`` at the repo root — plans under ``pr/<id>/plan.md`` / ``issue/<id>/plan.md`` /
+    ``topic/<slug>/plan.md``, and per-PR/issue folders ``review/<id>/{review,rubric,
     draft,pr-comments}.md`` (others' PRs) / ``pr/<id>/…`` (own PRs) / ``issue/<id>/rubric.md``, plus retry logs — those
     must never be committed. We append the rule to the repo's ``info/exclude`` —
     resolved via ``git rev-parse --git-path`` so it lands in the shared git dir

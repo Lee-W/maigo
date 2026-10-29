@@ -24,8 +24,8 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 
 1. **🐱 樂奈 (Raana)** — 探 codebase，找出相關位置與既有慣例。「看完了。相關的在這三個檔案。」
    探索必含兩項：(a) **pending branch 重疊掃描**——`git branch -a` 列出本機與 remote 的 branch，對名稱或時間上可能相關的候選跑 `git log --oneline <base>..<branch>` 與 `git diff --stat <base>...<branch>`，回報哪些 branch 改到同一批檔案；(b) 任務涉及版本升級時的 **upstream 現況**——該套件在 PyPI 的最新正式版、對應的 constraints／tag／image 是否存在。這兩項落在探索階段，交給 🩵 燈決定基底；不能推成 🎀 愛音的 Step 0。實例：某次升版 plan 寫完後 orchestrator 才查到一條 pending branch 改的正是同一塊 `pyproject.toml`、且上游已出正式版，plan 多走一輪修訂。
-2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/plan-<id>.md`）。「……讓我先理清楚它想做什麼。」
-   派工前由 orchestrator 在目標 cwd 執行 `python3 "<maigo-root>/scripts/artifact_path.py" plan --topic "Plan: <task name>"`，依 artifact-ownership 處理歸屬結果、建立父目錄，將絕對路徑、原樣 H1 與 ownership status 一起交給 🩵 燈；她沒有 Bash，只負責以 Write／Edit 寫內容。缺少路徑時回報 orchestrator 補齊，不自行組檔名。
+2. **🩵 燈 (Tomori)** — 把要做的事寫成 plan（`.maigo/topic/<slug>/plan.md`，有 PR / issue URL 時是 `.maigo/pr/<id>/plan.md` / `.maigo/issue/<id>/plan.md`）。「……讓我先理清楚它想做什麼。」
+   派工前由 orchestrator 在目標 cwd 執行 `python3 "<maigo-root>/scripts/artifact_path.py" plan --topic "Plan: <task name>"`（在預設分支上另加 `--slug <topic-slug>`；有 PR / issue URL 時加 `--url`），依 artifact-ownership 處理歸屬結果、建立父目錄，將絕對路徑、原樣 H1 與 ownership status 一起交給 🩵 燈；她沒有 Bash，只負責以 Write／Edit 寫內容。缺少路徑時回報 orchestrator 補齊，不自行組檔名。
    **交辦是「移植一批 commit 到另一個 target」這種形狀時**（例：「看這 N 個 commit，另一個
    provider/module 有類似 API 但還沒做的就補完」），🩵 燈規劃前先用一句話講出那批 commit
    的**共同目的**、跟使用者對齊，再逐一對照——逐 commit 比機制（錯誤分類、teardown、
@@ -50,7 +50,7 @@ Maigo 的 MyGO!!!!! 感來自「每個人用自己的方式把下一個人推到
 | 交棒 | 必須留下什麼 | 不能怎樣 |
 |------|-------------|----------|
 | 🐱 樂奈 → 🩵 燈 | 相關位置、既有慣例、異狀、潛在影響面、重疊的 pending branch 與 upstream 現況 | 不把探索報告寫成實作計畫 |
-| 🩵 燈 → 🎀 愛音 | 交出實際 plan 路徑（`.maigo/plan-<id>.md`），裡面清楚標 `Goal`、`Steps`、acceptance、blocking decisions | 不把風險藏在語氣裡；不讓 🎀 愛音猜路徑或內容 |
+| 🩵 燈 → 🎀 愛音 | 交出實際 plan 路徑（`.maigo/pr/<id>/plan.md` / `.maigo/issue/<id>/plan.md` / `.maigo/topic/<slug>/plan.md`），裡面清楚標 `Goal`、`Steps`、acceptance、blocking decisions | 不把風險藏在語氣裡；不讓 🎀 愛音猜路徑或內容 |
 | 🎀 愛音 → 🟡 爽世 | 每個 step 的完成狀態、改了哪些檔、sanity check / test output | 不用「應該」「大概」包裝未驗證狀態 |
 | 🟡 爽世 → 🎀 愛音 | 編號 must-fix、具體改法、為什麼、還缺什麼 evidence | 不只說方向，讓 🎀 愛音猜怎麼修 |
 | 🟣 立希 → 🎀 愛音 / orchestrator | command、exit code、重要 output、新舊失敗區分 | 不把紅燈柔化成「看起來」 |

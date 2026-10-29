@@ -33,8 +33,8 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 ### `ensure_maigo_ignored`
 
 不分 project，每次 SessionStart 都跑（在 rule 偵測之前）。maigo 的所有 command
-（go / quick / team / review / address-comments）都把 plan（扁平
-`plan-<id>.md`）、review rubric、review 報告（`review/<id>/review.md` 或 `pr/<id>/review.md`）、
+（go / quick / team / review / address-comments）都把 plan（`pr/<id>/plan.md` /
+`issue/<id>/plan.md` / `topic/<slug>/plan.md`）、review rubric、review 報告（`review/<id>/review.md` 或 `pr/<id>/review.md`）、
 pr-comments、retry log 等 artefact 寫進 repo root 的 `.maigo/`，這些絕不該被
 commit。
 
@@ -147,7 +147,7 @@ pattern 會命中正當內容（註解、對照表、fixture、詞彙表）或�
 判準回非預期值時錯的往往是判準而不是產物，而照字面「修好它」比原狀更糟。
 
 同一組偵測邏輯（`hooks/_grep_criteria.py`）也被 SubagentStop 的
-燈 (Tomori) 檢查重用，掃她剛寫進 `.maigo/plan-<id>.md` 的驗收條件。
+燈 (Tomori) 檢查重用，掃她剛寫進 `.maigo/pr/<id>/plan.md`（或 `issue/` / `topic/` 底下同名檔）的驗收條件。
 
 ### 放行為什麼不輸出 decision
 
@@ -261,9 +261,9 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 |-------|---------|----------------------|
 | **Raana** | `## Loaded memory entries` 段（即使無相關 entry 也要明寫「（無相關 entry）」）| 「缺 memory 載入回報」 |
 | **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
-| **Tomori** | 提到 `.maigo/plan-<id>.md`、`.maigo/review/<id>/rubric.md`、`.maigo/pr/<id>/rubric.md` 或 `.maigo/issue/<id>/rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
+| **Tomori** | 提到 `.maigo/pr/<id>/plan.md`、`.maigo/issue/<id>/plan.md`、`.maigo/topic/<slug>/plan.md`、`.maigo/review/<id>/rubric.md`、`.maigo/pr/<id>/rubric.md` 或 `.maigo/issue/<id>/rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
 | **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
-| **Tomori** | `.maigo/plan(-<id>).md` 的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
+| **Tomori** | plan（`pr/<id>/plan.md` / `issue/<id>/plan.md` / `topic/<slug>/plan.md`）的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **🟡 Soyo** | `## Verdict` 內的 review verdict：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`；triage：`READY` / `NEEDS_INFO` / `DUP` / `CLOSE` | 「沒下 verdict」 |
 | **🟡 Soyo** | `## Checklist (mode=<name>)` 段依序保留至少 9 項；依 [共用模式資料](https://github.com/Lee-W/maigo/blob/main/hooks/review_modes.json) 核對 full／quick／design-preview／compliance-only／test-only；code-review 的每個略過項附一致的 `skipped by mode=<name>`，triage 非 bug 情境可略過 2–4 | 「checklist 不完整、mode 矛盾或略過必要項目」 |

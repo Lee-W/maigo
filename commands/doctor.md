@@ -38,7 +38,7 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 6. **`.maigo/` 型錄**（read-only，只列不刪）：呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_dir_catalog.py"`
    掃描 `.maigo/` 頂層 `*.md` 檔與 `review/*/*.md`、`pr/*/*.md`、`issue/*/*.md` 兩層巢狀
    檔，分成六類——已在巢狀佈局的（`nested`）、非巢狀 kind（`plan`）的識別碼
-   命名（`identifier_named`，`plan-<id>.md` 這類）、巢狀 kind 分目錄前的
+   命名（`identifier_named`，頂層 `plan-<id>.md` 這類，已淘汰、待遷到 `topic/<id>/plan.md`）、巢狀 kind 分目錄前的
    扁平檔（`flat_identifier`，`review-rubric-<id>.md` 這類，待遷移）、已知
    種類的舊固定檔名（`legacy_fixed_name`，`.maigo/plan.md` 這類，代表升級前
    留下的孤兒）、已登記的非 artifact 檔（`registered_non_artifact`，

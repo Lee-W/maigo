@@ -8,8 +8,11 @@ session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻
 `.maigo/review/<id>/{review,rubric,draft,pr-comments,reply-draft}.md`，自己的 PR 在
 `.maigo/pr/<id>/` 同名檔，issue 在 `.maigo/issue/<id>/rubric.md`；作者判斷用
 [`scripts/pr_owner.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_owner.py)
-取得後以 `--owner mine|others` 傳給 `artifact_path.py`；`plan` 例外，維持扁平
-`.maigo/plan-<id>.md`。
+取得後以 `--owner mine|others` 傳給 `artifact_path.py`；`plan` 不依作者分流，改依 URL 分三組：
+`.maigo/pr/<id>/plan.md`（PR URL）、`.maigo/issue/<id>/plan.md`（issue URL）、
+`.maigo/topic/<slug>/plan.md`（其餘）。預設分支（`main` / `master` / `develop` /
+`trunk`）上識別碼不用分支名，改傳 `--slug`（優先）或由 `--topic` 的 H1 推導；
+兩者都推不出 slug 就報錯。頂層 `.maigo/plan-<id>.md` 已淘汰。
 Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要幫它取
 路徑之前。`.maigo/` 全貌型錄（含非 markdown 機器狀態檔、Work Board、舊固定
 檔名、分目錄前扁平檔與未登記檔案）見
@@ -58,8 +61,8 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
    **`suggest:` 已經幫你往下找過空位**：它是從第 2 個 attempt 起，第一個
    「檔案不存在、沒有 H1、或 H1 與本次主題相同」的路徑，不是固定的 `-2`。
    同一個 branch/PR 跑過多輪 `/maigo:go`、`/maigo:quick` 留下 `-2`、`-3`……
-   不同主題的產物時，候選會自動跳過它們——非巢狀 kind（`plan`）長成
-   `plan-<id>-3.md` 這類；巢狀 kind（`review` / `review-rubric` /
+   不同主題的產物時，候選會自動跳過它們——`plan` 長成
+   `topic/<slug>/plan-3.md`（或 `pr/<id>/plan-3.md` / `issue/<id>/plan-3.md`）這類；其他巢狀 kind（`review` / `review-rubric` /
    `review-draft` / `pr-comments` / `reply-draft` / `triage-rubric`）後綴落在檔名層、不是目錄
    層，長成 `review/<id>/rubric-3.md` 這類，不是另開 `review/<id>-3/` 資料夾。
    候選若剛好是 H1 與本次主題相同的既有檔，代表以前已經用同一個主題續寫過，
@@ -72,7 +75,7 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
 
 4. **舊固定檔名（stdout 的 `legacy_exists:` 那行指的檔案）與分目錄前扁平檔
    （`flat_exists:` 那行指的檔案，只有巢狀 kind 才可能有）都只可讀、不可當
-   寫入目標**——有續跑語意的產物（如 `plan-<id>.md`）在新路徑讀不到內容時
+   寫入目標**——有續跑語意的產物（如頂層舊 `plan-<id>.md`）在新路徑讀不到內容時
    可以退回依序讀 `flat_exists:` 再讀 `legacy_exists:` 繼續，但下一次寫入
    一律寫到 script 回的 `path:` 新路徑，不回寫任何一種舊檔。這條現在不是只
    靠你記得——`Write` / `Edit` 寫入 `.maigo/` 底下的舊固定檔名或分目錄前

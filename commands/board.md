@@ -202,7 +202,7 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。
 （對話是拋棄式的，真相仍在 board.md，不另造閱讀層）：
 
 - `overflow`：超過 `--max-new` 沒補進來的項目（編號、標題、作者），下次刷新接著補；
-- `unattributed`：未歸屬產物（`plan-*`、舊固定檔名、沒有可靠 PR 對應的本地 review 等），依類別計數＋檔名；
+- `unattributed`：未歸屬產物（頂層 `plan-*`、`topic/<slug>/plan.md`、舊固定檔名、沒有可靠 PR 對應的本地 review 等），依類別計數＋檔名；
 - ack 警告（`no_report` / `head_changed` / `locked` / `error`）與 `errors` 原文；
 - `pending_orphans`（寬限期內，本輪未判）、`removed`（本輪判為 dd 的項目）、`excluded_detail_files`
   （等你確認是否刪除）。

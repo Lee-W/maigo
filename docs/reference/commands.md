@@ -14,7 +14,7 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
 | 1 | Raana | 探索 codebase 找相關位置、慣例 |
-| 2 | 🩵 Tomori | 寫 orchestrator 已用 `scripts/artifact_path.py` 核對並準備目錄的 `.maigo/plan-<id>.md` |
+| 2 | 🩵 Tomori | 寫 orchestrator 已用 `scripts/artifact_path.py` 核對並準備目錄的 `.maigo/topic/<slug>/plan.md`（有 PR / issue URL 時是 `.maigo/pr/<id>/plan.md` / `.maigo/issue/<id>/plan.md`）|
 | 3 | (user) | 確認 plan、回 open questions |
 | 4 | Anon | 按 plan 實作 |
 | 5 | Soyo | review（依 `strict-review` skill） |

@@ -284,7 +284,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 | 項目 | `/maigo:go` | `/maigo:review` |
 |------|---------|---------------|
 | Anon 上場 | 是（核心） | 不上場 |
-| 燈的產出 | 實作計畫 (`plan-<id>.md`) | review rubric (`review/<id>/rubric.md`；自己的 PR 是 `pr/<id>/rubric.md`) |
+| 燈的產出 | 實作計畫 (`pr/<id>/plan.md` / `issue/<id>/plan.md` / `topic/<slug>/plan.md`) | review rubric (`review/<id>/rubric.md`；自己的 PR 是 `pr/<id>/rubric.md`) |
 | 終態 | 變更落地 + 全綠 | review 報告 |
 | 適用 | 開發新功能、修 bug | PR review、code audit |
 
