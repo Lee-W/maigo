@@ -53,7 +53,7 @@ class TestNaming:
     def test_artifact_path_format(self):
         assert (
             ap.artifact_path("plan", "fix-dag-run-stall")
-            == ".maigo/plan-fix-dag-run-stall.md"
+            == ".maigo/topic/fix-dag-run-stall/plan.md"
         )
 
     def test_legacy_path_format(self):
@@ -83,7 +83,7 @@ class TestNaming:
     @pytest.mark.parametrize(
         "kind, expected",
         [
-            ("plan", ".maigo/plan-58543.md"),
+            ("plan", ".maigo/topic/58543/plan.md"),
             ("review", ".maigo/review/58543/review.md"),
             ("review-rubric", ".maigo/review/58543/rubric.md"),
             ("review-draft", ".maigo/review/58543/draft.md"),
@@ -131,7 +131,11 @@ class TestNaming:
             ("review", "reply-draft"),
         ]
         assert ap.nested_locations("triage-rubric") == [("issue", "rubric")]
-        assert ap.nested_locations("plan") == []
+        assert ap.nested_locations("plan") == [
+            ("pr", "plan"),
+            ("issue", "plan"),
+            ("topic", "plan"),
+        ]
 
     def test_nested_layout_values_keep_group_stem_shape(self):
         # legacy hook / catalog destructure `(group, stem)`; a different shape
@@ -146,7 +150,10 @@ class TestNaming:
         ) == (".maigo/review/58543/rubric-2.md")
 
     def test_plan_attempt_2_suffix(self):
-        assert ap.artifact_path("plan", "58543", attempt=2) == ".maigo/plan-58543-2.md"
+        assert (
+            ap.artifact_path("plan", "58543", attempt=2)
+            == ".maigo/topic/58543/plan-2.md"
+        )
 
     def test_attempt_below_1_raises_value_error(self):
         with pytest.raises(ValueError):
@@ -166,9 +173,40 @@ class TestNaming:
         rubric_path = Path(ap.artifact_path("review-rubric", "58543", owner="others"))
         assert review_path.parent == rubric_path.parent == Path(".maigo/review/58543")
 
-    def test_nested_layout_is_subset_of_known_kinds_and_excludes_plan(self):
+    def test_plan_nests_under_pr_issue_topic_groups(self):
         assert set(ap._NESTED_LAYOUT).issubset(set(ap._KNOWN_KINDS))
+        # plan's group depends on the URL, so it is not a fixed `(group, stem)` row
         assert "plan" not in ap._NESTED_LAYOUT
+        assert ap._PLAN_GROUPS == ("pr", "issue", "topic")
+        for group in ap._PLAN_GROUPS:
+            assert (
+                ap.artifact_path("plan", "7", group=group)
+                == f".maigo/{group}/7/plan.md"
+            )
+        assert ap.artifact_path("plan", "7", attempt=3, group="pr") == (
+            ".maigo/pr/7/plan-3.md"
+        )
+
+    def test_plan_group_from_pr_url_issue_url_and_none(self):
+        assert ap.plan_group("https://github.com/o/r/pull/9", "o/r") == "pr"
+        assert ap.plan_group("https://github.com/o/r/pull/9/", "") == "pr"
+        assert ap.plan_group("https://github.com/o/r/issues/9", "o/r") == "issue"
+        assert ap.plan_group(None, "o/r") == "topic"
+        assert ap.plan_group("", "o/r") == "topic"
+        assert ap.plan_group("https://example.com/o/r/pull/9", "o/r") == "topic"
+        assert ap.plan_group("https://github.com/o/r/discussions/9", "o/r") == "topic"
+
+    def test_unknown_plan_group_and_group_on_other_kinds_raise(self):
+        with pytest.raises(ValueError, match="group"):
+            ap.artifact_path("plan", "7", group="review")
+        with pytest.raises(ValueError, match="group"):
+            ap.artifact_path("review", "7", owner="mine", group="pr")
+
+    def test_topic_slug_from_h1_strips_plan_prefix(self):
+        assert ap.topic_slug_from_h1("Plan: Example topic") == "example-topic"
+        assert ap.topic_slug_from_h1("plan：Example topic") == "example-topic"
+        assert ap.topic_slug_from_h1("Example topic") == "example-topic"
+        assert ap.topic_slug_from_h1("Plan: 純中文主題") is None
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +244,9 @@ class TestArtifactPathRegex:
             ".maigo/plan-x.md",
             ".maigo/review-rubric-42.md",
             ".maigo/plan.md",
+            ".maigo/pr/58543/plan.md",
+            ".maigo/issue/58543/plan-2.md",
+            ".maigo/topic/some-slug/plan.md",
         ],
     )
     def test_matches_new_flat_and_legacy_shapes(self, path):
@@ -217,6 +258,7 @@ class TestArtifactPathRegex:
         [
             ".maigo/review/58543/review.md",
             ".maigo/review/58543/notes.md",
+            ".maigo/topic/some-slug/rubric.md",
         ],
     )
     def test_does_not_match_other_kinds_or_stems(self, path):
@@ -294,6 +336,107 @@ class TestResolveIdentifierChain:
             ["git", "checkout", "-q", "--detach", "HEAD"], cwd=tmp_path, check=True
         )
         assert ap.resolve_identifier(tmp_path) == expected_sha
+
+    def test_level2_skips_default_branch_and_uses_topic_slug(self, tmp_path: Path):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        assert ap.resolve_identifier(tmp_path, topic_slug="my-topic") == "my-topic"
+        # without a topic slug the legacy chain is unchanged (other kinds)
+        assert ap.resolve_identifier(tmp_path) == "main"
+
+    @pytest.mark.parametrize("branch", sorted(ap.DEFAULT_BRANCHES))
+    def test_every_default_branch_is_skipped(self, tmp_path: Path, branch: str):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", branch], cwd=tmp_path, check=True)
+        assert ap.resolve_identifier(tmp_path, topic_slug="t") == "t"
+
+    def test_level2_keeps_feature_branch_slug(self, tmp_path: Path):
+        _init_git_repo(tmp_path)
+        subprocess.run(
+            ["git", "checkout", "-q", "-b", "feat/Tidy-Up"], cwd=tmp_path, check=True
+        )
+        assert ap.resolve_identifier(tmp_path, topic_slug="ignored") == "feat-tidy-up"
+        assert (
+            ap.resolve_for_write("plan", "Plan: something else", cwd=tmp_path).path
+            == ".maigo/topic/feat-tidy-up/plan.md"
+        )
+
+    def test_level1_url_beats_topic_slug_on_default_branch(self, tmp_path: Path):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        assert (
+            ap.resolve_identifier(
+                tmp_path,
+                url="https://github.com/o/r/pull/5",
+                home_repo="o/r",
+                topic_slug="t",
+            )
+            == "5"
+        )
+
+    def test_empty_topic_slug_on_default_branch_exits_nonzero(
+        self, tmp_path: Path, capsys
+    ):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        with pytest.raises(ValueError, match="slug"):
+            ap.resolve_identifier(tmp_path, topic_slug="")
+        with pytest.raises(ValueError, match="slug"):
+            ap.resolve_for_write("plan", "Plan: 純中文主題", cwd=tmp_path)
+        with pytest.raises(SystemExit) as excinfo:
+            ap.main(["plan", "--topic", "Plan: 純中文主題", "--cwd", str(tmp_path)])
+        assert excinfo.value.code != 0
+        assert "slug" in capsys.readouterr().err
+
+    def test_cli_plan_on_main_writes_topic_path(self, tmp_path: Path, capsys):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        assert (
+            ap.main(["plan", "--topic", "Plan: Example topic", "--cwd", str(tmp_path)])
+            == 0
+        )
+        assert capsys.readouterr().out.splitlines() == [
+            "status: new",
+            "path: .maigo/topic/example-topic/plan.md",
+        ]
+
+    def test_cli_slug_beats_h1_slug_and_rescues_cjk_topic(self, tmp_path: Path, capsys):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        assert (
+            ap.main(
+                [
+                    "plan",
+                    "--topic",
+                    "Plan: 純中文主題",
+                    "--slug",
+                    "My Slug",
+                    "--cwd",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+        assert "path: .maigo/topic/my-slug/plan.md" in capsys.readouterr().out
+
+    def test_cli_plan_with_pr_url_writes_pr_path(self, tmp_path: Path, capsys):
+        assert (
+            ap.main(
+                [
+                    "plan",
+                    "--topic",
+                    "Plan: X",
+                    "--url",
+                    "https://github.com/o/r/pull/9",
+                    "--repo",
+                    "o/r",
+                    "--cwd",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+        assert "path: .maigo/pr/9/plan.md" in capsys.readouterr().out
 
     def test_level4_non_git_repo_uses_cwd_dir_slug(self, tmp_path: Path):
         target_dir = tmp_path / "My Scratch Dir"
@@ -387,7 +530,7 @@ class TestResolveForWrite:
             cwd=tmp_path,
         )
         assert result.status == "new"
-        assert result.path == ".maigo/plan-42.md"
+        assert result.path == ".maigo/issue/42/plan.md"
         assert result.existing_topic is None
         assert result.suggested_path is None
         assert result.legacy_path is None
@@ -495,8 +638,8 @@ class TestResolveForWrite:
         assert result.flat_path is None
 
     def test_flat_path_always_none_for_plan_kind(self, tmp_path: Path):
-        # plan 不是巢狀 kind——`artifact_path("plan", "42")` 本身就是
-        # `.maigo/plan-42.md`，沒有與正典路徑不同的「扁平」形可退。
+        # plan 的 group 取決於 URL，不在 `_NESTED_LAYOUT`；分目錄前的扁平形
+        # （`.maigo/plan-42.md`）由遷移腳本處理，不是這裡的讀取退路。
         result = ap.resolve_for_write(
             "plan",
             "Plan: fix dag run stall",
@@ -507,7 +650,7 @@ class TestResolveForWrite:
         assert result.flat_path is None
 
     def test_new_when_existing_file_has_no_h1(self, tmp_path: Path):
-        target = tmp_path / ".maigo" / "plan-42.md"
+        target = tmp_path / ".maigo" / "issue" / "42" / "plan.md"
         target.parent.mkdir(parents=True)
         target.write_text("no h1 here\njust text\n", encoding="utf-8")
         result = ap.resolve_for_write(
@@ -518,10 +661,10 @@ class TestResolveForWrite:
             cwd=tmp_path,
         )
         assert result.status == "new"
-        assert result.path == ".maigo/plan-42.md"
+        assert result.path == ".maigo/issue/42/plan.md"
 
     def test_same_topic_when_h1_matches(self, tmp_path: Path):
-        target = tmp_path / ".maigo" / "plan-42.md"
+        target = tmp_path / ".maigo" / "issue" / "42" / "plan.md"
         target.parent.mkdir(parents=True)
         target.write_text("# Plan: fix dag run stall\n\nbody\n", encoding="utf-8")
         result = ap.resolve_for_write(
@@ -532,12 +675,12 @@ class TestResolveForWrite:
             cwd=tmp_path,
         )
         assert result.status == "same_topic"
-        assert result.path == ".maigo/plan-42.md"
+        assert result.path == ".maigo/issue/42/plan.md"
         assert result.existing_topic == "Plan: fix dag run stall"
         assert result.suggested_path is None
 
     def test_conflict_when_h1_differs(self, tmp_path: Path):
-        target = tmp_path / ".maigo" / "plan-42.md"
+        target = tmp_path / ".maigo" / "issue" / "42" / "plan.md"
         target.parent.mkdir(parents=True)
         target.write_text("# Plan: something else\n", encoding="utf-8")
         result = ap.resolve_for_write(
@@ -550,7 +693,7 @@ class TestResolveForWrite:
         assert result.status == "conflict"
         assert result.path is None
         assert result.existing_topic == "Plan: something else"
-        assert result.suggested_path == ".maigo/plan-42-2.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-2.md"
 
     def test_conflict_suggests_next_attempt_when_attempt_2_taken_by_other_topic(
         self, tmp_path: Path
@@ -558,14 +701,16 @@ class TestResolveForWrite:
         # T1：-2 已被另一個主題占用 → 候選不能再指向 -2，要遞增到 -3。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
-        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
-        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "plan.md").write_text("# Plan: A\n", encoding="utf-8")
+        (plan_dir / "plan-2.md").write_text("# Plan: B\n", encoding="utf-8")
         result = ap.resolve_for_write(
             "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
         )
         assert result.status == "conflict"
         assert result.path is None
-        assert result.suggested_path == ".maigo/plan-42-3.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-3.md"
 
     def test_conflict_suggests_attempt_2_when_it_already_has_same_topic(
         self, tmp_path: Path
@@ -574,14 +719,16 @@ class TestResolveForWrite:
         # （-1 檔屬於別的主題；同意閘門不因找到同主題檔而放寬）。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
-        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
-        (maigo_dir / "plan-42-2.md").write_text("# Plan: C\n", encoding="utf-8")
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "plan.md").write_text("# Plan: A\n", encoding="utf-8")
+        (plan_dir / "plan-2.md").write_text("# Plan: C\n", encoding="utf-8")
         result = ap.resolve_for_write(
             "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
         )
         assert result.status == "conflict"
         assert result.path is None
-        assert result.suggested_path == ".maigo/plan-42-2.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-2.md"
 
     def test_nested_conflict_suggests_next_attempt_when_attempt_2_taken(
         self, tmp_path: Path
@@ -608,13 +755,15 @@ class TestResolveForWrite:
         # T4：-2 被占用、-3 空著、-4 被占用 → 取第一個空號 -3，不是最大號 + 1。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
-        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
-        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
-        (maigo_dir / "plan-42-4.md").write_text("# Plan: D\n", encoding="utf-8")
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "plan.md").write_text("# Plan: A\n", encoding="utf-8")
+        (plan_dir / "plan-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        (plan_dir / "plan-4.md").write_text("# Plan: D\n", encoding="utf-8")
         result = ap.resolve_for_write(
             "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
         )
-        assert result.suggested_path == ".maigo/plan-42-3.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-3.md"
 
     def test_conflict_suggests_past_two_consecutive_taken_attempts(
         self, tmp_path: Path
@@ -622,14 +771,16 @@ class TestResolveForWrite:
         # T7：-2、-3 都被其他主題占用 → 要連續跳過，取 -4（抓「只跳一次」的實作）。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
         for name, topic in (("", "A"), ("-2", "B"), ("-3", "D")):
-            (maigo_dir / f"plan-42{name}.md").write_text(
+            (plan_dir / f"plan{name}.md").write_text(
                 f"# Plan: {topic}\n", encoding="utf-8"
             )
         result = ap.resolve_for_write(
             "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
         )
-        assert result.suggested_path == ".maigo/plan-42-4.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-4.md"
 
     def test_conflict_suggestion_treats_attempt_without_h1_as_available(
         self, tmp_path: Path
@@ -637,13 +788,15 @@ class TestResolveForWrite:
         # T5：-2 存在但沒有 H1 → 與主路徑 status="new" 的判準一致，視為可用。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
-        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
-        (maigo_dir / "plan-42-2.md").write_text("no heading here\n", encoding="utf-8")
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "plan.md").write_text("# Plan: A\n", encoding="utf-8")
+        (plan_dir / "plan-2.md").write_text("no heading here\n", encoding="utf-8")
         result = ap.resolve_for_write(
             "plan", "Plan: C", url=_URL, home_repo=_HOME_REPO, cwd=tmp_path
         )
         assert result.status == "conflict"
-        assert result.suggested_path == ".maigo/plan-42-2.md"
+        assert result.suggested_path == ".maigo/issue/42/plan-2.md"
 
     def test_legacy_exists_flag_when_old_fixed_name_present(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"
@@ -671,7 +824,7 @@ class TestResolveForWrite:
     def test_permission_denied_target_raises_not_new(self, tmp_path: Path):
         # must-fix #1 repro：真實內容 → chmod 000 → 呼叫，必須拋錯，不能變成
         # 可覆寫的 "new"。
-        target = tmp_path / ".maigo" / "plan-42.md"
+        target = tmp_path / ".maigo" / "issue" / "42" / "plan.md"
         target.parent.mkdir(parents=True)
         target.write_text("# Plan: something else\n", encoding="utf-8")
         target.chmod(0o000)
@@ -722,10 +875,10 @@ class TestCli:
         )
         out = capsys.readouterr().out.splitlines()
         assert exit_code == 0
-        assert out == ["status: new", "path: .maigo/plan-42.md"]
+        assert out == ["status: new", "path: .maigo/issue/42/plan.md"]
 
     def test_conflict_exits_3_and_omits_path(self, tmp_path: Path, capsys):
-        target = tmp_path / ".maigo" / "plan-42.md"
+        target = tmp_path / ".maigo" / "issue" / "42" / "plan.md"
         target.parent.mkdir(parents=True)
         target.write_text("# Plan: something else\n", encoding="utf-8")
         exit_code = ap.main(
@@ -746,7 +899,7 @@ class TestCli:
         assert out == [
             "status: conflict",
             "conflict_owner: Plan: something else",
-            "suggest: .maigo/plan-42-2.md",
+            "suggest: .maigo/issue/42/plan-2.md",
         ]
         assert not any(line.startswith("path:") for line in out)
 
@@ -754,8 +907,10 @@ class TestCli:
         # T6：CLI 路徑也拿到遞增後的候選；status / exit 3 / 不印 path: 不變。
         maigo_dir = tmp_path / ".maigo"
         maigo_dir.mkdir()
-        (maigo_dir / "plan-42.md").write_text("# Plan: A\n", encoding="utf-8")
-        (maigo_dir / "plan-42-2.md").write_text("# Plan: B\n", encoding="utf-8")
+        plan_dir = maigo_dir / "issue" / "42"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "plan.md").write_text("# Plan: A\n", encoding="utf-8")
+        (plan_dir / "plan-2.md").write_text("# Plan: B\n", encoding="utf-8")
         exit_code = ap.main(
             [
                 "plan",
@@ -771,7 +926,7 @@ class TestCli:
         )
         out = capsys.readouterr().out.splitlines()
         assert exit_code == 3
-        assert "suggest: .maigo/plan-42-3.md" in out
+        assert "suggest: .maigo/issue/42/plan-3.md" in out
         assert out[0] == "status: conflict"
         assert not any(line.startswith("path:") for line in out)
 
@@ -796,7 +951,7 @@ class TestCli:
         assert exit_code == 0
         assert out == [
             "status: new",
-            "path: .maigo/plan-42.md",
+            "path: .maigo/issue/42/plan.md",
             "legacy_exists: .maigo/plan.md",
         ]
 

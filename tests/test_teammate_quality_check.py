@@ -79,6 +79,43 @@ class TestCheckTomori:
         result = json.loads(capsys.readouterr().out.strip())
         assert result["decision"] == "block"
 
+    @pytest.mark.parametrize(
+        "path",
+        [
+            pytest.param(".maigo/pr/42/plan.md", id="pr"),
+            pytest.param(".maigo/issue/42/plan-2.md", id="issue"),
+            pytest.param(".maigo/topic/some-topic/plan.md", id="topic"),
+        ],
+    )
+    def test_tomori_nested_plan_paths_are_accepted(
+        self,
+        path: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        monkeypatch.chdir(tmp_path)
+        out = f"## Loaded memory entries\n（無相關 entry）\n{path}\n## Goal\n## Steps\n"
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(out)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result.get("decision") is None
+
+    def test_tomori_block_message_names_nested_plan_shapes(
+        self, capsys: pytest.CaptureFixture
+    ):
+        out = "## Loaded memory entries\n（無相關 entry）\nno path here\n## Goal\n"
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(out)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        for shape in (
+            ".maigo/pr/<id>/plan.md",
+            ".maigo/issue/<id>/plan.md",
+            ".maigo/topic/<slug>/plan.md",
+        ):
+            assert shape in result["reason"]
+
     def test_plan_path_but_no_heading_blocks(self, capsys: pytest.CaptureFixture):
         with pytest.raises(SystemExit):
             tqc.check_tomori(".maigo/plan.md was written\n")

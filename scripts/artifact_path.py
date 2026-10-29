@@ -17,7 +17,11 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
      PR/issue 的所有產物收進同一個目錄。PR 類 kind 依作者分流：呼叫端傳
      `owner`（`mine` → `pr/`，`others` → `review/`），`triage-rubric` 固定在
      `issue/`、不分流。
-   - 扁平（`plan`）：`.maigo/plan-<id>[-<attempt>].md`，不動。
+   - `plan`：`.maigo/<group>/<id>/plan[-<attempt>].md`，`<group>` 依 `url` 決定
+     （`plan_group()`）：PR URL → `pr`、issue URL → `issue`、其餘 → `topic`。
+     預設分支（`main` / `master` / `develop` / `trunk`）上 `<id>` 不用分支名，
+     改用 `--slug` 或 `--topic` H1 推導的 slug。頂層 `.maigo/plan-<id>.md` 已
+     淘汰，只供讀取退路與遷移。
    `<id>` 走四級來源鏈（`resolve_identifier()`），每一級都必須是事後可重新
    推導的——不是只要唯一就好。
 2. **(c) 歸屬檢查**：`resolve_for_write()` 是唯一對外入口，`topic`
@@ -48,7 +52,7 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 
 ```
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" plan \
-    --topic "<H1 主題>" [--url URL] [--repo owner/name] [--cwd DIR]
+    --topic "<H1 主題>" [--slug SLUG] [--url URL] [--repo owner/name] [--cwd DIR]
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric \
     --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name \
     --owner mine|others
@@ -58,10 +62,11 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric \
 沒有 `--url`（本地 branch / range）時預設 `mine`。
 
 stdout 第 1 行 `status: new|same_topic|conflict`；
-非 conflict 時第 2 行 `path: .maigo/plan-<id>.md`（巢狀 kind 則是
+非 conflict 時第 2 行 `path: .maigo/topic/<id>/plan.md`（plan 依 URL 也可能是
+`.maigo/pr/<id>/plan.md` 或 `.maigo/issue/<id>/plan.md`；其他巢狀 kind 則是
 `path: .maigo/review/<id>/rubric.md` 或 `.maigo/pr/<id>/rubric.md` 這類）；
 conflict 時第 2 行 `conflict_owner: <既有 H1>`、第 3 行
-`suggest: .maigo/plan-<id>-<n>.md`（候選路徑：從第 2 個 attempt 起，第一個
+`suggest: .maigo/topic/<id>/plan-<n>.md`（候選路徑：從第 2 個 attempt 起，第一個
 未被其他主題占用者——不存在、沒有 H1、或 H1 與本次主題相同的既有檔，所以
 `<n>` 可能是 2、3……；status 仍是 conflict，須經使用者同意才可以用），**exit 3**（非 0，讓 `&&` 串接的呼叫端直接停住），且不印任何可
 寫入的 `path:` 行。舊固定檔名存在時（不論 status）多印一行
@@ -95,8 +100,8 @@ _KNOWN_KINDS = (
 )
 
 # kind → (group 目錄, 檔名 stem)：巢狀佈局 `.maigo/<group>/<id>/<stem>.md`。
-# key 是 `_KNOWN_KINDS` 的子集，恰好不含 "plan"——plan 維持扁平
-# `.maigo/plan-<id>.md`，見 `artifact_path()`。
+# key 是 `_KNOWN_KINDS` 的子集，恰好不含 "plan"——plan 的 group 由 URL 決定，
+# 走下面的 `_PLAN_GROUPS` / `plan_group()`，見 `artifact_path()`。
 _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "review": ("review", "review"),
     "review-rubric": ("review", "rubric"),
@@ -105,6 +110,15 @@ _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "reply-draft": ("review", "reply-draft"),
     "triage-rubric": ("issue", "rubric"),
 }
+
+# plan 的 group 目錄：`.maigo/<group>/<id>/plan[-n].md`，stem 固定是 `plan`。
+# 刻意不放進 `_NESTED_LAYOUT`（那張表的 group 是 kind 的固有屬性，plan 的 group
+# 取決於 URL）也不放進 `_OWNER_SPLIT_KINDS`（plan 不依作者分流）。
+_PLAN_GROUPS = ("pr", "issue", "topic")
+_PLAN_STEM = "plan"
+
+# 這些分支不代表任何 topic：在上面開的 plan 會全部撞成同一個識別碼（`main`）。
+DEFAULT_BRANCHES = frozenset({"main", "master", "develop", "trunk"})
 
 # 依 PR 作者分流：owner → group。會分流的 kind，`_NESTED_LAYOUT` 的 value 填
 # `others` 那組（`review`）——value 形狀不能改，hook 只認 `(group, stem)`。
@@ -127,6 +141,9 @@ _SLUG_COLLAPSE_RE = re.compile(r"-{2,}")
 _SLUG_MAX_LEN = 40
 
 _H1_PREFIX = "# "
+_PLAN_H1_PREFIX_RE = re.compile(r"^\s*plan\s*[:：]\s*", re.IGNORECASE)
+_PR_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/pull/\d+/?$")
+_ISSUE_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/issues/\d+/?$")
 
 _IDENTIFIER_INVALID_CHARS = ("/", "\\")
 
@@ -159,11 +176,41 @@ def slugify(text: str) -> str | None:
     return truncated or None
 
 
+def topic_slug_from_h1(topic: str) -> str | None:
+    """
+    `--topic` 的 H1 文字去掉 `Plan:` 前綴後 `slugify()`。純函式。
+
+    `slugify()` 會把 CJK 整個換掉，純中文主題回 `None`——呼叫端要另外提供 `--slug`。
+    """
+    return slugify(_PLAN_H1_PREFIX_RE.sub("", topic, count=1))
+
+
+def plan_group(url: str | None, home_repo: str = "") -> str:
+    """
+    plan 的 group 目錄：PR URL → `pr`、issue URL → `issue`，其餘（沒有 URL、
+    非 GitHub、格式壞掉）→ `topic`。純函式。
+
+    `home_repo` 只影響識別碼（`github_ref()`），不影響 group：跨 repo 的 PR 仍是 `pr`。
+    """
+    del home_repo
+    if not url:
+        return "topic"
+    stripped = url.strip()
+    if _PR_URL_RE.match(stripped):
+        return "pr"
+    if _ISSUE_URL_RE.match(stripped):
+        return "issue"
+    return "topic"
+
+
 def nested_locations(kind: str) -> list[tuple[str, str]]:
     """
     *kind* 所有可能的 `(group, stem)`：會分流的 kind 回 `pr` 與 `review` 兩組，
-    其餘巢狀 kind 回一組，非巢狀（`plan`）回空 list。純函式。
+    `plan` 回 `pr` / `issue` / `topic` 三組，其餘巢狀 kind 回一組，未知 kind 回
+    空 list。純函式。
     """
+    if kind == "plan":
+        return [(group, _PLAN_STEM) for group in _PLAN_GROUPS]
     if kind not in _NESTED_LAYOUT:
         return []
     _group, stem = _NESTED_LAYOUT[kind]
@@ -188,11 +235,19 @@ def _check_owner(kind: str, owner: str | None) -> None:
 
 
 def artifact_path(
-    kind: str, identifier: str, attempt: int = 1, *, owner: str | None = None
+    kind: str,
+    identifier: str,
+    attempt: int = 1,
+    *,
+    owner: str | None = None,
+    group: str | None = None,
 ) -> str:
     """
-    正典路徑：巢狀 kind → `.maigo/<group>/<id>/<stem>[-<attempt>].md`；
-    其餘（目前只有 `plan`）→ `.maigo/<kind>-<id>[-<attempt>].md`。純函式。
+    正典路徑：`.maigo/<group>/<id>/<stem>[-<attempt>].md`。純函式。
+
+    `plan` 的 group 由呼叫端用 `plan_group()` 算出後以 `group` 傳入（`pr` /
+    `issue` / `topic`，沒給就是 `topic`）；其他 kind 的 group 是固有屬性，給了
+    `group` 就 `ValueError`。
 
     會分流的 kind 必須給 `owner`（`mine` → `pr/`、`others` → `review/`），沒給
     就 `ValueError`；不分流的 kind 給了 `owner` 也 `ValueError`。
@@ -213,12 +268,19 @@ def artifact_path(
         raise ValueError(f"attempt must be >= 1: {attempt!r}")
     _check_owner(kind, owner)
     suffix = "" if attempt == 1 else f"-{attempt}"
-    if kind in _NESTED_LAYOUT:
-        group, stem = _NESTED_LAYOUT[kind]
-        if owner is not None:
-            group = _OWNER_GROUPS[owner]
-        return f".maigo/{group}/{identifier}/{stem}{suffix}.md"
-    return f".maigo/{kind}-{identifier}{suffix}.md"
+    if kind == "plan":
+        plan_dir = group if group is not None else "topic"
+        if plan_dir not in _PLAN_GROUPS:
+            raise ValueError(
+                f"unknown plan group: {plan_dir!r}; must be one of {_PLAN_GROUPS}"
+            )
+        return f".maigo/{plan_dir}/{identifier}/{_PLAN_STEM}{suffix}.md"
+    if group is not None:
+        raise ValueError(f"kind {kind!r} has a fixed group; do not pass group")
+    nested_group, stem = _NESTED_LAYOUT[kind]
+    if owner is not None:
+        nested_group = _OWNER_GROUPS[owner]
+    return f".maigo/{nested_group}/{identifier}/{stem}{suffix}.md"
 
 
 def flat_path(kind: str, identifier: str) -> str:
@@ -319,13 +381,21 @@ def _rebase_original_branch_slug(cwd: str | Path) -> str | None:
 
 
 def resolve_identifier(
-    cwd: str | Path, url: str | None = None, home_repo: str = ""
+    cwd: str | Path,
+    url: str | None = None,
+    home_repo: str = "",
+    *,
+    topic_slug: str | None = None,
 ) -> str:
     """
     四級識別碼鏈，由上往下第一個取得到的就用；永不退回固定檔名。
 
     1. `url` 給的 GitHub issue/PR → `github_ref()`（逐字沿用 `detail_path()` 規則）。
     2. 當前 branch（`git branch --show-current`）→ `slugify()`。
+       例外：呼叫端傳了 `topic_slug`（plan 用；`None` 表示不用 topic 識別）且
+       branch 屬於 `DEFAULT_BRANCHES` 時，這一級改用 `topic_slug`——預設分支名
+       不代表任何 topic。此時 `topic_slug` 是空字串就 `ValueError`，不往下掉到
+       短 SHA（SHA 每次 commit 都變，同一 topic 的 plan 會散在不同目錄）。
     3. detached HEAD：進行中的 rebase 用記錄的原分支名（見
        `_rebase_original_branch_slug()`，穩定、不隨 `--continue`/`--amend`
        移動）；純粹靜止的 detached HEAD 才用 `git rev-parse --short HEAD`
@@ -340,6 +410,13 @@ def resolve_identifier(
             return ref
 
     branch = _run_git(["branch", "--show-current"], cwd)
+    if branch and topic_slug is not None and branch in DEFAULT_BRANCHES:
+        if not topic_slug:
+            raise ValueError(
+                f"on default branch {branch!r} a plan needs a topic slug, but the "
+                "topic yields an empty one; pass --slug"
+            )
+        return topic_slug
     if branch:
         slug = slugify(branch)
         if slug:
@@ -403,6 +480,7 @@ def _first_available_attempt(
     cwd: str | Path,
     normalized_topic: str,
     owner: str | None = None,
+    group: str | None = None,
 ) -> str:
     """
     從 attempt 2 起往上找第一個「不存在、沒有 H1、或 H1 與 `normalized_topic` 相同」
@@ -411,7 +489,9 @@ def _first_available_attempt(
     """
     attempt = 2
     while True:
-        candidate = artifact_path(kind, identifier, attempt=attempt, owner=owner)
+        candidate = artifact_path(
+            kind, identifier, attempt=attempt, owner=owner, group=group
+        )
         existing = read_topic(Path(cwd) / candidate)
         if existing is None or existing == normalized_topic:
             return candidate
@@ -426,6 +506,7 @@ def resolve_for_write(
     home_repo: str = "",
     cwd: str | Path = ".",
     owner: str | None = None,
+    slug: str | None = None,
 ) -> Resolution:
     """
     (c) 歸屬檢查的唯一對外入口。`topic` 必填——沒有申報主題就拿不到路徑。
@@ -439,6 +520,9 @@ def resolve_for_write(
 
     會分流的 kind：有 `url` 就必須給 `owner`（沒給 `ValueError`）；沒有 `url`
     （本地 branch / range）沒給 `owner` 時算自己的（`mine`）。
+
+    `plan`：group 由 `url` 決定（`plan_group()`）；在預設分支上識別碼用 `slug`
+    （優先）或 `topic` 的 H1 slug，兩者都空就 `ValueError`。
     """
     if kind in _OWNER_SPLIT_KINDS and owner is None:
         if url:
@@ -447,8 +531,14 @@ def resolve_for_write(
                 "(resolve it with scripts/pr_owner.py)"
             )
         owner = "mine"
-    identifier = resolve_identifier(cwd, url=url, home_repo=home_repo)
-    path_str = artifact_path(kind, identifier, owner=owner)
+    group = plan_group(url, home_repo) if kind == "plan" else None
+    topic_slug = None
+    if kind == "plan":
+        topic_slug = slug if slug is not None else (topic_slug_from_h1(topic) or "")
+    identifier = resolve_identifier(
+        cwd, url=url, home_repo=home_repo, topic_slug=topic_slug
+    )
+    path_str = artifact_path(kind, identifier, owner=owner, group=group)
     existing_topic = read_topic(Path(cwd) / path_str)
 
     legacy_str = legacy_path(kind)
@@ -498,7 +588,7 @@ def resolve_for_write(
         existing_topic=existing_topic,
         incoming_topic=normalized_incoming,
         suggested_path=_first_available_attempt(
-            kind, identifier, cwd, normalized_incoming, owner
+            kind, identifier, cwd, normalized_incoming, owner, group
         ),
         legacy_path=legacy_result,
         flat_path=flat_result,
@@ -518,6 +608,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--cwd", default=".", help="計算識別碼與檢查既有檔案的目錄")
     parser.add_argument(
+        "--slug",
+        default=None,
+        help="plan 專用：預設分支上的識別碼（優先於 --topic 的 H1 slug；"
+        "純中文主題在 main 上必須給）",
+    )
+    parser.add_argument(
         "--owner",
         choices=tuple(_OWNER_GROUPS),
         default=None,
@@ -534,14 +630,26 @@ def main(argv: list[str] | None = None) -> int:
             "run scripts/pr_owner.py --url <url> to resolve it"
         )
 
-    resolution = resolve_for_write(
-        args.kind,
-        args.topic,
-        url=args.url,
-        home_repo=args.repo,
-        cwd=args.cwd,
-        owner=args.owner,
-    )
+    if args.slug is not None and args.kind != "plan":
+        parser.error(f"--slug only applies to kind 'plan', not {args.kind!r}")
+    slug = None
+    if args.slug is not None:
+        slug = slugify(args.slug)
+        if slug is None:
+            parser.error(f"--slug {args.slug!r} is empty after slugify")
+
+    try:
+        resolution = resolve_for_write(
+            args.kind,
+            args.topic,
+            url=args.url,
+            home_repo=args.repo,
+            cwd=args.cwd,
+            owner=args.owner,
+            slug=slug,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     print(f"status: {resolution.status}")
     if resolution.status == "conflict":

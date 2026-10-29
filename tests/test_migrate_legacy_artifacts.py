@@ -50,7 +50,7 @@ class TestPlanMigration:
 
         assert len(actions) == 1
         assert actions[0].old_path == ".maigo/plan.md"
-        assert actions[0].new_path == ".maigo/plan-fix-dag-run-stall.md"
+        assert actions[0].new_path == ".maigo/topic/fix-dag-run-stall/plan.md"
         assert actions[0].disambiguated is False
         assert actions[0].h1 == "Fix DAG run stall"
 
@@ -99,7 +99,9 @@ class TestPlanMigration:
             "# Fix DAG run stall\n", encoding="utf-8"
         )
         # 該 repo 已有一份新命名檔案，恰好撞到遷移後會算出的目標檔名。
-        (repo / ".maigo" / "plan-fix-dag-run-stall.md").write_text(
+        taken = repo / ".maigo" / "topic" / "fix-dag-run-stall" / "plan.md"
+        taken.parent.mkdir(parents=True)
+        taken.write_text(
             "# Fix DAG run stall (already migrated by someone else)\n",
             encoding="utf-8",
         )
@@ -108,7 +110,7 @@ class TestPlanMigration:
         actions = mla.plan_migration(repo, catalog)
 
         assert len(actions) == 1
-        assert actions[0].new_path == ".maigo/plan-fix-dag-run-stall-2.md"
+        assert actions[0].new_path == ".maigo/topic/fix-dag-run-stall/plan-2.md"
         assert actions[0].disambiguated is True
 
     def test_two_legacy_files_colliding_on_same_h1_both_disambiguate(
@@ -119,13 +121,15 @@ class TestPlanMigration:
         # 連續撞名，驗證尾碼會遞增而不是卡在 -2。
         repo = _make_repo(tmp_path)
         (repo / ".maigo" / "plan.md").write_text("# X\n", encoding="utf-8")
-        (repo / ".maigo" / "plan-x.md").write_text("taken\n", encoding="utf-8")
-        (repo / ".maigo" / "plan-x-2.md").write_text("also taken\n", encoding="utf-8")
+        taken_dir = repo / ".maigo" / "topic" / "x"
+        taken_dir.mkdir(parents=True)
+        (taken_dir / "plan.md").write_text("taken\n", encoding="utf-8")
+        (taken_dir / "plan-2.md").write_text("also taken\n", encoding="utf-8")
 
         catalog = scan(repo / ".maigo")
         actions = mla.plan_migration(repo, catalog)
 
-        assert actions[0].new_path == ".maigo/plan-x-3.md"
+        assert actions[0].new_path == ".maigo/topic/x/plan-3.md"
         assert actions[0].disambiguated is True
 
     def test_no_legacy_files_returns_empty_list(self, tmp_path: Path):
@@ -163,17 +167,17 @@ class TestKindStutterRegressions:
         new_path = self._migrate_one(
             tmp_path, "plan.md", "# Plan: Stats — Pelican stat dual mode (EN)"
         )
-        assert new_path == ".maigo/plan-stats-pelican-stat-dual-mode-en.md"
+        assert new_path == ".maigo/topic/stats-pelican-stat-dual-mode-en/plan.md"
 
     def test_pelican_osm_plan_no_stutter(self, tmp_path: Path):
         new_path = self._migrate_one(
             tmp_path, "plan.md", "# Plan: Emoji icon pin for place markers"
         )
-        assert new_path == ".maigo/plan-emoji-icon-pin-for-place-markers.md"
+        assert new_path == ".maigo/topic/emoji-icon-pin-for-place-markers/plan.md"
 
     def test_ring_plan_no_stutter(self, tmp_path: Path):
         new_path = self._migrate_one(tmp_path, "plan.md", "# Plan: Ring kitty focuser")
-        assert new_path == ".maigo/plan-ring-kitty-focuser.md"
+        assert new_path == ".maigo/topic/ring-kitty-focuser/plan.md"
 
     def test_attila_review_rubric_no_stutter_and_truncation_lands_on_boundary(
         self, tmp_path: Path
@@ -215,7 +219,7 @@ class TestKindStutterRegressions:
             "plan.md",
             "# Plan: create_post slug — PR #224 review c2",
         )
-        assert new_path == ".maigo/plan-create_post-slug-pr-224-review-c2.md"
+        assert new_path == ".maigo/topic/create_post-slug-pr-224-review-c2/plan.md"
 
     def test_pycontw_blog_pr_comments_no_stutter_and_boundary(self, tmp_path: Path):
         new_path = self._migrate_one(
@@ -918,12 +922,13 @@ class TestCli:
 
         captured = capsys.readouterr()
         assert exit_code == 0
-        assert f"{repo} :: .maigo/plan.md -> .maigo/plan-fix-dag-run-stall.md" in (
-            captured.out
+        assert (
+            f"{repo} :: .maigo/plan.md -> .maigo/topic/fix-dag-run-stall/plan.md"
+            in (captured.out)
         )
         assert old.exists()
         assert _sha(old) == original_hash
-        assert not (repo / ".maigo" / "plan-fix-dag-run-stall.md").exists()
+        assert not (repo / ".maigo" / "topic").exists()
         assert not mla.manifest_path(repo).exists()
 
     def test_apply_flag_actually_renames(self, tmp_path: Path, capsys):
@@ -935,7 +940,7 @@ class TestCli:
 
         assert exit_code == 0
         assert not old.exists()
-        assert (repo / ".maigo" / "plan-fix-dag-run-stall.md").exists()
+        assert (repo / ".maigo" / "topic" / "fix-dag-run-stall" / "plan.md").exists()
 
     def test_rerun_after_apply_is_idempotent_and_reports_nothing_to_migrate(
         self, tmp_path: Path, capsys
@@ -953,7 +958,7 @@ class TestCli:
 
         assert exit_code == 0
         assert f"{repo} :: (nothing to migrate)" in captured.out
-        assert (repo / ".maigo" / "plan-fix-dag-run-stall.md").exists()
+        assert (repo / ".maigo" / "topic" / "fix-dag-run-stall" / "plan.md").exists()
         assert _snapshot(repo / ".maigo") == before
 
     def test_repo_list_file_is_read_when_no_positional_repos_given(
@@ -1031,7 +1036,7 @@ class TestCli:
         assert f"{fake_repo} :: skipped" in captured.out
         assert str(real_repo) in captured.out
         # 真的存在的 repo 仍照常算出遷移計畫，不受前一筆缺路徑影響
-        assert "plan-real.md" in captured.out
+        assert ".maigo/topic/real/plan.md" in captured.out
 
     def test_home_repo_name_flag_overrides_git_remote_detection(
         self, tmp_path: Path, capsys

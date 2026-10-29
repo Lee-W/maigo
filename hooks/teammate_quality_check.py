@@ -122,7 +122,8 @@ PR_DRAFT_RE = re.compile(r"##\s+Suggested PR title", re.IGNORECASE)
 # `review-rubric.md` / `triage-rubric.md`) through identifier-suffixed flat
 # ones (`plan-<id>.md` / ...) to the current nested-by-PR/issue layout
 # (`review/<id>/rubric.md` or `pr/<id>/rubric.md` by PR author,
-# `issue/<id>/rubric.md`) — see
+# `issue/<id>/rubric.md`; plans live at `pr/<id>/plan.md`, `issue/<id>/plan.md`
+# or `topic/<slug>/plan.md`) — see
 # `scripts/artifact_path.py`. `artifact_path_regex()` is the single source of
 # truth for matching all three shapes at once; dynamic import (not a literal
 # regex here) keeps this hook from drifting out of sync with that module.
@@ -183,7 +184,8 @@ def check_tomori(out: str) -> None:
     if _TOMORI_ARTIFACT_RE is not None and not _TOMORI_ARTIFACT_RE.search(out):
         emit(
             "block",
-            "燈 (Tomori) 的輸出沒提到 .maigo/plan-<id>.md / .maigo/review/<id>/rubric.md / "
+            "燈 (Tomori) 的輸出沒提到 .maigo/pr/<id>/plan.md / .maigo/issue/<id>/plan.md / "
+            ".maigo/topic/<slug>/plan.md / .maigo/review/<id>/rubric.md / "
             ".maigo/pr/<id>/rubric.md / .maigo/issue/<id>/rubric.md。呼叫 scripts/artifact_path.py 取得路徑，"
             "把計畫 / rubric 寫進那個檔案再回報。",
         )
