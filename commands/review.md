@@ -258,6 +258,9 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 
 - 本地 report 剛完成 → 先讀 report metadata 再跑 `board_state.py --maigo-root <repo-root>`。
   同步標題、`@貢獻者`、最後 review 時間與 report 路徑。
+- 用 script 回寫時，單顆 PR 收尾一律 `python3 <maigo-root>/scripts/board_sync.py refresh --apply --add <PR url> --no-discovery`——
+  不帶 `--no-discovery` 會順帶 discovery 全部待審 PR、把 board 從一行撐成幾十行（2026-10-29 實例：1 行變 45 行）；
+  要掃全部待審 PR 是 `/maigo:board` 的事，不是 review 收尾的事。
 - 本地 verdict 尚未送 GitHub、且使用者尚未標「已看完」→ 👀 行留在 🎯 下一件，
   狀態詞寫 `待送出`——不再寫成 `BLOCKED` / `NEEDS_CHANGES` / `APPROVE_WITH_NITS` /
   `APPROVE` 之一硬留 🎯；這修掉一個既知的漂移：舊寫法在下次刷新會被 `classify()`

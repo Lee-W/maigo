@@ -44,10 +44,20 @@ gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDra
 |---|---|
 | `state == "MERGED"` 或 `mergedAt` 已設 | 不進流程，queue 上標 `⏭️ skipped (merged)`，**自動推進**到下一個 |
 | `state == "CLOSED"` 未 merge | 同上，標 `⏭️ skipped (closed)` |
-| `isDraft == true` | orchestrator 先問使用者「PR #N 是 draft，還是要看嗎？」`yes` → 走，`skip` → 跳下一個 |
+| `isDraft == true` | 預設 `skip`，不逐顆問（見下方「大批次的預設選擇」）；使用者明講要看才走 |
 | 其他 | 正常進入 §1 樂奈 stage |
 
 merged / closed 的 PR **不需要** review report——只在 queue 表標 skipped 一行帶過。
+
+## 大批次的預設選擇（不必逐次再問）
+
+本檔適用的批次模式下，下列選擇直接套用，使用者另有指示才改（單顆審查的流程在 `strict-review` 本體，不受影響）：
+
+- **draft PR 預設跳過**，不逐顆問。
+- **已有舊報告的 PR 也全部重審**，不因舊報告存在、head 沒動就略過。
+- **模型調度用相對降檔**（對齊 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md) 的精神）：探索、規劃、審查三個角色在批次時可比單顆審查降一檔（基準＝單顆審查的調度）；驗證角色可再降一檔，因為它只做機械性的實跑與 read-back。單顆 PR 或高風險 PR 不適用。
+
+Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠大於收益；使用者在一次 46 顆的批次前如此選擇。
 
 ## 預設：平行審完全部、統一 publish、board 放最前
 
@@ -68,7 +78,7 @@ merged / closed 的 PR **不需要** review report——只在 queue 表標 skip
    問完；見「交付時效」）；must-fix 放不放、nit 怎麼送，**全部審完後集中問一次**（收尾用
    AskUserQuestion，每次最多 4 題、分輪問完；每題推薦項放第一個，選項寫清楚 must-fix 與 nit 各自
    怎麼處理）；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者必須先決定才不會白做」的
-   前提（例如範圍需要改審）才提前問。draft PR 仍照前置處理表先問。
+   前提（例如範圍需要改審）才提前問。draft PR 預設跳過，不問。
 4. **board 單一寫手**：Work Board 由**單一** agent 以 `Edit` 回寫（不要每顆各寫一次、也不整份
    覆寫；規則見 `skills/work-board`），這批 PR 的行放 🎯 最前面。
 5. 最後走 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）。
