@@ -80,6 +80,16 @@ maintainer and reshaped into an `AirflowTools` adapter.
 How to apply: for a new vendor SDK, compare against the existing adapters' shape and guarantee
 list; before proposing an operator, answer "what does it give that `AgentOperator` cannot?"
 
+## common.ai toolset strings and released parameters
+
+- **Hints use the toolset's own tool names.** Any string a model or user sees from a common.ai
+  toolset — retry hints, `allowed_tables` rejection messages, conflict hints — must be built from
+  that toolset's own (prefixed) tool names, never hard-coded bare names such as `list_tables`.
+- **A released major is frozen: restore, don't remove.** Once a common.ai major is on PyPI, a
+  minor release must not remove parameters. Restore the removed name as a deprecated alias
+  (`warnings.warn(..., AirflowProviderDeprecationWarning, stacklevel=2)`) kept until the next
+  major, and make the changelog name every class (hooks included) whose default changed.
+
 ---
 
 ## Airflow cases behind the generic design-integrity rules

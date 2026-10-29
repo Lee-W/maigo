@@ -90,3 +90,24 @@ the check should just be narrowed in scope. If the capability shipped but
 the newer test coverage for it didn't get backported, the right move is
 usually to backport the source PR that added the missing coverage — not to
 shrink the check to stop noticing the gap.
+
+**Backporting to `airflow-ctl/v*-test`.** That branch ships only `airflow-ctl/`, and CI runs
+`airflow-ctl-tests` only. Three adjustments follow:
+
+- **Drop `airflow-core` hunks.** A cherry-pick from main that also touches `airflow-core` (for
+  example a decorator plus its import that main added alongside the ctl change) must be dropped
+  unless the symbol exists on the base. Run
+  `git grep <symbol> upstream/airflow-ctl/v0-1-test -- airflow-core` before keeping it. Default:
+  drop it and do not backport the helper. A reviewer will otherwise find an import pointing at a
+  symbol the base does not have.
+- **Tests follow the base's datamodel.** `airflow-ctl/src/airflowctl/api/datamodels/generated.py`
+  is generated, and its field defaults can differ between main and the release branch (for
+  example `ClearTaskInstancesBody.run_on_latest_version` is `None` on main, `False` on
+  `airflow-ctl/v0-1-test`). A cherry-picked test that asserts a datamodel default must follow the
+  base's `generated.py`: change the expected value, never edit `generated.py` or loosen the
+  assertion.
+- **Verify in a dedicated environment.** The main worktree's shared `.venv` carries editable
+  provider installs that exist only on main (stale `.pth`), so on a release branch any
+  `import airflow` dies with `ModuleNotFoundError: No module named 'airflow.providers.<x>'`. Use
+  `env UV_PROJECT_ENVIRONMENT=<scratch dir> uv run --frozen --python 3.12 --project airflow-ctl pytest <paths>`
+  and pin `--python`; a fresh env otherwise picks a Python without pydantic-core wheels.

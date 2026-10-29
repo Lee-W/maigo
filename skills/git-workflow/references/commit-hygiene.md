@@ -64,6 +64,18 @@ between different commits so no single `--fixup` covers them:
 Run `git apply --check` first: overlapping hunks can make the second patch fail
 against the first one's result.
 
+**Splitting into several `fixup!` commits has two constraints at once**, which is what the
+fallback above can't satisfy alone:
+
+- Every staged state must pass the repo's pre-commit hooks on its own. With a mypy hook, removing
+  a symbol that doesn't exist on the base means any intermediate commit that still keeps the
+  import is red.
+- Each fixup's hunks must exist in the target commit's tree, or `rebase --autosquash` conflicts.
+
+When the two collide, land one fixup targeting the last commit that introduced the symbol; don't
+`SKIP=` through the hook. (A two-fixup plan on an upstream PR was blocked once by the mypy hook
+and once by autosquash.)
+
 Verify the rewrite lost nothing: tag the old tip first (`git tag
 backup/pre-amend-<date>`); then `git diff <pre-rewrite-sha> HEAD --stat` must equal
 exactly the change being folded in, and the subject lists of the old and new

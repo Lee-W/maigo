@@ -19,6 +19,9 @@ description: This skill should be used whenever writing, templating or generatin
 
 使用者用 nvim 直接開 `.maigo/` 底下的檔案來讀、來改。maigo 不蓋閱讀層、不建議裝 plugin，所以「好讀」只能靠檔案本身的形狀。這份 skill 是那個形狀的單一來源：各模板與產生器只放一行連結指到這裡，不重抄規則本文。
 
+交付物預設落成使用者能用編輯器打開的檔案（也就是這份 skill 排版的 `.maigo/` 產物），不要把報告整份印在聊天裡——聊天輸出用完即棄。要貼去別處的內容（PR 留言、回覆草稿）另外放進 fenced block，依
+[`copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)；兩條規則疊加：檔案是來源，fenced block 是貼上面。
+
 ## 適用範圍
 
 人讀產物的權威清單是 `scripts/artifact_path.py` 的 `_KNOWN_KINDS`，加上 Work Board（不在 `_KNOWN_KINDS` 裡）。各自的格式定義處：
