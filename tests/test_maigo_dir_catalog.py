@@ -262,3 +262,134 @@ class TestInternalDir:
 
     def test_other_non_markdown_files_stay_unregistered(self):
         assert mdc.categorize(["x.json"]).unregistered == ["x.json"]
+
+
+def _write(path: Path, text: str = "x\n") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+class TestScanTree:
+    def test_scan_tree_reports_unknown_top_level_dir_once(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "evals" / "a" / "one.json")
+        _write(maigo_dir / "evals" / "two.json")
+        _write(maigo_dir / "evals" / "three.md")
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert tree["unregistered"] == ["evals/"]
+
+    def test_scan_tree_sees_non_markdown_top_level_files(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "__titles.json", "{}")
+        _write(maigo_dir / "notes.txt")
+        _write(maigo_dir / "local-model-dispatch-plan.md")
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert tree["unregistered"] == [
+            "__titles.json",
+            "local-model-dispatch-plan.md",
+            "notes.txt",
+        ]
+        # `scan()` is blind to the non-markdown ones (its semantics stay unchanged)
+        assert mdc.scan(maigo_dir).unregistered == ["local-model-dispatch-plan.md"]
+
+    def test_scan_tree_recognises_topic_and_archive(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "topic" / "my-topic" / "plan.md")
+        _write(maigo_dir / "topic" / "my-topic" / "plan-2.md")
+        _write(maigo_dir / "topic" / "my-topic" / "rubric.md")
+        _write(maigo_dir / "pr" / "9" / "plan.md")
+        _write(maigo_dir / "issue" / "3" / "plan.md")
+        _write(maigo_dir / "review" / "5" / "rubric.md")
+        _write(maigo_dir / "_archive" / "review" / "42" / "review.md")
+        _write(maigo_dir / "_archive" / "i" / "42.md")
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert tree["nested"] == [
+            "issue/3/plan.md",
+            "pr/9/plan.md",
+            "review/5/rubric.md",
+            "topic/my-topic/plan-2.md",
+            "topic/my-topic/plan.md",
+        ]
+        # `rubric.md` is not a topic stem, so it is not a registered artifact there
+        assert tree["unregistered"] == ["topic/my-topic/rubric.md"]
+        assert len(tree["archive"]) == 2
+        assert tree["archive"][0].startswith("_archive/i/42.md (mtime 20")
+        assert tree["archive"][1].startswith("_archive/review/42 (mtime 20")
+
+    def test_scan_tree_flags_nested_dot_maigo(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / ".maigo" / "_internal" / "log" / "session-head.json")
+        _write(maigo_dir / "_internal" / "board" / "snapshot.json")
+        _write(maigo_dir / "_internal" / "log" / "token-usage.jsonl")
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert tree["nested_dot_maigo"] == [".maigo/"]
+        assert tree["internal"] == ["_internal/ (2 files)"]
+        assert tree["unregistered"] == []
+
+    def test_scan_tree_classifies_legacy_internal_logs(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        for name in (
+            "session-head.json",
+            "token-usage.jsonl",
+            "test-failures.jsonl",
+            "soyo-must-fix.jsonl",
+        ):
+            _write(maigo_dir / name)
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert tree["legacy_internal_log"] == [
+            "session-head.json",
+            "soyo-must-fix.jsonl",
+            "test-failures.jsonl",
+            "token-usage.jsonl",
+        ]
+        assert tree["unregistered"] == []
+
+    def test_scan_tree_covers_every_category_and_missing_dir(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "plan.md")
+        _write(maigo_dir / "plan-fix.md")
+        _write(maigo_dir / "review-rubric-42.md")
+        _write(maigo_dir / "board.md")
+        _write(maigo_dir / "i" / "42.md")
+
+        tree = mdc.scan_tree(maigo_dir)
+
+        assert set(tree) == set(mdc.TREE_CATEGORIES)
+        assert tree["legacy_fixed_name"] == ["plan.md"]
+        assert tree["identifier_named"] == ["plan-fix.md"]
+        assert tree["flat_identifier"] == ["review-rubric-42.md"]
+        assert tree["board"] == ["board.md", "i/42.md"]
+        assert all(v == [] for v in mdc.scan_tree(tmp_path / "nope").values())
+
+    def test_cli_tree_flag_prints_every_category(self, tmp_path: Path, capsys):
+        maigo_dir = tmp_path / ".maigo"
+        _write(maigo_dir / "evals" / "x.json")
+        _write(maigo_dir / "topic" / "t" / "plan.md")
+        _write(maigo_dir / "session-head.json")
+        _write(maigo_dir / "_archive" / "pr" / "1" / "plan.md")
+        _write(maigo_dir / "_internal" / "a.json")
+        _write(maigo_dir / ".maigo" / "x")
+        _write(maigo_dir / "board.md")
+        _write(maigo_dir / "plan-a.md")
+        _write(maigo_dir / "plan.md")
+        _write(maigo_dir / "review-b-1.md")
+
+        exit_code = mdc.main(["--dir", str(maigo_dir), "--tree"])
+        out = capsys.readouterr().out
+
+        assert exit_code == 0
+        for category in mdc.TREE_CATEGORIES:
+            header, _, rest = out.partition(f"{category}:\n")
+            assert rest, category
+            first_line = rest.splitlines()[0]
+            assert first_line.startswith("  "), (category, first_line)
