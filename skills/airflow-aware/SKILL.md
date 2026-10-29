@@ -94,7 +94,7 @@ from scheduler/worker internals. Cross-boundary changes need extra scrutiny — 
 ### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 During a **review task** (🟡 Soyo running `strict-review` on an Airflow diff), read `references/review-checks.md` and append its sub-checks as items 10+, with the severity each states.
-Its "Contents" list enumerates 10.1–10.37 plus the unnumbered DB portability and concurrency section. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the file.
+Its "Contents" list enumerates 10.1–10.37 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the file.
 
 ### 11. CLI / REST / docs / backport conventions
 
@@ -108,8 +108,8 @@ Its "Contents" list enumerates 10.1–10.37 plus the unnumbered DB portability a
 |---|---|
 | `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, Dag authoring |
 | `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle |
-| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds; attribution; docs screenshot procedure |
-| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); uv.lock drift diagnostic |
+| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds; attribution; relock pin-back to the documented version; docs screenshot procedure |
+| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); uv.lock drift diagnostic; release-tag check before "released"/"breaking" claims |
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
 | `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity |
 | `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs, docs examples |

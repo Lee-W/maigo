@@ -46,6 +46,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 - **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
 - **10.37** Before unifying several return paths of a released, stable-listed operator into one helper, read each path's behavior in the last release tag (Request changes, scope-gated to such unifications)
+- **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
 ## Secrets masker tests: `@pytest.mark.enable_redact` + reset before use
@@ -1233,6 +1234,23 @@ python-mode cannot work (model in a set / dict key, or class not registrable by 
 paths were already merged into one boolean at operator level (there,
 `serialize_output or not _CORE_WALKER`) before assuming the helper has to tell them apart: in
 1.0.0 those two had the same behavior, so splitting them was unnecessary.
+
+## Before calling a symbol "already released" or a change "breaking", check the release tags *(judgment gate — when a review comment or recommendation rests on a compatibility claim)*
+
+Companion to 10.25 (framing) and 10.37 (reading each path's released behavior). Before saying a
+symbol or behavior is "released, can't touch" or that a change "would be breaking", find which
+release tags (rc included) actually contain it:
+
+```bash
+git tag --contains <commit>
+git ls-tree <tag> -- <path>
+```
+
+A symbol that exists only on `main`, or was added after the latest tag, is unreleased and imposes
+no compatibility constraint. Case (#74695): `AgentOperator._dump_unregistered_models` (added by
+#74729) was in none of the `providers-common-ai` 1.0.0, 1.0.0rc1-rc3 or 1.1.0rc1 tags; recommending
+"docs only, keep two dump paths" without checking made the shared helper look impossible until the
+user asked whether a helper was feasible.
 
 ## DB portability and concurrency: four review checks *(narrow — when a diff touches a scheduler timer callback, a `DELETE` built from a subquery, Postgres error-code handling, or a unique-constraint get-or-create; Request changes)*
 

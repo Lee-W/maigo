@@ -787,6 +787,21 @@ the rebase paragraph above needs.
   `grep -c` on both locks (remaining lock hits may be a hash coincidence — read
   the line). Don't `grep -r` the whole monorepo.
 
+### A re-lock from `main`'s lock re-resolves the PR's new dependency to the latest version — pin it back to the documented one
+
+Restoring `main`'s `uv.lock` and running plain `uv lock` (the usual rebase fix above) resolves a
+dependency the PR newly added to the **current latest** release, not the version the PR was
+tested with. If the provider docs state a "tested with X" version or list X in a version table,
+the lock and the docs now disagree — which re-triggers the review rule "docs must match what CI
+installs". Case (#74026): `claude-agent-sdk` jumped from 0.2.168 to 0.2.174 after the re-lock
+while the docs still said 0.2.168; a verifier caught it, not the re-lock step itself.
+
+How to apply: after the re-lock, `grep -A1 '^name = "<pkg>"' uv.lock` and compare with the
+version in the docs. If they differ, either pin back with
+`uv lock --upgrade-package '<pkg>==X'` or change the docs after rerunning the tests on the new
+version. Finish with `git diff upstream/main --stat -- uv.lock`: only that package's increment
+should remain.
+
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 
 `AIRFLOW_HOME` defaults to `~/airflow` for every worktree, so
