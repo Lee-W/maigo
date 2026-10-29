@@ -163,7 +163,7 @@ def _validate_identifier(identifier: str) -> None:
 
 def slugify(text: str) -> str | None:
     """
-    轉小寫 → 非 `[a-z0-9._-]` 換成 `-` → 連續 `-` 收成一個 → 去頭尾 `-`/`.`
+    轉小寫 → 非 `[a-z0-9._-]` 換成 `-` → 連續 `-` 收成一個 → 去頭尾 `-`/`.`/`_`
     → 截斷 `_SLUG_MAX_LEN` 字元 → 空字串則回 `None` 讓呼叫端往下一級。
 
     純函式，不做任何 I/O。
@@ -171,7 +171,7 @@ def slugify(text: str) -> str | None:
     lowered = text.lower()
     replaced = _SLUG_INVALID_RE.sub("-", lowered)
     collapsed = _SLUG_COLLAPSE_RE.sub("-", replaced)
-    stripped = collapsed.strip("-.")
+    stripped = collapsed.strip("-._")
     truncated = stripped[:_SLUG_MAX_LEN]
     return truncated or None
 

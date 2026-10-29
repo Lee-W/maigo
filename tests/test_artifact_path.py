@@ -38,6 +38,10 @@ class TestSlugify:
     def test_lowercases_and_replaces_invalid_chars(self):
         assert ap.slugify("Fix/DAG Run_Stall!!") == "fix-dag-run_stall"
 
+    def test_strips_leading_and_trailing_underscores(self):
+        assert ap.slugify("_x") == "x"
+        assert ap.slugify("__x_y__") == "x_y"
+
     def test_truncates_to_40_chars(self):
         result = ap.slugify("a" * 50)
         assert result == "a" * 40
@@ -418,6 +422,25 @@ class TestResolveIdentifierChain:
             == 0
         )
         assert "path: .maigo/topic/my-slug/plan.md" in capsys.readouterr().out
+
+    def test_cli_slug_with_leading_underscore_is_stripped(self, tmp_path: Path, capsys):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        assert (
+            ap.main(
+                [
+                    "plan",
+                    "--topic",
+                    "Plan: 純中文主題",
+                    "--slug",
+                    "_x",
+                    "--cwd",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+        assert "path: .maigo/topic/x/plan.md" in capsys.readouterr().out
 
     def test_cli_plan_with_pr_url_writes_pr_path(self, tmp_path: Path, capsys):
         assert (
