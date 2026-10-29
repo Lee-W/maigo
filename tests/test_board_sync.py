@@ -238,6 +238,21 @@ class TestParseBoard:
         assert parsed["errors"] == [] and len(parsed["warnings"]) == 1
         assert parsed["lines"][0]["author"] is None
 
+    def test_author_pending_needs_a_whole_note_segment(self):
+        text = "## 🎯 下一件\n1. [ ] 👀 待 review（作者待補中） i/1.md — t\n"
+        parsed = sync.parse_board(text)
+        assert parsed["lines"] == [] and "缺 @作者" in parsed["errors"][0]
+        merged = "## 🎯 下一件\n1. [ ] 👀 待 review（手寫；作者待補） i/1.md — t\n"
+        assert sync.parse_board(merged)["errors"] == []
+
+    def test_read_board_prints_no_warnings_in_lenient_mode(self, tmp_path, capsys):
+        text = "## 🎯 下一件\n1. [ ] 👀 待 review i/1.md — t\n"
+        sync._read_board(tmp_path, text, allow_missing_author=True)
+        assert capsys.readouterr().err == ""
+        pending = "## 🎯 下一件\n1. [ ] 👀 待 review（作者待補） i/1.md — t\n"
+        sync._read_board(tmp_path, pending)
+        assert "作者待補" in capsys.readouterr().err
+
     def test_old_section_heading_is_legacy(self):
         assert sync.parse_board("## 🎯 你的球\n- [ ] x\n")["legacy"] is True
         assert sync.parse_board("## 🎯 下一件\n### 已 review\n")["legacy"] is True
@@ -725,6 +740,14 @@ class TestPlanSideEffects:
         saved = json.loads((state_dir(tmp_path) / "snapshot.json").read_text())
         assert info["count"] == 1 and list(saved["items"]) == [url(1)]
         assert saved["items"][url(1)]["checked"] is True and saved["version"] == 1
+
+
+def test_snapshot_keeps_lines_that_have_no_author_yet(tmp_path, gh):
+    items = [row(n).replace(" @carol", "") for n in range(1, 37)]
+    assert all("@" not in item for item in items)
+    make_board(tmp_path, *items, details=tuple(range(1, 37)))
+    info = sync.write_snapshot(tmp_path, REPO, NOW)
+    assert info["count"] == 36 and info["errors"] == []
 
 
 # --- ack -----------------------------------------------------------------------

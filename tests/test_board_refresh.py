@@ -318,6 +318,11 @@ def test_render_line_merges_author_pending_into_existing_note():
     assert line.count("（") == 1
 
 
+def test_render_line_treats_author_pending_lookalike_as_plain_note():
+    line = refresh.render_line(**_line_args(note="（作者待補中）"))
+    assert line == "- [ ] 👀 待 review（作者待補中；作者待補） i/1.md — t"
+
+
 def test_render_line_drops_pending_marker_once_author_is_known():
     only = refresh.render_line(**_line_args(note="（作者待補）", author="octocat"))
     assert only == "- [ ] 👀 待 review @octocat i/1.md — t"

@@ -165,11 +165,7 @@ def _merge_author_pending(note: str | None, has_author: bool) -> str | None:
     The body grammar admits a single note group, so the marker joins the existing
     note with `；` instead of sitting next to it. Idempotent.
     """
-    parts = [
-        part
-        for part in (note[1:-1].split("；") if note else [])
-        if part != sync.AUTHOR_PENDING
-    ]
+    parts = [part for part in sync.note_segments(note) if part != sync.AUTHOR_PENDING]
     if not has_author:
         parts.append(sync.AUTHOR_PENDING)
     return f"（{'；'.join(parts)}）" if parts else None

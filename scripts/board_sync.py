@@ -94,6 +94,18 @@ _BODY_RE = re.compile(
     r"\s*—\s?(?P<title>.*)$"
 )
 AUTHOR_PENDING = "作者待補"
+
+
+def note_segments(note: str | None) -> list[str]:
+    """Segments of a `（a；b）` note, split on `；` (empty list when no note)."""
+    return note[1:-1].split("；") if note else []
+
+
+def note_has_author_pending(note: str | None) -> bool:
+    """True only when a whole segment equals `作者待補` (`作者待補中` is a plain note)."""
+    return AUTHOR_PENDING in note_segments(note)
+
+
 _DETAIL_ANYWHERE_RE = re.compile(r"i/\S+?\.md")
 _LINK_RE = re.compile(r"^- 連結：(\S+)", re.MULTILINE)
 _LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*(\S+)", re.MULTILINE)
@@ -198,7 +210,7 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
         if problem is None and not parsed["detail"]:  # type: ignore[index]
             problem = "缺細節檔路徑"
         if problem is None and not parsed["author"]:  # type: ignore[index]
-            if AUTHOR_PENDING in (parsed["note"] or ""):  # type: ignore[index]
+            if note_has_author_pending(parsed["note"]):  # type: ignore[index]
                 warnings.append(f"board.md:{line_no}: {AUTHOR_PENDING}：{raw}")
             elif allow_missing_author:
                 warnings.append(f"board.md:{line_no}: 缺 @作者：{raw}")
@@ -609,8 +621,11 @@ def _read_board(
     parsed = parse_board(text, allow_missing_author=allow_missing_author)
     if parsed["legacy"]:
         raise BoardLegacyError("board.md 是舊版格式；請先跑整檔正規化再執行 plan")
-    for warning in parsed["warnings"]:
-        print(f"warning: {warning}", file=sys.stderr)
+    if (
+        not allow_missing_author
+    ):  # lenient callers (refresh) report via their own summary
+        for warning in parsed["warnings"]:
+            print(f"warning: {warning}", file=sys.stderr)
     return parsed
 
 
@@ -956,7 +971,8 @@ def write_snapshot(
     `checked_overrides[url]` records a different `checked` (or `None` = leave the
     URL out) so a checkbox change refresh could not process is seen again next round."""
     maigo_dir = maigo_root / ".maigo"
-    parsed = _read_board(maigo_root)
+    # Lenient: a snapshot only needs url/checked/detail, never the author.
+    parsed = _read_board(maigo_root, allow_missing_author=True)
     errors = list(parsed["errors"]) + _resolve_lines(parsed, maigo_dir, repo)
     items = {
         line["url"]: {"checked": line["checked"], "detail": line["detail"]}
