@@ -385,6 +385,8 @@ image: `ANSWER=no breeze run pytest <tests> -xvs`. The env var answers all
 of breeze's yes/no prompts globally — several of the entries below assume
 it's already in place.
 
+For a harness `.claude/test-command`, the `breeze run` form with `ANSWER=no` is the default — see "Airflow `test-command` prefixes" below.
+
 ### A brand-new worktree's first `breeze run` builds a CI image — that can outrun a harness timeout, and looks like a test failure
 
 In a git worktree (or image cache) that has never run breeze before, the
@@ -535,8 +537,14 @@ it, is in
 [`harness-discipline`'s `shell-and-tool-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/shell-and-tool-gotchas.md).
 Only the Airflow-specific prefixes are listed here.
 
+**Default form: `breeze run`.** Write the command as
+`/usr/bin/env ANSWER=no breeze run pytest <one test file> -q -x -p no:cacheprovider` — one line, no `&&`, with the variable carried by `env` because there is no shell.
+Prefer it to a host-side `uv run --project <pkg> pytest` (the fallback, and the shape used in the examples below), because a host environment often lacks a provider
+(e.g. `airflow.providers.fab`) or hits a stale `airflow.db` under `AIRFLOW_HOME` (`idx_xcom_key already exists`), so the red is the environment, not the test.
+Limit it to one file so each Stop-hook run finishes in a minute or two. The first `breeze run` may build the image: warm it up by hand once (see "A brand-new worktree's first `breeze run` builds a CI image").
+
 Prefixes a provider/breeze `test-command` usually needs, each written with
-the absolute `/usr/bin/env` so no shell is involved (the full command shape:
+the absolute `/usr/bin/env` so no shell is involved (the full host-fallback command shape:
 `/usr/bin/env AIRFLOW_HOME=<scratchpad>/airflow-home uv run --frozen --project
 providers/<p> python -m pytest <files> -q`; `mkdir -p` the home first):
 
@@ -856,9 +864,10 @@ delegation prompt, not just in your own head):
 - **Write a scoped `.claude/test-command` at the start, and run it once.** The repo root has no
   runnable pytest entry point, so the Stop hook's default `uv run pytest -x` dies with
   `ERROR collecting` — a collection error, not a test failure, with no suite run at all. Narrow it
-  to the package and directories this change touches (`uv run --project <pkg> pytest <dirs>`) and
+  to the package and directories this change touches and
   confirm it exits 0 rather than swapping one false signal for another. Prefer this to
-  `.claude/skip-test-verification`, which turns verification off entirely. When a test is renamed,
+  `.claude/skip-test-verification`, which turns verification off entirely.
+  Prefer the `breeze run` form from "Airflow `test-command` prefixes" as the default; the host `uv run --project <pkg> pytest` is the fallback. When a test is renamed,
   grep the command for the old id (`ERROR: not found:` means the suite never ran), and list only
   files this change touched so an old task's leftover paths don't bring unrelated reds in.
 - **Reusing one on-disk `AIRFLOW_HOME` accumulates residue.**
@@ -884,6 +893,18 @@ delegation prompt, not just in your own head):
   image from the registry and running `uv run --project <pkg> pytest` inside it. It is not
   breeze and not the CI environment, so say so in the report; and tests that need Linux skip
   wholesale on macOS, so a macOS green doesn't verify them.
+
+### Reproducing a providers Compat job locally (common.ai as the example)
+
+To reproduce a `Compat <older Airflow>` job of a provider such as `providers/common/ai`:
+
+1. **Do not use the documented `breeze shell --use-airflow-version <X> --mount-sources providers-and-tests`.** It installs the *published* `common-compat` (1.15.0 at the time of writing), so tests that import `SET_DURING_EXECUTION` / `AIRFLOW_V_3_4_PLUS` break at import — an environment failure, not a test result.
+2. **Build the wheels first, as CI does.** `breeze release-management prepare-provider-distributions --include-not-ready-providers --skip-tag-check --distribution-format wheel common.ai common.compat common.sql` writes them to the git-ignored `dist/`. Then run
+   `env ANSWER=no breeze shell --use-distributions-from-dist --distribution-format wheel --use-airflow-version <X> --install-airflow-with-constraints --providers-skip-constraints --mount-sources tests "cd /opt/airflow; python -m pytest <tests> -q -p no:cacheprovider -rs -o pythonpath="`.
+3. **`-o pythonpath=` is required.** The root `pyproject.toml` puts `airflow-core/src` on `pythonpath`; that directory exists in the image and shadows the installed airflow (`No module named airflow.providers`). `breeze testing providers-tests --use-airflow-version` hits the same problem.
+4. **The container has no `/opt/airflow/files`** — do not redirect output there. Save breeze's whole stdout on the host and read breeze's outer exit code (no `| tail`, which replaces it).
+
+Measured 2026-10-29: `providers/common/ai/tests/unit` on Airflow 3.2.2 — 4092 passed, 420 skipped.
 
 ## 5. Generated files: mutation canary and breeze-generated artifacts
 

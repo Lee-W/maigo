@@ -164,3 +164,17 @@ test removed, the whole-string comparison took about 8 minutes under breeze to
 fail (CI's limit is 60 seconds), because pytest diffed two ~250,000-character
 strings; after the split, removing the guard turned the `set(kept[1:])` line
 red in 2.5 seconds.
+
+---
+
+## Tests expecting a model to be dumped to a dict must gate on the deserialization walker
+
+Airflow-only case (no python-aware counterpart).
+
+After changing how `providers/common/ai` dumps structured output to XCom (`serialize_output`, `output_type`), a test that expects a **nested or unregistered** model to become a dict must carry `requires_typed_xcom` (or that file's `requires_walker`).
+
+Why: Airflow 3.1 / 3.2 task-sdk has `airflow.sdk.serde` but **no deserialization walker** (`iter_pydantic_models`), so the operators there deliberately push the instance. 2.11 / 3.0 have no serde at all, so every existing gate skips on them — a green 2.11 / 3.0 job says nothing about 3.1 / 3.2.
+
+Do not over-gate: a **top-level** model is still `model_dump()`ed there because `_serialize_model_output=True`, so a test expecting a dict for it is correct without the gate.
+
+apache/airflow #74695: Compat 3.1.8 / 3.2.2 went red on the `list-in-output-marker` parameter of the HITL tests in `test_agent.py`, which expected a dict for a nested model.
