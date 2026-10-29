@@ -14,7 +14,7 @@
 
 下列項目一律 `needs_confirm=True`，只有 `--apply --confirm <path>` 點名的那一筆才動
 （沒有「全部同意」的開關）：`topic/<slug>/` 封存（沒有外部訊號可判結案）、`_archive/`
-中 mtime 超過 `ARCHIVE_RETENTION` 的項目（delete-candidate）、`scan_tree` 判為
+中封存（mtime，tidy 封存時會重設成封存當下）超過 `ARCHIVE_RETENTION` 的項目（delete-candidate）、`scan_tree` 判為
 unregistered 的項目（`--confirm`＝備份後刪除，`--confirm-archive`＝備份後封存）、`.maigo/.maigo/`（同左）、
 以及 GitHub 狀態查不到的 `pr/`／`review/`／`issue/` 項目（確認＝封存）。
 
@@ -313,7 +313,7 @@ def _plan_expired_archive(
                     "delete-candidate",
                     _display(match["path"]),
                     None,
-                    f"封存 mtime {match['mtime']}，已 {age.days} 天，超過保留期 "
+                    f"封存時間 {match['mtime']}，已 {age.days} 天，超過保留期 "
                     f"{ARCHIVE_RETENTION.days} 天；確認＝備份後刪除",
                     True,
                 )
@@ -514,11 +514,18 @@ def _apply_move_internal_log(action: TidyAction, maigo_dir: Path) -> str:
     return f"move-internal-log：{action.target} 已存在，以新檔為準，刪 {action.path}"
 
 
+def _stamp_archive_time(maigo_dir: Path, moved: list[str]) -> None:
+    """rename 會沿用原 mtime；保留期從封存時間起算，所以搬完把目標 mtime 設成現在。"""
+    for rel in moved:
+        os.utime(maigo_dir / board_sync.ARCHIVE_DIR / rel)
+
+
 def _apply_archive(action: TidyAction, maigo_dir: Path) -> str:
     moved, skipped, missing = board_sync.archive_relpaths(
         maigo_dir.parent, [_rel(action.path)]
     )
     if moved:
+        _stamp_archive_time(maigo_dir, moved)
         return f"archive：{action.path} → {action.target}"
     if skipped:
         return f"archive 略過：{action.path}（目的地已存在，不覆蓋）"
@@ -531,6 +538,7 @@ def _apply_archive_confirmed(action: TidyAction, maigo_dir: Path) -> str:
     )
     target = _display(f"{board_sync.ARCHIVE_DIR}/{_rel(action.path)}")
     if moved:
+        _stamp_archive_time(maigo_dir, moved)
         return f"{action.kind}：已封存 {action.path} → {target}"
     if skipped:
         return f"{action.kind} 略過：{action.path}（{target} 已存在，不覆蓋）"

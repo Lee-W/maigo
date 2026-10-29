@@ -39,7 +39,7 @@ allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py:*), Bash
 **一律要你逐項勾選**（不隨 `--apply` 自動做）：
 
 - `topic/<slug>/` 封存——沒有外部訊號可判結案。
-- `_archive/` 裡 mtime 超過 90 天的項目（delete-candidate）。
+- `_archive/` 裡封存後超過 90 天的項目（tidy 封存時會把 mtime 重設成封存當下）（delete-candidate）。
 - catalog 判為 unregistered 的項目（`evals/`、`__titles.json` 這類）。
 - `.maigo/.maigo/`（hook 在子目錄 cwd 下長出的殘留）。
 - GitHub 狀態查不到的項目——查不到就不動。

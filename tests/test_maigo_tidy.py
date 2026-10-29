@@ -515,3 +515,24 @@ def test_home_repo_name_helper_has_public_alias():
     from scripts import migrate_legacy_artifacts as mla
 
     assert mla.infer_home_repo_name is mla._infer_home_repo_name
+
+
+def test_archived_old_file_is_not_a_candidate_until_90_days_after_archiving(tmp_path):
+    maigo = make_maigo(tmp_path)
+    old = write(maigo / "local-model-dispatch-plan.md")
+    long_ago = NOW.timestamp() - 200 * 86400
+    os.utime(old, (long_ago, long_ago))
+    run_apply(
+        maigo, build(maigo), archive_confirmed={".maigo/local-model-dispatch-plan.md"}
+    )
+    archived = maigo / "_archive" / "local-model-dispatch-plan.md"
+    assert archived.is_file()
+    assert archived.stat().st_mtime > long_ago + 199 * 86400
+
+    def candidates():
+        return [a.path for a in build(maigo) if a.kind == "delete-candidate"]
+
+    assert ".maigo/_archive/local-model-dispatch-plan.md" not in candidates()
+    backdated = NOW.timestamp() - 100 * 86400
+    os.utime(archived, (backdated, backdated))
+    assert ".maigo/_archive/local-model-dispatch-plan.md" in candidates()

@@ -129,7 +129,7 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 | 頂層舊檔（`plan.md`、`plan-<id>.md`、`<kind>-<id>.md` …） | 升級前的 maigo | 一律視為待遷移 | 遷移成巢狀佈局（規則型） |
 | 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時把舊檔接在新檔前面（舊在前、新在後；`session-head.json` 以新檔為準）（規則型） |
 | `_internal/log/*.jsonl` | hook | 超過 2,000 行 | 舊的搬成 `<name>.1.jsonl`，只留一代（規則型，門檻 `LOG_ROTATE_MAX_LINES`）；`/maigo:doctor` 的統計只看現行檔，不含 `.1.jsonl` |
-| `_archive/` 的項目 | `/maigo:board`、`/maigo:tidy` | mtime 超過 90 天（`ARCHIVE_RETENTION`） | 列為 delete-candidate，**一律要你逐項勾選**；確認＝備份後刪除 |
+| `_archive/` 的項目 | `/maigo:board`、`/maigo:tidy` | 封存後超過 90 天（`ARCHIVE_RETENTION`；以 `_archive/` 內的 mtime 判定，tidy 封存時會把它重設成封存當下） | 列為 delete-candidate，**一律要你逐項勾選**；確認＝備份後刪除 |
 | 未登記檔（`evals/`、`__titles.json`、`local-model-dispatch-plan.md` 這類） | 不明 | catalog 判為 `unregistered` | 不隨 `--apply` 動；`--confirm <path>`＝備份後刪除，`--confirm-archive <path>`＝備份後封存到 `_archive/`，不點名就保留 |
 | `.maigo/.maigo/` | hook 在子目錄 cwd 下的殘留 | 一律視為殘留 | 同上（刪除或封存）；要合併回上層請手動處理 |
 
