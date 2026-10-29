@@ -5,6 +5,32 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.71.0 (2026-10-29)
+
+### Feat
+
+- **commands**: add /maigo:tidy
+- **tidy**: add maigo_tidy.py with dry-run catalogue and rule-based apply
+- **board**: require an @author on every board line with an author-pending escape
+- **migrate**: move top-level plan files into topic/ and keep the manifest under _internal
+- **catalog**: add a whole-tree scan mode
+- **artifact-path**: nest plans under pr/, issue/ and topic/ and skip default branches
+
+### Fix
+
+- **tidy**: judge archive retention per archived unit, not per nested file
+- **archive**: stamp the archive time in archive_relpaths and never fail a finished move on utime
+- **tidy**: count the archive retention window from the archive time, not the file mtime
+- **tidy**: keep log order, pin --dir to .maigo, hide unresolvable i/ entries and add --confirm-archive
+- **board**: read snapshots leniently and dedupe author-pending warnings during the backfill transition
+- **artifact-path**: strip leading and trailing underscores from slugs
+- **hooks**: block top-level plan-<id>.md writes
+- **address-comments**: find the PR when its head lives on a fork or HEAD is detached
+
+### Refactor
+
+- **hooks**: write machine logs under .maigo/_internal/log with legacy read fallback
+
 ## v0.70.0 (2026-10-28)
 
 ### Feat
