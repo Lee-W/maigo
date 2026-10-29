@@ -44,7 +44,16 @@ orchestrator 親自跑步驟 1–4（含 1.5）：
 | 當前 branch 有對應 PR | `gh pr view --json number,title,url,state,headRefName,baseRefName,isDraft` | 「當前 branch `<branch>` 沒有對應的 PR。address-comments 需要一個 PR 才能跑——先開 PR（可用 `/maigo:describe-pr` 產草稿）。」 |
 
 `gh pr view` 不帶位置參數時會自動解析當前 branch 的 PR；exit 非 0 或回
-「no pull requests found」即視為**讀不到 PR**，擋下。
+「no pull requests found」即視為**讀不到 PR**，擋下——但擋下之前先排除兩種 `gh pr view` 自己找不到的形狀：
+
+- **PR head 在 fork**（`origin` 是使用者的 fork、PR 開在 upstream）：`gh pr view <branch>` 只找 `<upstream-owner>:<branch>`，
+  會回「no pull requests found」。改用 `gh pr list --repo <upstream> --head <branch> --state all --json number,title,url,state,headRefName,baseRefName,isDraft`
+  再查一次，有結果就算過關（之後所有 `gh pr view` 都帶 `<number> --repo <upstream>`）。
+- **HEAD detached**（例如 rebase 中途、`git status` 顯示 `HEAD`）：不帶參數的 `gh pr view` 沒有 branch 可解析。branch 名改從
+  `.git/rebase-merge/head-name`（rebase 中）或 `git rev-parse --abbrev-ref HEAD` 取，帶進上面的 `--head` 查詢；rebase 中途本身不擋，
+  交給步驟 1.5 處理。
+
+兩種都查過仍沒有 PR，才擋下。（2026-10-29 apache/airflow #70276：fork head ＋ rebase 中途，照字面規則會誤擋。）
 
 過關後記下 `number` / `title` / `url` / `headRefName` / `baseRefName`，往下走。
 PR 若是 `MERGED` / `CLOSED` 狀態——不擋，但在列表時標出狀態提醒使用者。
