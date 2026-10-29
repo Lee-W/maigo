@@ -165,7 +165,8 @@ trade-off 對照，不要等使用者問了才展開。已處理的條目在清�
 
 接著問使用者**哪些要處理**：
 
-- comment 數 ≤ 4 → 用 **AskUserQuestion**（`multiSelect`）逐條列為選項。
+- comment 數 = 1 → **不開 widget**（單一選項的 AskUserQuestion 會被 harness 拒絕——2026-10-29 apache/airflow #75847 第二輪實際撞到）。純文字印出那一條的分桶＋ rationale，說明「只有這一條，照它處理」後直接進步驟 4；使用者要略過就回話。
+- comment 數 2–4 → 用 **AskUserQuestion**（`multiSelect`）逐條列為選項。
 - comment 數 > 4 → 直接純文字提問「哪些要處理？回編號（如 `C1 C3`），或 `全部未解決`」。
 
 提醒：不是每條都要改 code——像 C3 那種純提問可能只需回覆、不需改動。使用者挑完才往下。
