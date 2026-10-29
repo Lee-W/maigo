@@ -366,7 +366,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 「判定依據 ＋ 預定動作」，一段一行、不用表格。`--apply` 只執行規則型動作（舊檔遷移成巢狀佈局、
 頂層機器日誌歸進 `_internal/log/`、merged／closed 的 `pr/`、`review/`、`issue/`、`i/` 項目鏡射封存到
 `_archive/`、超過 2,000 行的 jsonl 輪替只留一代）；刪除、未登記檔、`topic/` 封存、
-`_archive/` 中超過 90 天的項目、`.maigo/.maigo/` 永遠由使用者逐項勾選，以 `--confirm <path>` 點名才動。
+`_archive/` 中超過 90 天的項目、`.maigo/.maigo/` 永遠由使用者逐項勾選，以 `--confirm <path>` 點名才動（unregistered 與 `.maigo/.maigo/` 也可用 `--confirm-archive <path>` 改成備份後封存）。
 動手前先備份到 `.maigo/_internal/tidy/backup/<UTC ts>/`。🌑 Mortis 一句結算。
 
 ```

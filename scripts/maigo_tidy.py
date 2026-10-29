@@ -15,7 +15,7 @@
 下列項目一律 `needs_confirm=True`，只有 `--apply --confirm <path>` 點名的那一筆才動
 （沒有「全部同意」的開關）：`topic/<slug>/` 封存（沒有外部訊號可判結案）、`_archive/`
 中 mtime 超過 `ARCHIVE_RETENTION` 的項目（delete-candidate）、`scan_tree` 判為
-unregistered 的項目（確認＝備份後刪除）、`.maigo/.maigo/`（確認＝備份後刪除）、
+unregistered 的項目（`--confirm`＝備份後刪除，`--confirm-archive`＝備份後封存）、`.maigo/.maigo/`（同左）、
 以及 GitHub 狀態查不到的 `pr/`／`review/`／`issue/` 項目（確認＝封存）。
 
 結案判定要打 gh（`item_state(group, id)` 注入，回 `"open"`／`"merged"`／`"closed"`／
@@ -25,13 +25,13 @@ unregistered 的項目（確認＝備份後刪除）、`.maigo/.maigo/`（確認
 改寫類的寫入用 tmp ＋ rename；備份完成之前不搬任何東西。還原：把備份裡的路徑複製回 `.maigo/`。
 
 `build_actions()`／`apply()` 沒有 import 副作用，`maigo_dir` 與 gh 查詢都可注入。
-`maigo_dir` 必須是 `<repo root>/.maigo`（遷移與封存的 helper 以 `maigo_dir.parent` 為 root）。
+`maigo_dir` 的目錄名必須是 `.maigo`（遷移與封存的 helper 以 `maigo_dir.parent/.maigo` 為準；不是就拒絕）。
 
 跑（CLI）：
 
 ```
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py" [--dir .maigo] [--no-gh] \\
-    [--apply [--confirm .maigo/<path> ...]]
+    [--apply [--confirm .maigo/<path> ...] [--confirm-archive .maigo/<path> ...]]
 ```
 """
 
@@ -85,6 +85,12 @@ BACKUP_REL = "_internal/tidy/backup"
 GH_TIMEOUT_SEC = 20
 _ARCHIVE_ENTRY_RE = re.compile(r"^(?P<path>.+?) \(mtime (?P<mtime>[^)]+)\)$")
 
+CONFIRM_HOW = (
+    "；確認方式：--confirm PATH＝備份後刪除，"
+    "--confirm-archive PATH＝備份後封存到 _archive/，不點名就保留"
+)
+ARCHIVE_CONFIRM_KINDS = frozenset({"unregistered", "remove-nested-dot-maigo"})
+
 ItemState = Callable[[str, str], "str | None"]
 
 
@@ -126,7 +132,7 @@ def _migration_actions(
     if resumed is not None:
         return resumed
     if home_repo_name is None:
-        home_repo_name = migrate._infer_home_repo_name(repo_root)
+        home_repo_name = migrate.infer_home_repo_name(repo_root)
     return migrate.plan_migration(
         repo_root,
         maigo_dir_catalog.scan(maigo_dir),
@@ -155,7 +161,7 @@ def _plan_internal_logs(
         reason = "頂層機器日誌，新位置是 _internal/log/"
         if (maigo_dir / target_rel).exists():
             reason += (
-                "；目標已存在，逐行 append 到新檔再刪舊檔"
+                "；目標已存在，舊檔內容接在新檔前面（舊在前、新在後）再刪舊檔"
                 if name.endswith(".jsonl")
                 else "；目標已存在，以新檔為準、刪舊檔"
             )
@@ -222,32 +228,50 @@ def _settled_action(
     return None
 
 
-def _plan_settled(maigo_dir: Path, item_state: ItemState) -> list[TidyAction]:
+def _plan_settled(
+    maigo_dir: Path, item_state: ItemState, notes: list[str]
+) -> list[TidyAction]:
+    """只替 id 是純數字的項目查狀態；其餘（跨 repo 的 `<repo>-<n>`、slug）彙總成一行備註。"""
     actions = []
+    unresolvable_groups = 0
     for group in STATE_GROUPS:
         group_dir = maigo_dir / group
         if not _is_real_dir(group_dir):
             continue
         for entry in sorted(group_dir.iterdir()):
-            if _is_real_dir(entry):
-                actions.append(
-                    _settled_action(
-                        maigo_dir,
-                        group,
-                        entry.name,
-                        f"{group}/{entry.name}",
-                        item_state,
-                    )
+            if not _is_real_dir(entry):
+                continue
+            if not entry.name.isdigit():
+                unresolvable_groups += 1
+                continue
+            actions.append(
+                _settled_action(
+                    maigo_dir, group, entry.name, f"{group}/{entry.name}", item_state
                 )
+            )
+    unresolvable_details = 0
     detail_dir = maigo_dir / maigo_dir_catalog.BOARD_DETAIL_DIR
     if _is_real_dir(detail_dir):
         for entry in sorted(detail_dir.glob("*.md")):
-            if entry.is_file() and not entry.is_symlink():
-                actions.append(
-                    _settled_action(
-                        maigo_dir, "i", entry.stem, f"i/{entry.name}", item_state
-                    )
+            if not entry.is_file() or entry.is_symlink():
+                continue
+            if not entry.stem.isdigit():
+                unresolvable_details += 1
+                continue
+            actions.append(
+                _settled_action(
+                    maigo_dir, "i", entry.stem, f"i/{entry.name}", item_state
                 )
+            )
+    if unresolvable_groups:
+        notes.append(
+            f"pr/、review/、issue/ 有 {unresolvable_groups} 筆 id 不是純數字，"
+            "狀態查不到，沒有列動作"
+        )
+    if unresolvable_details:
+        notes.append(
+            f"i/ 有 {unresolvable_details} 筆狀態查不到（id 不是純數字），由 /maigo:board 處理"
+        )
     return [action for action in actions if action is not None]
 
 
@@ -317,7 +341,7 @@ def _plan_nested_dot_maigo(
             _display(maigo_dir_catalog.NESTED_DOT_MAIGO_DIR),
             None,
             f"hook 在子目錄 cwd 下長出的殘留，{len(names)} 個檔（{shown or '空'}）；"
-            "確認＝備份後刪除，要合併回上層請手動處理",
+            "要合併回上層請手動處理" + CONFIRM_HOW,
             True,
         )
     ]
@@ -335,7 +359,7 @@ def _plan_unregistered(maigo_dir: Path, tree: dict[str, list[str]]) -> list[Tidy
         full = maigo_dir / _rel(path)
         if _is_real_dir(full):
             reason += f"；目錄，{_describe_dir(full)}"
-        reason += "；確認＝備份後刪除"
+        reason += CONFIRM_HOW
         actions.append(TidyAction("unregistered", path, None, reason, True))
     return actions
 
@@ -352,20 +376,43 @@ def build_actions(
     `None`（查不到）；整個傳 `None` 代表不做結案判定（`--no-gh`），連「查不到」的項目
     也不列。`now` 要帶時區。
     """
+    return build_plan(
+        maigo_dir, now=now, item_state=item_state, home_repo_name=home_repo_name
+    )[0]
+
+
+def _check_dir_name(maigo_dir: Path) -> None:
+    if maigo_dir.resolve().name != ".maigo":
+        raise ValueError(
+            f"{maigo_dir} 的目錄名不是 .maigo（遷移與封存以 <root>/.maigo 為準，"
+            "列的和動的會不是同一個目錄）"
+        )
+
+
+def build_plan(
+    maigo_dir: str | Path,
+    *,
+    now: datetime,
+    item_state: ItemState | None,
+    home_repo_name: str | None = None,
+) -> tuple[list[TidyAction], list[str]]:
+    """`build_actions` 加上統計段要印的備註（例如「i/ 有 N 筆狀態查不到」）。"""
     maigo_dir = Path(maigo_dir)
+    _check_dir_name(maigo_dir)
+    notes: list[str] = []
     if not maigo_dir.is_dir():
-        return []
+        return [], notes
     tree = maigo_dir_catalog.scan_tree(maigo_dir)
     actions = _plan_migrate(maigo_dir, home_repo_name)
     actions += _plan_internal_logs(maigo_dir, tree)
     actions += _plan_rotations(maigo_dir)
     if item_state is not None:
-        actions += _plan_settled(maigo_dir, item_state)
+        actions += _plan_settled(maigo_dir, item_state, notes)
     actions += _plan_topics(maigo_dir)
     actions += _plan_expired_archive(tree, now)
     actions += _plan_nested_dot_maigo(maigo_dir, tree)
     actions += _plan_unregistered(maigo_dir, tree)
-    return actions
+    return actions, notes
 
 
 # --------------------------------------------------------------------------- 套用
@@ -385,8 +432,12 @@ def _move(source: Path, destination: Path) -> None:
 def _backup(maigo_dir: Path, backup_root: Path, rel: str) -> bool:
     source = maigo_dir / rel
     destination = backup_root / rel
-    if not (source.exists() or source.is_symlink()) or destination.exists():
+    if not (source.exists() or source.is_symlink()):
         return False
+    if destination.exists():
+        raise FileExistsError(
+            f"backup target already exists, refusing to reuse: {destination}"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     if _is_real_dir(source):
         shutil.copytree(source, destination, symlinks=True)
@@ -452,12 +503,13 @@ def _apply_move_internal_log(action: TidyAction, maigo_dir: Path) -> str:
         _move(source, destination)
         return f"move-internal-log：{action.path} → {action.target}"
     if source.name.endswith(".jsonl"):
-        head = destination.read_bytes()
-        if head and not head.endswith(b"\n"):
-            head += b"\n"
-        _atomic_write(destination, head + source.read_bytes())
+        # 舊的在前、新的在後：讀取端用 entries[-3:] 當「最近」。
+        older = source.read_bytes()
+        if older and not older.endswith(b"\n"):
+            older += b"\n"
+        _atomic_write(destination, older + destination.read_bytes())
         source.unlink()
-        return f"move-internal-log：{action.path} 逐行 append 到 {action.target}"
+        return f"move-internal-log：{action.path} 接在 {action.target} 前面（舊在前、新在後）"
     source.unlink()
     return f"move-internal-log：{action.target} 已存在，以新檔為準，刪 {action.path}"
 
@@ -473,22 +525,39 @@ def _apply_archive(action: TidyAction, maigo_dir: Path) -> str:
     return f"archive 略過：{action.path}（來源已不存在）"
 
 
+def _apply_archive_confirmed(action: TidyAction, maigo_dir: Path) -> str:
+    moved, skipped, _missing = board_sync.archive_relpaths(
+        maigo_dir.parent, [_rel(action.path)]
+    )
+    target = _display(f"{board_sync.ARCHIVE_DIR}/{_rel(action.path)}")
+    if moved:
+        return f"{action.kind}：已封存 {action.path} → {target}"
+    if skipped:
+        return f"{action.kind} 略過：{action.path}（{target} 已存在，不覆蓋）"
+    return f"{action.kind} 略過：{action.path}（來源已不存在）"
+
+
 def apply(
     actions: Iterable[TidyAction],
     *,
     maigo_dir: str | Path,
     backup_root: str | Path,
     confirmed: set[str] | frozenset[str] = frozenset(),
+    archive_confirmed: set[str] | frozenset[str] = frozenset(),
 ) -> list[str]:
     """
     只執行 `needs_confirm=False` 的動作，加上 `path` 被 `confirmed` 點名的動作。
-    全部要動的路徑先備份到 `backup_root/<相對 .maigo/ 的原路徑>`，備份完才開始搬。
-    回傳每個動作一行的結果訊息。
+    `archive_confirmed` 只對 unregistered 與 `.maigo/.maigo/` 有效：備份後鏡射封存到
+    `_archive/`（不覆蓋），而不是刪除。
+    全部要動的路徑先備份到 `backup_root/<相對 .maigo/ 的原路徑>`，備份完才開始搬
+    （備份目的地已存在就拋 `FileExistsError`，不沿用上一輪的備份）。
+    回傳每個動作一行的結果訊息；中途例外時先印已完成的結果行再 re-raise。
     """
     maigo_dir = Path(maigo_dir)
     backup_root = Path(backup_root)
     repo_root = maigo_dir.parent
-    approved = {_norm(path) for path in confirmed}
+    archive_approved = {_norm(path) for path in archive_confirmed}
+    approved = {_norm(path) for path in confirmed} | archive_approved
     todo = [
         action
         for action in actions
@@ -505,23 +574,35 @@ def apply(
         _backup(maigo_dir, backup_root, rel)
 
     results: list[str] = []
-    if migrations:
-        results.extend(_apply_migrate(migrations, link_rewrites, repo_root))
-    for action in todo:
-        if action.kind == "migrate":
-            continue
-        if action.kind == "move-internal-log":
-            results.append(_apply_move_internal_log(action, maigo_dir))
-        elif action.kind == "rotate-log":
-            _move(maigo_dir / _rel(action.path), maigo_dir / _rel(action.target or ""))
-            results.append(f"rotate-log：{action.path} → {action.target}")
-        elif action.kind == "archive":
-            results.append(_apply_archive(action, maigo_dir))
-        else:  # delete-candidate / unregistered / remove-nested-dot-maigo
-            _remove(maigo_dir / _rel(action.path))
-            results.append(
-                f"{action.kind}：已刪除 {action.path}（備份在 {backup_root.name}/）"
-            )
+    try:
+        if migrations:
+            results.extend(_apply_migrate(migrations, link_rewrites, repo_root))
+        for action in todo:
+            if action.kind == "migrate":
+                continue
+            if action.kind == "move-internal-log":
+                results.append(_apply_move_internal_log(action, maigo_dir))
+            elif action.kind == "rotate-log":
+                _move(
+                    maigo_dir / _rel(action.path), maigo_dir / _rel(action.target or "")
+                )
+                results.append(f"rotate-log：{action.path} → {action.target}")
+            elif action.kind == "archive":
+                results.append(_apply_archive(action, maigo_dir))
+            elif (
+                action.kind in ARCHIVE_CONFIRM_KINDS
+                and _norm(action.path) in archive_approved
+            ):
+                results.append(_apply_archive_confirmed(action, maigo_dir))
+            else:  # delete-candidate / unregistered / remove-nested-dot-maigo
+                _remove(maigo_dir / _rel(action.path))
+                results.append(
+                    f"{action.kind}：已刪除 {action.path}（備份在 {backup_root.name}/）"
+                )
+    except BaseException:
+        print("## 執行結果（中途中斷，以下是已完成的動作）")
+        print("\n".join(f"- {line}" for line in results) if results else "- （無）")
+        raise
     return results
 
 
@@ -534,7 +615,12 @@ def _line(action: TidyAction, *, checkbox: bool) -> str:
     return f"{head}{action.kind}：{action.path}{arrow} ｜ 依據：{action.reason}"
 
 
-def render(actions: list[TidyAction], *, state_checked: bool = True) -> str:
+def render(
+    actions: list[TidyAction],
+    *,
+    state_checked: bool = True,
+    notes: Iterable[str] = (),
+) -> str:
     """
     dry-run 輸出：一段一行、不用表格、路徑 `.maigo/` 開頭（skills/vim-friendly-artifacts）。
     每一行不是 `## ` 標題就是 `- ` 開頭。
@@ -546,11 +632,12 @@ def render(actions: list[TidyAction], *, state_checked: bool = True) -> str:
     lines += [_line(a, checkbox=False) for a in rules] or ["- （無）"]
     lines.append("## 需要你逐項勾選")
     lines += [_line(a, checkbox=True) for a in confirm] or ["- （無）"]
-    lines.append("## 未登記（只列不動）")
+    lines.append("## 未登記（不隨 --apply 動，點名才處理）")
     lines += [_line(a, checkbox=False) for a in unregistered] or ["- （無）"]
     lines.append("## 統計")
     counts = [(kind, sum(1 for a in actions if a.kind == kind)) for kind in KINDS]
     lines += [f"- {kind}：{count}" for kind, count in counts if count] or ["- （無）"]
+    lines += [f"- {note}" for note in notes]
     lines.append(
         "- 結案判定：已查 GitHub 狀態"
         if state_checked
@@ -619,6 +706,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="PATH",
         help="搭配 --apply，執行這一筆需要勾選的動作（可重複；路徑照 dry-run 印出的 .maigo/… 寫）",
     )
+    parser.add_argument(
+        "--confirm-archive",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="搭配 --apply，把這一筆 unregistered／.maigo/.maigo 備份後封存到 _archive/（可重複）",
+    )
     parser.add_argument("--no-gh", action="store_true", help="跳過結案判定，不打 gh")
     args = parser.parse_args(argv)
 
@@ -626,19 +720,24 @@ def main(argv: list[str] | None = None) -> int:
     if not maigo_dir.is_dir():
         print(f"error: {maigo_dir} 不存在", file=sys.stderr)
         return 1
+    try:
+        _check_dir_name(maigo_dir)
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
     now = datetime.now(timezone.utc)
     item_state = None if args.no_gh else make_gh_item_state(maigo_dir.resolve().parent)
     try:
-        actions = build_actions(maigo_dir, now=now, item_state=item_state)
+        actions, notes = build_plan(maigo_dir, now=now, item_state=item_state)
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
     if not args.apply:
-        if args.confirm:
-            print("error: --confirm 要搭配 --apply", file=sys.stderr)
+        if args.confirm or args.confirm_archive:
+            print("error: --confirm／--confirm-archive 要搭配 --apply", file=sys.stderr)
             return 1
-        print(render(actions, state_checked=not args.no_gh))
+        print(render(actions, state_checked=not args.no_gh, notes=notes))
         return 0
 
     known = {_norm(a.path) for a in actions if a.needs_confirm}
@@ -648,6 +747,23 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: --confirm {path} 不在需要勾選的清單裡", file=sys.stderr)
         return 1
 
+    archivable = {_norm(a.path) for a in actions if a.kind in ARCHIVE_CONFIRM_KINDS}
+    bad_archive = [p for p in args.confirm_archive if _norm(p) not in archivable]
+    if bad_archive:
+        for path in bad_archive:
+            print(
+                f"error: --confirm-archive {path} 不是 unregistered／.maigo/.maigo 清單裡的路徑",
+                file=sys.stderr,
+            )
+        return 1
+    both = {_norm(p) for p in args.confirm} & {_norm(p) for p in args.confirm_archive}
+    if both:
+        print(
+            f"error: {sorted(both)} 同時出現在 --confirm 與 --confirm-archive",
+            file=sys.stderr,
+        )
+        return 1
+
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     backup_root = maigo_dir / BACKUP_REL / stamp
     results = apply(
@@ -655,12 +771,13 @@ def main(argv: list[str] | None = None) -> int:
         maigo_dir=maigo_dir,
         backup_root=backup_root,
         confirmed=set(args.confirm),
+        archive_confirmed=set(args.confirm_archive),
     )
     print("## 執行結果")
     print("\n".join(f"- {line}" for line in results) if results else "- （無）")
     if results:
         print(f"- 備份：{_display(f'{BACKUP_REL}/{stamp}')}/")
-    approved = {_norm(path) for path in args.confirm}
+    approved = {_norm(path) for path in [*args.confirm, *args.confirm_archive]}
     pending = [a for a in actions if a.needs_confirm and _norm(a.path) not in approved]
     print(f"- 仍待勾選：{len(pending)} 項（重跑 dry-run 查看）")
     return 0

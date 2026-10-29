@@ -123,15 +123,15 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 
 | 產物 | owner | 結案條件 | 去向 |
 |------|-------|----------|------|
-| `pr/<id>/`、`review/<id>/`、`issue/<id>/` | 該 PR／issue 的處理者（orchestrator 與 agent 寫入） | GitHub 狀態是 merged 或 closed（`gh pr view`／`gh issue view`）；查不到就不動 | 鏡射搬到 `_archive/<原相對路徑>`（規則型，`--apply` 會做） |
-| `i/<id>.md` | `/maigo:board` | 對應 PR／issue merged 或 closed | 同上 |
+| `pr/<id>/`、`review/<id>/`、`issue/<id>/` | 該 PR／issue 的處理者（orchestrator 與 agent 寫入） | id 是純數字，且 GitHub 狀態是 merged 或 closed（`gh pr view`／`gh issue view`）；查不到就不動，非純數字的 id（`<repo>-<n>`、slug）不逐筆列、在統計段彙總一行 | 鏡射搬到 `_archive/<原相對路徑>`（規則型，`--apply` 會做） |
+| `i/<id>.md` | `/maigo:board` | id 是純數字且對應 PR／issue merged 或 closed；`<repo>-<n>` 形的由 `/maigo:board` 處理，tidy 只在統計段彙總 | 同上 |
 | `topic/<slug>/` | 寫 plan 的人 | 沒有外部訊號可查，只能由你勾選 | 勾選後封存到 `_archive/topic/<slug>/` |
 | 頂層舊檔（`plan.md`、`plan-<id>.md`、`<kind>-<id>.md` …） | 升級前的 maigo | 一律視為待遷移 | 遷移成巢狀佈局（規則型） |
-| 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時逐行 append 到新檔（規則型） |
-| `_internal/log/*.jsonl` | hook | 超過 2,000 行 | 舊的搬成 `<name>.1.jsonl`，只留一代（規則型，門檻 `LOG_ROTATE_MAX_LINES`） |
+| 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時把舊檔接在新檔前面（舊在前、新在後；`session-head.json` 以新檔為準）（規則型） |
+| `_internal/log/*.jsonl` | hook | 超過 2,000 行 | 舊的搬成 `<name>.1.jsonl`，只留一代（規則型，門檻 `LOG_ROTATE_MAX_LINES`）；`/maigo:doctor` 的統計只看現行檔，不含 `.1.jsonl` |
 | `_archive/` 的項目 | `/maigo:board`、`/maigo:tidy` | mtime 超過 90 天（`ARCHIVE_RETENTION`） | 列為 delete-candidate，**一律要你逐項勾選**；確認＝備份後刪除 |
-| 未登記檔（`evals/`、`__titles.json`、`local-model-dispatch-plan.md` 這類） | 不明 | catalog 判為 `unregistered` | 只列不動；勾選確認＝備份後刪除 |
-| `.maigo/.maigo/` | hook 在子目錄 cwd 下的殘留 | 一律視為殘留 | 勾選確認＝備份後刪除；要合併回上層請手動處理 |
+| 未登記檔（`evals/`、`__titles.json`、`local-model-dispatch-plan.md` 這類） | 不明 | catalog 判為 `unregistered` | 不隨 `--apply` 動；`--confirm <path>`＝備份後刪除，`--confirm-archive <path>`＝備份後封存到 `_archive/`，不點名就保留 |
+| `.maigo/.maigo/` | hook 在子目錄 cwd 下的殘留 | 一律視為殘留 | 同上（刪除或封存）；要合併回上層請手動處理 |
 
 規則型動作之外沒有「全部同意」的開關：刪除類與 `topic/` 封存只對 `--confirm` 點名的那一筆動手。
 每個動作前都先備份到 `_internal/tidy/backup/<UTC ts>/`。

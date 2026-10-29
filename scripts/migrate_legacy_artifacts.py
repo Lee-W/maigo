@@ -1010,6 +1010,9 @@ def _infer_home_repo_name(repo_root: str | Path) -> str:
     return last_segment.removesuffix(".git")
 
 
+infer_home_repo_name = _infer_home_repo_name
+
+
 def _parse_repo_slug(url: str) -> str:
     """
     `git@github.com:owner/name.git`、`https://github.com/owner/name(.git)`、

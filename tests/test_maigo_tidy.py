@@ -70,9 +70,28 @@ def by_path(actions, path: str) -> tidy.TidyAction:
     return next(a for a in actions if a.path == path)
 
 
-def run_apply(maigo: Path, actions, confirmed=frozenset()):
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
-    return tidy.apply(actions, maigo_dir=maigo, backup_root=backup, confirmed=confirmed)
+_RUNS = iter(range(1, 1000))
+
+
+def backup_of(maigo: Path) -> Path:
+    """最近一次 `run_apply` 的備份目錄。"""
+    return max(
+        (maigo / "_internal" / "tidy" / "backup").iterdir(),
+        key=lambda p: p.stat().st_mtime_ns,
+    )
+
+
+def run_apply(
+    maigo: Path, actions, confirmed=frozenset(), archive_confirmed=frozenset()
+):
+    backup = maigo / "_internal" / "tidy" / "backup" / f"T{next(_RUNS)}"
+    return tidy.apply(
+        actions,
+        maigo_dir=maigo,
+        backup_root=backup,
+        confirmed=confirmed,
+        archive_confirmed=archive_confirmed,
+    )
 
 
 def test_dry_run_touches_nothing(tmp_path, capsys):
@@ -97,7 +116,7 @@ def test_apply_skips_needs_confirm_without_confirm_flag(tmp_path):
     assert (maigo / "topic" / "foo" / "plan.md").is_file()
     assert (maigo / "evals" / "a.json").is_file()
     assert (maigo / "_archive" / "pr" / "1" / "x.md").is_file()
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
+    backup = backup_of(maigo)
     assert not (backup / "evals").exists()
 
 
@@ -110,7 +129,7 @@ def test_apply_runs_confirmed_delete_only_for_listed_path(tmp_path):
     assert not (maigo / "_archive" / "pr" / "1").exists()
     assert (maigo / "_archive" / "pr" / "2" / "x.md").is_file()
     assert (maigo / "evals" / "a.json").is_file()
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
+    backup = backup_of(maigo)
     assert (backup / "_archive" / "pr" / "1" / "x.md").is_file()
 
 
@@ -162,7 +181,7 @@ def test_legacy_logs_merge_into_existing_internal_log(tmp_path):
     assert by_path(actions, ".maigo/token-usage.jsonl").kind == "move-internal-log"
     run_apply(maigo, actions)
     merged = (maigo / "_internal" / "log" / "token-usage.jsonl").read_text()
-    assert merged == '{"b": 2}\n{"a": 1}\n'
+    assert merged == '{"a": 1}\n{"b": 2}\n'
     assert not (maigo / "token-usage.jsonl").exists()
     assert (
         maigo / "_internal" / "log" / "session-head.json"
@@ -189,7 +208,7 @@ def test_legacy_plan_migrates_to_topic(tmp_path):
     run_apply(maigo, actions)
     assert (maigo / "topic" / "fix-thing" / "plan.md").is_file()
     assert not (maigo / "plan.md").exists()
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
+    backup = backup_of(maigo)
     assert (backup / "plan.md").read_text() == "# Plan: Fix thing\n"
 
 
@@ -206,7 +225,7 @@ def test_log_over_threshold_rotates_to_one_generation(tmp_path):
     assert not (log / "test-failures.jsonl").exists()
     assert (log / "test-failures.1.jsonl").read_text().count("row") == 2001
     assert (log / "soyo-must-fix.jsonl").is_file()
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1" / "_internal" / "log"
+    backup = backup_of(maigo) / "_internal" / "log"
     assert (backup / "test-failures.1.jsonl").read_text() == "previous generation\n"
 
 
@@ -224,7 +243,7 @@ def test_topic_archive_requires_confirm(tmp_path):
 
 def test_backup_written_before_any_move(tmp_path, monkeypatch):
     maigo = make_maigo(tmp_path)
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
+    backup = maigo / "_internal" / "tidy" / "backup" / "SPY"
     seen: list[bool] = []
     real_move = tidy._move
     real_archive = board_sync.archive_relpaths
@@ -239,7 +258,7 @@ def test_backup_written_before_any_move(tmp_path, monkeypatch):
 
     monkeypatch.setattr(tidy, "_move", spy_move)
     monkeypatch.setattr(board_sync, "archive_relpaths", spy_archive)
-    run_apply(maigo, build(maigo))
+    tidy.apply(build(maigo), maigo_dir=maigo, backup_root=backup)
     assert seen and all(seen)
 
 
@@ -252,7 +271,7 @@ def test_unregistered_dir_listed_once(tmp_path):
     assert "3 個檔" in evals[0].reason
     run_apply(maigo, actions, {".maigo/evals"})
     assert not (maigo / "evals").exists()
-    backup = maigo / "_internal" / "tidy" / "backup" / "T1"
+    backup = backup_of(maigo)
     assert (backup / "evals" / "sub" / "c.json").is_file()
 
 
@@ -291,7 +310,7 @@ def test_dry_run_output_shape(tmp_path):
     assert headings == [
         "## 規則型動作（--apply 會執行）",
         "## 需要你逐項勾選",
-        "## 未登記（只列不動）",
+        "## 未登記（不隨 --apply 動，點名才處理）",
         "## 統計",
     ]
     for line in text.splitlines():
@@ -377,3 +396,122 @@ def test_archive_relpaths_is_shared_with_board_sync(tmp_path):
 @pytest.mark.parametrize("flag", ["--apply", "--no-gh"])
 def test_missing_dir_is_an_error(tmp_path, flag):
     assert tidy.main(["--dir", str(tmp_path / "nope"), flag]) == 1
+
+
+def test_merged_log_keeps_oldest_first_newest_last(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "token-usage.jsonl", '{"ts": "T1"}')  # 舊檔，結尾沒有換行
+    write(maigo / "_internal" / "log" / "token-usage.jsonl", '{"ts": "T2"}\n')
+    run_apply(maigo, build(maigo))
+    lines = (maigo / "_internal" / "log" / "token-usage.jsonl").read_text().splitlines()
+    assert lines == ['{"ts": "T1"}', '{"ts": "T2"}']
+
+
+def test_dir_not_named_dot_maigo_is_rejected(tmp_path, capsys):
+    other = tmp_path / "other"
+    write(other / "plan.md", "# Plan: x\n")
+    before = snapshot(tmp_path)
+    for flags in ([], ["--apply"]):
+        assert tidy.main(["--dir", str(other), "--no-gh", *flags]) == 1
+        assert ".maigo" in capsys.readouterr().err
+    with pytest.raises(ValueError, match=r"\.maigo"):
+        tidy.build_actions(other, now=NOW, item_state=None, home_repo_name="")
+    assert snapshot(tmp_path) == before
+
+
+def test_non_numeric_ids_are_summarised_not_listed(tmp_path):
+    maigo = tmp_path / ".maigo"
+    write(maigo / "i" / "airflow-12.md")
+    write(maigo / "i" / "airflow-13.md")
+    write(maigo / "i" / "7.md")
+    write(maigo / "pr" / "repo-5" / "reply-draft.md")
+    write(maigo / "issue" / "slug" / "rubric.md")
+    asked: list[tuple[str, str]] = []
+
+    def state(group, ident):
+        asked.append((group, ident))
+        return "merged"
+
+    actions, notes = tidy.build_plan(
+        maigo, now=NOW, item_state=state, home_repo_name=""
+    )
+    assert asked == [("i", "7")]
+    assert [a.path for a in actions] == [".maigo/i/7.md"]
+    assert "i/ 有 2 筆狀態查不到（id 不是純數字），由 /maigo:board 處理" in notes
+    assert any("pr/、review/、issue/ 有 2 筆" in note for note in notes)
+    text = tidy.render(actions, notes=notes)
+    assert text.count("airflow-12") == 0
+    assert (
+        "- i/ 有 2 筆狀態查不到（id 不是純數字），由 /maigo:board 處理"
+        in text.splitlines()
+    )
+
+
+def test_confirm_archive_moves_unregistered_to_archive_after_backup(tmp_path):
+    maigo = make_maigo(tmp_path)
+    actions = build(maigo)
+    assert "--confirm-archive PATH" in by_path(actions, ".maigo/evals").reason
+    run_apply(maigo, actions, archive_confirmed={".maigo/evals"})
+    assert not (maigo / "evals").exists()
+    assert (maigo / "_archive" / "evals" / "sub" / "c.json").is_file()
+    assert (backup_of(maigo) / "evals" / "a.json").is_file()
+
+
+def test_confirm_archive_does_not_overwrite_existing_archive(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "_archive" / "evals" / "keep.md", "kept\n")
+    results = run_apply(maigo, build(maigo), archive_confirmed={".maigo/evals"})
+    assert any("已存在，不覆蓋" in line for line in results)
+    assert (maigo / "evals" / "a.json").is_file()
+
+
+def test_cli_confirm_archive_accepts_only_unregistered_paths(tmp_path, capsys):
+    maigo = make_maigo(tmp_path)
+    args = ["--dir", str(maigo), "--no-gh", "--apply"]
+    assert tidy.main([*args, "--confirm-archive", ".maigo/topic/foo"]) == 1
+    assert "不是 unregistered" in capsys.readouterr().err
+    assert (
+        tidy.main(
+            [*args, "--confirm", ".maigo/evals", "--confirm-archive", ".maigo/evals"]
+        )
+        == 1
+    )
+    assert (maigo / "evals" / "a.json").is_file()
+    assert tidy.main([*args, "--confirm-archive", ".maigo/evals"]) == 0
+    assert (maigo / "_archive" / "evals" / "a.json").is_file()
+    assert (maigo / "topic" / "foo" / "plan.md").is_file()
+
+
+def test_backup_target_already_present_refuses_to_reuse(tmp_path):
+    maigo = make_maigo(tmp_path)
+    backup = maigo / "_internal" / "tidy" / "backup" / "SAME"
+    write(backup / "evals" / "a.json", "left by the previous run\n")
+    write(maigo / "evals" / "a.json", "changed\n")
+    with pytest.raises(FileExistsError):
+        tidy.apply(
+            build(maigo),
+            maigo_dir=maigo,
+            backup_root=backup,
+            confirmed={".maigo/evals"},
+        )
+    assert (maigo / "evals" / "a.json").read_text() == "changed\n"
+
+
+def test_apply_prints_completed_results_before_reraising(tmp_path, monkeypatch, capsys):
+    maigo = make_maigo(tmp_path)
+
+    def boom(source, destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(tidy, "_move", boom)
+    with pytest.raises(OSError, match="disk full"):
+        run_apply(maigo, build(maigo))
+    out = capsys.readouterr().out
+    assert "中途中斷" in out
+    assert "- migrate：.maigo/plan.md → .maigo/topic/fix-thing/plan.md" in out
+
+
+def test_home_repo_name_helper_has_public_alias():
+    from scripts import migrate_legacy_artifacts as mla
+
+    assert mla.infer_home_repo_name is mla._infer_home_repo_name
