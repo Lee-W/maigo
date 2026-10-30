@@ -45,7 +45,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.34** A provider hook's connection-field parsing: rejected credentials fail closed (no env-var fallback), nullable form strings accept `null` and JSON, validation errors never echo the value (Request changes, scope-gated to provider hook connection-field parsing)
 - **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 - **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
-- **10.37** Before unifying several return paths of a released, stable-listed operator into one helper, read each path's behavior in the last release tag (Request changes, scope-gated to such unifications)
+- **10.37** Before changing or unifying the output / serialization paths of a released, stable-listed `common.ai` operator, read each path's behavior in the last release tag (Request changes, scope-gated to such diffs)
 - **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
@@ -793,7 +793,7 @@ self.do_xcom_push:` in the same PR, and require a test asserting
 apache/airflow#72151, caught by a reviewer.
 
 For `providers/common/ai` model output pushed to XCom, see 10.36 (helper routing and dump mode) and
-10.37 (released-behavior check before unifying paths).
+10.37 (released-behavior check before changing or unifying output paths).
 
 ## 10.25 Frame an SDK/Core capability gap as feature completion, not a bugfix — but check release state first *(judgment gate)*
 
@@ -1174,7 +1174,7 @@ other tests.
 
 **Scope gate**: `providers/common/ai` operators/utilities that turn model output into an XCom value.
 Companion to 10.24 (the extra-`xcom_push` guard) and 10.37 (check each path's released behavior
-before unifying paths into one helper).
+before changing or unifying paths).
 
 - **Helper provenance**: the helpers named here (`is_model_dump_required`, `dump_output_for_xcom`
   in `providers/common/ai/.../utils/output_type.py`) come from apache/airflow #74695; confirm they
@@ -1213,9 +1213,17 @@ before unifying paths into one helper).
   dict-key case), and feed at least one result to the real `serde.serialize` instead of
   asserting on the dump alone.
 
-## 10.37 Before unifying several return paths into one helper, read each path's behavior in the last release tag *(narrow — when a diff folds divergent paths of a released, stable-listed operator into a shared helper; Request changes)*
+## 10.37 Before changing or unifying output paths of a released `common.ai` operator, read each path's behavior in the last release tag *(narrow — when a diff changes the output / serialization path of a released, stable-listed `common.ai` operator, or folds its divergent paths into a shared helper; Request changes)*
 
 Companion to 10.36 (which dump mode; this one: whether a path may change at all).
+
+The trigger is wider than unification: it applies whenever a fix for a new problem touches the
+output or serialization path of a released, stable-listed `common.ai` operator. List every path the
+fix can change (top-level model, container, review path, no-walker path) and compare each against
+the released behavior. A path whose behavior must stay the same needs a test that locks it.
+Beyond `date` / `Decimal` (below), two more error shapes came up in the same review: an `HttpUrl`
+inside a container made the XCom push fail, and a code comment falsely claimed 1.0.0 pushes python
+mode.
 
 For each path being folded in, read what it did in the last **released** version —
 `git show <last-release-tag>:<path>` (e.g. `providers-common-ai/1.0.0`) — before deciding which

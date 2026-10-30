@@ -1,9 +1,11 @@
 # Python runtime gotchas (type-system and version-skew pitfalls)
 
 Loaded on demand by `skills/python-aware/SKILL.md` — execution-time defects that pass a
-type checker and a casual read but fail against a specific Python or pydantic version.
+type checker and a casual read but fail against a specific Python version, pydantic version, or
+library runtime behavior.
 Read this file when writing or reviewing a type- or version-sensitive construct:
-`Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int`.
+`Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int`, chained
+`.append()` on an ORM query result.
 
 ---
 
@@ -113,3 +115,21 @@ Two transferable lessons:
    interpolating it into an error message; when the value is unbounded,
    bound and order it first (same reasoning as bounding and ordering any
    unbounded collection rendered into a DB row or log).
+
+## Chaining `.append()` onto a query result can raise `ObjectDereferencedError`
+
+Writing `session.scalar(select(Parent).where(...)).children.append(Child(...))` in one
+expression intermittently fails with `sqlalchemy.orm.exc.ObjectDereferencedError: Can't emit change
+event for attribute 'Parent.children' - parent object ... has been garbage collected`.
+
+Why: the session's identity map holds only a **weak reference** to a clean (unmodified) ORM
+object. If nothing binds the queried object to a name, the garbage collector may reclaim it before
+`.append` emits its change event. It depends on GC timing, so it is intermittent, not red on every
+run. Case (apache/airflow #75404, an asset-orphaning test): the chained form failed sporadically;
+binding the result to a local first (`shared = session.scalar(...)`, then
+`shared.aliases.append(...)`) made the whole test group green.
+
+How to apply: before any relationship operation (append, remove, assignment) on an object returned
+by `session.scalar()` / `session.get()` / a query, bind it to a local variable first; never chain
+`.relationship.xxx` directly onto the return value. When writing or reviewing tests and fixtures,
+rewrite this chained shape on sight. It is a language-level convention, valid in any SQLAlchemy repo.

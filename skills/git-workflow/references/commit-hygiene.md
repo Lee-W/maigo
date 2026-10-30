@@ -386,3 +386,19 @@ code — it reports the `git log`, not the commit.
 A pre-commit hook that blocks the commit can leave the index reset, so `git diff --cached` comes
 back empty (a patch built from it had 0 lines). To capture the intended change after a block, use
 `git diff HEAD`.
+
+## Took the upstream side of a rebase conflict: `git diff HEAD` for leftovers outside the conflict blocks
+
+After resolving a rebase conflict by taking the upstream version of a block, run `git diff HEAD --
+<file>` on that file and deal with whatever auto-merged **outside** the conflict blocks.
+
+Why: a commit had deleted the imports of two symbols in a non-conflicting region, while the upstream
+code taking over the conflict block still used them. A marker scan (`grep '^<<<<<<<'`) cannot see
+this kind of leftover; only `git diff HEAD` showed the deleted imports.
+
+How to apply, in order:
+
+1. After taking the upstream side, first run `git diff HEAD -- <file>`.
+2. If the whole file is superseded by upstream, restore the whole file to its `HEAD` version. If
+   `git checkout` is blocked, use `Edit` to put back the deleted imports or symbols.
+3. Run the tests that cover the file.
