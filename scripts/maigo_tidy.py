@@ -52,6 +52,7 @@ from typing import Literal
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import board_sync  # noqa: E402
 import maigo_dir_catalog  # noqa: E402
+import maigo_state  # noqa: E402
 import migrate_legacy_artifacts as migrate  # noqa: E402
 
 Kind = Literal[
@@ -382,7 +383,7 @@ def build_actions(
 
 
 def _check_dir_name(maigo_dir: Path) -> None:
-    if maigo_dir.resolve().name != ".maigo":
+    if Path(os.path.abspath(maigo_dir)).name != ".maigo":
         raise ValueError(
             f"{maigo_dir} 的目錄名不是 .maigo（遷移與封存以 <root>/.maigo 為準，"
             "列的和動的會不是同一個目錄）"
@@ -740,8 +741,18 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    if args.apply:
+        try:
+            maigo_state.check_maigo_link_trusted(maigo_dir)
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
     now = datetime.now(timezone.utc)
-    item_state = None if args.no_gh else make_gh_item_state(maigo_dir.resolve().parent)
+    item_state = (
+        None
+        if args.no_gh
+        else make_gh_item_state(Path(os.path.abspath(maigo_dir)).parent)
+    )
     try:
         actions, notes = build_plan(maigo_dir, now=now, item_state=item_state)
     except ValueError as error:

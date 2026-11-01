@@ -11,6 +11,14 @@ from typing import Any
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def isolate_maigo_state_home(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep every test away from the real ~/.local/share/maigo/state."""
+    monkeypatch.setenv("MAIGO_STATE_HOME", str(tmp_path_factory.mktemp("maigo_state")))
+
+
 def run_hook_main(
     module: types.ModuleType,
     payload: dict[str, Any],

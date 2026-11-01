@@ -16,12 +16,13 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 ### 偵測流程
 
 1. 讀 stdin JSON 取 `cwd`（缺欄位 → fallback `os.getcwd()`）
-2. **確保 `.maigo/` 被 git 忽略**（`ensure_maigo_ignored`，見下）
-3. **記下目前 HEAD**（`_session_head.record`，見下）
-4. 對 `REPO_RULES` 內每個 rule，依序跑其 `detectors`
-5. **任一** detector 命中即視為 rule 命中（OR 邏輯）
-6. 命中 → emit `approve` + systemMessage（要求載入 `skills/<skill>/SKILL.md`）
-7. 全部未命中 → emit `approve` + 空 systemMessage（silent）
+2. **把 `.maigo` 接到集中儲存**（`ensure_maigo_linked`，見下）
+3. **確保 `.maigo` 被 git 忽略**（`ensure_maigo_ignored`，見下）
+4. **記下目前 HEAD**（`_session_head.record`，見下）
+5. 對 `REPO_RULES` 內每個 rule，依序跑其 `detectors`
+6. **任一** detector 命中即視為 rule 命中（OR 邏輯）
+7. 命中 → emit `approve` + systemMessage（要求載入 `skills/<skill>/SKILL.md`）
+8. 全部未命中 → emit `approve` + 空 systemMessage（silent）
 
 ### 目前 registry
 
@@ -29,6 +30,21 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 |---------|-------|--------------|
 | `apache-airflow` | `airflow-aware` | git remote 含 `apache/airflow`，**或** `airflow/__init__.py` 存在且 `airflow/models/dag.py` / `airflow/dag.py` 至少有一個 |
 | `commitizen-tools-commitizen` | `commitizen-aware` | git remote 含 `commitizen-tools/commitizen`，**或** `commitizen/__init__.py` 存在且 `commitizen/cli.py` / `commitizen/commands/__init__.py` / `commitizen/bump.py` 至少有一個 |
+
+### `ensure_maigo_linked`
+
+不分 project，每次 SessionStart 都跑（在 `ensure_maigo_ignored` 之前）。呼叫
+`scripts/maigo_state.py` 的 `ensure_link`：`<repo root>/.maigo` 不存在時，建成指向
+本機集中 root（`$MAIGO_STATE_HOME`，預設 `~/.local/share/maigo/state/<owner>/<repo>/`）
+的 symlink，同一個 repo 的所有 worktree 因此共用一份 `.maigo/`。細節（identity 規則、
+遷移既有目錄）見 [`.maigo/` 集中儲存](state-storage.md)。
+
+特性：
+
+- **不碰既有資料**：`.maigo` 已是真目錄、指向別處的 symlink 或一般檔案 → 原樣保留，
+  要把真目錄併進去用 `scripts/maigo_state.py migrate`（預設 dry-run）。
+- **冪等**：已是正確 symlink → 不動。
+- **fail-open**：非 git repo、無法 import `maigo_state`、或任何例外 → 靜默略過。
 
 ### `ensure_maigo_ignored`
 
@@ -45,7 +61,9 @@ commit。
 
 特性：
 
-- **冪等**：`.maigo/` 已被任何機制忽略（global excludesfile、被追蹤的
+- **規則是不帶斜線的 `.maigo`**：`.maigo` 是 symlink，git 把 symlink 當檔案，帶斜線的
+  `.maigo/` 只匹配目錄、匹配不到它；不帶斜線的規則同時涵蓋真目錄與 symlink。
+- **冪等**：`.maigo` 已被任何機制忽略（global excludesfile、被追蹤的
   `.gitignore`、或前次寫入的 exclude）→ 不重複寫；entry 已在 exclude 裡 → 跳過。
 - **fail-open**：非 git repo、git 不存在、timeout 或任何 OS error → 靜默略過，
   不影響 session 啟動。

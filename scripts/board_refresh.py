@@ -35,11 +35,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 if __package__:
-    from . import board_state, review_report
+    from . import board_state, maigo_state, review_report
     from . import board_sync as sync
 else:  # run as a script: scripts/ is on sys.path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import board_state  # type: ignore[no-redef]  # noqa: E402
+    import maigo_state  # type: ignore[no-redef]  # noqa: E402
     import board_sync as sync  # type: ignore[no-redef]  # noqa: E402
     import review_report  # type: ignore[no-redef]  # noqa: E402
 
@@ -1375,10 +1376,13 @@ def find_maigo_root(cwd: Path) -> Path:
             1, f"不在 git repo 裡，請指定 --maigo-root（{error}）"
         ) from error
     found = []
+    seen_boards = set()
     for line in out.splitlines():
         if line.startswith("worktree "):
             path = Path(line[len("worktree ") :])
-            if (path / ".maigo" / "board.md").exists():
+            board = path / ".maigo" / "board.md"
+            if board.exists() and os.path.realpath(board) not in seen_boards:
+                seen_boards.add(os.path.realpath(board))
                 found.append(path)
     if not found:
         raise RefreshError(
@@ -1457,6 +1461,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 def cli(args: argparse.Namespace, *, now: datetime | None = None) -> int:
     try:
         root = (args.maigo_root or find_maigo_root(Path.cwd())).resolve()
+        if args.apply:
+            try:
+                maigo_state.check_maigo_link_trusted(root / ".maigo")
+            except ValueError as error:
+                raise RefreshError(1, str(error)) from error
         repo = resolve_repo(root, args.repo)
         you = resolve_you(args.you)
         summary = run_refresh(

@@ -7,6 +7,14 @@
 
 `.maigo/` 人讀產物（plan、review 報告、rubric、草稿、board 與 i/ 細節檔）的版面規範見 [`vim-friendly-artifacts`](../skills/vim-friendly-artifacts.md)。
 
+## 實體位置
+
+`.maigo` 預設不是真目錄，而是指向本機集中 root 的 symlink：
+`$MAIGO_STATE_HOME`（預設 `~/.local/share/maigo/state`）`/<owner>/<repo>/`。同一個 repo
+identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面的版面與 `artifact_path.py`
+都不變。identity 規則、既有真目錄的遷移與行為變更見
+[`.maigo/` 集中儲存](state-storage.md)。
+
 ## 佈局總覽
 
 ```text

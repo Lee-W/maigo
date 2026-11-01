@@ -19,6 +19,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit
 from _session_head import record as record_session_head
 
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from maigo_state import ensure_link
+except Exception:
+    # fail-open: a broken scripts/maigo_state.py must not take the SessionStart hook down.
+    ensure_link = None
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -171,9 +178,25 @@ def seed_claude_config(cwd: str, seeds: dict[str, str]) -> list[str]:
     return written
 
 
+def ensure_maigo_linked(cwd: str) -> None:
+    """
+    Point ``<repo root>/.maigo`` at the central per-repo state directory.
+
+    Fail-open: a real ``.maigo/`` directory, a symlink to another target, a non-git
+    cwd, or any error leaves everything as it was (``scripts/maigo_state.py migrate``
+    is the explicit way to adopt an existing directory).
+    """
+    if ensure_link is None:
+        return
+    try:
+        ensure_link(cwd)
+    except Exception:
+        return
+
+
 def ensure_maigo_ignored(cwd: str) -> None:
     """
-    Make ``.maigo/`` git-ignored locally, without touching a tracked .gitignore.
+    Make ``.maigo`` git-ignored locally, without touching a tracked .gitignore.
 
     maigo writes working artefacts into ``.maigo/`` at the repo root — plans under ``pr/<id>/plan.md`` / ``issue/<id>/plan.md`` /
     ``topic/<slug>/plan.md``, and per-PR/issue folders ``review/<id>/{review,rubric,
@@ -183,18 +206,25 @@ def ensure_maigo_ignored(cwd: str) -> None:
     even from a linked worktree — rather than the project's tracked ``.gitignore``,
     which the host repo (e.g. apache/airflow) commits and must not be mutated.
 
-    Idempotent and fail-open: does nothing if ``.maigo/`` is already ignored (a
+    The rule is ``.maigo`` without a trailing slash: ``.maigo`` is a symlink into the
+    central state directory, git treats a symlink as a file, and a ``.maigo/``
+    pattern (directories only) does not match it. The slash-less rule covers a real
+    ``.maigo/`` directory too.
+
+    Idempotent and fail-open: does nothing if ``.maigo`` is already ignored (a
     global excludesfile, a tracked ``.gitignore``, or a prior run), if *cwd* is
     not a git repo, or on any git/OS error.
     """
     try:
-        already = subprocess.run(
-            ["git", "-C", cwd, "check-ignore", "-q", ".maigo/"],
-            timeout=GIT_TIMEOUT_SEC,
-            check=False,
-        )
-        if already.returncode == 0:
-            return  # already ignored by some mechanism — nothing to do
+        for pathspec in (".maigo", ".maigo/"):
+            already = subprocess.run(
+                ["git", "-C", cwd, "check-ignore", "-q", pathspec],
+                capture_output=True,
+                timeout=GIT_TIMEOUT_SEC,
+                check=False,
+            )
+            if already.returncode == 0:
+                return  # already ignored by some mechanism — nothing to do
 
         resolved = subprocess.run(
             ["git", "-C", cwd, "rev-parse", "--git-path", "info/exclude"],
@@ -210,13 +240,13 @@ def ensure_maigo_ignored(cwd: str) -> None:
             exclude = Path(cwd) / exclude
 
         existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
-        if ".maigo/" in existing.split():
+        if ".maigo" in existing.split():
             return  # entry already present
 
         exclude.parent.mkdir(parents=True, exist_ok=True)
         prefix = "" if (not existing or existing.endswith("\n")) else "\n"
         with exclude.open("a", encoding="utf-8") as fh:
-            fh.write(f"{prefix}# maigo working artefacts (auto-added)\n.maigo/\n")
+            fh.write(f"{prefix}# maigo working artefacts (auto-added)\n.maigo\n")
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return
 
@@ -239,6 +269,7 @@ def main() -> None:
         # Keep maigo's own scratch dir out of the host repo regardless of which
         # project this is — every command (go/quick/team/review/address-comments)
         # writes into .maigo/.
+        ensure_maigo_linked(cwd)
         ensure_maigo_ignored(cwd)
 
         # Record the HEAD this session starts at so the Stop hook can tell a

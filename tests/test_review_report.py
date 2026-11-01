@@ -512,3 +512,39 @@ def test_acknowledge_finds_report_by_owner(tmp_path):
         report.acknowledge(
             tmp_path, URL, "owner/project", HEAD, "reviewer", owner="others"
         )
+
+
+def test_publish_through_symlinked_maigo_dir(tmp_path):
+    central = Path(os.environ["MAIGO_STATE_HOME"]) / "owner" / "repo"
+    central.mkdir(parents=True)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".maigo").symlink_to(central, target_is_directory=True)
+
+    path = Path(publish(repo)["path"])
+
+    assert path.resolve().is_relative_to(central.resolve())
+    assert path.read_text().startswith("# Review: Fix ranges\n")
+
+
+def test_symlinked_group_dir_inside_maigo_still_escapes(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / ".maigo").mkdir()
+    (tmp_path / ".maigo" / "review").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="escapes"):
+        publish(tmp_path)
+    assert list(outside.iterdir()) == []
+
+
+def test_maigo_symlink_outside_state_root_is_refused(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".maigo").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="escapes"):
+        publish(repo)
+    assert list(outside.iterdir()) == []

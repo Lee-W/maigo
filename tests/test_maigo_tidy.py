@@ -621,3 +621,33 @@ def test_archived_board_detail_file_is_its_own_unit(tmp_path):
     assert _archive_candidates(maigo, ".maigo/_archive/i") == [
         ".maigo/_archive/i/old-slug.md"
     ]
+
+
+def test_cli_accepts_symlinked_maigo_dir(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    link = make_maigo(repo)
+    central = Path(os.environ["MAIGO_STATE_HOME"]) / "owner" / "repo"
+    central.parent.mkdir(parents=True)
+    link.rename(central)
+    link.symlink_to(central, target_is_directory=True)
+
+    assert tidy.main(["--dir", str(link), "--no-gh", "--apply"]) == 0
+
+    assert link.is_symlink()
+    assert (central / "_internal" / "tidy" / "backup").is_dir()
+    assert "備份：.maigo/_internal/tidy/backup/" in capsys.readouterr().out
+
+
+def test_apply_refuses_symlinked_maigo_outside_state_root(tmp_path, capsys):
+    outside = tmp_path / "outside"
+    write(outside / "plan.md", "# Plan: x\n")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".maigo").symlink_to(outside, target_is_directory=True)
+    before = snapshot(outside)
+
+    assert tidy.main(["--dir", str(repo / ".maigo"), "--no-gh", "--apply"]) == 1
+
+    assert snapshot(outside) == before
+    assert "outside the maigo state root" in capsys.readouterr().err

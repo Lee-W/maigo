@@ -1265,3 +1265,62 @@ def test_s6_stray_detail_without_judgment_rejects_even_when_its_fetch_fails(
     assert run_cli(tmp_path, "--apply", "--no-discovery", "--add", url(9)) == 1
     assert tree_hash(tmp_path) == before
     assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+
+
+def _git(cwd: Path, *args: str) -> None:
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    subprocess.run(
+        ["git", "-C", str(cwd), *args], capture_output=True, check=True, env=env
+    )
+
+
+def _repo_with_worktree(tmp_path: Path) -> tuple[Path, Path]:
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q")
+    _git(main, "commit", "-q", "--allow-empty", "-m", "init")
+    linked = tmp_path / "linked"
+    _git(main, "worktree", "add", "-q", "-b", "wt", str(linked))
+    return main, linked
+
+
+def test_find_maigo_root_counts_worktrees_sharing_one_board_once(tmp_path):
+    main, linked = _repo_with_worktree(tmp_path)
+    central = tmp_path / "central"
+    central.mkdir()
+    (central / "board.md").write_text("board", encoding="utf-8")
+    for worktree in (main, linked):
+        (worktree / ".maigo").symlink_to(central, target_is_directory=True)
+
+    assert refresh.find_maigo_root(main) == main.resolve()
+
+
+def test_find_maigo_root_still_rejects_distinct_boards(tmp_path):
+    main, linked = _repo_with_worktree(tmp_path)
+    for worktree in (main, linked):
+        (worktree / ".maigo").mkdir()
+        (worktree / ".maigo" / "board.md").write_text("board", encoding="utf-8")
+
+    with pytest.raises(refresh.RefreshError, match="多份 board.md"):
+        refresh.find_maigo_root(main)
+
+
+def test_apply_refuses_maigo_symlink_outside_state_root(tmp_path, capsys):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "board.md").write_text("board", encoding="utf-8")
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / ".maigo").symlink_to(outside, target_is_directory=True)
+    before = tree_hash(outside)
+
+    assert run_cli(root, "--apply") == 1
+
+    assert tree_hash(outside) == before
+    assert "outside the maigo state root" in capsys.readouterr().err
