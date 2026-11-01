@@ -310,6 +310,107 @@ class TestRecordsSessionHead:
         assert status.stdout.decode().strip() == ""
 
 
+def _git_status(repo: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain"],
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout.decode().strip()
+
+
+class TestEnsureMaigoLinked:
+    @staticmethod
+    def _init_repo(path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        empty = path.parent / "gitconfig.empty"
+        empty.write_text("", encoding="utf-8")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
+        monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(empty))
+        path.mkdir()
+        subprocess.run(["git", "init", "-q", str(path)], check=True)
+        subprocess.run(
+            ["git", "-C", str(path), "commit", "-q", "--allow-empty", "-m", "init"],
+            env=GIT_ENV,
+            check=True,
+        )
+
+    def test_hook_links_maigo_into_state_home_and_keeps_status_clean(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+    ) -> None:
+        repo = tmp_path / "repo"
+        self._init_repo(repo, monkeypatch)
+
+        run_hook_main(rd, {"cwd": str(repo), "session_id": "s"}, monkeypatch, capsys)
+
+        state_home = Path(os.environ["MAIGO_STATE_HOME"])
+        assert (repo / ".maigo").is_symlink()
+        assert (repo / ".maigo").resolve().is_relative_to(state_home.resolve())
+        assert (repo / ".maigo/_internal/log/session-head.json").is_file()
+        assert _git_status(repo) == ""
+
+    def test_linked_worktree_shares_the_same_state_and_stays_clean(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+    ) -> None:
+        repo = tmp_path / "repo"
+        self._init_repo(repo, monkeypatch)
+        linked = tmp_path / "linked"
+        subprocess.run(
+            ["git", "-C", str(repo), "worktree", "add", "-q", "-b", "wt", str(linked)],
+            check=True,
+        )
+
+        run_hook_main(rd, {"cwd": str(repo), "session_id": "a"}, monkeypatch, capsys)
+        run_hook_main(rd, {"cwd": str(linked), "session_id": "b"}, monkeypatch, capsys)
+
+        assert (repo / ".maigo").resolve() == (linked / ".maigo").resolve()
+        assert _git_status(repo) == ""
+        assert _git_status(linked) == ""
+
+    def test_real_maigo_directory_is_left_alone(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "repo"
+        self._init_repo(repo, monkeypatch)
+        (repo / ".maigo").mkdir()
+        (repo / ".maigo" / "board.md").write_text("keep", encoding="utf-8")
+
+        rd.ensure_maigo_linked(str(repo))
+
+        assert not (repo / ".maigo").is_symlink()
+        assert (repo / ".maigo" / "board.md").read_text(encoding="utf-8") == "keep"
+
+    def test_fails_open_when_linking_raises(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        def boom(cwd: str):
+            raise PermissionError("read-only home")
+
+        monkeypatch.setattr(rd, "ensure_link", boom)
+
+        rd.ensure_maigo_linked(str(tmp_path))
+
+    def test_noop_when_maigo_state_import_failed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "repo"
+        self._init_repo(repo, monkeypatch)
+        monkeypatch.setattr(rd, "ensure_link", None)
+
+        rd.ensure_maigo_linked(str(repo))
+
+        assert not (repo / ".maigo").exists()
+
+    def test_noop_outside_git_repo(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        plain = tmp_path / "plain"
+        plain.mkdir()
+
+        rd.ensure_maigo_linked(str(plain))
+
+        assert not (plain / ".maigo").exists()
+
+
 class TestEnsureMaigoIgnored:
     """Exercises the real-git side effect, isolated from the machine's global config."""
 
@@ -332,10 +433,10 @@ class TestEnsureMaigoIgnored:
         rd.ensure_maigo_ignored(str(tmp_path))
 
         exclude = tmp_path / ".git" / "info" / "exclude"
-        assert ".maigo/" in exclude.read_text(encoding="utf-8").split()
+        assert ".maigo" in exclude.read_text(encoding="utf-8").split()
         # The whole point: git now actually ignores the dir.
         check = subprocess.run(
-            ["git", "-C", str(tmp_path), "check-ignore", "-q", ".maigo/"], check=False
+            ["git", "-C", str(tmp_path), "check-ignore", "-q", ".maigo"], check=False
         )
         assert check.returncode == 0
 
@@ -346,7 +447,7 @@ class TestEnsureMaigoIgnored:
         rd.ensure_maigo_ignored(str(tmp_path))
 
         exclude = tmp_path / ".git" / "info" / "exclude"
-        assert exclude.read_text(encoding="utf-8").count(".maigo/") == 1
+        assert exclude.read_text(encoding="utf-8").split().count(".maigo") == 1
 
     def test_noop_when_already_ignored_by_tracked_gitignore(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -358,7 +459,51 @@ class TestEnsureMaigoIgnored:
 
         exclude = tmp_path / ".git" / "info" / "exclude"
         text = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
-        assert ".maigo/" not in text.split()
+        assert ".maigo" not in text.split()
+
+    def test_symlinked_maigo_is_ignored_and_status_is_clean(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "repo"
+        TestEnsureMaigoLinked._init_repo(repo, monkeypatch)
+        central = tmp_path / "central"
+        central.mkdir()
+        (repo / ".maigo").symlink_to(central, target_is_directory=True)
+
+        rd.ensure_maigo_ignored(str(repo))
+
+        assert _git_status(repo) == ""
+
+    def test_slash_rule_does_not_cover_a_symlink(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "repo"
+        TestEnsureMaigoLinked._init_repo(repo, monkeypatch)
+        central = tmp_path / "central"
+        central.mkdir()
+        (repo / ".maigo").symlink_to(central, target_is_directory=True)
+        exclude = repo / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(".maigo/\n", encoding="utf-8")
+        assert _git_status(repo) == "?? .maigo"
+
+        rd.ensure_maigo_ignored(str(repo))
+
+        assert ".maigo" in exclude.read_text(encoding="utf-8").split()
+        assert _git_status(repo) == ""
+
+    def test_existing_slash_rule_still_covers_a_real_directory(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        self._init_repo(tmp_path, monkeypatch)
+        exclude = tmp_path / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(".maigo/\n", encoding="utf-8")
+        (tmp_path / ".maigo").mkdir()
+
+        rd.ensure_maigo_ignored(str(tmp_path))
+
+        assert exclude.read_text(encoding="utf-8").split().count(".maigo") == 0
 
     def test_noop_outside_git_repo(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

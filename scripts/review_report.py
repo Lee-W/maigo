@@ -20,6 +20,9 @@ import re
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from maigo_state import check_maigo_link_trusted  # noqa: E402
+
 _METADATA = re.compile(r"^<!-- maigo-review: (.+) -->$", re.MULTILINE)
 VERDICTS = ("APPROVE", "APPROVE_WITH_NITS", "NEEDS_CHANGES", "BLOCKED")
 
@@ -101,10 +104,10 @@ def report_path(
     if not identifier:
         raise ValueError("Review source must have a stable identifier")
     path = root / artifact_path("review", identifier, owner=owner)
+    check_maigo_link_trusted(root / ".maigo")
     if any(
-        part.is_symlink()
-        for part in (root / ".maigo", path.parent.parent, path.parent, path)
-    ) or not path.resolve().is_relative_to(root.resolve()):
+        part.is_symlink() for part in (path.parent.parent, path.parent, path)
+    ) or not path.resolve().is_relative_to((root / ".maigo").resolve()):
         raise ValueError("Review path escapes the repository")
     return path
 

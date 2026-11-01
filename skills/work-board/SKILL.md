@@ -467,21 +467,28 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
 maigo 命令自己處理的項目**不勾 checkbox**——checkbox 專屬「使用者親自處理」的訊號（見 §5）。
 `--reviewed` 是使用者的明確操作，可以勾（等同使用者在 nvim 手勾）。
 
-**Work Board 每個專案只有一份**，但它的位置**不是固定的**——它住在「當初建立它的那個
-worktree」，不一定是主 worktree；那個 worktree 一旦被 `git worktree remove`，board 就得
-搬到別的存活 worktree，記下來的舊路徑會過期（2026-09-09 實例：一份記憶條目原記 `<repo>-main`，
-但 board 實際已經在一個 topic worktree 裡）。跑 board 回寫類命令（`/maigo:board`、
-`address-comments` 步驟 8 等）時，**先 `find <workspace 根> -maxdepth 3 -name board.md`
-找到現存的那一份再 upsert**，不要假設它在主 worktree、也不要照抄任何舊記錄的路徑；
-找不到任何 `board.md` → 問使用者要建在哪，不要自己挑一個 worktree 建。
+**Work Board 每個 repo identity 只有一份，位置就是目前 worktree 的 `.maigo/board.md`。**
+`.maigo` 預設是指向本機集中 root 的 symlink（`$MAIGO_STATE_HOME`，預設
+`~/.local/share/maigo/state/<owner>/<repo>/`；SessionStart hook `repo_detect.py` 會建，
+identity 與遷移細節見 [`.maigo/` 集中儲存](https://github.com/Lee-W/maigo/blob/main/docs/reference/state-storage.md)），同一個 repo 的
+所有 worktree 讀寫同一份，board 不會因為某個 worktree 被 `git worktree remove` 而搬家，
+也不必再找「哪個 worktree 有 board」。跑 board 回寫類命令（`/maigo:board`、
+`address-comments` 步驟 8 等）時直接讀寫 `.maigo/board.md`；`board.md` 不存在 → 這個 repo
+還沒有 board，問使用者要不要建，不要自己建。
 
-**報告與 board 可能不在同一個 worktree。** `review/<id>/review.md` 與 `draft.md` 由
-`artifact_path.py` 落在**執行命令所在 worktree** 的 `.maigo/` 下；`board_state.py` 的
-`--maigo-root` 只讀該根底下的 `.maigo/review/<id>/review.md`（`_auto_local_verdict_at`），
-找不到就退回 GitHub reviews 與 `prior_status`。在 board 以外的 worktree 跑 `/maigo:review`
-時，細節檔 `## 筆記` 裡 repo root 相對的路徑（`.maigo/review/<id>/review.md`）在 board 所在根會開不起來，本地 verdict 也可能不被
-`board_state.py` 看見。回寫時把筆記改寫成絕對路徑，或把 `review/<id>/` 複製到 board 所在根的
-`.maigo/review/`；不要因為路徑相對就假設報告在 board 旁邊（2026-10-14 實例：6 顆 PR 在 topic
+**尚未遷移的 repo（`.maigo` 還是真目錄，`/bin/ls -ld .maigo` 不是 symlink）才有舊行為：**
+每個 worktree 各有一份 `.maigo/`，board 住在當初建立它的那個 worktree，記下來的舊路徑會過期
+（2026-09-09 實例：一份記憶條目原記 `<repo>-main`，board 實際在一個 topic worktree 裡）。
+這時先 `find <workspace 根> -maxdepth 3 -name board.md` 找到現存的那一份再 upsert，
+不要假設它在主 worktree；找不到任何 `board.md` → 問使用者要建在哪。
+
+**報告與 board 在同一份 `.maigo/` 底下（已遷移的 repo）。** `review/<id>/review.md` 與
+`draft.md` 由 `artifact_path.py` 落在 `.maigo/` 下，不論哪個 worktree 執行，`board_state.py`
+的 `--maigo-root` 讀到的都是同一份，細節檔 `## 筆記` 用 repo root 相對路徑
+（`.maigo/review/<id>/review.md`）就夠了，不必改寫成絕對路徑，也不必複製目錄。
+**尚未遷移的 repo** 才會發生報告落在執行命令的 worktree、board 在別處：`board_state.py`
+找不到就退回 GitHub reviews 與 `prior_status`；回寫時把筆記改寫成絕對路徑，或把
+`review/<id>/` 複製到 board 所在根的 `.maigo/review/`（2026-10-14 實例：6 顆 PR 在 topic
 worktree 審完、board 在別的 worktree，筆記改用絕對路徑）。
 
 **Upsert 紀律**（單項 upsert 的日期更新、容易被漏掉的獨立檢查、verdict 未必已送出 GitHub）

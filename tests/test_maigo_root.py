@@ -113,3 +113,15 @@ def test_readable_log_path_prefers_new_then_legacy(tmp_path: Path):
         _maigo_root.readable_log_path(tmp_path, "none.jsonl")
         == tmp_path / ".maigo" / "_internal" / "log" / "none.jsonl"
     )
+
+
+def test_cwd_inside_symlinked_dot_maigo_resolves_to_repo_root(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git_init(repo)
+    central = tmp_path / "central"
+    (central / "pr" / "1").mkdir(parents=True)
+    (repo / ".maigo").symlink_to(central, target_is_directory=True)
+
+    assert _maigo_root.maigo_root(repo / ".maigo" / "pr" / "1") == repo.resolve()
+    assert _maigo_root.maigo_root(repo / ".maigo") == repo.resolve()

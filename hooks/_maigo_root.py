@@ -15,11 +15,15 @@ an ancestor that merely happens to be named `.maigo`, so a non-git project that
 itself lives under a `.maigo` ancestor resolves to the ancestor's parent.
 A cwd that cannot be resolved at all (for example one containing a NUL byte)
 falls back to the cwd as given: hooks always fail open.
+The cwd is made absolute but symlinks are not followed: `.maigo` is normally a symlink
+into the central state directory (`scripts/maigo_state.py`), and following it would
+lose the repo.
 No environment variable is read.
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -36,7 +40,7 @@ def _git_toplevel(cwd: Path) -> Path | None:
             timeout=GIT_TIMEOUT_SEC,
             check=False,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError, ValueError):
         return None
     if result.returncode != 0:
         return None
@@ -54,7 +58,7 @@ def _strip_dot_maigo(path: Path) -> Path:
 def maigo_root(cwd: str | Path) -> Path:
     """Return the repo root for `cwd` (git toplevel, else `cwd` minus `.maigo`)."""
     try:
-        start = Path(cwd).resolve()
+        start = Path(os.path.abspath(cwd))
     except (ValueError, OSError):
         return Path(cwd)
     top = _git_toplevel(start)

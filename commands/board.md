@@ -182,7 +182,7 @@ python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply   # 寫回
 
 `$MAIGO_HOME` 是 maigo 的 checkout 或 plugin 安裝目錄（由你在 dotfiles 裡指向）。cwd 在 board 所在 repo
 的任一 worktree 內都可以，script 會用 `git worktree list` 自動找到唯一一份 `.maigo/board.md`
-（找不到或有多份就拒絕，用 `--maigo-root` 指定）；`--repo` 預設取 board 第一行 header，`--you` 預設取
+（共用同一個集中 `.maigo/` 的 worktree 算同一份；找不到或有多份不同的就拒絕，用 `--maigo-root` 指定）；`--repo` 預設取 board 第一行 header，`--you` 預設取
 `gh api user`。可用旗標：`--add <url|n>...`、`--max-new`、`--no-discovery`、`--stale-days`、`--jobs`、`--json`。
 
 在 nvim 裡開著 board 時：先 `:w`，再 `:!python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply`，最後

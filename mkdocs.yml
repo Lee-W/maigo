@@ -24,6 +24,7 @@ nav:
       - Skills: reference/skills.md
       - Memory: reference/memory.md
       - Artifacts: reference/artifacts.md
+      - State storage: reference/state-storage.md
       - Character colors: reference/character-colors.md
   - Guides:
       - Getting Started: guides/getting-started.md
