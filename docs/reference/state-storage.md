@@ -3,6 +3,7 @@
 `.maigo/` 的實體放在本機一個集中 root，每個 worktree 的 `.maigo` 只是指向它的 symlink。
 同一個 repo 的所有 worktree 因此共用一份 board、plan 與 review 報告，不再各自一份。
 這一頁只描述儲存層；它不同步任何東西，也不決定哪些內容可以離開這台機器。
+跨機器同步見 [`.maigo/` 跨機器同步](state-sync.md)。
 
 ## 位置與 repo identity
 

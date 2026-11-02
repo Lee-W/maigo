@@ -25,6 +25,7 @@ nav:
       - Memory: reference/memory.md
       - Artifacts: reference/artifacts.md
       - State storage: reference/state-storage.md
+      - State sync: reference/state-sync.md
       - Character colors: reference/character-colors.md
   - Guides:
       - Getting Started: guides/getting-started.md
