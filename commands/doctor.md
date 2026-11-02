@@ -10,7 +10,9 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 開始命令時先讀 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md)
 並消費 `--model-profile <path>`；執行角色前依宿主能力解析派工，無 subagents 時依序執行。
 
-> 「哪裡不舒服嗎。讓我看看。」 —— 🌑 Mortis
+開場：🌑 Mortis 依本輪任務生成 ≤2 句（例如這次是全面檢查、還是追某一項），只沿用已知事實：
+
+> 🌑 Mortis：「哪裡不舒服嗎。讓我看看。」（示例）
 
 檢查 Maigo 運行所需的外部依賴與配置是否到位。
 

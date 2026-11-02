@@ -34,10 +34,10 @@ orchestrator 直接呼叫 Anon 動手，做完跑 Soyo 輕量 review（9 項 →
 
 ## 流程
 
-1. **愛音 (Anon)** — 直接動手實作（無 Raana 探索、無 Tomori plan）。「嗯！先做 Step 1！」
+1. **🎀 愛音 (Anon)** — 直接動手實作（無 🐱 Raana 探索、無 🩵 Tomori plan）。「OK，這個我直接改！先看旁邊一兩個檔對齊慣例。」
    - Anon 自己看周邊 1-2 個檔抓慣例，不做大範圍探索
    - 不寫 plan.md
-2. **爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「這裡這樣寫，應該不對。」
+2. **🟡 爽世 (Soyo)** — 輕量 review，只跑 9 項中的 4 項。「項目少了，標準沒有少。這四項過了，我才放行。」
 3. **Orchestrator 顯式驗證** — 🟡 爽世 APPROVED 後，依下節執行驗證 CLI，保存 command、cwd、exit code 與 output。修過檔案就重跑，不能沿用修改前的結果。
 4. **Orchestrator** — 驗證 `passed` 後，若還有未 commit 的本次變更，依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 草擬一段 commit message 附在 final summary。格式照該 skill 的偵測跑，**不預設 CC**——target repo 的成文慣例優先（例：apache/airflow 明禁 CC 前綴並有 commit-msg hook 擋）。驗證綠了就**直接落地 commit**（明列檔案路徑 `git add`、不用 `SKIP=`），回報 hash 與 `--stat`；**push 不代跑**。接著依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對當前 branch 若已開 PR，其 title/description 是否仍符合現在的實際改動；沒有對應 PR 就跳過，不算失敗。
 
@@ -89,7 +89,7 @@ repo 的測試指令，而文件錯字、壞掉的 cross-reference、渲染失�
 沒有 hooks 時，這是命令要求的顯式檢查，不能宣稱宿主已機器強制。
 Claude Code 的 Stop hook 保留額外檢查，不能用「之後 hook 會跑」取代步驟 3。
 
-## Soyo 輕量 checklist（9 項 → 4 項）
+## 🟡 Soyo 輕量 checklist（9 項 → 4 項）
 
 | 項 | 跑？ |
 |---|------|
@@ -113,7 +113,7 @@ orchestrator 啟動 🟡 Soyo 時 prompt 必須明示「mode=quick」與上述 s
 
 ## 失敗處理
 
-### Soyo 擋下（NEEDS_CHANGES / BLOCKED）
+### 🟡 Soyo 擋下（NEEDS_CHANGES / BLOCKED）
 
 跟 `/maigo:go` 同——把 must-fix 完整給 Anon、修完重 review、**2** 次同條才停下找使用者。
 詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。

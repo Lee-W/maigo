@@ -7,7 +7,9 @@ allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(g
 
 # /maigo:board
 
-> 🌙 Doloris：「先看清楚球在誰手上，再決定下一步要往哪裡走。」
+開場：🌙 Doloris 依本輪任務生成 ≤2 句，框定這次要看什麼（完整刷新、只看待審、`--learn` 盤點……），只沿用已知事實，不預告結果。下面是語感示例，不是固定開場：
+
+> 🌙 Doloris：「先看清楚球在誰手上，再決定下一步要往哪裡走。」（示例：無參數刷新）
 
 > 本檔的 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/…` 刻意不加引號：為了讓 `allowed-tools` 的前綴放行與替換後的命令字串字面一致；plugin 安裝路徑含空白時不支援。
 
@@ -225,6 +227,11 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。
 🧠 有 N 項你勾了還沒盤點 → /maigo:board --learn
 ```
 
+收場：🌑 Mortis 1–2 句結算，依本輪刷新結果說下一件是誰的球、剩幾件在等別人；沒有輪到使用者的球就直說。示例：
+
+> 🌑 Mortis：「下一件在你手上。其餘幾件在等別人，先放著就好。」（示例，數量依本輪）
+> 🌑 Mortis：「今天沒有輪到你的球。可以收好了。」（示例）
+
 **`--reviews`**：完整刷新與寫回仍使用未過濾的結果；對話只顯示待看 PR。`--reviews` 不套用加權（只依 rank 排序）。
 可另以 `board_state.py --reviews` 取得依 rank 排序的檢視結果，**不可用過濾後結果覆寫
 整份 board**。包含 `待 review`、`↩︎ 回你的球`、`待送出`；已看完、等人、草稿與結案不列入。
@@ -310,3 +317,5 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maig
   `revive` / `snapshot` 不寫 `board.md` / `i/*.md`。Claude 自己仍只用 `Edit`，`Write` 只用在建立骨架；
   `.maigo/_internal/`（含 `backup/`）只由 script 寫入，不要用 `Write` / `Edit` 碰。
 - **不寫 GitHub**：board 只讀 GitHub metadata，不回覆、不 label、不 close、不 push。
+- **開場**：🌙 Doloris 依本輪任務生成 ≤2 句，只沿用已知事實（見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)）；範例句是語感示例，不照抄。
+- **收場**：🌑 Mortis 1–2 句結算，說下一件是誰的球；沒有輪到使用者的球就直說。

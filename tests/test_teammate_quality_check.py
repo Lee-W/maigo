@@ -676,6 +676,52 @@ class TestCheckTaki:
 
 
 # ---------------------------------------------------------------------------
+# opening-line slot (agents/*.md「開場一句話」)
+# ---------------------------------------------------------------------------
+
+
+class TestOpeningLineSlot:
+    """The chat-layer opening line sits before the first `##` and must not trip any hook."""
+
+    def _run(self, check, text: str, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            check(text)
+        return json.loads(capsys.readouterr().out.strip())
+
+    def test_raana_opening_line_approves(self, capsys):
+        text = (
+            "🐱 樂奈：只有 `quick.md` 沒走這條。差異在第 37 行，留給 🩵 燈。\n\n"
+            + MEMORY
+        )
+        assert self._run(tqc.check_raana, text, capsys).get("decision") is None
+
+    def test_soyo_opening_line_approves(self, capsys):
+        text = (
+            "🟡 爽世：這次證據齊了。兩個入口都照 acceptance 處理，可以放行。\n\n"
+            + MEMORY
+            + "\n## Verdict\nAPPROVED\n\n"
+            + CHECKLIST
+        )
+        assert self._run(tqc.check_soyo, text, capsys).get("decision") is None
+
+    def test_taki_opening_line_approves(self, capsys):
+        text = (
+            "🟣 立希：全綠。三條都 exit 0，通過。\n\n"
+            "## Commands\n- `uv run pytest tests/` — exit 0 — 42 passed\n\n"
+            "## Verdict\nPASS\n"
+        )
+        assert self._run(tqc.check_taki, text, capsys).get("decision") is None
+
+    def test_taki_hedge_in_opening_line_blocks(self, capsys):
+        text = (
+            "🟣 立希：應該可以。三條都 exit 0。\n\n"
+            "## Commands\n- `uv run pytest tests/` — exit 0 — 42 passed\n\n"
+            "## Verdict\nPASS\n"
+        )
+        assert self._run(tqc.check_taki, text, capsys)["decision"] == "block"
+
+
+# ---------------------------------------------------------------------------
 # check_anon
 # ---------------------------------------------------------------------------
 

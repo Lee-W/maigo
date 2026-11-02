@@ -32,7 +32,7 @@ memory，不能只靠 delegate 給 Raana/Tomori/Soyo 時才觸發這個 skill—
 2. **讀 index 每行** `- [Title](file.md) — description`（兩層 index 合併），判斷哪些 description 跟當前 task 的 keyword / 主題有 overlap
 3. **相關性排序**：把**兩層合併後**的候選 entry 依匹配度排序
 4. **限量載入**：若相關條目過多，僅 Read 最相關的前 10 筆 entry 全文——**10 筆是兩層合計上限，不是每層各 10**；當作這次工作的 context
-5. **在輸出開頭印 `## Loaded memory entries` 段**，列出用了哪些 entry
+5. **在身份標識與開場一句話之後（沒有槽位的角色則緊接身份標識）印 `## Loaded memory entries` 段**，列出用了哪些 entry
 
 ## Schema 自檢（lazy）
 

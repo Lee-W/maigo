@@ -70,7 +70,7 @@ stdout 第 1 行 `owner: mine|others`，記下來——下面所有 `artifact_pa
 AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答案當 `--owner`。本地 branch / range
 省略 `--owner`（預設 `mine`）。
 
-### 1. 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
+### 1. 🐱 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
 **先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。`status: owner_unknown`（exit 4，查不到 PR 作者）→ 依上面「判斷 owner」問使用者後，用 `--rubric <path>`（路徑由 `artifact_path.py review-rubric --owner …` 算出）重跑。
 **`status: conflict` 時 rubric 檔裡既有的 cache 區塊是舊 head 的過期快取，不是現況**——現 head 的 diff 以 `gh pr diff` 另存為準，並交代燈／爽世不要引用該區塊。
@@ -83,7 +83,7 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 - **看周邊**：diff 涉及檔案的呼叫關係（被誰用、用了誰）、同檔案 / 同 module 既有的寫法慣例
 - 回報：變更摘要 + 周邊 context + 既有慣例
 
-### 2. 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
+### 2. 🩵 燈 (Tomori) — 寫 review rubric。「……讓我先理清楚它想做什麼。」
 
 派 🩵 燈前，**orchestrator** 取 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時由 orchestrator 呼叫
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name> --owner <owner>` 並處理 ownership 結果，
@@ -106,7 +106,7 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 **為什麼這步很關鍵：** 沒有對照基準的 review = 憑感覺。
 這也是 reviewer 不嚴謹最常見的根因。
 
-### 3. 爽世 (Soyo) — 拿 rubric 對 diff 做嚴格 review。「你說的『應該』，是有跑過、還是只是『應該』？」
+### 3. 🟡 爽世 (Soyo) — 拿 rubric 對 diff 做嚴格 review。「我在意的是 rubric 的每一條有沒有對到 evidence。對不上的，我會寫清楚還缺什麼。」
 
 依 `skills/strict-review/SKILL.md` 操作（預設 BLOCKED、9 項 checklist、要 evidence、不接受 TODO 規避）。
 
@@ -117,7 +117,7 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 
 **Mode-aware：** orchestrator 傳給 Soyo 的 prompt 必須明示 mode 與對應 checklist subset。Soyo 輸出 checklist 表時：mode subset 內的項照常 `[x]` / `[ ]`；不在 subset 內的項標 `[—]`，附 `skipped by mode=<name>`。
 
-### 4. 立希 (Taki) — 跑驗證。「跑出來爆了，看 line 42。」
+### 4. 🟣 立希 (Taki) — 跑驗證。「跑出來爆了，看 line 42。」
 
 **若 mode=design-preview → 不啟動本 stage，最終報告 Verification 段標「Skipped (mode=design-preview)」。**
 

@@ -24,7 +24,7 @@ v1 不支援 `--label needs-triage` 之類自動拉清單的旗標——使用�
 
 ## 流程
 
-### 1. 樂奈 (Raana) — 抓 metadata + 排隊
+### 1. 🐱 樂奈 (Raana) — 抓 metadata + 排隊
 
 第一輪 🐱 樂奈以 parallel 方式抓**每條 issue** 的 lightweight metadata：
 
@@ -55,7 +55,7 @@ gh issue view <N> --repo <repo> --json number,title,author,createdAt,state,label
 
 第一條 issue **不必**等 go-ahead——使用者送多 issue 進來就授權批次啟動。「等 go-ahead」規則只在 issue 與 issue 之間。
 
-### 2. 每條 issue — 樂奈 fetch full + 找 dup
+### 2. 每條 issue — 🐱 樂奈 fetch full + 找 dup
 
 🐱 樂奈進場第二輪，這條 issue 抓完整內容：
 
@@ -72,7 +72,7 @@ gh api repos/<owner>/<repo>/issues/<N>/timeline --paginate              # linked
 
 回報：full body 摘要 + comments 摘要 + linked refs + 疑似 dup `#<N>` 清單（沒有則「(none found)」）。
 
-### 3. 燈 (Tomori) — 寫 triage rubric
+### 3. 🩵 燈 (Tomori) — 寫 triage rubric
 
 派工前由 **orchestrator** 在目標 cwd 呼叫 `python3 "<maigo-root>/scripts/artifact_path.py" triage-rubric --url <issue url> --repo <owner/name> --topic "Triage rubric: <issue title> (#<N>)"`，處理歸屬結果、建立回傳路徑的父目錄，再交付絕對路徑、原樣 H1 與 ownership status。🩵 燈沒有 Bash，只負責寫 rubric。**每條 issue 各自一份**，使用 helper 實際回傳的路徑，不自行推算 `.maigo/issue/<N>/`——同一批多條 issue 不再共用同一個檔案，爽世讀完即可，不需要長期保留（歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)）。
 
@@ -82,9 +82,9 @@ gh api repos/<owner>/<repo>/issues/<N>/timeline --paginate              # linked
 - **Why this category 必填**，引用 body 的具體片段（line / 段落），避免「感覺像 bug」這種無依據判斷
 - Potential duplicates 抄樂奈第二步的結果
 
-### 4. 爽世 (Soyo) — 套 strict-triage 給 verdict
+### 4. 🟡 爽世 (Soyo) — 套 strict-triage 給 verdict
 
-🟡 爽世：「每一條都該有它的位置。該往前的往前，該停下的，就停在這裡吧。♪」
+🟡 爽世：「每一條我都會照 checklist 看完。資料齊的往前送，缺的我會寫清楚還差什麼。」
 
 依 [`skills/strict-triage`](https://github.com/Lee-W/maigo/blob/main/skills/strict-triage/SKILL.md) 操作：
 

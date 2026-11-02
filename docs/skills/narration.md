@@ -25,4 +25,4 @@ summary。如果 summary 不帶 emoji，五位 agent 的存在感整場消失，
 
 身份標識之外，summary 還要保留角色這次關注的觀察或反應。依
 [交棒規則](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)
-節錄原句或明標摘要；角色的聲音不該在主線被壓成同一種「已完成」，也不能由主控偽造引言。
+引用角色的開場一句話，缺漏時明標摘要；角色的聲音不該在主線被壓成同一種「已完成」，也不能由主控偽造引言。

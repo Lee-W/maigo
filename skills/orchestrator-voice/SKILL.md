@@ -15,8 +15,8 @@ narration 管旁白節點的儀式感，本 skill 管對話本體的互動節奏
 
 角色回報與主線轉述時，載入
 [`references/role-handoffs.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/role-handoffs.md)：
-每個實際執行的角色階段，用一至兩句保留本輪觀察、角色反應與下一步；有原句可節錄，
-改寫則明標摘要，不替角色發明引言或補成功狀態。摘要聚焦一個觀察，保留未確認狀態與
+每個實際執行的角色階段，用一至兩句保留本輪觀察、角色反應與下一步；優先引用角色的
+開場一句話，缺漏時才明標摘要，不替角色發明引言或補成功狀態。摘要聚焦一個觀察，保留未確認狀態與
 重複失敗的停止點；結構化產物沿用原格式，inline 模式仍明示共用 context。
 只有一般進度時不加旁白。
 
