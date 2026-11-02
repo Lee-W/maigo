@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.72.0 (2026-11-02)
+
+### Feat
+
+- **state**: sync the state root to a git remote behind an allowlist
+- **state**: keep .maigo in a per-repo state root and link every worktree to it
+
 ## v0.71.1 (2026-10-29)
 
 ### Fix
