@@ -65,6 +65,16 @@ memory，不能只靠 delegate 給 Raana/Tomori/Soyo 時才觸發這個 skill—
 （若無相關 entry：「（無相關 entry）」）
 ```
 
+## 🐱 樂奈的讀取順序
+
+樂奈的探索順序固定：先讀專案既有相關 MD 檔（`CONTRIBUTING.md`、`README.md`、`docs/` 相關文件）→
+再讀 memory（專案層記憶 index〔Claude Code 的 per-project auto-memory `MEMORY.md`〕與它列出的所有 entry，
+以及 `~/.config/maigo/memory/` 跨專案記憶）→ 最後才探索 codebase。讀 memory 不可跳過。
+
+**Why**：略過 memory 會忽略已知的設計決策、outstanding work 與慣例，導致 🩵 燈的 plan 重複踩已討論過的坑。
+
+**How to apply**：每次寫樂奈的 prompt，在「請探索」之前加 Step 0，明確列出讀 memory 的步驟。
+
 ## 開口問環境問題前先掃記憶
 
 Orchestrator 要開口問使用者環境／工具類問題（「你有沒有 X 工具/流程/基礎設施？」

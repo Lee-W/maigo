@@ -142,6 +142,7 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 
 - `放進 review`——照 Soyo 的嚴重度送（must-fix → request changes 的理由；nit → 建議）
 - `降成建議`——must-fix 改以非阻擋的建議送出
+- 預設排序：有 must-fix 時 nit 預設也「放進 review」（非阻擋建議）；只有 nit 時預設不帶——見 [review-templates](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)
 - `不提`——不寫進 review，不寫記憶
 - `標記本 repo 不適用 + 理由`——同上，導向 Soyo propose
 

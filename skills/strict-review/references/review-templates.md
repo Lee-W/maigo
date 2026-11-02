@@ -134,6 +134,8 @@ When a review of another contributor's PR ends as "approve with nits" and nothin
 
 How to apply: if the user explicitly asks for the nits to be in the review, do that. Opening the follow-up worktree and pushing it is the user's action; stack it on the PR head only when the edit depends on the PR's change.
 
+**Exception: when the review already has a must-fix, send the nits too.** The review is going out as request-changes anyway, so the author is paying the cycle regardless. Keep each must-fix as blocking, and put the nits in the same review as non-blocking suggestions (dead code, cost magnitude, import rationale, a missing comment, wording, a pure observation all count). Drop only what is unrelated to the PR, such as an incidental refactor that should be reverted. With no must-fix, the default above still holds: nits-only means an APPROVE draft without nits. The `commands/review.md` §4.5 gate is still asked item by item; this rule only sets which option is listed first.
+
 ### 多 PR batch 最終 roll-up
 
 batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行改成 roll-up：

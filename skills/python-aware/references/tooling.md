@@ -83,3 +83,17 @@ How to apply:
   certainly exercises the code and confirm the number moves.
 - To judge branch coverage, pass both `--cov-branch` and `--cov-report=term-missing`; without
   `--cov-branch` the report cannot show `A->B` arcs.
+
+## `uv lock --upgrade` for a vulnerability: check every version the lock holds, not just the first
+
+`uv.lock` forks by `resolution-markers` (for example `python_full_version < '3.11'`), so one package can appear
+several times at different versions. After `uv lock --upgrade-package <pkg>`, a line like `v6.5.10 -> v6.5.10, v6.6`
+means the old-Python fork is still on the vulnerable version.
+
+- List every version of the package in the lock, not only the first hit:
+  `grep -iA1 '^name = "<pkg>"' uv.lock | grep version`.
+- If the fork comes from the `requires-python` lower bound, read the fixed release's `requires_python`
+  (`https://pypi.org/pypi/<pkg>/<ver>/json`). When the old Python is already EOL, raise the `requires-python`
+  floor, update ruff `target-version` to match, then re-lock.
+- Example: a blog repo's `>=3.10` floor kept the 3.10 fork on old releases of two dependencies; 3.10 was EOL, so
+  raising the floor to `>=3.11` removed the fork.

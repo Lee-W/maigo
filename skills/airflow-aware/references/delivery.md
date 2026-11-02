@@ -111,3 +111,17 @@ shrink the check to stop noticing the gap.
   `import airflow` dies with `ModuleNotFoundError: No module named 'airflow.providers.<x>'`. Use
   `env UV_PROJECT_ENVIRONMENT=<scratch dir> uv run --frozen --python 3.12 --project airflow-ctl pytest <paths>`
   and pin `--python`; a fresh env otherwise picks a Python without pydantic-core wheels.
+
+## Review fixes on an apache/airflow PR branch land as `--fixup` commits, and the user squashes and pushes mid-review
+
+When handling review comments on a PR branch in `apache/airflow`, the orchestrator lands each work item's
+fix as `git commit --fixup=<the PR's main commit>`, with no `Co-Authored-By` trailer, and does not push.
+The mechanics (`--fixup` plus autosquash, "commit yes, push no") are in
+[`git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md);
+this section only adds the Airflow default and the timing.
+
+- Autosquash, rebase onto the latest `main`, and push are the user's actions, and they may happen while the
+  orchestrator is still reviewing. Before touching the branch, re-read `git log -1` and `git status` instead of
+  assuming HEAD is where it was last seen; an unexpected rebase or commit means the user acted in a parallel
+  terminal ([`worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)).
+- Example: across one three-round fixup sequence, the user squashed and pushed twice on their own.

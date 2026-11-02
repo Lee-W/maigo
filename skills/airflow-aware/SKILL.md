@@ -87,6 +87,7 @@ A PR that changes a per-call scheduler hot path (cron `_get_next` / `_get_prev`,
 - Agent-opened PRs include a `Generated-by:` footer (see the "Pull requests" section of `AGENTS.md`).
 - **Newsfragments are only required** for changes to `airflow-core/`, `chart/`, or `dev/mypy/`.
 - A docs-page PR attaches a before/after screenshot at PR-open time; **never prefix a doc-only commit subject with `Docs:`** (it trips the conventional-commit hook) — `references/delivery.md`.
+- Review fixes on a PR branch land as `git commit --fixup=<main commit>`, no trailer, no push; the user squashes and pushes, possibly mid-review, so re-read `git log -1` first — `references/delivery.md`.
 
 ### 9. Architecture boundaries *(optional, for architectural review)*
 
