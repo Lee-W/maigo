@@ -1,6 +1,6 @@
 ---
 description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
-allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py:*), Read, Write, Edit
+allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state_sync.py status:*), Read, Write, Edit
 ---
 
 <!-- mkdocs-include-start -->
@@ -37,6 +37,13 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 URL 若指到其他 repo，行內保留 `owner/repo#n` 全稱。
 
 ## 流程
+
+### 0. 提示集中 root 落後 remote（只提示）
+
+先跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state_sync.py status --fetch`。輸出有 `behind: N` 且 N > 0 時，
+在回覆開頭提示一句「集中 root 落後 origin N 個 commit，要同步請手動跑 `maigo_state_sync.py pull`」，**不自動 pull**。
+輸出是 `not a git repository`、沒有 `behind:` 行、或指令失敗時都略過，不提示也不中斷後面的流程。
+同步的完整說明見 [`.maigo/` 跨機器同步](https://github.com/Lee-W/maigo/blob/main/docs/reference/state-sync.md)。
 
 ### 1. 載入或建立 board
 
