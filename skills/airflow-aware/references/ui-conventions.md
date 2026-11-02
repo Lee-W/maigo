@@ -112,6 +112,17 @@ follow the pending-partition-run detail endpoint's shape and use a query
 param — don't copy the path-param shape of sibling routes whose params are
 controlled IDs.
 
+## A submit guard keys on whether the control is rendered, not on a data flag
+
+Key a "cannot submit" guard (for example, an empty selection) on whether the control it protects is
+on screen, and scope it to that render path. A data flag such as `multiple` doesn't track that: a case
+where the flag is false but the control still renders leaves the guard open. And a guard placed in a
+shared `handleSubmit` also runs for the other render paths (button mode, approval, preloaded values),
+where that field doesn't exist, and wrongly blocks them. Before editing, list every condition that
+renders the control and every path through the shared handler. Test both sides: should-block blocks,
+and should-not-block passes (the latter passes before the fix too, so it is a guard, not a regression
+detector).
+
 ## zh-TW locale content
 
 **zh-TW locale content**: call it "Taiwanese Mandarin", never "Traditional

@@ -623,6 +623,24 @@ rendered before a screenshot counts as evidence, see
   Sphinx directive (mermaid included) doesn't apply — check for a `conf.py` and whether the
   folder is in the `breeze build-docs` list first.
 
+## A new `providers/common/ai` framework adapter needs every enumeration site updated
+
+Scope: only when the diff adds a framework adapter under `providers/common/ai` (a sibling of the
+existing Claude Agent SDK one). Besides the adapter, its guide, example and tests, several docs
+pages *list* the adapters; missing one makes the new adapter look like a second-class member, and
+the author's own `git grep` for the new name won't find the gap because the gap is where the name is
+absent. Use the predecessor as the checklist instead:
+
+```bash
+git grep -n 'Claude Agent SDK' providers/common/ai
+```
+
+Add a parallel entry at each hit. At the time of writing these include `docs/features.rst` (the
+sentence listing adapters and the table row), `docs/toolsets/index.rst` (the bridge listing),
+`docs/stability.rst`, and the `docs/frameworks/` page plus its index entries. Confirm the docs still
+build with `breeze build-docs common.ai` (dotted short name) and look for the success line and fresh
+HTML.
+
 ## Status claims in provider docs: verify against a primary source and align every mention
 
 Before writing or approving a claim about stability, release state, CI or support in a provider's docs, changelog or PR description:

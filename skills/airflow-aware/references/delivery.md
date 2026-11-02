@@ -81,6 +81,17 @@ Write plain prose describing user impact instead (e.g. "Sync
 "Docs: Sync..."). If `check-no-conventional-commit-message` fails, drop
 the leading type-like prefix and retry — don't reach for `--no-verify`.
 
+## The scheduled "Upgrade important CI environment" PR is bot-regenerated
+
+That PR is produced by `.github/workflows/scheduled-upgrade-check-*.yml` (one per target branch; the
+logic is in `upgrade-check.yml`), and its head is the `ci-upgrade-<target branch>` branch that the
+workflow recreates on every run. When it goes red, the cause is usually an incompatible new dependency
+or an advisory, not the PR's own code. Open a separate fix PR into `main` (the next scheduled run
+regenerates from the new `main`); never rebase or push the bot's branch. For an advisory, check
+`gh api /advisories/<GHSA>` for `first_patched_version` first — if a patched release already exists,
+waiting for the next run is often enough, and the repo's `exclude-newer` window may hide a just-published
+fix until it ages in.
+
 ## Backport judgment
 
 When a backport branch's drift-check fails because it references something

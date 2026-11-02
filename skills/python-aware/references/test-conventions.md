@@ -913,6 +913,14 @@ path length first.
 
 When a review thread gives a concrete repro (input and expected value), add it as a parametrize case named for the scenario (for example `<zone>-<direction>-<scenario>`) even if the current head already handles it, and name the case id in the reply. First derive the expected value with your own oracle instead of copying the reviewer's. Then check the case goes red on the base branch; if it does not, it is a guard test, and the reply says which mutation it blocks.
 
+## Pydantic `HttpUrl` fields: construct the value explicitly in typed test code
+
+Scope: only a repo whose mypy runs **without the pydantic plugin**. A pydantic model with an
+`HttpUrl` field accepts a plain `str` at runtime (pydantic coerces it), but without the plugin mypy
+reports `incompatible type "str"; expected "HttpUrl" [arg-type]`. In module-level constants and
+annotated functions, write `Model(url=HttpUrl("https://example.com/a"))`. Unannotated functions
+aren't type-checked, so a bare `str` there passing mypy doesn't make it legitimate.
+
 ## A `# type: ignore[arg-type]` needed to feed a documented value means the signature promise is wrong
 
 When a test needs `# type: ignore[arg-type]` to pass a value that the docstring, the docs or the changelog promises is accepted (for example a docstring saying `None` is accepted while the annotation is `str`), the defect is the signature and its documentation disagreeing, not the test. Make the annotation, the docstring and the docs state the same promise: either widen the type, or drop the promise and record it in the changelog. Do not leave the `ignore` in place so the test passes.
