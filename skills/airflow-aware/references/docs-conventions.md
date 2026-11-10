@@ -658,3 +658,32 @@ GENERATED" comment) that gets overwritten at release time. Reordering/placement 
 When a new parameter/flag changes user-visible API semantics (e.g. how a special character is interpreted in a query param),
 the **public description / OpenAPI spec must be updated in the same change** as the code — not left describing the old
 semantics. Regenerate the spec + client after editing.
+
+## New `common.ai` framework adapter: enumerate every place the existing adapters are listed
+
+Scope gate: applies when a diff adds a framework adapter under `providers/common/ai` (one modelled on the existing
+Claude Agent SDK adapter).
+
+Besides the adapter, its guide, example Dag and tests, many docs and code spots list *all* adapters. Missing one makes
+the new adapter look like a non-peer. One such change shipped without two of these spots (the features page's prose
+and table, and the toolsets page's bridge list); the implementer's own `git grep` missed them, and an independent
+verifier found them by searching where the predecessor adapter appears on `main`.
+
+Method: take the **predecessor adapter's name** (the most recently added one; at the time of writing, the Claude Agent SDK) and list every place it appears
+(`git grep -n 'Claude Agent SDK' providers/common/ai`, plus its identifier forms such as `claude_agent_sdk` and
+`claude-agent-sdk` across `providers/common/ai` and `shared/observability`), then add a parallel entry at each. Line
+numbers drift, so always re-run the grep rather than trusting a list. The places found that way on `main`:
+
+- `docs/features.rst`: the sentence listing adapters and the table row
+- `docs/toolsets/index.rst`: the bridge list
+- `docs/index.rst`: the extras table
+- `docs/stability.rst`: the experimental row
+- `docs/observability.rst`: the framework tag values
+- `docs/frameworks/index.rst`: table rows, tested-versions row, the guidance bullets and the toctree
+- `src/airflow/providers/common/ai/utils/tool_metrics.py`: the `Framework` `Literal`
+- `shared/observability/.../metrics_template.yaml`: the framework tag documentation
+- `pyproject.toml`: the extra and the dev dependency group; regenerate `uv.lock` with the repo-pinned uv
+
+Verification: `breeze build-docs common.ai` (the dotted short name) succeeds with no unresolved reference in the log,
+and the new link renders as an internal reference in the built HTML. Run prek by listing each file explicitly; the
+`update-providers-build-files` hook needs Docker.

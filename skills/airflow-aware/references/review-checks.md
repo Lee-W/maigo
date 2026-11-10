@@ -1727,3 +1727,22 @@ episode (apache/airflow #71072 review, two rounds: short fetch first, then empty
   `with_row_locks` with a side effect that makes the query apply `.limit(1)` to simulate a
   short fetch and `.limit(0)` to simulate an empty one while the backlog is still above the
   cap.
+
+### A new required field on an API response model: every `airflowctl` construction site needs it
+
+Scope gate: applies when a diff in `airflow-core` adds a **required** field to an API response model that
+`airflow-ctl/src/airflowctl/api/datamodels/generated.py` mirrors (for example `DAGResponse`, and
+`DAGDetailsResponse`, which subclasses it). This is a case study, not a numbered check.
+
+The generated `airflow-ctl` model makes the field required too, so every place in `airflow-ctl` that constructs
+those models must pass it. Otherwise `mypy-airflow-ctl` reports `call-arg: Missing named argument` and pytest fails
+with a pydantic `ValidationError: Field required`. One PR fixed some tests and missed two construction sites that
+other PRs had added to `main` after the field first appeared, so a grep at writing time could not find them; they
+arrived on rebase and CI failed on the old head.
+
+How to apply: after adding the field and after every rebase, parse the `airflow-ctl` Python files (from
+`git ls-files`, excluding `generated.py`) with `ast`, list each `DAGResponse(` and `DAGDetailsResponse(` call as
+file:line, class and "passes the new field?", and require all True. Also look for `**kwargs` passed into the
+constructor. A symbol grep alone is not enough, because the sites that fail are the ones added to `main` recently.
+Run the check locally with `prek run mypy-airflow-ctl --files <each file listed>`; the uv in the worktree venv must
+satisfy the project's `required-version` or the hook aborts before mypy runs, and `no files to check` is not a pass.

@@ -125,3 +125,26 @@ this section only adds the Airflow default and the timing.
   assuming HEAD is where it was last seen; an unexpected rebase or commit means the user acted in a parallel
   terminal ([`worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)).
 - Example: across one three-round fixup sequence, the user squashed and pushed twice on their own.
+
+## Review-time diff basis: `origin` may be a stale fork, and a stacked PR's base is not `main`
+
+Scope gate: applies when reviewing or addressing comments on a local branch, or when a PR's base branch is not `main`.
+
+- **`origin/main` can be wrong.** In an Airflow checkout `origin` can be the user's fork, whose `main` is out of
+  date, while the PR itself lives in `apache/airflow` and the local branch has usually been rebased. A
+  `git diff origin/main...HEAD` then lists dozens of files that are not the PR's (one review saw 44 files where the
+  PR's real change was 2). Count the branch's commits with `git log --oneline` and diff `HEAD~N..HEAD`, or diff
+  against upstream's `main`. When the pushed head's SHA differs from the local HEAD, use `git range-diff` to tell a
+  rebase from a content change.
+- **Stacked PRs.** Before reviewing, run `gh pr view <n> --json baseRefName,baseRefOid`. If the base is another PR's
+  branch:
+  - `gh pr diff` is the increment over that base and is the review target.
+  - A local `git diff origin/main..<ref>` is **not** the PR diff: it folds in the parent PR and upstream drift
+    (one case: GitHub showed 8 files, the local diff against `main` showed 21). For the increment use
+    `git diff <parent head> <this head>` after `git merge-base --is-ancestor` confirms the parent is an ancestor.
+  - Checks on such a PR may show every job as skipping. Don't read that as evidence either way; say "CI gives no
+    evidence" in the report and ask the author to post results after retargeting to `main`. The *reason* they skip
+    (a workflow filter on the base branch) is an inference: the workflow configuration was not read to confirm it.
+  - Review the parent PR separately.
+  - If the parent later squash-merges, the child needs `rebase --onto`; a local review normally doesn't simulate
+    that, so list it as unverified.

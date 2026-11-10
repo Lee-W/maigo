@@ -720,3 +720,25 @@ data, so a missing key leaves the card on non-latest pages empty").
 How to apply: grep new comments for note-style identifiers (snake_case names with a `reference_` or
 `feedback_` prefix, or any pointer to a memory entry) and replace each with the concrete
 consequence.
+
+---
+
+## A changed call sequence: run the existing tests that mock that function, not only the PR's tests
+
+When a PR adds, removes or reorders a call inside a function or command (for example one more `run_command` on the
+success path), the tests that break are often *existing* tests that assert on the mock of that call — `call_args`,
+`call_args_list`, `call_count`, `assert_called_once` — in a test file the PR did not touch. Running only the PR's own
+or modified test files does not verify that surface (one review gave an approval on that basis; the PR's one extra
+call turned two existing last-call assertions red in a test directory the diff never listed, and the matching CI job
+was already red).
+
+How to apply during review:
+
+1. For each source file the diff changes, grep the test tree for test files that import or mock that module or
+   function, and list them.
+2. Run every listed file, not just the ones in the diff. A red there that disappears on the base version is the PR's
+   responsibility.
+3. When delegating the verification, write the same instruction into the brief: "for every source file the PR
+   changes, find the tests that import or mock that module/function, list them, and run them", rather than "run the
+   PR's tests". A test target that lives in a different sub-project than the source file (a `dev/` tool whose tests
+   sit under another directory) is the case this catches.

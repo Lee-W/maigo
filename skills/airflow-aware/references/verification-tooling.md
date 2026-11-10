@@ -518,6 +518,20 @@ usage: it resolves only that sub-project's dependency set, not the whole
 workspace. Don't conflate the two — the danger is specific to `--project` at
 a worktree root, not to `--project` itself.
 
+### Sub-project `uv run` quirks that look like the PR broke something
+
+Three setup failures in sub-projects look like a regression in the PR but are the scratch environment:
+
+- `dev/registry` has no `uv.lock`, so `uv run --project dev/registry pytest …` must **not** carry `--frozen`.
+- `uv run --project airflow-core pytest …` fails with `ModuleNotFoundError: airflow_shared` unless
+  `PYTHONPATH` lists every `shared/<dist>/src` directory (expand the glob; `PYTHONPATH` does not; the docs-build entry below makes the same point about every
+  `<worktree>/shared/*/src`).
+- Breeze's own tests run as `uv run --project dev/breeze pytest …` (inferred from its `uv.lock` existing, not run, so `--frozen` should work there).
+
+When delegating verification to 🟣 Taki, write the sub-project's exact command (including the `PYTHONPATH` and the
+absence of `--frozen`) into the brief; otherwise the verifier reports the environment error as a PR defect or burns a
+round rediscovering it.
+
 ### `verify_completion` in this repo
 
 `repo_detect` writes `.claude/skip-test-verification` on first detection so the
@@ -688,6 +702,14 @@ plain `uv lock` with the repo-pinned uv (`uvx uv@<pin> lock`) — no `rm`, no
 `--upgrade`. Between the rebase finishing and the re-lock, `uv lock --check`
 fails because the new dependencies aren't in the lock yet — that is the
 expected state.
+
+**Mechanics of that re-lock.** Mid-rebase, `--ours` is the upstream side, so
+`git checkout --ours uv.lock` gives the same restored base as `git checkout HEAD -- uv.lock`; do not hand-edit
+conflict markers. Take the uv version from the `ARG AIRFLOW_UV_VERSION` line in `Dockerfile.ci` (the machine's own
+uv can be older than the pin). Resolving the whole workspace takes about six minutes, so run it in the background,
+wait for the completion notice and don't start a second one. Afterwards check that `uv.lock` has no conflict
+markers and that the packages added versus the base are exactly the ones this branch's `pyproject.toml` files
+introduce, then `git add` and `git rebase --continue`.
 
 **Don't follow the `rm uv.lock && uv lock` wording** that the repo's AGENTS.md
 and the uv-lock-rebase-notice bot suggest for a conflicted lock: it re-resolves
@@ -1080,9 +1102,11 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
   worktree's own breeze venv (~10 min, silent), then builds the CI image from
   scratch (30+ min of apt downloads) before Sphinx starts; with a recent CI
   image the image step takes seconds to minutes. Run it in the background,
-  output to a file:
+  output to a file, **after the user has agreed to a CI-image rebuild** (it costs time and disk; ask first):
   `breeze build-docs --package-filter apache-airflow-providers-<x> --answer y
-  > <log> 2>&1 < /dev/null`. Without `--answer` and with a non-tty stdin, breeze
+  > <log> 2>&1 < /dev/null`. `--answer` is an option of `build-docs` itself (declared on the command in
+  `developer_commands.py`), so this position is the one to use. Without
+  `--answer` and with a non-tty stdin, breeze
   asks whether to build the image and aborts with `Errno 22`, exit 1 — which
   looks like a docs failure but is the prompt. The background task's "exit 0"
   is the wrapper's; read the real verdict from an `echo DOCS_EXIT=$?` you add
@@ -1092,6 +1116,14 @@ see `airflow-aware/SKILL.md` §8. This section is the how-to.
   (`generated/_build/docs/<dist>/stable/…/*.html`, newer than the rst), not by
   grepping the rst. If it can't finish in time, say in the PR that the docs
   build is left to CI.
+- **`--answer y` answers the CI-image rebuild question only, never a docker volume prompt.** Use it as the
+  entry above says, after the user agreed to the rebuild. A different prompt can appear on a rerun in the same
+  worktree: docker compose asks whether to recreate a volume whose settings no longer match the compose file
+  ("data will be lost"). Don't answer it, and don't extend the `y` to it: recreating a volume deletes data and the
+  volume may be shared with other worktrees, so that decision is the user's. Why the volume stopped matching the
+  compose settings is not investigated. Report "docs rendering not verified; the user runs the docs build in an
+  interactive terminal and decides on the volume" instead; prek's RST hooks are not rendering evidence. This was
+  seen once, so don't generalise it to "docs builds always stall".
 - **Host (no breeze) docs build on macOS can be a false report.**
   `uv run --group docs build-docs` in a provider directory without the enchant C
   library fails to load `sphinxcontrib.spelling`, reports doc-build and spelling
@@ -1138,3 +1170,12 @@ The general symptoms and fixes (stale shebangs, stale `.pyc`, an old absolute pa
 - Provider venvs also need `PYTHONPATH=<worktree>/shared/secrets_masker/src` for tests that use the
   structlog `caplog` fixture (otherwise `No module named 'airflow_shared'` at fixture setup), and
   that path goes stale on a move too.
+- The `.venv`'s editable-install `*.pth` files (under `.venv/lib/python<X.Y>/site-packages/`) keep the old absolute
+  path. Symptom: pytest dies at collection with `No module named 'airflow.providers.<x>'` (raised while
+  `providers_manager` loads entry points), which reads like a missing package although the entry point is
+  registered and only the editable path is dead. Diagnose: `cat` one `*.pth` and check the path exists, and count
+  how many still carry the old prefix. Fix (the `.venv` is untracked): copy the affected `*.pth` files to a new
+  directory under the scratchpad first, then rewrite the old prefix with macOS's BSD sed (`/usr/bin/sed -i ''`),
+  verify with `.venv/bin/python -I -c 'import airflow.providers.<x>'`, and confirm `git status` is unchanged. A
+  full `uv sync --frozen` also works but is slow. The `direct_url.json` files in the dist-info directories are
+  metadata only and don't affect imports.

@@ -112,6 +112,38 @@ follow the pending-partition-run detail endpoint's shape and use a query
 param — don't copy the path-param shape of sibling routes whose params are
 controlled IDs.
 
+## A "cannot submit" guard keys on the control being rendered, not on a data flag
+
+A guard that blocks submit (for example an empty selection) must be conditioned on "this control is on screen", not on
+a data flag that merely correlates with it, such as the HITL detail's `multiple`. In the HITL response form a guard
+opening with `multiple &&` let an empty `chosen_options` through when `multiple` was false but the options were too
+many for buttons and the Respond control was shown instead. Whenever that control appears, the field exists and an
+empty value is never valid.
+
+Scope the guard to that render path too. The shared `handleSubmit` also runs from the option-button path, which has no
+such field, so an unscoped guard blocks every option button.
+
+How to apply: before editing the guard, list every condition under which the control renders and make the guard's
+trigger match that list; then check the shared submit handler on each other path (button mode, approval, preloaded
+values). Tests need both kinds: the case that must be blocked, and the cases that must not be (the latter also pass
+before the fix, so they are guards against over-blocking, not regression detectors).
+
+## react-hook-form: `reset` rebases `dirtyFields`, so don't use it to detect a user edit
+
+In an Airflow UI form, "apply an external value (an API suggestion) only if the user hasn't touched the field" must
+not be gated on `formState.dirtyFields`. `reset(...)` makes the reset values the new `defaultValues`, so what the
+user just typed stops counting as dirty, `dirtyFields.<field>` flips back to false, and the external value overwrites
+the input. Any `reset` in the form triggers this, e.g. applying a recent config or editing the JSON conf and blurring.
+
+Pattern: keep a `useRef` of the last external value applied; the effect calls `setValue` (and updates the ref) only when
+the field is empty or equals that remembered value, with dependencies like `[open, externalValue, getValues,
+setValue]`. A modal that unmounts on exit drops the ref with the form, so nothing stale survives.
+
+Case: the first fix used `dirtyFields` and passed a test that only re-rendered with a new suggestion, which never
+reached a `reset` path; reading the code, not the green run, found the bug. Tests must go through the real reset
+paths (choose a recent config; edit the JSON editor and blur), and a mutation proves them: temporarily revert the
+implementation to depend on `dirtyFields` and both tests must turn red.
+
 ## zh-TW locale content
 
 **zh-TW locale content**: call it "Taiwanese Mandarin", never "Traditional

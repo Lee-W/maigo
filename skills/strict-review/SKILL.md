@@ -274,6 +274,7 @@ Full rationale and recipes in `references/recurring-patterns.md` — read it whe
 - **Naming: guard-then-hook pairs use two distinct verbs, not an underscore** — check for an existing same-file pairing convention before naming; collapsing to `x`/`_x` when the file's other pairs use two verbs reads as confusing, not idiomatic. Details: `references/recurring-patterns.md`.
 - **State the rule, don't enumerate a code-derived set** — a comment/docstring listing "all the other X" goes stale as the set grows; require the rule itself. Hitting the same incomplete-enumeration defect a second round is a signal to change approach, not add the N+1th member.
   Details: `references/recurring-patterns.md`.
+- **A PR that adds, removes or reorders calls inside a function: run the existing tests that assert on that function's mocks** — not only the tests the PR touched. Details: `references/recurring-patterns.md`.
 
 ## Design integrity checks (references)
 
