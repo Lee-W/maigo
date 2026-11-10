@@ -155,6 +155,8 @@ board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
 
+inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題、下面接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號。
+
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
 **gate 不 block report、不改 verdict**——report 出完後純收集意願，不影響 Soyo 的 APPROVE / REQUEST_CHANGES / BLOCKED 結論。

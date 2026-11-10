@@ -107,6 +107,10 @@ uv run mkdocs build --strict
 只有每個必要 command 的最新結果都是 exit 0 才能 PASS；缺結果或略過不能 PASS。
 `## Verdict` 內只寫一個最終 PASS 或 FAIL，敘述中的字樣不構成 verdict。
 
+交辦文給了 scratchpad 路徑時，每個 command 的**完整輸出**（含 exit code）寫成該路徑下的檔案，
+報告的 `## Commands` 在每列後附檔案路徑；只留摘要、不留 log，事後無法重核（曾有一顆 PR 的實測
+只剩 11 行摘要，報告引用的測試名只能依摘要整理）。寫檔只寫 scratchpad，不寫 repo 內任何路徑。
+
 ```
 🟣 立希：<開場一句話>
 

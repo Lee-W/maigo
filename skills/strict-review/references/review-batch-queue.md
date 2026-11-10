@@ -45,6 +45,7 @@ gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDra
 | `state == "MERGED"` 或 `mergedAt` 已設 | 不進流程，queue 上標 `⏭️ skipped (merged)`，**自動推進**到下一個 |
 | `state == "CLOSED"` 未 merge | 同上，標 `⏭️ skipped (closed)` |
 | `isDraft == true` | 預設 `skip`，不逐顆問（見下方「大批次的預設選擇」）；使用者明講要看才走 |
+| 審查**途中**才 merged（發佈報告前重查 `state` 發現） | 不送 review：已發佈的報告照留，註明 merged 時間；對 main 逐項重新驗證 must-fix 是否還在，仍在的起草 follow-up issue（`.maigo/review/<id>/follow-up-issue.md`，附最小重現），已不在的不提；board 行進 ✅ 最近結案 |
 | 其他 | 正常進入 §1 樂奈 stage |
 
 merged / closed 的 PR **不需要** review report——只在 queue 表標 skipped 一行帶過。
@@ -73,6 +74,9 @@ Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠�
    同一個數字——曾經約 10 個並行 worktree 耗盡硬碟、整個 verify 階段掛掉兩次），開之前先查剩餘磁碟
    （每個約 2GB 以上），超過上限的 PR 排隊等前面的立希收工、worktree 移除後再開。並行度另照下方
    「節流」縮波次，每波一完成就落地。
+   平行的立希**scratchpad 產物也要每顆 PR 各用一個子目錄**（例如 `<scratchpad>/t<PR號>/`），並在
+   交辦文寫明該子目錄的絕對路徑；共用同一個 scratchpad 路徑時，檔名相同的 log／PoC 會互相覆蓋，
+   讀回來的是別顆 PR 的結果（曾在 8 顆平行審查中發生，事後得發訊息要在跑的立希改路徑）。
 3. **全部跑完才統一收尾**：每顆審完只產出並發佈 report（本地 report；貼上 GitHub 仍是使用者的動作，
    「交付時效」那節不變：裁決集中問一次，但每份 report 一產出本地就可讀、可先貼，使用者不必等整批
    問完；見「交付時效」）；must-fix 放不放、nit 怎麼送，**全部審完後集中問一次**（收尾用

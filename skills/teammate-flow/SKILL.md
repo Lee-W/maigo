@@ -177,6 +177,12 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
   測試**的 diff 做審查，而且沒有任何訊號告訴它漏了東西——它只會看到一份「看起來完整」的 diff。
   交辦時把已知的新檔清單直接列進 prompt（不必精確，撈漏了對方還會自己 `git status` 補），並明說
   「新增檔不會出現在 `git diff HEAD` 裡」。同理適用於 🟣 立希的驗證交辦。
+- **交辦 🎀 愛音時，把 `.claude/test-command` 的完整現行內容原文寫進 prompt**，並明講：要改只能換
+  測試路徑，前綴與 env（例如 `env AIRFLOW_HOME=...`）原樣保留；改完照 hook 的執行方式
+  （`shlex.split` 後 `subprocess.run`，不經 shell）跑一次確認 exit 0 且測試真的有跑。實例：
+  orchestrator 先寫好帶 `env AIRFLOW_HOME=<scratch>` 的 test-command，愛音實作時把它換成新測試檔、
+  順手拿掉前綴，Stop hook 連三輪報「20 errors」——全是 pytest 去重建 `~/airflow/airflow.db` 失敗，
+  不是程式碼問題，卻每輪擋下 orchestrator。
 
 ### Commit message draft + 落地
 
