@@ -71,6 +71,7 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |
+| `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` 裁決 gate） | 同上 | inline review comment 的草稿正本，裁決 gate 用；隨 PR 目錄一起封存 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
 
 `review_report.py publish` 先原子寫入最新 `review.md`，才清理同目錄 `review-N.md` 與

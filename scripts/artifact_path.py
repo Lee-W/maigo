@@ -12,7 +12,7 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
 
 1. **命名**：`<kind>` 分兩種形狀——
    - 巢狀（`review` / `review-rubric` / `review-draft` / `pr-comments` /
-     `reply-draft` / `triage-rubric`）：`.maigo/<group>/<id>/<stem>[-<attempt>].md`，
+     `reply-draft` / `inline-comments` / `triage-rubric`）：`.maigo/<group>/<id>/<stem>[-<attempt>].md`，
      `<group>` 是 `review`（別人的 PR）、`pr`（自己的 PR）或 `issue`，同一顆
      PR/issue 的所有產物收進同一個目錄。PR 類 kind 依作者分流：呼叫端傳
      `owner`（`mine` → `pr/`，`others` → `review/`），`triage-rubric` 固定在
@@ -97,6 +97,7 @@ _KNOWN_KINDS = (
     "triage-rubric",
     "pr-comments",
     "reply-draft",
+    "inline-comments",
 )
 
 # kind → (group 目錄, 檔名 stem)：巢狀佈局 `.maigo/<group>/<id>/<stem>.md`。
@@ -108,6 +109,7 @@ _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "review-draft": ("review", "draft"),
     "pr-comments": ("review", "pr-comments"),
     "reply-draft": ("review", "reply-draft"),
+    "inline-comments": ("review", "inline-comments"),
     "triage-rubric": ("issue", "rubric"),
 }
 
@@ -124,7 +126,14 @@ DEFAULT_BRANCHES = frozenset({"main", "master", "develop", "trunk"})
 # `others` 那組（`review`）——value 形狀不能改，hook 只認 `(group, stem)`。
 _OWNER_GROUPS: dict[str, str] = {"mine": "pr", "others": "review"}
 _OWNER_SPLIT_KINDS = frozenset(
-    {"review", "review-rubric", "review-draft", "pr-comments", "reply-draft"}
+    {
+        "review",
+        "review-rubric",
+        "review-draft",
+        "pr-comments",
+        "reply-draft",
+        "inline-comments",
+    }
 )
 # 所有 PR 產物 group 目錄（給 board_sync archive 迭代用）。
 PR_ARTIFACT_GROUPS = ("review", "pr")

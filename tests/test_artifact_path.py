@@ -93,6 +93,7 @@ class TestNaming:
             ("review-draft", ".maigo/review/58543/draft.md"),
             ("pr-comments", ".maigo/review/58543/pr-comments.md"),
             ("reply-draft", ".maigo/review/58543/reply-draft.md"),
+            ("inline-comments", ".maigo/review/58543/inline-comments.md"),
             ("triage-rubric", ".maigo/issue/58543/rubric.md"),
         ],
     )

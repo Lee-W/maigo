@@ -149,6 +149,13 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   `~/airflow`）；根因與其他症狀見
   [`airflow-aware` 的「Every worktree shares one sqlite test DB」一節](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)。
 
+- 立希的驗證 worktree **一律用獨立後綴路徑**（`.worktrees/review-<N>-verify`），交辦文寫明該路徑，
+  不沿用也不移除既有的 `.worktrees/review-<N>`——重審時它常是舊輪次留下、停在舊 head 的 worktree，
+  不是這次建的。`git worktree add` 回 `already exists`，或既有 worktree 的 HEAD 與 `headRefOid` 不符，
+  立希應停手回報而非自行刪除；收尾只 `git worktree remove` 自己建的那個。
+  （實例：5 顆重審批次中，一隻立希在 `review-76575` 撞到停在上一輪 head 的舊 worktree，
+  整輪驗證停擺，換成 `-verify` 路徑重派才跑通。）
+
 - 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到具名 ref**（例如
   `git fetch <remote> +pull/<N>/head:refs/review/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
   「不要用 `FETCH_HEAD`」。**refspec 開頭要有 `+`**：重審時早先 session 留下的同名 ref 已存在，

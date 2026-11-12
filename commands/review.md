@@ -155,7 +155,35 @@ board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
 
-inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題、下面接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號。
+inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題，標題下一行放該位置的 Files 分頁連結，空一行後接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號並重產連結。
+
+連結格式是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(repo 相對路徑)>R<行號>`（hash 是路徑字串的 SHA-256 hex），獨立成行、不放進標題——放進標題會讓標題太長難讀。範例：
+
+```markdown
+## providers/common/ai/docs/tool_approval.rst:260
+https://github.com/apache/airflow/pull/76882/files#diff-cdba9dcc211e01826fce2f72acddddd2b4416513506ca40d8a42104f8f96ca18R260
+
+Must-fix (docs): ...
+```
+
+**重審同一顆 PR：直接改寫 `draft.md`、`inline-comments.md`、`rubric.md` 成單一最新狀態**——仍成立的 finding 保留並對新 head 重核行號，已解的移除，新的加入。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
+
+**每則 inline comment 1–3 句**：must-fix 只寫「壞在哪＋一個證據＋改法（用問句提出）」；推導過程、旁支說明（例如「這個問題 base 上其實也存在」）、行號引用與完整程式碼建議都不放——那些留在 `review.md`。nit 只寫結論。（2026-11-12 實例：#76862、#76882 兩份草稿各三段的 must-fix 被退回「太長」，砍到每則 1–3 句才收。）
+
+**錨點落在引入被批評行為的那一行**：`## <path>:<line>` 要指向 diff 裡真正引入該行為的 `+` 行，不是附近任一個有改到的行。寫進 inline comment 的行號引用與「只有 X」「沒有 Y」這類斷言，落筆前用 `git show <head>:<file>` 對照 reviewed head 逐一確認。（2026-11-12 實例：#76862 的 must-fix 錨在只多傳一個參數的 `journal.py:556`，被質疑「沒有這個改動」；內文引的 `:538` 其實是一行 log，「唯一寫入者」也漏了 `pause`。）
+
+**inline comment 的命名類 finding 只給 `suggestion` block，不附規則說明**：每個要改名的函式各一則，錨在該函式 `def` 那一行（必須是 diff 的 `+` 行），內文只有一個 `suggestion` block，內容是原本整行 `def`（含縮排）只換掉名字；改名後超過該 repo 的行長上限時照 formatter 的方式折行。不寫「依命名規則應以動詞開頭」這類解釋，也不把多個改名併成一則文字清單。同名的 Protocol stub 與實作都在 diff 裡時兩處都給，否則改一半會破壞配對。suggestion 只改 `def` 行，呼叫端不在範圍內。範例：
+
+````markdown
+## providers/common/ai/src/airflow/providers/common/ai/operators/agent.py:278
+https://github.com/apache/airflow/pull/76882/files#diff-97860ef93cc1e228b433cb355ce258bfe2083ff7787994a54e2f16130eecfb7eR278
+
+```suggestion
+def _fingerprint_call_content(call: ToolCallPart) -> str | None:
+```
+````
+
+（2026-11-12 實例：五份草稿的命名 nit 原本都是一則「`a` → `b`、`c` → `d`……」的文字清單，使用者要的是可一鍵套用的 suggestion。）
 
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 

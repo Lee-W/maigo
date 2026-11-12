@@ -275,6 +275,18 @@ def test_unregistered_dir_listed_once(tmp_path):
     assert (backup / "evals" / "sub" / "c.json").is_file()
 
 
+def test_inline_comments_is_not_listed_as_unregistered(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "pr" / "11" / "inline-comments.md")
+    write(maigo / "review" / "12" / "inline-comments.md")
+    actions = build(maigo)
+    assert [
+        a.path
+        for a in actions
+        if a.kind == "unregistered" and a.path.endswith("inline-comments.md")
+    ] == []
+
+
 def test_nested_dot_maigo_is_listed_and_deleted_only_when_confirmed(tmp_path):
     maigo = make_maigo(tmp_path)
     write(maigo / ".maigo" / "session-head.json", "{}")

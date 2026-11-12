@@ -100,7 +100,13 @@ git merge-tree --write-tree origin/<baseRefName> HEAD
    **雙方語意衝突**（兩邊都改了同一段邏輯、取捨會改變行為）→ **停下**，把衝突檔、雙方各自的意圖攤給
    使用者，不自行猜。
 3. **解完驗證**：確認沒有殘留衝突標記（`git diff --check`）、`git status` 乾淨，並跑該 repo 的測試／檢查
-   指令；通過才進步驟 2。
+   指令；通過才進步驟 2。若 PR 已經 push 過（`gh pr view --json headRefOid` 有值），再用
+   `git range-diff <pushed>~N..<pushed> HEAD~N..HEAD`（N ＝ branch 上的 commit 數）對照 pushed head，
+   確認只有解衝突的那幾支 commit 不是 `=`，而且差異只落在衝突區段。這是為了證明 rebase 沒有順手帶進
+   其他改動，否則 force-push 之後，reviewer 看到的 head 會多出他沒審過的內容。同時，本機若已有這顆 PR
+   的回覆草稿，把它的前置條件改成「先 force-push 再貼」，草稿裡引用的 HEAD 也一併更新。
+   （實例：2026-11-12 apache/airflow #74695，changelog 衝突解完後，range-diff 顯示 32 支 commit 中只有
+   1 支在上下文行有差異。）
 4. **不 push**：rebase 後歷史改寫需要 force push，merge 也要 push 才會更新 PR——兩者都由使用者自己執行；
    Finale 提醒「衝突解決後尚未 push」。此處的 rebase / merge 是本步驟的明確授權，不受步驟 5
    「不 rebase」限制（那條管的是各 work item 的 commit 落地）。
@@ -134,6 +140,14 @@ pushed head。判進 `已處理` 的條目，先比對 `gh pr view --json headRe
 確認處理該意見的 patch 在 pushed head 上也有（`=` 或內容等價）——本機只是 rebase 過、base 不同，
 兩個 SHA 就會不同，SHA 不同本身不代表沒 push。只在本機的，標成 `已處理（未 push）`，Finale 的回覆
 草稿要附一句「先 push 再貼」，否則回覆會對 reviewer 宣稱一個他看不到的修正。
+
+**「已處理」還要問 CI 對這個修正怎麼說**：本機 HEAD 符合意見字面、且已在 pushed head 上，仍不代表
+修正在所有版本矩陣下成立。判進 `已處理` 的條目，若那個修正改變了有版本分歧的路徑（compat 矩陣、
+特定版本才有的 API、lazy import 的 fallback），先跑 `gh pr checks <number>`，確認對應的 job
+（例如 Compat）沒有因這個修正變紅；本機只有單一版本環境時，本機綠不能代表其他版本。
+有紅燈就把該條降回 `部分處理` 或 `仍有效`，不要照字面標 `已處理`。
+（實例：2026-11-10 apache/airflow #74695，C1 的修法讓無 walker 時的行為改變，標 `已處理` 後
+使用者追問才發現 Compat 四個 job 全紅。）
 
 **reviewer 點名的 `file:line` 是他觀察到症狀的位置，不必然是唯一的修法位置**：上一段驗的是
 「這條意見**還有效嗎**」，這段驗的是「改那一處**就夠了嗎**」——兩者都做對，仍可能只修一半。

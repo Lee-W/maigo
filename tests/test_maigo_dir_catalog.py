@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scripts import maigo_dir_catalog as mdc
 
 
@@ -114,6 +116,14 @@ class TestCategorize:
     def test_pr_group_nested_paths_are_nested(self):
         catalog = mdc.categorize(["pr/7/review.md", "pr/7/reply-draft.md"])
         assert sorted(catalog.nested) == ["pr/7/reply-draft.md", "pr/7/review.md"]
+        assert catalog.unregistered == []
+
+    @pytest.mark.parametrize(
+        "path", ["pr/7/inline-comments.md", "review/58543/inline-comments-2.md"]
+    )
+    def test_inline_comments_is_registered_nested(self, path):
+        catalog = mdc.categorize([path])
+        assert catalog.nested == [path]
         assert catalog.unregistered == []
 
     def test_pr_group_unknown_stem_is_unregistered(self):
