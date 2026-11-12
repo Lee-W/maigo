@@ -122,6 +122,8 @@ because none of them produced an explicit list of new `def`s to check
 against. Only enumerating mechanically (grepping `^\s*def ` on the new lines
 and going through the resulting list one entry at a time) surfaced it.
 
+Predicates belong in the list too: a predicate takes an `is_` / `has_` name and must not raise, so check both when it appears in the enumeration.
+
 How to apply: run a `def`/`async def` extraction over the diff's added lines
 (not the whole file — unchanged names aren't this review's business), list
 every match including nested ones, and attach the judgment list to the

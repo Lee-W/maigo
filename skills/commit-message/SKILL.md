@@ -93,6 +93,14 @@ The body is for the **future bisecting engineer**, not the current reviewer:
 | Restating the subject as the body | Adds bytes without adding signal |
 | Citing an exact commit sha (`reverts a8910e8`, `see 306feea`) | Shas go stale after rebase / squash and carry no meaning for readers; describe the change instead. **Never include one**, no exceptions |
 
+## No internal ticket IDs or customer-ticket details in a public repo
+
+A commit message, PR text, code comment, test or plan file that ends up in a public repo must not carry internal tracker IDs (any private ticket-number format given in a task description), or anything lifted from a customer ticket: its timezone and date combination, its crash narrative or database error text, links to its issues. Public maintainers cannot see those systems and should not learn about them.
+
+- Describe the requirement in plain words instead (for example "the comment and the field share one result-size budget"), and when delegating, rewrite the ticket reference the same way instead of forwarding it verbatim into the subagent prompt.
+- For an example that came from a customer case, build a new one yourself, actually run it, and compute the expected value by an independent method rather than from the code under test.
+- Before committing, grep the draft and any plan file for the tracker's ID pattern. Same family as the trailer rule below: public artifacts carry no internal or harness traces.
+
 ## Stay tool-neutral in provider-neutral projects
 
 In a project that is deliberately provider-neutral, the commit message and any user-visible string or code comment do not name a specific external or competing tool. Describe the behavior generically ("detect another notifier", "an external binary"), and leave the concrete tool name to runtime detection (`shutil.which(...)`), not core logic. Test fixtures use a neutral stand-in (`other-notifier`), not a real product name. Naming a competitor in the commit blurs the decoupled boundary and ties that tool into the project's semantics.

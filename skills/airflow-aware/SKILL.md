@@ -95,11 +95,12 @@ A PR that changes a per-call scheduler hot path (cron `_get_next` / `_get_prev`,
 from scheduler/worker internals. Cross-boundary changes need extra scrutiny — read `code-review.instructions.md` (its §1) first.
 **Core ↔ SDK paired classes** (same name in `airflow-core/` and `task-sdk/`): drift on a same-named attribute is a **bug**, not a nit — fix it in the current PR
 (compare constructor signature, post-`__init__` type, normalization, eager-raise; `references/design-integrity.md`).
+**Provider public surface** (trigger / hook / operator signatures, capability flags, serialized payloads): new parameters get defaults and keep the old call shape, capabilities are explicit class attributes, a serialized-content change is a compatibility change, module-only helpers are `_private`, factory parameters are keyword-only Protocols (`references/design-integrity.md`, "Provider public-surface compatibility").
 
 ### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 During a **review task** (🟡 Soyo running `strict-review` on an Airflow diff), read `references/review-checks.md` and append its sub-checks as items 10+, with the severity each states.
-Its "Contents" list enumerates 10.1–10.37 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the file.
+Its "Contents" list enumerates 10.1–10.38 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the file.
 
 ### 11. CLI / REST / docs / backport conventions
 
@@ -116,7 +117,7 @@ Its "Contents" list enumerates 10.1–10.37 plus the unnumbered release-tag chec
 | `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds; attribution; relock pin-back to the documented version; docs screenshot procedure |
 | `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); uv.lock drift diagnostic; release-tag check before "released"/"breaking" claims |
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
-| `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity |
+| `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity, provider public-surface compatibility |
 | `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs, docs examples |
 | `references/test-cases.md` | Writing or reviewing Airflow tests: Airflow instances and Airflow-specific facts behind the python-aware test-conventions rules (read alongside the rule) |
 | `references/ui-conventions.md` | `airflow-core/src/airflow/ui` changes; zh-TW translation rules |
@@ -131,6 +132,6 @@ Its "Contents" list enumerates 10.1–10.37 plus the unnumbered release-tag chec
 Builds on [`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/SKILL.md) (Layering above); pairs with [`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md).
 
 **Review scenario** — run `strict-review`'s 9-item base checklist, then apply these as Airflow supplements: convention 2 (naming) → base item 4; 4 and 5 (style, correctness) → items 5–6;
-6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.37) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
+6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.38) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
 
 **Quick-fix / refactor scenario** — use conventions 3–7 as background. Flag violations you notice, but do not run the full `strict-review` checklist unless the task calls for it; §10 is review-only.

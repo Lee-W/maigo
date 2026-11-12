@@ -206,6 +206,11 @@ docs spelling one remained. Applying every item in the CI log literally would
 have deleted a definition that no longer existed. Report which reds are
 "already fixed locally" separately from which ones you fixed this round.
 
+The same applies when deciding whether a review fix is already on the PR: after a local rebase every
+SHA differs, so `git log <pushed>..HEAD` and `git merge-base --is-ancestor` say nothing about what
+was pushed. Take `headRefOid` from `gh pr view --json headRefOid` and check content, with
+`git show <oid>:<file> | grep` for a symbol unique to the fix (a new name, a moved import).
+
 Cross-reference "Recompute base refs live" and "A green/skipped CI check and
 a changelog line are proxies, not proof" above — same family of stale-proxy
 traps, this one specific to CI-red triage.

@@ -215,6 +215,10 @@ explicit `### Acceptance` or similar headers only when the user asks for them
 or the issue genuinely needs pinned acceptance criteria (e.g. a feature
 request being scoped for a milestone).
 
+## 公開 repo 的 PR 不帶內部票號與客戶工單資訊
+
+要進公開 repo 的 PR 標題、描述、範例與測試，不得出現內部票號（任務描述帶來的私有追蹤系統編號），也不得帶客戶工單的內容：工單裡的時區與日期組合、crash 敘述（例如特定的資料庫錯誤）、相關 issue 連結。需求用語意描述（「註解與欄位共用同一個 result-size 預算」）；範例改用自己構造、實際跑過的新例子，期望值用獨立方法算，不靠被測程式。動筆前先問「這個例子是不是來自工單」，是就換掉並重新實測；寫完 grep 一次票號格式。完整規則見 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的「No internal ticket IDs」段。
+
 ## No AI attribution
 
 PR body 不加任何 AI / Claude 署名——不寫「🤖 Generated with Claude Code」之類字句，即使 host 工具 / 平台預設會塞。與 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的 Trailers 段同精神（commit 不加 `Co-Authored-By`）：產出對外保持中性、不留 AI 痕跡。

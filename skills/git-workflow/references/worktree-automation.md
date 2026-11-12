@@ -68,16 +68,26 @@ ignore configuration for it. Present the three options and let them choose:
 
 ## 2. `.maigo/` ownership inside a worktree task
 
-Two different things live under `.maigo/`, and they have **opposite**
-locality rules:
+Every worktree's `.maigo` is a symlink to **one per-repo state root**, so every `.maigo/`
+artifact, wherever the command runs, lands in the same place. A worktree must not have a physical
+`.maigo/` directory of its own. Storage layout, repo identity and the `link` / `migrate`
+commands: [`docs/reference/state-storage.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/state-storage.md).
 
 | What | Where it lives | Why |
 |------|----------------|-----|
-| Single-task temporary artifacts (`pr/<id>/plan.md` / `issue/<id>/plan.md` / `topic/<slug>/plan.md`, `review/<id>/{review,rubric,draft,pr-comments,reply-draft}.md` or `pr/<id>/…` for your own PR, `issue/<id>/rubric.md`) | The **worktree's own** `.maigo/` | `artifact_path.py`'s `resolve_identifier()` derives the identifier from cwd's current git branch (on a default branch a plan uses `--slug` / the H1 slug instead). cwd inside the worktree naturally resolves to the worktree's own branch slug — no code change needed, it just falls out of the existing four-tier identifier chain. |
-| Work Board (`.maigo/board.md` and `.maigo/i/*.md`) | **Always the main checkout**, never a worktree | The board is a cross-session, cross-task single source of truth — it doesn't make sense duplicated per worktree. |
+| All task artifacts: `pr/<id>/plan.md` / `issue/<id>/plan.md` / `topic/<slug>/plan.md`, `review/<id>/{review,rubric,draft,inline-comments,pr-comments,reply-draft}.md` (or `pr/<id>/…` for your own PR), `issue/<id>/rubric.md` | The shared state root, reached through the worktree's `.maigo` symlink | Review artifacts always belong in the repo-level `.maigo`: the Work Board and other sessions look for reviews there, never in a per-worktree copy. `artifact_path.py`'s `resolve_identifier()` still derives the identifier from cwd's current git branch (on a default branch a plan uses `--slug` / the H1 slug instead), but the *location* no longer depends on which worktree cwd is in. |
+| Work Board (`.maigo/board.md` and `.maigo/i/*.md`) | The same state root; one board per repo | The board is a cross-session, cross-task single source of truth — it doesn't make sense duplicated per worktree. |
 
-When a command running inside a worktree needs to read or write the board, it
-must first resolve the shared main checkout root — never assume cwd is it:
+If a worktree turns out to hold a **physical** `.maigo/` directory (an older worktree created
+before the state root existed), its artifacts are invisible to the board and to other worktrees.
+Migrate it instead of working around it: run
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state.py" migrate [--cwd DIR]` (dry-run by default,
+`--apply` to perform it). To fix a review artifact that was written to a stray physical directory,
+move it into the state root only after confirming the target does not already exist.
+
+When a command running inside a worktree needs to read or write the board and the worktree's
+`.maigo` is not a symlink (not yet migrated), it must first resolve the shared main checkout
+root — never assume cwd is it:
 
 ```bash
 git rev-parse --path-format=absolute --git-common-dir
@@ -87,6 +97,8 @@ The parent directory of that path is the main checkout root; all board reads
 and writes go there, not to cwd.
 
 ## 3. This rule survives the cross-repo rewrite unchanged
+
+(The "board only lives in the main checkout" wording below applies to worktrees that have not been migrated to the state-root symlink; migrated worktrees share the one board through `.maigo`.)
 
 The "board only lives in the main checkout" rule above predates this plan's
 cross-repo scope, and stays exactly as written — the cross-repo board index

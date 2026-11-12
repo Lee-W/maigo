@@ -112,6 +112,24 @@ shrink the check to stop noticing the gap.
   `env UV_PROJECT_ENVIRONMENT=<scratch dir> uv run --frozen --python 3.12 --project airflow-ctl pytest <paths>`
   and pin `--python`; a fresh env otherwise picks a Python without pydantic-core wheels.
 
+## Bot-opened CI-upgrade backport PRs: find the main follow-up, and push only with explicit say-so
+
+Applies to a bot-opened `[v3-x-test] Upgrade important CI environment` backport PR whose checks are widely red while the release branch itself is green. The bot regenerates such PRs on its own schedule.
+
+**Diagnose: the root cause is usually a main-side follow-up that was never backported.** The dependency upgrade in the bot's `uv.lock` bump needed a companion fix on `main`, and that fix is missing on the release branch. Case (#76524): `uv.lock` moved Celery from 5.6.3 to 5.7.0; 5.7 no longer exports `retry` from `celery.backends.database`, so `celery_executor_utils.py` raised `ImportError` at import, and the DB, Non-DB, K8S, Special and PROD e2e jobs all went red together; the matching fix on `main` was #76591. Fixing job by job is wasted work when the failure surface is this wide.
+
+1. Read the failure logs of several jobs from different categories and find the first error they share.
+2. Look for the corresponding fix on `main`.
+3. Cherry-pick it as-is on top of the bot's commit, and reconcile it with `git patch-id --stable` against the `main` commit.
+4. Re-check the PR head (below), then push as a fast-forward to the bot branch.
+5. The bot overwrites that commit when it regenerates the PR. For a fix that must last, open a separate backport PR.
+
+**Pushing to the bot's branch on apache is a per-time exception to "push only to your fork", and it needs the user's explicit instruction every time.** Authorization from an earlier push does not carry over. This does not conflict with the push rule in [`git-workflow` outward-ops-authority](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/outward-ops-authority.md): pushing stays the user's action unless the user has explicitly instructed this one push for this PR. Only with that instruction may the orchestrator run the single fast-forward push; without it, hand over the command and stop. Before pushing, all three must hold, otherwise stop and report:
+
+- The user said to push to upstream for this PR.
+- `gh pr view <N> --repo apache/airflow --json headRefOid` equals the parent of your fix commit (the bot can regenerate the PR at any moment).
+- The push is a fast-forward (`git push <apache remote> <local>:<bot branch>`), never forced. Confirm the apache remote's name with `git remote -v` first; `origin` may be a fork.
+
 ## Review fixes on an apache/airflow PR branch land as `--fixup` commits, and the user squashes and pushes mid-review
 
 When handling review comments on a PR branch in `apache/airflow`, the orchestrator lands each work item's

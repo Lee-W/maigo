@@ -94,6 +94,63 @@ list; before proposing an operator, answer "what does it give that `AgentOperato
   (`warnings.warn(..., AirflowProviderDeprecationWarning, stacklevel=2)`) kept until the next
   major, and make the changelog name every class (hooks included) whose default changed.
 
+## Provider public-surface compatibility: six checks for trigger / hook / operator changes
+
+Scope: a diff that changes a provider's public trigger, hook or operator surface — signatures,
+capability detection, new parameters, serialized payloads. Once a provider is at 1.0 its public
+signatures are frozen, and already-serialized state (triggers queued on a triggerer, Dag hashes,
+serde payloads written by the previous version) must keep working across a rolling upgrade. Check
+each of the following; every rule has at least one reviewer-flagged instance in apache/airflow.
+
+1. **A new parameter on a public trigger / hook signature has a default, preferably keyword-only,
+   and an unused new feature leaves the call shape unchanged.** A required new parameter breaks
+   triggers already deferred before the upgrade (`TypeError` on `cls(**kwargs)` against the old
+   serialized kwargs; #65618). When the new parameter is not used, the call made into a
+   third-party subclass and the serialized kwargs must be identical to the old version's — pass
+   the argument only when it is not `None`, otherwise a subclassed `DbApiHook.get_records` that
+   does not accept it raises `TypeError` (#76270). If the same change alters a contract such as a
+   `TriggerEvent` status, treat it as breaking too and add a changelog entry. Check: (a) does every
+   new parameter have a default; (b) can an old serialized kwargs dict still rebuild the trigger;
+   (c) with the feature unused, is what reaches third-party subclasses byte-for-byte the old call.
+2. **Detect capability with an explicit class attribute, not method or object identity.** Declare
+   it as `supports_async_execution = False` and let the subclass flip it to `True`, following the
+   existing `supports_autocommit` / `supports_executemany` pattern on `DbApiHook`. An identity
+   test such as `type(self).aget_conn is not DbApiHook.aget_conn` misfires under mixins,
+   decorators and intermediate abstract bases (#65618), and `self.selector is not _first_cell`
+   breaks for a user who passes `itemgetter(0)` or a deep-copied sensor (#76270). On seeing
+   `is not <default function/object>`, ask "can the subclass just declare the capability?"; when
+   the identity check stays, add tests for an explicit argument equal to the default, a
+   `copy.deepcopy`, and the constructed result after `expand`.
+3. **New parameter and method names reuse the repo's vocabulary; no magic values; reject bad
+   combinations at construction.** Grep for an existing synonym first (`MinimumCount` /
+   `WaitForAll` for partition rollups; the `aget_*` prefix for async variants, so `arun` rather
+   than `run_async`; #65618, #70225). A special value standing for a meaning (`-1` for "all")
+   cannot express "at least n"; use an explicit flag or enum instead (#70225). List the parameter
+   combinations that conflict (`limit < expected_count`) and `raise` in `__init__` so the trap
+   never ships, and make the parameter name match the type it accepts (#70225).
+4. **A change to serialized content is a compatibility change.** This covers a serde
+   `__version__` or semantics change, `repr` used as the serialized value, and any label or
+   string that enters the serialized Dag hash. Check: (a) a payload written by the old version
+   still reads back (a naive-datetime `timestamp` whose meaning changed without a `__version__`
+   bump cannot be told apart during a rolling upgrade; #73748); (b) when the version number moves,
+   comparison logic such as the Dag version diff normalizes old and new, since a migration that
+   stored version 2 against a new serializer emitting 3 produces a false deadline diff, so keep
+   the literal or normalize before comparing, and test that v2 and v3 compare equal (#73748);
+   (c) there is a "serialize twice, compare equal" test and a "read the old-format payload" test
+   — an object without `__repr__` inside `partial_kwargs` or expand values serializes to a string
+   containing the object id and writes a new Dag version on every parse (#70225); (d) a comment
+   next to the string says that changing it changes the Dag hash (#70225).
+5. **A helper used only inside its own module is underscore-private.** After 1.0 a public name is
+   a frozen signature; a test that imports it directly is not an external caller, so rename the
+   helper and update the test together (#74695).
+6. **Type a callback / factory parameter with a Protocol whose `__call__` is keyword-only, not
+   `Callable[..., X]`.** The `...` hides the keyword arguments the factory is called with. Define
+   `class XFactory(Protocol)` with `def __call__(self, *, model_name: str, ...) -> X: ...` and
+   annotate both parameter and return with it; follow the in-provider precedent (the `AgentFactory`
+   Protocol in `durable/strands.py`) and do not add `@runtime_checkable`, which the precedent also
+   omits. A class whose constructor argument names are compatible (extra keyword-only parameters
+   with defaults are fine) can be passed directly as the factory (#75369).
+
 ---
 
 ## Airflow cases behind the generic design-integrity rules

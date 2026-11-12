@@ -55,10 +55,10 @@ merged / closed 的 PR **不需要** review report——只在 queue 表標 skip
 本檔適用的批次模式下，下列選擇直接套用，使用者另有指示才改（單顆審查的流程在 `strict-review` 本體，不受影響）：
 
 - **draft PR 預設跳過**，不逐顆問。
-- **已有舊報告的 PR 也全部重審**，不因舊報告存在、head 沒動就略過。
+- **已有舊報告的 PR：head 沒變就跳過，head 變了才審增量。** 先對每顆跑 `gh pr view <n> --json headRefOid`，與舊 review.md 記錄的 `head_sha` 比對；相同就不重審，只在批次總表帶一行（例如「無新 commit，只多了 bot 通知／別人的 approve」）。head 有變時審增量——即使看起來只是 rebase，也用 patch-id 確認 PR 自己的 commit 有沒有動。這與下方「審之前先查 PR state」並存：先查 state（merged／closed 直接 skipped），再比 head。
 - **模型調度用相對降檔**（對齊 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md) 的精神）：探索、規劃、審查三個角色在批次時可比單顆審查降一檔（基準＝單顆審查的調度）；驗證角色可再降一檔，因為它只做機械性的實跑與 read-back。單顆 PR 或高風險 PR 不適用。
 
-Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠大於收益；使用者在一次 46 顆的批次前如此選擇。
+Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠大於收益；使用者在一次 46 顆的批次前如此選擇。head 沒變就跳過則是使用者明確推翻「全部重審」的舊預設（「沒有改動就不用重審」）；以此為準。
 
 ## 預設：平行審完全部、統一 publish、board 放最前
 

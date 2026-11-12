@@ -551,7 +551,7 @@ cite.
 Don't write the same behaviour explanation (e.g. a budget across attempts) in the docstring, the
 how-to `.rst`, and the changelog. Keep the full version in the how-to with a dedicated anchor; the
 docstring gets a 3–5 line summary plus a `:ref:`; the changelog note keeps only the behaviour
-change and migration, about 8–12 lines. When trimming, inventory sentence by sentence first: a fact
+change and migration, about 8–12 lines. The changelog and user-facing `.rst` state only behaviour a user can see and how it differs from the previous release; they never name an internal helper ("a shared `dump_…` helper" is implementation detail), because helper names belong in the PR description or commit message (#74695). When trimming, inventory sentence by sentence first: a fact
 that appears in only one place must not be cut, and qualifiers (e.g. "on every Airflow version")
 stay. (apache/airflow #73706, where a maintainer wrote "Lot of repetition across files … Let's trim
 it down.")

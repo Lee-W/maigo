@@ -46,6 +46,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.35** Scheduler-written audit `Log(...)` rows must set `owner="scheduler"` / `owner_display_name="Scheduler"`, and `dag_id` when the event belongs to a Dag (a row without it is invisible on every Dag's audit page; a scheduler-level event with no single culprit gets one capped row per affected Dag) (Request changes, scope-gated to scheduler-side `Log(...)` additions)
 - **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
 - **10.37** Before changing or unifying the output / serialization paths of a released, stable-listed `common.ai` operator, read each path's behavior in the last release tag (Request changes, scope-gated to such diffs)
+- **10.38** Deferrable path: validate hook support on the worker before deferring, and prove parity with the synchronous path through real serialization (Request changes, scope-gated to diffs that touch `deferrable`, a trigger, or `execute_complete`)
 - **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
@@ -1242,6 +1243,40 @@ python-mode cannot work (model in a set / dict key, or class not registrable by 
 paths were already merged into one boolean at operator level (there,
 `serialize_output or not _CORE_WALKER`) before assuming the helper has to tell them apart: in
 1.0.0 those two had the same behavior, so splitting them was unnecessary.
+
+## 10.38 Deferrable path: validate on the worker before deferring, and prove parity with the synchronous path *(narrow — only when a diff touches `deferrable`, a trigger class, or `execute_complete`; Request changes)*
+
+Trigger when the diff adds or changes a `deferrable` parameter, a trigger, or `execute_complete`.
+Two obligations, four checks.
+
+**(1) Validate on the worker, before the task defers.** A task that defers and then fails inside
+the triggerer fails late and far from the cause.
+
+- Does `execute()` verify, before `defer()`, that the hook can run on a triggerer (async-capable,
+  read-only, and so on)? An unsupported hook must either fail immediately on the worker or fall
+  back to worker-side execution. Case: `deferrable=True` by default combined with a non-Postgres
+  `DbApiHook` deferred first and then died in the triggerer with `NotImplementedError` (#65618).
+- Does the "should we defer?" guard cover every override that changes what the trigger would do,
+  not only `poke`? A guard that only blocks a `poke` override lets an overridden `_get_hook` or
+  custom `hook_params` bypass the check once the trigger runs; fall back to the worker for those
+  too (#76270).
+- Does trigger code call an Execution API endpoint the triggerer does not have (for example the
+  asset-event lookups by asset or by alias)? Tests that mock the real API call hide this, and
+  native async is preferred over wrapping sync code in `sync_to_async` (#70225).
+
+**(2) Prove the deferrable path equals the synchronous path.**
+
+- Kwargs and results must survive a serialization round trip unchanged. Values that go into trigger
+  kwargs change shape: a tuple comes back as a list, and `date`, `Decimal`, `bytes` and
+  timestamp-with-timezone values may fail to serialize (#76270). Normalizing one result field
+  (`descriptions`) while returning another (`results`) unchanged is the same bug at half the
+  scale; require a check with numeric / timestamptz / bytea / uuid columns against the
+  `deferrable=False` result (#65618).
+- A trigger timeout is not `AirflowSensorTimeout`, so `soft_fail` and `retries` behave differently
+  unless the mapping is explicit (#76270). Ask for a test that exercises that mapping with
+  `deferrable=True`.
+- The tests must go through real serialization and compare values one by one against the
+  synchronous path; a mock that replaces serialization proves nothing.
 
 ## Before calling a symbol "already released" or a change "breaking", check the release tags *(judgment gate — when a review comment or recommendation rests on a compatibility claim)*
 
