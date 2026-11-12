@@ -46,7 +46,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 ## 版面規則
 
-1. **一段一行，不手動斷行。** 理由：nvim 的 `wrap` 預設開啟，長行會自動折行顯示；改一個字不必重排整段，diff 也乾淨。review-draft 與 reply-draft 還會被貼上 GitHub，GitHub 留言把單一換行渲染成斷行，hard-wrap 的草稿貼過去會碎。條列一項一行，fenced code block 內容原樣。
+1. **一段一行，不手動斷行。** 理由：nvim 的 `wrap` 預設開啟，長行會自動折行顯示；改一個字不必重排整段，diff 也乾淨。review-draft 與 reply-draft 還會被貼上 GitHub，GitHub 留言把單一換行渲染成斷行，hard-wrap 的草稿貼過去會碎。條列一項一行，fenced code block 內容原樣。review 報告的 PR 摘要用 ```mermaid fenced block 畫改動前後圖，屬於 fenced code block，不違反 HTML 規則；在 nvim 裡是純文字，節點文字要自己讀得懂。
 2. **不用 markdown 表格，改成 `- **欄位**：值` 條列或拆小節。** 理由：寬表格在 wrap 下整列折爛，補一個欄位要重排整列。唯一例外是逐字引用的既有表格，照原樣保留。
 3. **用 `## ` 標題切段，標題字要夠具體、可被搜尋。** 理由：導覽靠 `/` 搜尋標題文字，以及 `gO` 大綱（實測：filetype plugin 開啟時，`gO` 在 markdown buffer 會列出標題；`-u NONE` 下沒有）。
 4. **不要把導覽建立在 fold 上。** 理由：實測顯示預設的 `foldmethod=manual`、`foldexpr=0`，`## ` 標題不是 fold 邊界，沒有任何預設 fold；要 fold 得使用者自己設定。模板與說明文字不要寫「收合」「fold 邊界」當成產物的功能。

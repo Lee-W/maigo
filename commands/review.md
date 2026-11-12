@@ -225,9 +225,14 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 
 ## 輸出
 
-單一 PR / branch / range（預設）輸出 Context / Rubric / Verdict / Verification / Bottom line
-五段；batch 內最後一個 PR 跑完後把「Queue 還剩...」那行換成 roll-up；`--bilingual` 或
-repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結 + horizontal rule 再接英文 detail。
+單一 PR / branch / range（預設）輸出 PR 摘要（為什麼 → 改動前後圖 → 改了什麼）/ Context / Rubric / Verdict /
+Verification / Bottom line 六段；PR 摘要先講 PR 本身（為什麼要有、做了哪些改動、每項改在哪些檔案），再進 findings。
+每項改動以行為描述，括號標出改在哪些檔案（路徑或 `file:line`），並附一句為什麼；為什麼之後、條列之前放改動前、改動後兩個獨立的 mermaid
+fenced block（上下排、各有一行小標，每塊只一張圖、不用 subgraph 並排；改動前會壞掉的節點標紅、改動後改動或新增的節點標綠，其餘不上色，小標寫明顏色意思）的對照圖（行為改動很小——純 rename、docs typo、依賴升級——時省略並寫明原因；節點只放 PR 描述或
+diff 能證實的東西）。動機查不到就寫「PR 沒說明動機」並列進 rubric 待作者補答，不代編。
+增量 review 時，若 PR 本身的 patch 沒變就沿用上次這段，只補新 commit 的改動。
+batch 內最後一個 PR 跑完後把「Queue 還剩...」那行換成 roll-up（roll-up 不加摘要與圖）；`--bilingual` 或
+repo-detect 觸發時最終 report 前加 Taiwanese Mandarin 快結（同樣先為什麼、再改了什麼〔含括號檔案〕、最後 verdict，不放圖）+ horizontal rule 再接英文 detail。
 三種版型的完整骨架見
 [`skills/strict-review/references/review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)「輸出」——
 正文套用這份骨架；publisher 補上共用檔頭後，讀回檔案呈現，不另外維護對話版。

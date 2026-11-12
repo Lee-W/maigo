@@ -15,6 +15,7 @@ file when writing the rubric or assembling the final report.
 # Review rubric: <PR title>
 
 ## 這個 PR 應該做到什麼（acceptance）
+從「為什麼要有這個改動」推導，與報告的 PR 摘要一致；動機查不到就照實寫「PR 沒說明動機」，不代編。
 1. <期待行為 1>
 2. <期待行為 2>
 
@@ -68,8 +69,36 @@ file when writing the rubric or assembling the final report.
 ### 單一 PR / branch / range（預設）
 
 ```markdown
+## 這個 PR 改了什麼、為什麼
+**為什麼：** <問題或動機；標明出處（PR 描述／issue／commit message），並標明是「作者的說法」還是「我們核對過」；疊在別的 PR 上時一併說明>
+
+改動前（紅色是會壞掉的地方）：
+
+```mermaid
+flowchart LR
+    A1[<元件或檔案>] --> A2[<問題發生處>]
+    classDef problem fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    class A2 problem
+```
+
+改動後（綠色是這個 PR 改動或新增的地方）：
+
+```mermaid
+flowchart LR
+    B1[<元件或檔案>] --> B2[<修法>]
+    classDef changed fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+    class B2 changed
+```
+
+**改了什麼（括號內是改在哪）：**
+
+- <行為層面的改動 1>（`<path>` 或 `<path>:<line>`）。為什麼：<一句>
+- <行為層面的改動 2>（`<path>`）。為什麼：<一句>
+
+**作者自己列的 known issues：** <PR 描述有列才寫；沒有就省略這行>
+
 ## Context（🐱 樂奈）
-<變更摘要 + 周邊 context 一段>
+<PR 摘要以外的周邊 context 一段：base 的狀態、相關 PR／thread、CI 狀況；不重複 PR 摘要>
 
 ## Rubric（🩵 燈）
 <rubric 摘要——詳見本次 review rubric 檔（pr-context-cache 印出的 rubric: 路徑）>
@@ -89,6 +118,14 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 ## Bottom line
 <一句話總結>
 ```
+
+PR 摘要的規則（單一 PR 與雙語版的英文 detail 都適用）：
+
+- 每項改動以行為描述，**每項附改在哪的檔案**（括號內放路徑或 `file:line`），並**每項附一句為什麼**；不寫成純檔案清單。
+- 摘要排在 Context 之前。查不到動機時，「為什麼」寫「PR 沒說明動機」，並把它列進 rubric 的「Description 沒講清楚的地方（需要 author 補答）」，不得代編。
+- mermaid 圖放在「為什麼」之後、條列改動之前，預設畫改動前 → 改動後的 flowchart 對照：兩個獨立的 mermaid 區塊上下排，各自前面一行小標（「改動前：」「改動後：」）；每個區塊只畫一張圖，不用 subgraph 把前後並排塞進同一張。改動前圖把會壞掉、或 PR 要修的節點用 `classDef problem fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d` 標紅；改動後圖把這個 PR 改動或新增的節點用 `classDef changed fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d` 標綠（再以 `class <節點id,...> problem|changed` 套用）；沒改動的節點不上色；小標寫明顏色的意思。節點文字標出對應檔案或元件。節點只放 PR 描述或 diff 能證實的東西，不代編流程；行為改動很小（純 rename、docs typo、依賴升級）時省略圖，並在「為什麼」後寫明省略原因。節點文字不放 HTML 標籤。
+- 增量 review 時，若 PR 本身的 patch 沒變，沿用上次這段，只補新 commit 的改動。
+- 多 PR roll-up 是對話內的一頁總結，不加摘要與圖；逐顆報告才有。
 
 ### Head moved after this review
 
@@ -170,14 +207,19 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 
 **PR:** <url>
 
-**PR #<N> — <short title>** <APPROVE / REQUEST_CHANGES / BLOCKED>
-<1-3 句：做什麼、能不能上、最大一個 concern>
+**PR #<N> — <short title>**
+
+**為什麼：** <一句：問題或動機，標明出處與「作者的說法／我們核對過」；查不到寫「PR 沒說明動機」>
+
+**改了什麼：** <行為層面的改動，每項括號標改在哪些檔案，並附一句為什麼；快結不放圖>
+
+**Verdict：** <APPROVE / REQUEST_CHANGES / BLOCKED> — <能不能上、最大一個 concern>
 
 ---
 
 ## English — Detailed Review
 
-[既有 Context / Rubric / Verdict / Verification / Bottom line，章節仍用 H2/H3；不新增 H1]
+[既有 PR 摘要（含 mermaid 圖）/ Context / Rubric / Verdict / Verification / Bottom line，章節仍用 H2/H3；不新增 H1]
 
 ---
 

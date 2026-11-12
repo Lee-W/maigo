@@ -64,6 +64,10 @@ stored report:
    - **new concerns** introduced by the new commits
    - bottom line + updated verdict
 
+The report's PR summary section (why / what, each change with the files it touches)
+follows the same rule: if the PR's own patch is unchanged since the stored report, reuse
+the previous summary and add only what the new commits changed.
+
 Be precise relaying maintainer thread state: "author replied, awaiting
 reviewer re-confirmation" is not the same as "no response" — GitHub's
 `isResolved: false` often just means nobody has clicked Resolve yet.
