@@ -383,6 +383,9 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 `待送出` 的下一步：`.maigo/review/<id>/draft.md` 存在才給 `gh pr review --body-file` 指令，不存在時
 改為「尚無草稿：先起草 …（§4.5 裁決 gate）」——否則使用者照 board 跑指令會因檔案不存在而失敗
 （2026-10 batch 有 5 顆 `待送出` 指向沒起草的 draft.md）。沒給 `--maigo-root` 時無從判斷，維持給指令。
+「這輪已送出」以你的 GitHub review 的 `commit_id` 等於 report 的 `head_sha`、或 `submitted_at` 晚於 report 的 `reviewed_at` 為準；
+只看「這顆 PR 上有沒有你的 review」會把前一輪的 review 誤判成本地草稿已送——手動盤點（例如批次整理草稿前挑出未送清單）同樣適用
+（2026-11-12 實例：#73748、#76221、#75499 的已送 review 都是 11-02 舊 commit 的前一輪，本地 follow-up 草稿其實未送，卻被當成已送而跳過）。
 `PENDING` / `DISMISSED` 的 GitHub review 不算已送出。`--reviews` 檢視只列 `needs_review`
 為 true 的項目：待 review、回你的球、待送出，依 rank 排序；**這個過濾結果不得拿去重寫
 完整 board**。索引顯示標題與貢獻者；最後 review／已看完時間在細節與對話待看清單中顯示。

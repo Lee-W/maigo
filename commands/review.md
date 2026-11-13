@@ -270,6 +270,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
   同 id 的 `review.md` 中能確認同 source 的過期報告；草稿、rubric、手寫筆記、別顆 PR、無法確認歸屬的檔案保留。
   stdout 列出 `removed` / `retained`；清除不依賴 mtime 猜「同一份」。
 - 新報告清除上一輪「已看完」標記；要由使用者看完這一版再標記。
+- 每次 publish 都把「最後 review」重設為當下，publisher 沒有保留原時間的選項——只為套新版型或修措辭而重新 publish
+  （沒有重審）也一樣，原本的審查時間會消失。批次整理前先記下各報告原本的 `reviewed_at`，收尾時向使用者說明；
+  `--head` 仍填原本審查的 commit，不填新 head。（2026-11-12 實例：30 份未送 review 套新版型後，「最後 review」全變成當天。）
 
 source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保留舊檔；不要直接 Write 繞過。
 舊版（沒有 metadata 的）報告只有在含 `# Review:` 標題**且**有一行 `**PR:** <canonical-url>` 時，
