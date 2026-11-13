@@ -390,6 +390,18 @@ Stop hook 保留既有 skip／known-failure 放行政策；CLI 用獨立狀態�
 Stop 事件沒有可靠的 task ID，因此這條入口不累計跨呼叫的重試次數；失敗仍照常 block。
 需要任務級計次時用上述顯式 CLI，orchestrator 仍遵守 failure-handling 的重試預算。
 
+### 執行中的 subagent
+
+訊號來源是 Stop payload 的 `background_tasks`（官方文件載明：仍在執行的背景工作陣列，
+`type` 可為 shell／subagent／monitor 等）。陣列中只要有 `type` 為 `subagent` 的項目，
+hook 就放行並略過 test 驗證，避免在 subagent 編輯到一半時跑出假紅燈；訊息會寫
+「N 個 subagent 仍在執行中」，它們結束後的下一次 Stop 照常驗證。
+
+- 只有 `subagent` 型會放行，不看 `status`；`shell`、`monitor` 等其他型不算。
+- 欄位缺席、不是 list、或項目形狀不符，一律當未知，照常跑測試。
+- `scripts/verify_task.py` 的顯式驗證不受影響，一律照跑。
+- 本機 runtime 的 Stop payload 是否真的帶此欄位尚未實測；沒帶時行為與以前相同。
+
 ### 偵測順序
 
 | 偵測到 | 跑什麼指令 |

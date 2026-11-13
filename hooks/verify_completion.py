@@ -299,6 +299,20 @@ def approve_with_usage(reason: str, cwd: Path, session_id: object) -> NoReturn:
     raise AssertionError("emit() must exit")
 
 
+def count_running_subagents(data: dict) -> int:
+    """Count `subagent` entries in the Stop payload's `background_tasks`.
+
+    Anything that is not a list of dicts with ``type == "subagent"`` counts as
+    zero (unknown shape = current behaviour). `status` is deliberately ignored.
+    """
+    tasks = data.get("background_tasks")
+    if not isinstance(tasks, list):
+        return 0
+    return sum(
+        1 for item in tasks if isinstance(item, dict) and item.get("type") == "subagent"
+    )
+
+
 VerificationStatus = Literal[
     "passed", "failed", "unavailable", "skipped", "known_failures"
 ]
@@ -476,6 +490,14 @@ def main() -> None:
     if not has_git_modifications(cwd) and not head_moved(cwd, session_id):
         approve_with_usage(
             "立希 (Taki)：本次 session 無檔案修改（working tree 乾淨且 HEAD 未變動），跳過 test 驗證",
+            cwd,
+            session_id,
+        )
+
+    running = count_running_subagents(data)
+    if running > 0:
+        approve_with_usage(
+            f"立希 (Taki)：偵測到 {running} 個 subagent 仍在執行中（Stop payload 的 background_tasks），工作區可能正被編輯，本次略過 test 驗證；它們結束後的下一次 Stop 會照常驗證",
             cwd,
             session_id,
         )

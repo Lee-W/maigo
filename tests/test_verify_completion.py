@@ -453,6 +453,131 @@ class TestMain:
 # ---------------------------------------------------------------------------
 
 
+class TestCountRunningSubagents:
+    def test_counts_only_subagent_type(self):
+        data = {
+            "background_tasks": [
+                {"type": "subagent"},
+                {"type": "shell"},
+                {"type": "subagent", "status": "anything"},
+                {"type": "monitor"},
+            ]
+        }
+        assert verify_completion.count_running_subagents(data) == 2
+
+    @pytest.mark.parametrize(
+        "value",
+        ["subagent", {"type": "subagent"}, None, 3, []],
+    )
+    def test_non_list_is_zero(self, value):
+        assert (
+            verify_completion.count_running_subagents({"background_tasks": value}) == 0
+        )
+
+    def test_missing_field_is_zero(self):
+        assert verify_completion.count_running_subagents({}) == 0
+
+
+class TestRunningSubagentSkip:
+    @pytest.fixture
+    def calls(self, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+        recorded: list[Path] = []
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+
+        def fake_run_verification(cwd):
+            recorded.append(cwd)
+            return verify_completion.VerificationResult("passed", "ok")
+
+        monkeypatch.setattr(
+            verify_completion, "run_verification", fake_run_verification
+        )
+        return recorded
+
+    def test_running_subagent_skips_verification(
+        self, tmp_path, monkeypatch, capsys, calls
+    ):
+        payload = {"cwd": str(tmp_path), "background_tasks": [{"type": "subagent"}]}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result.get("decision") is None
+        assert "subagent" in result["reason"]
+        assert calls == []
+
+    def test_skip_message_reports_subagent_count(
+        self, tmp_path, monkeypatch, capsys, calls
+    ):
+        payload = {
+            "cwd": str(tmp_path),
+            "background_tasks": [
+                {"type": "subagent"},
+                {"type": "subagent"},
+                {"type": "shell"},
+            ],
+        }
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert "2 個 subagent" in result["reason"]
+        assert calls == []
+
+    def test_non_subagent_background_tasks_still_verify(
+        self, tmp_path, monkeypatch, capsys, calls
+    ):
+        payload = {
+            "cwd": str(tmp_path),
+            "background_tasks": [
+                {"type": "shell"},
+                {"type": "monitor"},
+                {"type": "workflow"},
+            ],
+        }
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert len(calls) == 1
+
+    def test_missing_background_tasks_still_verifies(
+        self, tmp_path, monkeypatch, capsys, calls
+    ):
+        run_hook_main(verify_completion, {"cwd": str(tmp_path)}, monkeypatch, capsys)
+        assert len(calls) == 1
+
+    def test_empty_background_tasks_still_verifies(
+        self, tmp_path, monkeypatch, capsys, calls
+    ):
+        payload = {"cwd": str(tmp_path), "background_tasks": []}
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert len(calls) == 1
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "subagent",
+            {"type": "subagent"},
+            None,
+            [None, "x", 3, {}, {"type": 5}, {"type": None}],
+        ],
+    )
+    def test_malformed_background_tasks_still_verifies(
+        self, tmp_path, monkeypatch, capsys, calls, value
+    ):
+        payload = {"cwd": str(tmp_path), "background_tasks": value}
+        run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert len(calls) == 1
+
+    def test_subagent_skip_does_not_bypass_failures_when_none_running(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(
+            verify_completion, "has_git_modifications", lambda cwd: True
+        )
+        monkeypatch.setattr(
+            verify_completion,
+            "run_verification",
+            lambda cwd: verify_completion.VerificationResult("failed", "boom"),
+        )
+        payload = {"cwd": str(tmp_path), "background_tasks": []}
+        result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
+        assert result["decision"] == "block"
+
+
 class TestRetryLogPath:
     def test_path_structure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(verify_completion, "_RETRY_LOG_BASE", None)

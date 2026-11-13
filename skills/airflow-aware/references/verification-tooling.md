@@ -931,6 +931,9 @@ Two further shapes of the same clash (the Stop hook counts as one more concurren
   `running` (confirm with `ListAgents`), hook reds are noise: don't write them into
   `.claude/known-test-failures`. Root cause unproven — repeated greens on the isolated DB only
   support the interference explanation.
+  The Stop hook skips its test run when the payload's `background_tasks` contains a `subagent`
+  entry, so many of these reds should stop appearing while a subagent runs; it does not cover an
+  orchestrator's own parallel runner, nor a payload that lacks that field.
 
 ### A new worktree needs a scoped test command, a fresh `AIRFLOW_HOME` per verifier run, and a few env fix-ups
 
