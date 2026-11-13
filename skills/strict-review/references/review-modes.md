@@ -133,6 +133,26 @@ obviously belong to a different, unrelated PR
 it's a rebase — use the current `gh pr diff <n>` (against `main`) instead to
 see the PR's actual delta.
 
+### Pick the delta's endpoints from the stored report and the live PR, not the pasted link
+
+A pasted `.../changes/<oldSha>..<newSha>` link says where the user last looked,
+not what was last reviewed. Before diffing:
+
+- **Start = the stored report's reviewed head.** Read the `head_sha` in the existing
+  `review/<id>/review.md`. If it differs from the link's `<oldSha>`, diff from the
+  stored head and say so in `## Context`. (2026-11-13 #76974: the link started at
+  `6645f89`, the stored report had reviewed `316f2d1`, and 13 lines of real change sat
+  between them.)
+- **End = the PR's current `headRefOid`.** Re-read it before starting; when it is past
+  the link's `<newSha>`, review up to the current head and name the extra commits in
+  the report (the same #76974 had four commits pushed after the linked `608138a`).
+- **Reconcile with what GitHub actually shows before re-reviewing.** Compare the stored
+  report's verdict and "sent / approved" claims with
+  `gh pr view <n> --json reviews,reviewDecision` (your own login's reviews). When they
+  disagree, GitHub wins: carry the submitted state into the new report and correct the
+  stale claim. (2026-11-13: #76916 was already APPROVED on GitHub while the stored
+  report said NEEDS_CHANGES; #76917's report claimed approvals that did not exist.)
+
 ### Rebase-only delta: the pipeline may be compressed
 
 If the delta check shows the PR's **own** patches are unchanged since the stored
