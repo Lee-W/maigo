@@ -5,6 +5,14 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.74.0 (2026-11-13)
+
+### Feat
+
+- **board**: let --learn take every merged closed item, not only checked ones
+- **review**: open the report with what the PR changes and why
+- **review**: add inline-comments artifact and tighten review draft guidance
+
 ## v0.73.0 (2026-11-02)
 
 ### Feat
