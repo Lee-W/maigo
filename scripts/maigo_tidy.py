@@ -38,6 +38,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py" [--dir .maigo] [--no-gh] \
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -164,6 +165,8 @@ def _plan_internal_logs(
             reason += (
                 "；目標已存在，舊檔內容接在新檔前面（舊在前、新在後）再刪舊檔"
                 if name.endswith(".jsonl")
+                else "；目標已存在，兩邊合併（同一 session 以新檔為準）再刪舊檔"
+                if name == "session-head.json"
                 else "；目標已存在，以新檔為準、刪舊檔"
             )
         actions.append(
@@ -511,6 +514,18 @@ def _apply_move_internal_log(action: TidyAction, maigo_dir: Path) -> str:
         _atomic_write(destination, older + destination.read_bytes())
         source.unlink()
         return f"move-internal-log：{action.path} 接在 {action.target} 前面（舊在前、新在後）"
+    if source.name == "session-head.json":
+        try:
+            old_data = json.loads(source.read_text(encoding="utf-8"))
+            new_data = json.loads(destination.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            # ValueError covers JSONDecodeError and UnicodeDecodeError.
+            old_data = new_data = None
+        if isinstance(old_data, dict) and isinstance(new_data, dict):
+            merged = json.dumps(old_data | new_data, ensure_ascii=False) + "\n"
+            _atomic_write(destination, merged.encode("utf-8"))
+            source.unlink()
+            return f"move-internal-log：{action.path} 已合併進 {action.target}（同一 session 以新檔為準）"
     source.unlink()
     return f"move-internal-log：{action.target} 已存在，以新檔為準，刪 {action.path}"
 

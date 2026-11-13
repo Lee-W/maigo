@@ -204,6 +204,42 @@ class TestHeadMoved:
         commit_empty(tmp_path, "work")
         assert _session_head.head_moved(tmp_path, None) is False
 
+    def test_head_moved_uses_legacy_record_when_new_file_lacks_session(
+        self, tmp_path: Path
+    ):
+        head = init_repo(tmp_path)
+        legacy = tmp_path / ".maigo" / _session_head.LOG_NAME
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(json.dumps({"sess-1": head}), encoding="utf-8")
+        new = tmp_path / _session_head.LOG_PATH
+        new.parent.mkdir(parents=True)
+        new.write_text(json.dumps({"other": head}), encoding="utf-8")
+        commit_empty(tmp_path, "work")
+        assert _session_head.head_moved(tmp_path, "sess-1") is True
+
+    def test_head_moved_prefers_new_record_for_same_session(self, tmp_path: Path):
+        head = init_repo(tmp_path)
+        new_head = commit_empty(tmp_path, "second")
+        legacy = tmp_path / ".maigo" / _session_head.LOG_NAME
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(json.dumps({"sess-1": head}), encoding="utf-8")
+        new = tmp_path / _session_head.LOG_PATH
+        new.parent.mkdir(parents=True)
+        new.write_text(json.dumps({"sess-1": new_head}), encoding="utf-8")
+        # Legacy record would say "moved"; the new one matches HEAD.
+        assert _session_head.head_moved(tmp_path, "sess-1") is False
+
+    def test_head_moved_false_when_no_file_has_session(self, tmp_path: Path):
+        head = init_repo(tmp_path)
+        legacy = tmp_path / ".maigo" / _session_head.LOG_NAME
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(json.dumps({"a": head}), encoding="utf-8")
+        new = tmp_path / _session_head.LOG_PATH
+        new.parent.mkdir(parents=True)
+        new.write_text(json.dumps({"b": head}), encoding="utf-8")
+        commit_empty(tmp_path, "work")
+        assert _session_head.head_moved(tmp_path, "sess-1") is False
+
     def test_false_when_head_unreadable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

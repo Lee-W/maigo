@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import scripts.retry_log_summary as rls
@@ -15,6 +16,14 @@ def test_missing_log_is_empty(tmp_path: Path):
     assert summary.counts == {}
     assert summary.malformed_lines == 0
     assert "無紀錄" in rls.format_summary(summary)
+
+
+def test_empty_path_list_is_an_empty_log(tmp_path: Path):
+    summary = rls.summarize_log("taki", [], "failures")
+
+    assert summary.total_entries == 0
+    assert summary.counts == {}
+    assert summary.malformed_lines == 0
 
 
 def test_counts_keys_and_keeps_recent_three(tmp_path: Path):
@@ -78,7 +87,7 @@ def _line(key: str) -> str:
     return json.dumps({"ts": "2026-01-01T00:00:00Z", "failures": [key]}) + "\n"
 
 
-def test_reads_internal_log_path_first(tmp_path: Path):
+def test_merges_legacy_and_internal_logs_when_both_exist(tmp_path: Path):
     maigo = tmp_path / ".maigo"
     (maigo / "_internal" / "log").mkdir(parents=True)
     (maigo / "_internal" / "log" / "test-failures.jsonl").write_text(
@@ -88,8 +97,37 @@ def test_reads_internal_log_path_first(tmp_path: Path):
 
     taki = rls.summarize_repo(tmp_path)[1]
 
-    assert taki.counts == {"new": 1}
+    assert taki.counts == {"new": 1, "legacy": 1}
     assert taki.path == maigo / "_internal" / "log" / "test-failures.jsonl"
+
+
+def test_summarize_repo_merges_legacy_and_new_logs(tmp_path: Path):
+    maigo = tmp_path / ".maigo"
+    (maigo / "_internal" / "log").mkdir(parents=True)
+    (maigo / "test-failures.jsonl").write_text(
+        _line("a") + _line("b"), encoding="utf-8"
+    )
+    (maigo / "_internal" / "log" / "test-failures.jsonl").write_text(
+        _line("c") + _line("d"), encoding="utf-8"
+    )
+
+    taki = rls.summarize_repo(tmp_path)[1]
+
+    assert taki.total_entries == 4
+    assert [e["failures"] for e in taki.recent] == [["b"], ["c"], ["d"]]
+
+
+def test_root_is_used_as_given_even_inside_a_git_repo(tmp_path: Path):
+    """`--root <dir>` reads <dir>/.maigo even when <dir> is a repo subdirectory."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    sub = tmp_path / "sub"
+    (sub / ".maigo").mkdir(parents=True)
+    (sub / ".maigo" / "test-failures.jsonl").write_text(_line("sub"), encoding="utf-8")
+
+    taki = rls.summarize_repo(sub)[1]
+
+    assert taki.counts == {"sub": 1}
+    assert taki.path == sub / ".maigo" / "test-failures.jsonl"
 
 
 def test_falls_back_to_legacy_top_level_path(tmp_path: Path):

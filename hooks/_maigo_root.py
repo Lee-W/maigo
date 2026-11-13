@@ -78,11 +78,20 @@ def internal_log_dir(cwd: str | Path) -> Path:
 def readable_log_path(cwd: str | Path, name: str) -> Path:
     """Path to read `name` from: the `_internal/log/` copy, else the legacy top-level one.
 
-    Only the read side falls back; when both exist the new one wins and the two
-    are never merged (moving old files is `/maigo:tidy`'s job).
+    Single-path version: the new file wins and the two are never merged. Readers
+    that need both locations use `readable_log_paths`.
     """
     new = internal_log_dir(cwd) / name
     if new.exists():
         return new
     legacy = maigo_dir(cwd) / name
     return legacy if legacy.exists() else new
+
+
+def readable_log_paths(cwd: str | Path, name: str) -> list[Path]:
+    """Existing copies of `name`, legacy first and new last (empty if neither exists).
+
+    Merge semantics are left to the caller; later entries are the newer location.
+    """
+    candidates = [maigo_dir(cwd) / name, internal_log_dir(cwd) / name]
+    return [path for path in candidates if path.exists()]

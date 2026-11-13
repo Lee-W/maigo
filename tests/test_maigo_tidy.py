@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -183,9 +184,51 @@ def test_legacy_logs_merge_into_existing_internal_log(tmp_path):
     merged = (maigo / "_internal" / "log" / "token-usage.jsonl").read_text()
     assert merged == '{"a": 1}\n{"b": 2}\n'
     assert not (maigo / "token-usage.jsonl").exists()
-    assert (
-        maigo / "_internal" / "log" / "session-head.json"
-    ).read_text() == '{"new": true}'
+    merged_head = json.loads(
+        (maigo / "_internal" / "log" / "session-head.json").read_text()
+    )
+    assert merged_head == {"old": True, "new": True}
+    assert not (maigo / "session-head.json").exists()
+
+
+def test_session_head_merge_prefers_new_on_same_session(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "session-head.json", '{"s1": "old", "s2": "old"}')
+    write(maigo / "_internal" / "log" / "session-head.json", '{"s1": "new"}')
+    run_apply(maigo, build(maigo))
+    merged = json.loads((maigo / "_internal" / "log" / "session-head.json").read_text())
+    assert merged == {"s1": "new", "s2": "old"}
+    assert not (maigo / "session-head.json").exists()
+
+
+def test_session_head_unparseable_legacy_keeps_new_file(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "session-head.json", "{not json")
+    write(maigo / "_internal" / "log" / "session-head.json", '{"new": true}')
+    run_apply(maigo, build(maigo))
+    target = maigo / "_internal" / "log" / "session-head.json"
+    assert target.read_text() == '{"new": true}'
+    assert not (maigo / "session-head.json").exists()
+
+
+def test_session_head_non_utf8_legacy_keeps_new_file(tmp_path):
+    maigo = make_maigo(tmp_path)
+    (maigo / "session-head.json").write_bytes(b"\xff\xfe")
+    write(maigo / "_internal" / "log" / "session-head.json", '{"new": true}')
+    run_apply(maigo, build(maigo))
+    target = maigo / "_internal" / "log" / "session-head.json"
+    assert target.read_text() == '{"new": true}'
+    assert not (maigo / "session-head.json").exists()
+
+
+def test_session_head_non_utf8_new_file_does_not_raise(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "session-head.json", '{"old": true}')
+    target = maigo / "_internal" / "log" / "session-head.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"\xff\xfe")
+    run_apply(maigo, build(maigo))
+    assert target.read_bytes() == b"\xff\xfe"
     assert not (maigo / "session-head.json").exists()
 
 

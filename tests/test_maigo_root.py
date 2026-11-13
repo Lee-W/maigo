@@ -125,3 +125,18 @@ def test_cwd_inside_symlinked_dot_maigo_resolves_to_repo_root(tmp_path: Path):
 
     assert _maigo_root.maigo_root(repo / ".maigo" / "pr" / "1") == repo.resolve()
     assert _maigo_root.maigo_root(repo / ".maigo") == repo.resolve()
+
+
+def test_readable_log_paths_lists_existing_oldest_first(tmp_path: Path):
+    legacy = tmp_path / ".maigo" / "a.jsonl"
+    new = tmp_path / ".maigo" / "_internal" / "log" / "a.jsonl"
+
+    assert _maigo_root.readable_log_paths(tmp_path, "a.jsonl") == []
+
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("legacy\n", encoding="utf-8")
+    assert _maigo_root.readable_log_paths(tmp_path, "a.jsonl") == [legacy]
+
+    new.parent.mkdir(parents=True)
+    new.write_text("new\n", encoding="utf-8")
+    assert _maigo_root.readable_log_paths(tmp_path, "a.jsonl") == [legacy, new]

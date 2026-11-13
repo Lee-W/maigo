@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,16 +15,13 @@ SOURCES = (
     ("soyo", "soyo-must-fix.jsonl", "must_fix_keys"),
     ("taki", "test-failures.jsonl", "failures"),
 )
-# New home first; the legacy top-level path is only read when the new one is absent.
-LOG_DIRS = (".maigo/_internal/log", ".maigo")
+# Both copies are read, legacy first. Paths are built straight from `root`
+# (no git-toplevel lookup) so `--root <dir>` finds exactly what it used to.
+LOG_DIRS = (".maigo", ".maigo/_internal/log")
 
 
-def resolve_log_path(root: Path, name: str) -> Path:
-    for log_dir in LOG_DIRS:
-        candidate = root / log_dir / name
-        if candidate.exists():
-            return candidate
-    return root / LOG_DIRS[0] / name
+def existing_log_paths(root: Path, name: str) -> list[Path]:
+    return [root / d / name for d in LOG_DIRS if (root / d / name).exists()]
 
 
 @dataclass(frozen=True)
@@ -66,8 +64,14 @@ def read_jsonl(path: Path) -> tuple[list[dict], int]:
     return entries, malformed
 
 
-def summarize_log(label: str, path: Path, field: str) -> LogSummary:
-    entries, malformed = read_jsonl(path)
+def summarize_log(label: str, path: Path | Sequence[Path], field: str) -> LogSummary:
+    paths = [path] if isinstance(path, Path) else list(path)
+    entries: list[dict] = []
+    malformed = 0
+    for one in paths:
+        found, bad = read_jsonl(one)
+        entries.extend(found)
+        malformed += bad
     counts: collections.Counter[str] = collections.Counter()
     for entry in entries:
         values = entry.get(field, [])
@@ -75,7 +79,7 @@ def summarize_log(label: str, path: Path, field: str) -> LogSummary:
             counts.update(str(value) for value in values)
     return LogSummary(
         label=label,
-        path=path,
+        path=paths[-1] if paths else Path(),
         field=field,
         total_entries=len(entries),
         counts=counts,
@@ -86,7 +90,9 @@ def summarize_log(label: str, path: Path, field: str) -> LogSummary:
 
 def summarize_repo(root: Path) -> list[LogSummary]:
     return [
-        summarize_log(label, resolve_log_path(root, name), field)
+        summarize_log(
+            label, existing_log_paths(root, name) or root / LOG_DIRS[1] / name, field
+        )
         for label, name, field in SOURCES
     ]
 

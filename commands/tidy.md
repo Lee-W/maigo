@@ -32,7 +32,7 @@ allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py:*), Bash
 **規則型動作**（`--apply` 會執行）：
 
 - 舊扁平檔遷移成巢狀佈局（`scripts/migrate_legacy_artifacts.py` 的規劃）。
-- 頂層機器日誌（`session-head.json`、三個 jsonl）搬進 `.maigo/_internal/log/`；新舊都在時 jsonl 把舊檔接在新檔前面（舊在前、新在後），`session-head.json` 以新檔為準。
+- 頂層機器日誌（`session-head.json`、三個 jsonl）搬進 `.maigo/_internal/log/`；新舊都在時 jsonl 把舊檔接在新檔前面（舊在前、新在後），`session-head.json` 兩邊合併、同一個 session 以新檔為準。
 - 狀態是 merged／closed 的 `pr/`、`review/`、`issue/` 目錄與 `i/<id>.md`，鏡射封存到 `.maigo/_archive/<原相對路徑>`。只處理 id 是純數字的項目；跨 repo 的 `<repo>-<n>`、slug 不逐筆列，統計段彙總成一行，`i/` 的那批由 `/maigo:board` 處理。
 - `_internal/log/*.jsonl` 超過 2,000 行就輪替成 `<name>.1.jsonl`，只留一代。
 

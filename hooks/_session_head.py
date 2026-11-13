@@ -7,7 +7,8 @@ matters most (the work is now in history, unverified). Comparing HEAD against
 the SHA recorded by `repo_detect.py` at SessionStart closes that gap.
 
 The record lives in `.maigo/_internal/log/` (a legacy top-level
-`.maigo/session-head.json` is still read when the new file is absent), which
+`.maigo/session-head.json` is still read and merged in, the new file winning for
+the same session), which
 `repo_detect.ensure_maigo_ignored` keeps out of `git status`, so writing it
 cannot itself make the tree look dirty.
 
@@ -26,7 +27,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _maigo_root import maigo_root, readable_log_path  # noqa: E402
+from _maigo_root import maigo_root, readable_log_paths  # noqa: E402
 
 LOG_NAME = "session-head.json"
 LOG_PATH = Path(".maigo/_internal/log") / LOG_NAME
@@ -67,6 +68,14 @@ def read_records(path: Path) -> dict[str, str]:
     if not isinstance(data, dict):
         return {}
     return {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def read_merged_records(cwd: Path) -> dict[str, str]:
+    """Merge the legacy and new records; the new file wins for the same session."""
+    merged: dict[str, str] = {}
+    for path in readable_log_paths(cwd, LOG_NAME):
+        merged |= read_records(path)
+    return merged
 
 
 def record(cwd: Path, session_id: object) -> bool:
@@ -115,7 +124,7 @@ def head_moved(cwd: Path, session_id: object) -> bool:
     """
     if not isinstance(session_id, str) or not session_id:
         return False
-    start = read_records(readable_log_path(cwd, LOG_NAME)).get(session_id)
+    start = read_merged_records(cwd).get(session_id)
     if not start:
         return False
     head = current_head(cwd)

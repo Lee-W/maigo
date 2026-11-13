@@ -136,7 +136,7 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 | `i/<id>.md` | `/maigo:board` | id 是純數字且對應 PR／issue merged 或 closed；`<repo>-<n>` 形的由 `/maigo:board` 處理，tidy 只在統計段彙總 | 同上 |
 | `topic/<slug>/` | 寫 plan 的人 | 沒有外部訊號可查，只能由你勾選 | 勾選後封存到 `_archive/topic/<slug>/` |
 | 頂層舊檔（`plan.md`、`plan-<id>.md`、`<kind>-<id>.md` …） | 升級前的 maigo | 一律視為待遷移 | 遷移成巢狀佈局（規則型） |
-| 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時把舊檔接在新檔前面（舊在前、新在後；`session-head.json` 以新檔為準）（規則型） |
+| 頂層機器日誌（`session-head.json`、三個 jsonl） | 升級前的 hook | 一律視為待搬 | 搬進 `_internal/log/`，jsonl 新舊都在時把舊檔接在新檔前面（舊在前、新在後）；`session-head.json` 兩邊合併，同一個 session 以新檔為準（規則型） |
 | `_internal/log/*.jsonl` | hook | 超過 2,000 行 | 舊的搬成 `<name>.1.jsonl`，只留一代（規則型，門檻 `LOG_ROTATE_MAX_LINES`）；`/maigo:doctor` 的統計只看現行檔，不含 `.1.jsonl` |
 | `_archive/` 的項目 | `/maigo:board`、`/maigo:tidy` | 封存後超過 90 天（`ARCHIVE_RETENTION`；以封存單位的 mtime 計——單位是 `_archive/<group>/<id>`（`pr`／`review`／`issue`／`topic`／`i`）或其餘 `_archive/<name>` 本身，單位內部檔的 mtime 不看；`/maigo:board` 與 `/maigo:tidy` 封存時都會把它重設成封存當下） | 列為 delete-candidate，**一律要你逐項勾選**；確認＝備份後刪除 |
 | 未登記檔（`evals/`、`__titles.json`、`local-model-dispatch-plan.md` 這類） | 不明 | catalog 判為 `unregistered` | 不隨 `--apply` 動；`--confirm <path>`＝備份後刪除，`--confirm-archive <path>`＝備份後封存到 `_archive/`，不點名就保留 |
@@ -153,8 +153,8 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 `test-failures.jsonl` / `soyo-must-fix.jsonl`（retry / failure log）。
 hook 一律寫到 repo 根目錄的 `.maigo/`（`hooks/_maigo_root.py`：git toplevel，
 git 不可用時退回 payload cwd），不管 session 的 cwd 在哪個子目錄，也不會再長出
-`.maigo/.maigo/`。讀取端先讀 `_internal/log/` 的新檔，沒有才讀舊的頂層同名檔
-（新舊都在時只讀新的、不合併）；舊檔不由 hook 搬，留給 `/maigo:tidy` 處理。
+`.maigo/.maigo/`。讀取端新舊兩邊都讀並合併：`session-head.json` 同一個 session 以新檔為準，jsonl 舊在前新在後，
+token-usage 以 `session_id`＋`agent_id` 去重、新檔優先；舊檔不由 hook 搬，留給 `/maigo:tidy` 處理。
 其餘：`__titles.json`（內部快取）、`_internal/migrate-legacy-artifacts.manifest.json`
 （`scripts/migrate_legacy_artifacts.py --apply` 的搬移對應表，只在一次 apply
 沒跑完時留存，重跑時照它續跑，跑完即刪；升級前放在 `.maigo/` 頂層的舊位置

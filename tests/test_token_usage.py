@@ -278,3 +278,84 @@ def test_writes_under_internal_log_from_subdir_cwd(tmp_path: Path):
     assert len(usage.read_entries(target)[0]) == 1
     assert not (tmp_path / ".maigo" / ".maigo").exists()
     assert not (sub / ".maigo").exists()
+
+
+def _usage_row(session_id: str | None, agent_id: str | None, tokens: int, **extra):
+    row = {
+        "ts": "2999-01-01T00:00:00Z",
+        "agent_type": "maigo:Soyo",
+        "model": "m",
+        "input_tokens": tokens,
+        "output_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        **extra,
+    }
+    if session_id is not None:
+        row["session_id"] = session_id
+    if agent_id is not None:
+        row["agent_id"] = agent_id
+    return row
+
+
+def _write_rows(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+
+def _both_logs(tmp_path: Path, legacy_rows, new_rows) -> list[Path]:
+    legacy = tmp_path / ".maigo" / usage.LOG_NAME
+    new = tmp_path / usage.LOG_PATH
+    _write_rows(legacy, legacy_rows)
+    _write_rows(new, new_rows)
+    return [legacy, new]
+
+
+def test_summarize_merges_legacy_and_new_logs(tmp_path: Path):
+    paths = _both_logs(
+        tmp_path,
+        [_usage_row("s", "a1", 100)],
+        [_usage_row("s", "a2", 50)],
+    )
+    summary = usage.summarize(paths, session_id="s")
+    assert summary.tracked_agents == 2
+    assert summary.input_tokens == 150
+
+
+def test_summarize_counts_duplicate_agent_once_new_wins(tmp_path: Path):
+    paths = _both_logs(
+        tmp_path,
+        [_usage_row("s", "a1", 100)],
+        [_usage_row("s", "a1", 70)],
+    )
+    summary = usage.summarize(paths)
+    assert summary.tracked_agents == 1
+    assert summary.input_tokens == 70
+
+
+def test_breakdown_merges_legacy_and_new_logs(tmp_path: Path):
+    paths = _both_logs(
+        tmp_path,
+        [_usage_row("s", "a1", 100, agent_type="maigo:Raana")],
+        [_usage_row("s", "a2", 50, agent_type="maigo:Soyo")],
+    )
+    agents, models = usage.breakdown(paths)
+    assert agents == {"maigo:Raana": 100, "maigo:Soyo": 50}
+    assert models == {"m": 150}
+
+
+def test_entries_missing_ids_are_never_deduplicated(tmp_path: Path):
+    paths = _both_logs(
+        tmp_path,
+        [_usage_row("s", None, 10), _usage_row(None, "a1", 10)],
+        [_usage_row("s", None, 10), _usage_row(None, "a1", 10)],
+    )
+    assert usage.summarize(paths).tracked_agents == 4
+
+
+def test_record_skips_when_legacy_log_already_has_agent(tmp_path: Path):
+    legacy = tmp_path / ".maigo" / usage.LOG_NAME
+    _write_rows(legacy, [_usage_row("session-1", "agent-1", 5)])
+
+    assert not usage.record_agent_usage(agent_event(tmp_path))
+    assert not (tmp_path / usage.LOG_PATH).exists()

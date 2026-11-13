@@ -245,7 +245,7 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 {"ts":"2026-07-16T12:00:00Z","session_id":"...","agent_id":"...","agent_type":"maigo:Soyo","model":"claude-sonnet","input_tokens":8320,"output_tokens":1230,"cache_creation_input_tokens":400,"cache_read_input_tokens":2500}
 ```
 
-兩條路徑共用同一份 log，以 `session_id + agent_id` 去重，所以 foreground agent 只會記一筆。下列情況靜默略過：
+兩條路徑共用同一份 log，以 `session_id + agent_id` 去重，所以 foreground agent 只會記一筆。寫入前的去重同時看新舊兩個位置：舊位置已記過的組合不會在新位置再寫一筆。下列情況靜默略過：
 
 - PostToolUse：`status` 不是 `completed`（包含 background agent 的 `async_launched`）
 - PostToolUse：harness 沒提供 `usage`；SubagentStop：transcript 不存在、不可讀或四欄全為 0

@@ -376,6 +376,44 @@ class TestMain:
         assert "Token usage：input 1.2k" in result["reason"]
         assert "已追蹤 1 agents" in result["reason"]
 
+    def test_approve_includes_usage_from_legacy_and_new_logs(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ):
+        def row(agent_id: str, tokens: int) -> str:
+            return (
+                json.dumps(
+                    {
+                        "session_id": "session-1",
+                        "agent_id": agent_id,
+                        "input_tokens": tokens,
+                        "output_tokens": 0,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                    }
+                )
+                + "\n"
+            )
+
+        legacy = tmp_path / ".maigo" / "token-usage.jsonl"
+        legacy.parent.mkdir()
+        legacy.write_text(row("a1", 1_000), encoding="utf-8")
+        new = tmp_path / ".maigo" / "_internal" / "log" / "token-usage.jsonl"
+        new.parent.mkdir(parents=True)
+        new.write_text(row("a2", 2_000), encoding="utf-8")
+
+        result = run_hook_main(
+            verify_completion,
+            {"cwd": str(tmp_path), "session_id": "session-1"},
+            monkeypatch,
+            capsys,
+        )
+
+        assert "input 3.0k" in result["reason"]
+        assert "已追蹤 2 agents" in result["reason"]
+
     def test_clean_tree_and_unmoved_head_skips(
         self,
         tmp_path: Path,

@@ -6,12 +6,13 @@ import datetime
 import json
 import sys
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _maigo_root import maigo_root  # noqa: E402
+from _maigo_root import maigo_root, readable_log_paths  # noqa: E402
 from _transcript import USAGE_FIELDS, read_with_retry, sum_usage  # noqa: E402
 
 LOG_NAME = "token-usage.jsonl"
@@ -46,6 +47,45 @@ def read_entries(path: Path) -> tuple[list[dict[str, Any]], int]:
         else:
             malformed += 1
     return entries, malformed
+
+
+def read_entries_merged(
+    paths: Sequence[Path],
+) -> tuple[list[dict[str, Any]], int]:
+    """Read several logs (oldest first) into one entry list.
+
+    Entries with a non-empty string `session_id` and `agent_id` are deduplicated
+    on that pair, the newest file winning; entries missing either field are
+    always kept. Malformed counts add up.
+    """
+    per_file = [read_entries(path) for path in paths]
+    malformed = sum(count for _, count in per_file)
+    seen: set[tuple[str, str]] = set()
+    kept_newest_first: list[list[dict[str, Any]]] = []
+    for entries, _ in reversed(per_file):
+        kept: list[dict[str, Any]] = []
+        for entry in reversed(entries):
+            session_id = entry.get("session_id")
+            agent_id = entry.get("agent_id")
+            if (
+                isinstance(session_id, str)
+                and session_id
+                and isinstance(agent_id, str)
+                and agent_id
+            ):
+                key = (session_id, agent_id)
+                if key in seen:
+                    continue
+                seen.add(key)
+            kept.append(entry)
+        kept.reverse()
+        kept_newest_first.append(kept)
+    merged = [entry for kept in reversed(kept_newest_first) for entry in kept]
+    return merged, malformed
+
+
+def _as_paths(path: Path | Sequence[Path]) -> list[Path]:
+    return [path] if isinstance(path, Path) else list(path)
 
 
 def record_agent_usage(data: dict[str, Any]) -> bool:
@@ -130,7 +170,7 @@ def record_subagent_usage(data: dict[str, Any]) -> bool:
 def _append_record(cwd: str, fields: dict[str, Any]) -> bool:
     """Append a record unless session_id + agent_id is already logged."""
     log_path = maigo_root(cwd) / LOG_PATH
-    entries, _ = read_entries(log_path)
+    entries, _ = read_entries_merged(readable_log_paths(cwd, LOG_NAME))
     if any(
         entry.get("session_id") == fields["session_id"]
         and entry.get("agent_id") == fields["agent_id"]
@@ -188,12 +228,12 @@ def _filter_entries(
 
 
 def summarize(
-    path: Path,
+    path: Path | Sequence[Path],
     *,
     session_id: str | None = None,
     since: datetime.datetime | None = None,
 ) -> UsageSummary:
-    entries, malformed = read_entries(path)
+    entries, malformed = read_entries_merged(_as_paths(path))
     entries = _filter_entries(entries, session_id=session_id, since=since)
     totals = {
         field: sum(_token_count(entry.get(field)) for entry in entries)
@@ -203,10 +243,10 @@ def summarize(
 
 
 def breakdown(
-    path: Path, *, since: datetime.datetime | None = None
+    path: Path | Sequence[Path], *, since: datetime.datetime | None = None
 ) -> tuple[Counter[str], Counter[str]]:
     """Return total recorded tokens grouped by agent type and model."""
-    entries, _ = read_entries(path)
+    entries, _ = read_entries_merged(_as_paths(path))
     entries = _filter_entries(entries, since=since)
     agents: Counter[str] = Counter()
     models: Counter[str] = Counter()

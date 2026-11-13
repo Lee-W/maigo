@@ -28,7 +28,7 @@ from typing import Literal, NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hook_io import emit_stop as emit  # noqa: E402
-from _maigo_root import internal_log_dir, readable_log_path  # noqa: E402
+from _maigo_root import internal_log_dir, readable_log_paths  # noqa: E402
 from _retry_log import RetryScope, record_and_count  # noqa: E402
 from _session_head import head_moved  # noqa: E402
 from _token_usage import LOG_NAME, format_one_line, summarize  # noqa: E402
@@ -293,7 +293,7 @@ def _retry_warning(counts: dict[str, int], keys: set[str], label: str) -> str:
 def approve_with_usage(reason: str, cwd: Path, session_id: object) -> NoReturn:
     """Approve and append local usage metadata when the hook can correlate it."""
     if isinstance(session_id, str) and session_id:
-        usage = summarize(readable_log_path(cwd, LOG_NAME), session_id=session_id)
+        usage = summarize(readable_log_paths(cwd, LOG_NAME), session_id=session_id)
         reason = f"{reason}\n{format_one_line(usage)}"
     emit("approve", reason)
     raise AssertionError("emit() must exit")
