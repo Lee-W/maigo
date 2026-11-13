@@ -292,7 +292,7 @@ treat it as a real regression.
 
 **Scope gate**: only applies to a bugfix PR/branch where the bug was
 **self-discovered** (found by the agent itself while working on something
-else), not opened from a tracked issue.
+else) or is a CI-red fix, not opened from a tracked issue.
 
 Before investing further in the branch, and again before opening the PR,
 check whether `upstream/main` already has an equivalent fix in flight or
@@ -311,6 +311,11 @@ merged upstream fix means drop the branch (verify how much of the diff still
 adds value — sometimes only a small leftover, like a missing translation
 string, survives); an open PR means review or build on it rather than
 opening a near-duplicate.
+
+Full-text `gh pr list --search` is noisy on a large repo; `gh pr list --author <login>` is more
+reliable (find the login with `gh pr view <a PR they merged> --json author`). Finding nothing does not
+mean nobody is on it — that information often lives only in chat — so put what you searched and "is
+anyone already on this?" to the user **before opening a worktree**, not after implementing.
 
 ## 10.10 Forward-looking code comments need a tracking-issue URL or a neutral rewrite *(Request changes)*
 

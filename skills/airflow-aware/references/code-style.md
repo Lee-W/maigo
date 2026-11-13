@@ -257,6 +257,18 @@ Airflow reviewers push back on literal-equality assertions. Distinct from
 `.rst` spell-check entry — that one is about coined nouns in doc prose; the codespell trap for
 deliberate misspellings in `.py` test values is in `python-aware/references/test-conventions.md`.
 
+## airflowctl: user-visible warnings go to stderr, not `log.*`
+
+Scope: a diff touching `airflow-ctl/src`. airflowctl never configures structlog, so `log.warning(...)`
+defaults to **stdout**; on a success path it puts a line in front of the JSON and breaks
+`airflowctl ... --output json | jq`. Write user-facing warnings with `sys.stderr.write(...)` (with
+enough context, such as the model name and the field), as `airflowctl/api/client.py` already does
+(see the "structlog would use stdout" comment around `sys.stderr.write(`).
+
+Test with `capsys` and assert **both** that stderr has the warning **and** that stdout is empty;
+`capture_logs` sees the structlog event but cannot prove which stream it went to, so the bug passes
+it. In review, a new `log.*` call that can run on a success path is a finding.
+
 ## Authoring
 
 ### No `dag_run.logical_date` in Airflow 3 examples

@@ -467,6 +467,26 @@ thing for them to clean up.
    delete the backup branch only when the hashes match.
 4. Don't push or open a PR; hand it back to the user.
 
+## A branch stacked on a feature that later merged: don't rebase the whole stack
+
+When the feature your branch was stacked on lands in `main` (squashed or rewritten), a plain rebase
+replays every stacked commit and stops on both-added conflicts whose resolution is just an older
+copy of what `main` has.
+
+1. Judge first whether `main` is newer: `git diff <branch-tip> origin/main -- <the feature's files>`.
+   If the branch holds content `main` lacks, decide it item by item; don't drop it wholesale.
+2. Before moving anything, create a backup ref at the old tip; if a rebase is already in progress
+   and has no resolved conflicts yet, `git rebase --abort`.
+3. Move only your own commits with `git rebase --onto origin/main <last commit to drop> <branch>`
+   (check that `<your first commit>^` is exactly that commit).
+4. For a conflicted `uv.lock`, take `main`'s version and re-lock with the repo-pinned uv; read the
+   diff to confirm only your own dependencies were added.
+5. Then catch up to `main`'s version of the feature: for each change `main` made to it after your
+   branch diverged, decide whether your commits need the same shape, and write down why when not.
+
+Stacking decisions up front are in
+[`commit-hygiene`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md).
+
 ## Before replying "fixed" / "linked it", confirm the PR head contains the commit
 
 A local commit isn't on the PR. Before drafting or posting a review reply that claims a fix or

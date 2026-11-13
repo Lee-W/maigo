@@ -186,6 +186,14 @@ backend's optional dependency added only to extras, guarding 353 lines of
 tests over a path that ships user commands/file contents to a third-party
 service).
 
+To run such a file while verifying, inject the package for that run only —
+`uv run --frozen --project providers/<name> --with '<pkg><floor>' python -m
+pytest <file> -q` (take the floor from the version the file's own
+`importorskip` expects; don't hardcode one here) — and check that the
+**collected count is non-zero and not all skipped**: a summary line that
+reads green while everything skipped proves nothing. The same `--with` must
+go into `.claude/test-command` (no `&&`; the hook has no shell).
+
 ## 3. Local-machine false reds
 
 These are environment states that make real, unmodified code look broken.
@@ -213,6 +221,26 @@ that write to localStorage, and **the losing set of files rotates between
 runs**. Tell a real regression apart from this pollution by running the
 suspect file alone with its own fresh store file: pollution passes in
 isolation, a real regression still fails.
+
+**Run one UI test file with `pnpm exec vitest run <file>`**, not
+`pnpm test -- <file>`: the package's `test` script is already `vitest run`
+and the extra argument does not narrow it, so the whole suite runs. The same
+form works in `.claude/test-command` (`pnpm --dir <ui dir> exec vitest run
+<file>`).
+
+### The airflow-ctl help-images hook fails at image build on a machine with no local CI image
+
+Touching `airflow-ctl/src/airflowctl/api/operations.py` triggers the
+`generate-airflowctl-help-images` hook, which lives in
+`airflow-ctl/.pre-commit-config.yaml` (not the root config). With no locally
+built CI image it exits 1 at the **image-build step**, before any help text
+is compared — that is an environment failure, not stale help. Help output is
+generated from method signatures, so check whether the diff touched any:
+`git diff --cached -U0 <operations.py> | grep -E '^[+-]\s*def '` (empty =
+no signature change). Then **stop and ask the user** how to proceed (for
+example building the image first with `breeze ci-image build`); don't decide
+on your own to bypass the hook, and say in the report that the hook did not
+run.
 
 ### Host `uv run` tests: one venv per worktree, and a locale-independent environment
 
@@ -683,6 +711,21 @@ ImportError` that only sets a flag so a test module still imports is not that
 shape, as long as a skipif gates the tests — see the 3.3-only SDK symbol
 section above.)
 
+**Vendor-drift tests compare both directions.** A test that diffs the
+installed vendor SDK's modules against the declared labels fails forward
+(installed module has no label) and backward (declared vendor missing from
+the installed version). Classify each new module one of three ways: gets a
+label and a declaration (driveable with an API key), goes in the
+unreachable-modules list (the model factory doesn't recognise it), or goes in
+the hook-incompatible list with its own available-from version constant
+(OAuth-only, can't be driven by the hook). When declaring a new vendor, raise
+`ALL_DECLARED_VENDORS_AVAILABLE_FROM` to the version where it first appears.
+Verify on both the locked version and the new one: `uv run --frozen --project
+<p> python -m pytest ...`, then the same command plus `--with
+'<sdk>==<new>'`. Use `python -m pytest` — a bare `pytest` resolves to the
+project venv's copy and silently ignores `--with` — and print the SDK version
+from the same environment to prove the swap took effect.
+
 **Don't stop at making the assertion pass.** Widening it in only one
 direction (e.g. dropping a strict two-way equality to a one-way subset check)
 just to get past the immediate red reopens the exact defect a two-directional
@@ -815,6 +858,8 @@ the rebase paragraph above needs.
   `uv sync --frozen --project providers/<p>` (touches only the ignored `.venv`,
   but removes other providers' packages — re-sync to test another provider).
   Editing `PATH` instead is an untested inference.
+  A `mypy-<project>` hook that reports `Failed` because of this never ran
+  mypy — treat it as *unverified*, not as a type error and not as clean.
 - **Bumping the repo's `uv` version: `dev/breeze/uv.lock` is a separate
   lock** (`uv` is a transitive dependency of `hatch` there, not listed in its
   `pyproject.toml`), easy to miss after the root files are updated. From

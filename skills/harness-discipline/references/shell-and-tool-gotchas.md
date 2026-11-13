@@ -199,6 +199,8 @@ harness 丟背景，最後曾觀察到回 `failed to get run log: stream error: 
 
 相關：第 1 節（glob 字元要加引號）與其「同源」小節（未加引號的變數不做 word splitting）。
 
+同源：以 `=` 開頭的字詞（例如分隔線 `echo ====`）會被 zsh 當 `=cmd` 展開成命令路徑而報錯，這類字串用單引號包住。
+
 ## 8. macOS 的 BSD `sed` 不認 `\b` `\s`：要 word boundary 用 `perl`，替換後要對帳
 
 **規則**：這台 macOS 的 `sed` 是 BSD 版，`-E` 下不支援 `\b`、`\s` 這類 GNU/PCRE 擴充。需要
