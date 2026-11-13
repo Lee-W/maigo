@@ -556,7 +556,7 @@ head 已變 → `head_changed`；`unchecked` → `acknowledge --undo`。最終 �
 👀 勾了卻沒有 report 或 head 已變：取消勾、加 `🔖`，並警告先 `/maigo:review <n>`。
 
 **學習訊號 `🔖`**：👀 行的 `checkbox_change == checked` 且行上沒有 `🧠` 時加 `🔖`（`learn_pending`），
-跨刷新保留；`--learn` 處理「(`[x]` 或 `🔖`) 且沒有 `🧠`」的行，完成後加 `🧠`、拿掉 `🔖`。
+跨刷新保留；`--learn` 處理沒有 `🧠` 且為「(`[x]` 或 `🔖`)」或「✅ 區 `merged`」的行，完成後加 `🧠`、拿掉 `🔖`。
 
 ## 4. 併入遷移（review-board.md 退役）
 

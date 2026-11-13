@@ -213,7 +213,7 @@ checkbox 清單。
 /maigo:board --reviews      # 現在要看的 PR：標題、貢獻者、最後 review 時間
 /maigo:board --reviewed <n...> # 等同勾 [x]：本地 ack 這版（不送 GitHub）、加 🔖
 /maigo:board --unreviewed <n...> # 等同取消勾：撤銷 ack
-/maigo:board --learn        # 盤點「(已勾 [x] 或 🔖) 且沒有 🧠」的項目
+/maigo:board --learn        # 盤點「(已勾 [x] 或 🔖) 或 merged 結案」且沒有 🧠 的項目
 /maigo:board --check <n...> # 只翻 [x]，效果等同在 nvim 手勾
 /maigo:board --uncheck <n...> # 只翻回 [ ]
 /maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄

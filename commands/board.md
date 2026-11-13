@@ -28,7 +28,7 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 /maigo:board --reviews      # 只顯示現在需要我看的 PR（標題、貢獻者、最後 review）
 /maigo:board --reviewed <n...> # 等同在 board 勾 [x]：本地 ack 這版 report、勾上、加 🔖；不送 GitHub
 /maigo:board --unreviewed <n...> # 等同取消勾：撤銷本地 ack、改回 [ ]
-/maigo:board --learn        # 對「已勾 [x] 或 🔖、但沒有 🧠」的項目跑學習盤點
+/maigo:board --learn        # 對「已勾 [x] 或 🔖、或 merged 結案」且沒有 🧠 的項目跑學習盤點
 /maigo:board --check <n...> # 只翻 [ ]→[x]（等同 nvim 手勾），下次刷新才判斷是否 ack
 /maigo:board --uncheck <n...> # 只翻 [x]→[ ]
 /maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄，之後刷新不再補回
@@ -249,8 +249,11 @@ checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`�
 
 ### 5. `--learn`
 
-`--learn` 不刷新其他項目，只處理 `.maigo/board.md` 裡「(`[x]` 或 `🔖`) 且沒有 `🧠`」的行
-（`🔖` 是學習訊號的持久化：👀 行被勾過之後即使自動取消勾，訊號也還在）。
+`--learn` 不刷新其他項目，只處理 `.maigo/board.md` 裡沒有 `🧠` 且符合下列任一條件的行：
+(`[x]` 或 `🔖`)，或在 `✅ 最近結案` 且狀態詞為 `merged`（不論有沒有勾）。
+（`🔖` 是學習訊號的持久化：👀 行被勾過之後即使自動取消勾，訊號也還在。merged 結案項目
+上的真人 review 與作者的修改本身就是可學的料，不需要先勾；`closed`、`已放棄` 不算。）
+刷新結尾的 `🧠 有 N 項…` 提示只計 (`[x]` 或 `🔖`) 的行，merged 結案項目不列入計數。
 orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條候選知識，接
 [`memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md)
 讓使用者確認；處理完（含沒有候選）就在該行加 `🧠`、移除 `🔖`。
