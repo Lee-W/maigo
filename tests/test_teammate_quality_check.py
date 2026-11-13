@@ -274,13 +274,27 @@ class TestTomoriPlanCriteria:
         self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ):
         self._write_plan(
-            tmp_path, "## Acceptance\n- [ ] `git diff | grep -c old_field` 為 0\n"
+            tmp_path,
+            "## Acceptance\n- [ ] `git diff` 的新增行中 `grep -c old_field` 為 0\n",
         )
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
             tqc.check_tomori(self.OUT)
         result = json.loads(capsys.readouterr().out.strip())
         assert result.get("decision") is None
+
+    def test_bare_git_diff_grep_criterion_in_plan_blocks(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        self._write_plan(
+            tmp_path, "## Acceptance\n- [ ] `git diff | grep -c old_field` 為 0\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            tqc.check_tomori(self.OUT)
+        result = json.loads(capsys.readouterr().out.strip())
+        assert result["decision"] == "block"
+        assert "字面 grep 當判準" in result["reason"]
 
     def test_missing_plan_file_fails_open(
         self, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
