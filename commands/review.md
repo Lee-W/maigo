@@ -87,7 +87,7 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 
 派 🩵 燈前，**orchestrator** 取 pr-context-cache 印出的 `rubric:` 路徑（沒跑 pr-context-cache 時由 orchestrator 呼叫
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric --topic "Review rubric: <PR title>" --url <PR url> --repo <owner/name> --owner <owner>` 並處理 ownership 結果，
-`--repo` 取值見「## 輸出」段的 `pr_context_cache.repo_slug()`；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo`/`--owner` 即可，路徑落在 `.maigo/pr/<id>/rubric.md`；有 PR 時自己的 PR 是 `.maigo/pr/<id>/rubric.md`、別人的是 `.maigo/review/<id>/rubric.md`），
+`--repo` 取目前 repo 的 `owner/name`（即 `pr_context_cache.py` 的 `repo_slug()`，來源是 `gh repo view --json nameWithOwner -q .nameWithOwner`；它是 cwd 所屬 repo、不是目標 PR 的 repo，與下方「## 輸出」段 `review_report.py publish --repo` 同值）；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo`/`--owner` 即可，路徑落在 `.maigo/pr/<id>/rubric.md`；有 PR 時自己的 PR 是 `.maigo/pr/<id>/rubric.md`、別人的是 `.maigo/review/<id>/rubric.md`），
 歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
 （目錄不存在由 orchestrator 先建立該路徑的父目錄），再把絕對路徑、原樣 H1 與 ownership status 交給 🩵 燈。她沒有 Bash，不執行 helper 或 `mkdir`。
 
@@ -349,4 +349,4 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - **裁決 gate（§4.5）與 Soyo propose 的關係**：gate 把「不適用+理由」導向 Soyo 的即時 propose；
   orchestrator 自己不寫記憶、不 soften review；記憶寫入唯一路徑是 Soyo propose → confirm flow。
   gate 在單一 PR 的 report 之後；平行預設下各 PR 的 gate 集中到全部審完後問一次（逐顆模式則在下一個 PR 的 go-ahead 之前）——不與批次推進混淆。
-- **A 步驟（§5 學習收尾）**：orchestrator 親跑、不開新 agent、只讀 GitHub（不回覆 / 不 resolve thread、不 push、不碰 GitHub 寫入）。
+- **步驟 5（學習收尾）**：orchestrator 親跑、不開新 agent、只讀 GitHub（不回覆 / 不 resolve thread、不 push、不碰 GitHub 寫入）。

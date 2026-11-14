@@ -42,7 +42,7 @@ allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py:*), Bash
 - `_archive/` 裡封存後超過 90 天的項目（tidy 封存時會把 mtime 重設成封存當下）（delete-candidate）。
 - catalog 判為 unregistered 的項目（`evals/`、`__titles.json` 這類）。
 - `.maigo/.maigo/`（hook 在子目錄 cwd 下長出的殘留）。
-- GitHub 狀態查不到的項目——查不到就不動。
+- GitHub 狀態查不到（`gh` 失敗、離線）的純數字 `pr/`、`review/`、`issue/` 項目——不自動封存，列為需勾選的封存候選，確認＝備份後封存。
 
 unregistered 項目與 `.maigo/.maigo/` 有三條路，每一項都要明講選哪一條：
 
@@ -86,7 +86,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py --apply --confirm .maigo/top
 
 ## 範圍與限制
 
-- 結案判定走 `gh pr view` / `gh issue view`，只認純數字 id；跨 repo 的 `<repo>-<n>` 查不到，列為「狀態查不到」。`gh` 失敗或離線時該項不動。
+- 結案判定走 `gh pr view` / `gh issue view`，只認純數字 id；跨 repo 的 `<repo>-<n>` 查不到，列為「狀態查不到」。`gh` 失敗或離線時該項不自動封存，列為需勾選。
 - 不碰 `board.md`、`_internal/board/`；board 的對帳與封存仍由 `/maigo:board` 負責。
 - 命令與 skill 的改動要開新 session 才看得到。
 

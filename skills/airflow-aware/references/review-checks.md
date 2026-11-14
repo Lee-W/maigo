@@ -1,9 +1,14 @@
 # Airflow review-time checks (strict-review items 10+)
 
-Loaded on demand by `skills/airflow-aware/SKILL.md` §10 — **review tasks only**
-(🟡 Soyo running `strict-review` on an Airflow diff). Each sub-check below becomes
-an item 10+ in the checklist output, with the stated Block / Request-changes severity.
-Outside of a review context (quick-fix / refactor), do not gate tasks on these.
+Loaded on demand by `skills/airflow-aware/SKILL.md` §10 and its index table. The
+10.x sub-checks are **review tasks only** (🟡 Soyo running `strict-review` on an
+Airflow diff). Each sub-check below becomes an item 10+ in the checklist output,
+with the stated Block / Request-changes severity. Outside of a review context
+(quick-fix / refactor), do not gate tasks on the 10.x sub-checks; the unnumbered
+release-tag check and DB portability sections are likewise review-only. The file's other
+sections (e.g. uv.lock drift diagnostic, `uv` version pin churn, example-Dag policy,
+migration PR conventions, secrets-masker tests) are read on demand when the task
+matches them.
 
 ## Contents
 

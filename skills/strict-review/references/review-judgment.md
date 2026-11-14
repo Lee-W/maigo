@@ -166,7 +166,7 @@ How to apply:
 - If a checker exists for the issue → run it and quote its output verbatim.
 - If no checker exists → state explicitly "based on grep, may include false
   positives" rather than presenting the count as authoritative.
-- Applies to `/maigo:fix` summaries, `/maigo:review` findings, and PR
+- Applies to `/maigo:quick` summaries, `/maigo:review` findings, and PR
   descriptions — anywhere a countable scope claim is made.
 
 ---

@@ -32,9 +32,9 @@ allowed-tools: Bash(gh --version:*), Bash(gh auth status:*), Bash(python3:*), Ba
 4. **Retry / failure 統計**（read-only，只讀不清）：讀 `.maigo/_internal/log/soyo-must-fix.jsonl`
    （🟡 爽世 must-fix 觸發，`teammate_quality_check.py` 寫入）與 `.maigo/_internal/log/test-failures.jsonl`
    （🟣 立希 test failure 觸發，`verify_completion.py` 寫入），彙整各 key 的觸發次數 + 最近
-   3 筆摘要。**兩個 log 都在當前 repo 根目錄的 `.maigo/_internal/log/` 底下**；新路徑沒有檔時退回讀舊的頂層 `.maigo/<name>`（新舊都在時只讀新的，舊檔由 `/maigo:tidy` 搬）。不存在或是空的 → 印正常訊息
+   3 筆摘要。**兩個 log 都在當前 repo 根目錄的 `.maigo/_internal/log/` 底下**；新舊兩個位置（舊的頂層 `.maigo/<name>`）都有檔時一起讀（舊在前、新在後），舊檔由 `/maigo:tidy` 搬進 `_internal/log/`。不存在或是空的 → 印正常訊息
    （新環境 / 還沒觸發過 retry 本來就不該有），不算 error。
-5. **Token usage**（read-only）：讀 `.maigo/_internal/log/token-usage.jsonl`（同樣退回舊的頂層路徑），彙整最近 7 天總量並依角色／model
+5. **Token usage**（read-only）：讀 `.maigo/_internal/log/token-usage.jsonl`（同樣新舊兩個位置都有檔時一起讀，以 `session_id`＋`agent_id` 去重、新檔優先），彙整最近 7 天總量並依角色／model
    分組。只採用 harness 已提供的 foreground subagent metadata；背景 agent、Codex 或舊版 harness
    沒資料時標示 unavailable，不自行估算、不算 error。
 6. **`.maigo/` 型錄**（read-only，只列不刪）：呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_dir_catalog.py"`
