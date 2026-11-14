@@ -20,6 +20,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -160,23 +161,58 @@ def detect_test_command(cwd: Path) -> list[str] | None:
     return None
 
 
+def _kill_process_group(proc: subprocess.Popen[bytes]) -> None:
+    """逾時時連孫行程一起殺；非 POSIX 或群組殺不到就退回只殺直接子行程。
+
+    macOS 對「已退出但尚未 wait」的群組長 killpg 會丟 PermissionError，與群組已不在
+    （ProcessLookupError）一樣處理；退路 kill() 也不讓例外往外拋（hook fail-open）。
+    """
+    if os.name == "posix":
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+            return
+        except (ProcessLookupError, PermissionError):
+            pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+
+
+def _reap_after_timeout(proc: subprocess.Popen[bytes]) -> None:
+    """只 wait 直接子行程並關閉管線：不再 communicate()，否則逃出群組、仍握著管線的孫行程會卡住 hook。"""
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    for pipe in (proc.stdout, proc.stderr):
+        if pipe is not None:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+
 def run_command(cmd: list[str], cwd: Path) -> tuple[int, str]:
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=str(cwd),
-            capture_output=True,
-            timeout=TEST_TIMEOUT_SEC,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=(os.name == "posix"),
         )
-        out = (proc.stdout + proc.stderr).decode("utf-8", errors="replace")
-        return proc.returncode, out
     except FileNotFoundError:
         return -1, f"command not found: {cmd[0]}"
-    except subprocess.TimeoutExpired:
-        return -1, f"timeout after {TEST_TIMEOUT_SEC}s: {' '.join(cmd)}"
     except OSError as exc:
         return -1, f"cannot run {' '.join(cmd)}: {exc}"
+    try:
+        stdout, stderr = proc.communicate(timeout=TEST_TIMEOUT_SEC)
+    except subprocess.TimeoutExpired:
+        _kill_process_group(proc)
+        _reap_after_timeout(proc)
+        return -1, f"timeout after {TEST_TIMEOUT_SEC}s: {' '.join(cmd)}"
+    return proc.returncode, (stdout + stderr).decode("utf-8", errors="replace")
 
 
 def _scan_pytest_id(text: str, start: int) -> int | None:

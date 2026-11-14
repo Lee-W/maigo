@@ -454,7 +454,7 @@ message 強調「這不是 test fail，是 import 錯」。
 ### Timeout
 
 預設 90 秒（hook 自身 timeout 120 秒，留 30 秒 buffer）。
-編輯 `TEST_TIMEOUT_SEC` 常數可調。
+編輯 `TEST_TIMEOUT_SEC` 常數可調。逾時會終止測試指令的整個行程群組，不留孫行程。
 
 ### 偵測到專案類型但無可跑的測試（**不** fail-open）
 

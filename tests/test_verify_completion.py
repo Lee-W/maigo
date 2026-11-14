@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -484,6 +488,110 @@ class TestMain:
         payload = {"cwd": str(tmp_path)}
         result = run_hook_main(verify_completion, payload, monkeypatch, capsys)
         assert result.get("decision") is None
+
+
+class TestRunCommandTimeout:
+    @staticmethod
+    def _alive(pid: int) -> bool:
+        stat = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        return bool(stat) and not stat.startswith("Z")
+
+    def test_timeout_kills_grandchild_process_group(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(verify_completion, "TEST_TIMEOUT_SEC", 1)
+        pidfile = tmp_path / "grandchild.pid"
+        try:
+            code, out = verify_completion.run_command(
+                ["sh", "-c", f"sleep 300 & echo $! > {pidfile}; wait"], tmp_path
+            )
+            assert code == -1
+            assert "timeout after" in out
+            pid = int(pidfile.read_text().strip())
+            deadline = time.monotonic() + 3
+            while self._alive(pid) and time.monotonic() < deadline:
+                time.sleep(0.1)
+            assert not self._alive(pid), f"grandchild {pid} survived the timeout"
+        finally:
+            if pidfile.exists():
+                try:
+                    os.kill(int(pidfile.read_text().strip()), signal.SIGKILL)
+                except (ProcessLookupError, ValueError):
+                    pass
+
+    def test_timeout_does_not_wait_for_grandchild_that_escaped_the_group(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(verify_completion, "TEST_TIMEOUT_SEC", 1)
+        pidfile = tmp_path / "escaped.pid"
+        code = (
+            "import subprocess, time\n"
+            "p = subprocess.Popen(['sleep', '8'], start_new_session=True)\n"
+            f"open({str(pidfile)!r}, 'w').write(str(p.pid))\n"
+            "time.sleep(60)\n"
+        )
+        try:
+            started = time.monotonic()
+            result = verify_completion.run_command(
+                [sys.executable, "-c", code], tmp_path
+            )
+            elapsed = time.monotonic() - started
+            assert result[0] == -1 and "timeout after" in result[1]
+            assert elapsed < 4, (
+                f"run_command blocked {elapsed:.1f}s on an escaped grandchild"
+            )
+        finally:
+            if pidfile.exists():
+                try:
+                    os.kill(int(pidfile.read_text().strip()), signal.SIGKILL)
+                except (ProcessLookupError, ValueError):
+                    pass
+
+    def test_timeout_survives_killpg_permission_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(verify_completion, "TEST_TIMEOUT_SEC", 1)
+
+        def deny(pgid: int, sig: int) -> None:
+            raise PermissionError(1, "Operation not permitted")
+
+        monkeypatch.setattr(verify_completion.os, "killpg", deny)
+        pidfile = tmp_path / "leader.pid"
+        try:
+            code, out = verify_completion.run_command(
+                ["sh", "-c", f"echo $$ > {pidfile}; exec sleep 300"], tmp_path
+            )
+            assert code == -1 and "timeout after" in out
+            pid = int(pidfile.read_text().strip())
+            deadline = time.monotonic() + 3
+            while self._alive(pid) and time.monotonic() < deadline:
+                time.sleep(0.1)
+            assert not self._alive(pid)
+        finally:
+            if pidfile.exists():
+                try:
+                    os.kill(int(pidfile.read_text().strip()), signal.SIGKILL)
+                except (ProcessLookupError, ValueError):
+                    pass
+
+    def test_normal_run_returns_exit_code_and_output(self, tmp_path: Path):
+        code, out = verify_completion.run_command(
+            ["sh", "-c", "echo out; echo err >&2; exit 3"], tmp_path
+        )
+        assert code == 3
+        assert "out" in out and "err" in out
+
+    def test_missing_command_reports_not_found(self, tmp_path: Path):
+        code, out = verify_completion.run_command(
+            ["definitely-not-a-real-command-xyz"], tmp_path
+        )
+        assert code == -1
+        assert "command not found" in out
 
 
 # ---------------------------------------------------------------------------
