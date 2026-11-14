@@ -65,7 +65,7 @@ unregistered 項目與 `.maigo/.maigo/` 有三條路，每一項都要明講選�
 
 使用者看過清單、同意規則型動作之後，才跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_tidy.py --apply`。
 動手前腳本會把每個要動的路徑備份到 `.maigo/_internal/tidy/backup/<UTC ts>/`（相對 `.maigo/` 的原路徑），
-備份完才開始搬；改寫用 tmp ＋ rename。回報備份目錄與每一筆結果。
+備份完才開始搬；改寫用 tmp ＋ rename。點名的項目若在另一個被點名的目錄之下，備份與動作只做最外層，結果會列出哪些項目隨哪個父項處理。回報備份目錄與每一筆結果。
 
 ### 3. 需要勾選的項目：逐項問
 

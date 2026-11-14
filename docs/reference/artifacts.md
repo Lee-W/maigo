@@ -143,7 +143,7 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 | `.maigo/.maigo/` | hook 在子目錄 cwd 下的殘留 | 一律視為殘留 | 同上（刪除或封存）；要合併回上層請手動處理 |
 
 規則型動作之外沒有「全部同意」的開關：刪除類與 `topic/` 封存只對 `--confirm` 點名的那一筆動手。
-每個動作前都先備份到 `_internal/tidy/backup/<UTC ts>/`。
+每個動作前都先備份到 `_internal/tidy/backup/<UTC ts>/`。點名的項目若在另一個被點名的目錄之下，備份與動作只做最外層，結果會列出哪些項目隨哪個父項處理。
 
 ## 非 markdown 機器狀態檔
 

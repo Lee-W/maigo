@@ -481,7 +481,33 @@ def _backup_rels(
         if action.kind in ("move-internal-log", "rotate-log") and action.target:
             rels.append(_rel(action.target))
     rels.extend(_rel(rewrite.detail_path) for rewrite in link_rewrites)
-    return list(dict.fromkeys(rels))
+    unique = list(dict.fromkeys(rels))
+    # 只留最外層：子路徑隨父目錄一起備份，單獨再備份會撞到已存在的目的地。
+    return [
+        rel
+        for rel in unique
+        if not any(rel.startswith(other + "/") for other in unique if other != rel)
+    ]
+
+
+ABSORBING_KINDS = frozenset(
+    {"archive", "delete-candidate", "unregistered", "remove-nested-dot-maigo"}
+)
+
+
+def _absorbed_children(todo: list[TidyAction]) -> dict[int, str]:
+    """被另一筆「整個目錄會被搬走或刪除」的動作涵蓋的子動作：索引 → 父路徑。"""
+    parents = [a for a in todo if a.kind in ABSORBING_KINDS]
+    absorbed: dict[int, str] = {}
+    for index, action in enumerate(todo):
+        child = _rel(action.path)
+        for parent in parents:
+            if parent is action:
+                continue
+            if child.startswith(_rel(parent.path) + "/"):
+                absorbed[index] = parent.path
+                break
+    return absorbed
 
 
 def _apply_migrate(
@@ -597,6 +623,7 @@ def apply(
     if not todo:
         return []
 
+    absorbed = _absorbed_children(todo)
     migrations = _migration_items(todo, repo_root)
     link_rewrites = (
         migrate.plan_link_rewrites(repo_root, migrations) if migrations else []
@@ -605,12 +632,15 @@ def apply(
         _backup(maigo_dir, backup_root, rel)
 
     results: list[str] = []
+    parent_outcome: dict[str, str] = {}
     try:
         if migrations:
             results.extend(_apply_migrate(migrations, link_rewrites, repo_root))
-        for action in todo:
+        for index, action in enumerate(todo):
             if action.kind == "migrate":
                 continue
+            if index in absorbed:
+                continue  # 父項的結果出來後才寫（子項可能排在父項前面）
             if action.kind == "move-internal-log":
                 results.append(_apply_move_internal_log(action, maigo_dir))
             elif action.kind == "rotate-log":
@@ -630,6 +660,32 @@ def apply(
                 results.append(
                     f"{action.kind}：已刪除 {action.path}（備份在 {backup_root.name}/）"
                 )
+            if action.path in absorbed.values():
+                parent_outcome[action.path] = (
+                    "skipped"
+                    if results[-1].startswith(f"{action.kind} 略過")
+                    else "archived"
+                    if action.kind == "archive"
+                    or (
+                        action.kind in ARCHIVE_CONFIRM_KINDS
+                        and _norm(action.path) in archive_approved
+                    )
+                    else "deleted"
+                )
+        for index in sorted(absorbed):
+            action, parent = todo[index], absorbed[index]
+            head = f"{action.kind} 略過：{action.path}"
+            outcome = parent_outcome.get(parent, "deleted")
+            if outcome == "skipped":
+                results.append(f"{head}（父項 {parent} 被略過，子項未動）")
+            elif outcome == "deleted" and _norm(action.path) in archive_approved:
+                results.append(
+                    f"{head}（點名封存，但父項 {parent} 已被刪除，子項隨之刪除；"
+                    f"備份在 {backup_root.name}/）"
+                )
+            else:
+                verb = "封存" if outcome == "archived" else "刪除"
+                results.append(f"{head}（已隨 {parent} 一併{verb}）")
     except BaseException:
         print("## 執行結果（中途中斷，以下是已完成的動作）")
         print("\n".join(f"- {line}" for line in results) if results else "- （無）")

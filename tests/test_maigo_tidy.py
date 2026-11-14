@@ -552,6 +552,91 @@ def test_backup_target_already_present_refuses_to_reuse(tmp_path):
     assert (maigo / "evals" / "a.json").read_text() == "changed\n"
 
 
+PARENT = ".maigo/topic/foo"
+CHILD = ".maigo/topic/foo/rubric.md"
+
+
+def make_parent_and_child(tmp_path: Path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "topic" / "foo" / "rubric.md", "rubric\n")
+    actions = build(maigo)
+    assert by_path(actions, PARENT).kind == "archive"
+    assert by_path(actions, CHILD).kind == "unregistered"
+    return maigo, actions
+
+
+def test_confirm_parent_and_child_together_applies_once(tmp_path):
+    maigo, actions = make_parent_and_child(tmp_path)
+    results = run_apply(maigo, actions, confirmed={PARENT, CHILD})
+    assert (maigo / "_archive" / "topic" / "foo" / "plan.md").is_file()
+    assert (maigo / "_archive" / "topic" / "foo" / "rubric.md").is_file()
+    assert not (maigo / "topic" / "foo").exists()
+    backup = backup_of(maigo) / "topic" / "foo"
+    assert (backup / "plan.md").is_file() and (backup / "rubric.md").is_file()
+    assert any(CHILD in line and PARENT in line and "略過" in line for line in results)
+
+
+def test_confirm_child_before_parent_order_does_not_matter(tmp_path):
+    maigo, actions = make_parent_and_child(tmp_path)
+    child_first = sorted(actions, key=lambda a: a.path != CHILD)
+    assert child_first[0].path == CHILD
+    results = run_apply(maigo, child_first, confirmed={CHILD, PARENT})
+    assert (maigo / "_archive" / "topic" / "foo" / "rubric.md").is_file()
+    assert not (maigo / "topic" / "foo").exists()
+    assert any(CHILD in line and PARENT in line and "略過" in line for line in results)
+
+
+def test_child_confirm_archive_with_parent_confirm_is_absorbed(tmp_path):
+    maigo, actions = make_parent_and_child(tmp_path)
+    results = run_apply(maigo, actions, confirmed={PARENT}, archive_confirmed={CHILD})
+    assert (maigo / "_archive" / "topic" / "foo" / "rubric.md").is_file()
+    assert not (maigo / "topic" / "foo").exists()
+    assert any(CHILD in line and PARENT in line and "略過" in line for line in results)
+
+
+def test_absorbed_child_archive_under_deleted_parent_says_it_was_deleted(tmp_path):
+    maigo = make_maigo(tmp_path)
+    parent = tidy.TidyAction("unregistered", ".maigo/evals", None, "r", True)
+    child = tidy.TidyAction("unregistered", ".maigo/evals/a.json", None, "r", True)
+    results = run_apply(
+        maigo,
+        [parent, child],
+        confirmed={parent.path},
+        archive_confirmed={child.path},
+    )
+    assert not (maigo / "evals").exists()
+    assert not (maigo / "_archive" / "evals").exists()
+    line = next(r for r in results if child.path in r)
+    assert parent.path in line and "刪除" in line and "一併處理" not in line
+
+
+def test_absorbed_child_is_not_reported_handled_when_parent_was_skipped(tmp_path):
+    maigo, actions = make_parent_and_child(tmp_path)
+    write(maigo / "_archive" / "topic" / "foo" / "keep.md", "kept\n")
+    results = run_apply(maigo, actions, confirmed={PARENT, CHILD})
+    assert (maigo / "topic" / "foo" / "rubric.md").is_file()
+    line = next(r for r in results if r.startswith("unregistered") and CHILD in r)
+    assert PARENT in line and "未動" in line and "一併處理" not in line
+
+
+def test_absorbed_child_is_not_removed_twice(tmp_path, monkeypatch):
+    maigo, actions = make_parent_and_child(tmp_path)
+    removed: list[str] = []
+    archived: list[str] = []
+    real_archive = tidy.board_sync.archive_relpaths
+
+    monkeypatch.setattr(tidy, "_remove", lambda path: removed.append(str(path)))
+
+    def spy_archive(root, rels):
+        archived.extend(rels)
+        return real_archive(root, rels)
+
+    monkeypatch.setattr(tidy.board_sync, "archive_relpaths", spy_archive)
+    run_apply(maigo, actions, confirmed={PARENT, CHILD})
+    assert not any(path.endswith("rubric.md") for path in removed)
+    assert [rel for rel in archived if rel.startswith("topic/")] == ["topic/foo"]
+
+
 def test_apply_prints_completed_results_before_reraising(tmp_path, monkeypatch, capsys):
     maigo = make_maigo(tmp_path)
 
