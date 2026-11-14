@@ -96,6 +96,37 @@ class TestFindLiteralGrepCriteria:
         assert len(find_literal_grep_criteria("- `grep -c foo x` 等於 0")) == 1
         assert len(find_literal_grep_criteria("- `rg foo` count equals 0")) == 1
 
+    @pytest.mark.parametrize(
+        "tail",
+        [
+            pytest.param("的輸出不為 0", id="not_wei_zero"),
+            pytest.param("的輸出不為0", id="not_wei_zero_nospace"),
+            pytest.param("的輸出不為零", id="not_wei_zero_zh"),
+            pytest.param("的輸出不得為 0", id="not_de_wei_zero"),
+            pytest.param("的輸出不應為 0", id="not_ying_wei_zero"),
+            pytest.param("的輸出不會回 0", id="not_hui_hui_zero"),
+            pytest.param("的輸出不回 0", id="not_hui_zero"),
+            pytest.param("的輸出 != 0", id="bang_equals_zero"),
+            pytest.param("的輸出 ≠ 0", id="neq_sign_zero"),
+        ],
+    )
+    def test_negated_zero_assertion_forms_pass(self, tail: str):
+        assert find_literal_grep_criteria(f"- `grep -c foo x.py` {tail}") == []
+
+    @pytest.mark.parametrize(
+        "tail",
+        [
+            pytest.param("的輸出為 0", id="wei_zero"),
+            pytest.param("的輸出回 0", id="hui_zero"),
+            pytest.param("的輸出必須是 0", id="must_be_zero"),
+            pytest.param("的輸出 = 0", id="eq_zero"),
+            pytest.param("的輸出應為 0", id="ying_wei_zero"),
+        ],
+    )
+    def test_affirmative_zero_forms_still_flagged(self, tail: str):
+        line = f"- `grep -c foo x.py` {tail}"
+        assert len(find_literal_grep_criteria(line)) == 1
+
     def test_exit_code_zero_criterion_without_search_command_is_not_flagged(self):
         line = "驗收條件：測試結束碼必須等於 0；the exit code must equal 0"
         assert find_literal_grep_criteria(line) == []
