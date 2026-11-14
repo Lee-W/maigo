@@ -126,6 +126,17 @@ class TestCategorize:
         assert catalog.nested == [path]
         assert catalog.unregistered == []
 
+    def test_pr_and_issue_plan_are_nested(self):
+        names = ["pr/7/plan.md", "pr/7/plan-2.md", "issue/5/plan.md"]
+        catalog = mdc.categorize(names)
+        assert sorted(catalog.nested) == sorted(names)
+        assert catalog.unregistered == []
+
+    def test_topic_plan_is_not_a_scan_category(self):
+        catalog = mdc.categorize(["topic/foo/plan.md"])
+        assert catalog.nested == []
+        assert catalog.unregistered == ["topic/foo/plan.md"]
+
     def test_pr_group_unknown_stem_is_unregistered(self):
         catalog = mdc.categorize(["pr/7/unknown.md"])
         assert catalog.unregistered == ["pr/7/unknown.md"]
@@ -203,6 +214,33 @@ class TestScan:
         catalog = mdc.scan(tmp_path / ".maigo")
 
         assert catalog.nested == ["pr/7/reply-draft.md"]
+
+    def test_scan_recognises_pr_and_issue_plan_on_disk(self, tmp_path: Path):
+        maigo_dir = tmp_path / ".maigo"
+        for rel in (
+            "pr/12/plan.md",
+            "pr/12/plan-2.md",
+            "pr/12/reply-draft.md",
+            "pr/12/bogus.md",
+            "issue/5/plan.md",
+            "issue/5/rubric.md",
+            "topic/foo/plan.md",
+            "review/9/review.md",
+        ):
+            path = maigo_dir / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# x\n", encoding="utf-8")
+
+        catalog = mdc.scan(maigo_dir)
+
+        assert {
+            "pr/12/plan.md",
+            "pr/12/plan-2.md",
+            "issue/5/plan.md",
+        } <= set(catalog.nested)
+        assert catalog.unregistered == ["pr/12/bogus.md"]
+        assert "topic/foo/plan.md" not in catalog.nested
+        assert "topic/foo/plan.md" not in catalog.unregistered
 
     def test_does_not_descend_past_two_levels(self, tmp_path: Path):
         maigo_dir = tmp_path / ".maigo"

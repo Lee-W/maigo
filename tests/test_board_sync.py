@@ -475,6 +475,43 @@ class TestReconcileArtifacts:
             "review/other-5/rubric.md",
         } <= skipped
 
+    def test_pr_plan_is_own_artifact_not_unregistered(self, tmp_path):
+        maigo = tmp_path / ".maigo"
+        (maigo / "pr" / "12").mkdir(parents=True)
+        (maigo / "pr" / "12" / "plan.md").write_text("# Plan: x\n")
+        candidates, unattributed, errors = sync.reconcile_artifacts(maigo, REPO)
+        assert errors == [] and candidates == []
+        assert unattributed == [
+            {
+                "path": "pr/12/plan.md",
+                "category": "nested",
+                "reason": "自己的 PR 產物，不是 👀 候選",
+            }
+        ]
+
+    def test_issue_plan_only_becomes_derived_candidate(self, tmp_path):
+        maigo = tmp_path / ".maigo"
+        (maigo / "issue" / "5").mkdir(parents=True)
+        (maigo / "issue" / "5" / "plan.md").write_text("# Plan: x\n")
+        candidates, unattributed, errors = sync.reconcile_artifacts(maigo, REPO)
+        assert errors == [] and unattributed == []
+        assert candidates == [
+            {
+                "url": url(5, "issues"),
+                "artifact_source": "derived",
+                "type_hint": "🐛",
+            }
+        ]
+
+    def test_issue_plan_with_rubric_is_still_one_candidate(self, tmp_path):
+        maigo = tmp_path / ".maigo"
+        (maigo / "issue" / "5").mkdir(parents=True)
+        (maigo / "issue" / "5" / "plan.md").write_text("# Plan: x\n")
+        (maigo / "issue" / "5" / "rubric.md").write_text("# Triage rubric: x\n")
+        candidates, unattributed, errors = sync.reconcile_artifacts(maigo, REPO)
+        assert errors == [] and unattributed == []
+        assert [c["url"] for c in candidates] == [url(5, "issues")]
+
     def test_own_pr_artifacts_are_not_review_candidates(self, tmp_path):
         own = report.publish(
             tmp_path, url(12), REPO, "Mine", "## A\nx\n", HEAD, "APPROVE", owner="mine"

@@ -1100,6 +1100,18 @@ class TestCli:
         assert ".maigo/review/58543/review.md" in captured.out
         assert "[normalized from airflow-58543]" in captured.out
 
+    def test_pr_and_issue_plan_are_not_reported_as_skipped(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        for rel in ("pr/12/plan.md", "issue/5/plan.md", "pr/12/bogus.md"):
+            path = repo / ".maigo" / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# x\n", encoding="utf-8")
+
+        lines = list(mla._iter_skip_lines(str(repo), scan(repo / ".maigo")))
+
+        assert [line for line in lines if "plan.md" in line] == []
+        assert any("pr/12/bogus.md" in line for line in lines)
+
     def test_skipped_categories_are_reported_with_reasons(self, tmp_path: Path, capsys):
         repo = _make_repo(tmp_path)
         (repo / ".maigo" / "board.md").write_text("# Work Board\n", encoding="utf-8")

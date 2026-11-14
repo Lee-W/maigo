@@ -15,7 +15,9 @@ import _KNOWN_KINDS`，這是唯一正典來源；平行維護第二份清單正
 
 (a) 巢狀佈局：`<group>/<id>/<stem>[-<attempt>].md`，`(group, stem)` 對得上
     `artifact_path.nested_locations()` 的某個 kind（例：`review/58543/rubric.md`、
-    `pr/58543/reply-draft.md`、`issue/12/rubric-2.md`）→ `nested`。
+    `pr/58543/reply-draft.md`、`issue/12/rubric-2.md`、`pr/58543/plan.md`）→ `nested`。
+    `plan` 在 `pr/`、`issue/` 兩個 group 也算巢狀；`topic/<slug>/plan.md` 不進
+    `scan()`（只有 `scan_tree()` 認得）。
 (b) 巢狀 kind 的分目錄前扁平檔：`<kind>-<id>.md`，`kind` 屬於巢狀 kind
     （例：`review-42.md`、`review-rubric-42.md`）→ `flat_identifier`，待遷移。
 (c) 非巢狀 kind（目前只有 `plan`）的識別碼命名：`<kind>-<id>.md`
@@ -80,9 +82,12 @@ INTERNAL_DIR = "_internal"
 # （如 "review-rubric-42.md"）。
 _KINDS_BY_LENGTH_DESC = tuple(sorted(_KNOWN_KINDS, key=len, reverse=True))
 
+# `plan` 刻意不在 `_NESTED_LAYOUT`，但 `pr/<id>/plan.md`、`issue/<id>/plan.md` 是正典
+# 巢狀產物，所以併進來；`topic/` 不納入 `scan()`（只有 `scan_tree()` 看得到）。
+_TOPIC_GROUP = "topic"
 _ALL_NESTED_LOCATIONS = {
     location for kind in _NESTED_LAYOUT for location in nested_locations(kind)
-}
+} | {location for location in nested_locations("plan") if location[0] != _TOPIC_GROUP}
 _NESTED_GROUP_STEMS = set(_ALL_NESTED_LOCATIONS)
 _NESTED_GROUP_NAMES = sorted({group for group, _stem in _ALL_NESTED_LOCATIONS})
 _ATTEMPT_SUFFIX_RE = re.compile(r"-\d+$")
@@ -205,7 +210,8 @@ def categorize(names: list[str]) -> Catalog:
 def scan(maigo_dir: str | Path) -> Catalog:
     """
     對給定的 `.maigo/` 目錄做唯讀掃描：頂層 `*.md` 檔，加上兩層遞迴
-    `review/*/*.md`、`pr/*/*.md` 與 `issue/*/*.md`（不進 `i/`，其他深度一律不收）。
+    `review/*/*.md`、`pr/*/*.md` 與 `issue/*/*.md`（不進 `i/` 與 `topic/`，其他深度一律不收）；
+    `pr/*/plan[-n].md`、`issue/*/plan[-n].md` 與其他巢狀 kind 一樣歸 `nested`。
 
     目錄不存在時回傳全空的 `Catalog`（不建立目錄，不當錯誤）。
     """
