@@ -71,8 +71,18 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |
-| `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` 裁決 gate） | 同上 | inline review comment 的草稿正本，裁決 gate 用；隨 PR 目錄一起封存 |
+| `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` §4.5） | `scripts/artifact_path.py`（kind `inline-comments`，`_KNOWN_KINDS`）＋ [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) 的草稿格式規則 | 待手動貼上 GitHub 的 inline comment 草稿，不送出；重審同一顆 PR 時直接改寫成最新狀態；隨 PR 目錄一起被 `/maigo:tidy` 封存 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
+
+### `inline-comments.md` 格式
+
+- 路徑：別人的 PR 在 `.maigo/review/<id>/inline-comments.md`，自己的 PR 在 `.maigo/pr/<id>/inline-comments.md`。
+- 第一行寫明所依據的 head SHA；其後每則留言一個 `## <repo 相對路徑>:<行號>` 標題；標題下一行是該位置的 Files 分頁連結（`https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(路徑)>R<行號>`）；空一行後是要貼上的留言內文。
+- 標題的行號只供你定位貼上；內文以 symbol 指涉、不寫行號。作者再 push 後要對新 head 重核行號並重產連結。
+- 每則 1 到 3 句。
+- 重審同一顆 PR 直接改寫成單一最新狀態，不留 `.bak-<日期>`、`.old` 或加後綴的副本、不另開檔；沒有可貼的 comment 時，head 那行下補一行原因。
+- 只起草、不送出；結案隨 PR 目錄封存（見下方生命週期表）。
+- 舊固定檔名 `.maigo/inline-comments.md` 會被 `legacy_artifact_path_check` 擋。
 
 `review_report.py publish` 先原子寫入最新 `review.md`，才清理同目錄 `review-N.md` 與
 `.maigo/review-<id>.md` 中可確認同 source 的舊報告；未知歸屬、較新的 timestamp、
@@ -132,7 +142,7 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 
 | 產物 | owner | 結案條件 | 去向 |
 |------|-------|----------|------|
-| `pr/<id>/`、`review/<id>/`、`issue/<id>/` | 該 PR／issue 的處理者（orchestrator 與 agent 寫入） | id 是純數字，且 GitHub 狀態是 merged 或 closed（`gh pr view`／`gh issue view`）；查不到就不動，非純數字的 id（`<repo>-<n>`、slug）不逐筆列、在統計段彙總一行 | 鏡射搬到 `_archive/<原相對路徑>`（規則型，`--apply` 會做） |
+| `pr/<id>/`、`review/<id>/`、`issue/<id>/` | 該 PR／issue 的處理者（orchestrator 與 agent 寫入） | id 是純數字，且 GitHub 狀態是 merged 或 closed（`gh pr view`／`gh issue view`）；查不到（`gh` 失敗、離線）的純數字項目不會自動封存，會列在「需你勾選」清單（確認＝備份後封存）；非純數字的 id（`<repo>-<n>`、slug）不逐筆列、在統計段彙總一行 | 鏡射搬到 `_archive/<原相對路徑>`（規則型，`--apply` 會做） |
 | `i/<id>.md` | `/maigo:board` | id 是純數字且對應 PR／issue merged 或 closed；`<repo>-<n>` 形的由 `/maigo:board` 處理，tidy 只在統計段彙總 | 同上 |
 | `topic/<slug>/` | 寫 plan 的人 | 沒有外部訊號可查，只能由你勾選 | 勾選後封存到 `_archive/topic/<slug>/` |
 | 頂層舊檔（`plan.md`、`plan-<id>.md`、`<kind>-<id>.md` …） | 升級前的 maigo | 一律視為待遷移 | 遷移成巢狀佈局（規則型） |

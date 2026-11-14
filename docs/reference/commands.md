@@ -1,6 +1,6 @@
 # Commands Reference
 
-Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md`。
+Maigo 提供十六個命令，所有命令的 source-of-truth 是 `commands/*.md`。
 本頁是 quick reference。
 
 ## `/maigo:go` — 開發新功能 / 修 bug
@@ -9,7 +9,10 @@ Maigo 提供十五個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 ```
 /maigo:go <任務描述>
+/maigo:go --worktree <任務描述>   # opt-in：在獨立 worktree 裡跑整趟流程
 ```
+
+`--worktree` 預設不開；帶旗標時在 🐱 樂奈之前建 `<repo>/.worktrees/<topic>` 的獨立 worktree，整趟流程在裡面跑，收尾印出 worktree 路徑與 branch。細節見 [`commands/go.md`](../commands/go.md)。
 
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
@@ -95,6 +98,7 @@ Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真�
 /maigo:review feature/email-validation                 # 本地 branch（vs main）
 /maigo:review HEAD~3..HEAD                             # commit range
 /maigo:review                                          # 預設目前 branch vs main
+/maigo:review --bilingual <target>                     # 雙語輸出（最終 report 前加 Taiwanese Mandarin 快結）
 ```
 
 **Mode（optional）：**
@@ -104,6 +108,8 @@ Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真�
 | `full`（預設） | 9 項全跑 | ✅ | 一般 PR review |
 | `--mode=design-preview` | 1 + 4 | skip | 早期設計討論、介面預審 |
 | `--mode=compliance-only` | 4/5/6/7/8 | ✅ | 安全 audit、規範對焦 |
+
+`--bilingual` 是輸出層旗標，與 `--mode` 正交：帶旗標，或 repo-detect 偵測到 `apache/airflow` 時自動觸發，最終 report 前加一段 Taiwanese Mandarin 快結；非 Airflow repo 顯式傳入也照樣執行。review 會產出 `draft.md` 與 `inline-comments.md`，只起草、不由 maigo 送出，格式見 [Artifacts Reference](artifacts.md)。
 
 | Stage | Agent | 做什麼 |
 |-------|-------|--------|
@@ -217,7 +223,10 @@ checkbox 清單。
 /maigo:board --check <n...> # 只翻 [x]，效果等同在 nvim 手勾
 /maigo:board --uncheck <n...> # 只翻回 [ ]
 /maigo:board --drop <n...>  # 不追了，移進 ✅ 最近結案（狀態詞 已放棄），並寫入排除紀錄
+/maigo:board --cross-repo   # 本地刷新照舊，額外產出跨 repo 總索引
 ```
+
+`--cross-repo` 是 opt-in：本地刷新照舊，額外讀 `~/.config/maigo/repos.txt`（可用 `board_index.py` 的 `--repo-list` 指定；一行一個 repo 的絕對路徑）列出的各 repo，產出 `~/.config/maigo/board-index.md` 跨 repo 總索引；全程只讀，不改任何被掃描 repo 的內容。
 
 刷新會做三件事（解析、對帳與渲染都在 `scripts/board_sync.py` / `scripts/board_refresh.py`；`refresh --apply` 會用 CAS 原子寫回 board 與細節檔，衝突時不寫；也可以從 shell 直接跑，零 token，見 `/maigo:board`）：
 
@@ -325,7 +334,10 @@ plan，須引用 issue 編號與 acceptance criteria → 🎀 愛音實作 → �
 
 ```
 /maigo:take-issue <issue 編號或 URL>
+/maigo:take-issue --worktree <issue 編號或 URL>   # opt-in：在獨立 worktree 裡跑整趟流程
 ```
+
+`--worktree` 與 `/maigo:go` 共用機制，預設不開，細節見 [`commands/take-issue.md`](../commands/take-issue.md)。
 
 | 步驟 | 誰 | 做什麼 |
 |------|-----|--------|
@@ -376,7 +388,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 /maigo:tidy --apply --confirm <path> # 另外執行點名的那一筆需要勾選的動作
 ```
 
-結案判定走 `gh pr view` / `gh issue view`；狀態查不到的項目一律不動。各類產物的 owner 與結案條件見
+結案判定走 `gh pr view` / `gh issue view`；狀態查不到（`gh` 失敗、離線）的純數字項目不會自動封存，會列在需勾選清單（確認＝備份後封存）。各類產物的 owner 與結案條件見
 [`.maigo/` Artifacts Reference](artifacts.md)。
 
 → Source: [`commands/tidy.md`](../commands/tidy.md)

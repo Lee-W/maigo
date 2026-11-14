@@ -185,7 +185,8 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 匹配 `Write` / `Edit` 兩種工具。擋下寫入 `.maigo/` 底下兩種舊形狀的產物：
 
 1. **舊固定檔名**（`plan.md` / `review-rubric.md` / `review.md` / `review-draft.md` /
-   `triage-rubric.md` / `pr-comments.md` / `reply-draft.md`）
+   `triage-rubric.md` / `pr-comments.md` / `reply-draft.md` / `inline-comments.md`；
+   即 `_KNOWN_KINDS` 每個 kind 的 `<kind>.md`）
 2. **巢狀 kind 的分目錄前扁平檔**（`review-rubric-42.md` 這類，`kind` 是
    `nested_locations(kind)` 非空的 kind，**頂層 `plan-<id>[-<n>].md` 也在內**——
    plan 已改收進 `pr/` / `issue/` / `topic/`；`review-batch-state.md` /
@@ -283,7 +284,7 @@ python3 scripts/token_usage_summary.py --days 30    # 自訂觀察期間
 | **Raana** | `## Loaded memory entries` 段（即使無相關 entry 也要明寫「（無相關 entry）」）| 「缺 memory 載入回報」 |
 | **Tomori** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **Tomori** | 提到 `.maigo/pr/<id>/plan.md`、`.maigo/issue/<id>/plan.md`、`.maigo/topic/<slug>/plan.md`、`.maigo/review/<id>/rubric.md`、`.maigo/pr/<id>/rubric.md` 或 `.maigo/issue/<id>/rubric.md` 路徑 | 「沒提到計畫檔路徑」 |
-| **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## 目標` / `## 步驟` 之一 | 「缺計畫結構」 |
+| **Tomori** | 結構段落：`## Goal` / `## Steps` / `## Rubric` / `## Acceptance` / `## Category` / `## 目標` / `## 步驟` / `## 期待` / `## 對照` / `## 分類` 之一 | 「缺計畫結構」 |
 | **Tomori** | plan（`pr/<id>/plan.md` / `issue/<id>/plan.md` / `topic/<slug>/plan.md`）的驗收條件**不得**把字面 grep 命中數當性質證明（判準同 PreToolUse；讀不到檔案就 fail-open）| 「把字面 grep 的命中數當成抽象性質的證明」 |
 | **Soyo** | `## Loaded memory entries` 段 | 「缺 memory 載入回報」 |
 | **🟡 Soyo** | `## Verdict` 內的 review verdict：`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`；triage：`READY` / `NEEDS_INFO` / `DUP` / `CLOSE` | 「沒下 verdict」 |
