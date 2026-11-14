@@ -779,6 +779,20 @@ def test_cli_accepts_symlinked_maigo_dir(tmp_path, capsys):
     assert "備份：.maigo/_internal/tidy/backup/" in capsys.readouterr().out
 
 
+def test_apply_refuses_symlinked_maigo_pointing_at_state_root(tmp_path, capsys):
+    root = Path(os.environ["MAIGO_STATE_HOME"])
+    write(root / "plan.md", "# Plan: x\n")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".maigo").symlink_to(root, target_is_directory=True)
+    before = snapshot(root)
+
+    assert tidy.main(["--dir", str(repo / ".maigo"), "--no-gh", "--apply"]) == 1
+
+    assert snapshot(root) == before
+    assert "escapes" in capsys.readouterr().err
+
+
 def test_apply_refuses_symlinked_maigo_outside_state_root(tmp_path, capsys):
     outside = tmp_path / "outside"
     write(outside / "plan.md", "# Plan: x\n")

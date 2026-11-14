@@ -418,6 +418,32 @@ class TestTrustedLink:
         for name in ("a", "b", "missing"):
             ms.check_maigo_link_trusted(tmp_path / name)
 
+    def test_symlink_to_state_root_itself_is_rejected(self, tmp_path: Path):
+        root = ms.get_state_root()
+        root.mkdir(parents=True, exist_ok=True)
+        (tmp_path / ".maigo").symlink_to(root, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="escapes"):
+            ms.check_maigo_link_trusted(tmp_path / ".maigo")
+
+    @pytest.mark.parametrize(
+        "relative", ["o", "o/r/sub"], ids=["one-level", "three-levels"]
+    )
+    def test_symlink_to_wrong_depth_is_rejected(self, tmp_path: Path, relative: str):
+        target = ms.get_state_root() / relative
+        target.mkdir(parents=True)
+        (tmp_path / ".maigo").symlink_to(target, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="escapes"):
+            ms.check_maigo_link_trusted(tmp_path / ".maigo")
+
+    def test_symlink_to_another_repos_state_is_still_allowed(self, tmp_path: Path):
+        other = ms.get_state_root() / "other" / "repo"
+        other.mkdir(parents=True)
+        (tmp_path / ".maigo").symlink_to(other, target_is_directory=True)
+
+        ms.check_maigo_link_trusted(tmp_path / ".maigo")
+
 
 class TestCli:
     def test_help_exits_zero(self, capsys: pytest.CaptureFixture):

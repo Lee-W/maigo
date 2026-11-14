@@ -177,7 +177,8 @@ def ensure_link(cwd: str | Path) -> LinkResult:
 
 
 def check_maigo_link_trusted(maigo: str | Path) -> None:
-    """`.maigo` 是 symlink 時，目標必須在集中 root 之內；真目錄與不存在都放行。
+    """`.maigo` 是 symlink 時，目標必須是集中 root 底下的 `<owner>/<repo>` 這一層；
+    真目錄與不存在都放行。指到另一個 repo 的 state 仍放行（不比對 repo 身分）。
 
     repo 若 commit 了一個指向任意位置的 `.maigo` symlink，沒有這道檢查，寫入端會被導出 repo 外。
     """
@@ -190,6 +191,11 @@ def check_maigo_link_trusted(maigo: str | Path) -> None:
         raise ValueError(
             f"{link} is a symlink to {resolved}, outside the maigo state root {root}: "
             "path escapes the repository"
+        )
+    if len(resolved.relative_to(root).parts) != 2:
+        raise ValueError(
+            f"{link} is a symlink to {resolved}, which is not an <owner>/<repo> "
+            f"directory under the maigo state root {root}: path escapes the repository"
         )
 
 

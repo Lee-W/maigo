@@ -51,8 +51,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state.py" migrate [--cwd DIR] [--ap
 ## 信任邊界
 
 `.maigo` 若是 symlink，寫入端（review 報告發佈、`/maigo:tidy --apply`、`board_sync.py refresh --apply`）
-會檢查它的目標落在集中 root（`$MAIGO_STATE_HOME`）之內，否則拒絕——避免 repo commit 了一個
-指向任意位置的 `.maigo` 把寫入導到 repo 外。真目錄照舊放行。其餘寫入端（例如 hook 寫的
+會檢查它的目標落在集中 root（`$MAIGO_STATE_HOME`）之內，且恰好是 `<owner>/<repo>` 這一層，否則拒絕（指到 root 本身或其他層級也會被拒絕）——避免 repo commit 了一個
+指向任意位置的 `.maigo` 把寫入導到 repo 外。指到另一個 repo 的 state 仍會放行，這道檢查不比對 repo 身分。真目錄照舊放行。其餘寫入端（例如 hook 寫的
 `_internal/log/`）沒有這道檢查。
 
 `/maigo:tidy` 要在 repo 內跑（`--dir` 預設 `.maigo`），不要把集中目錄本身當 `--dir`，目錄名檢查會拒絕。
