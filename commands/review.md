@@ -121,9 +121,9 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 
 **若 mode=design-preview → 不啟動本 stage，最終報告 Verification 段標「Skipped (mode=design-preview)」。**
 
-- **checkout 變更**：
-  - PR → `gh pr checkout <num/url>`
-  - branch → `git checkout <branch>`
+- **用獨立 detached worktree 驗證，不切換使用者目前的 branch**：建立與收尾照
+  [batch-queue 的「立希的驗證 worktree」](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)；
+  PR 與 branch 兩條入口都一樣，禁用 `gh pr checkout` 與 `git checkout`
 - 跑 test / lint / type check，照 `agents/Taki.md` 的標準回報
 - **不接受「CI 已經綠了」當理由略過**——至少重跑一次 lint/type 確認本地能複現
 
@@ -339,7 +339,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - Soyo 的 review 輸出若含 `## Memory propose`，
   把 review report 完整呈現給使用者後再觸發 confirm flow；
   不要在使用者讀完 report 之前插入確認問題。
-- **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、預設平行審完全部並統一 publish（逐顆等 go-ahead 只在使用者明講時用）——細節見「## 多 PR 批次與狀態前置處理」；平行時依 batch-queue reference 先一次 fetch 各 PR head、立希各用獨立 worktree；不要自己決定 draft 要不要看。
+- **多 PR batch**：queue 排序、merged/closed 自動 skip、draft 先問、預設平行審完全部並統一 publish（逐顆等 go-ahead 只在使用者明講時用）——細節見「## 多 PR 批次與狀態前置處理」；平行時依 batch-queue reference 先一次 fetch 各 PR head；立希驗證用獨立 detached worktree（單 PR 與批次寫法一致，見 batch-queue 的「立希的驗證 worktree」）；不要自己決定 draft 要不要看。
 - **Work Board**：使用者長期追一批 PR 時維護 `.maigo/board.md`；每跑完一顆依
   [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 回寫狀態。
   刷新 / 查看 board 用 `/maigo:board`。board 決定誰該看，review 負責看，兩者不重疊。

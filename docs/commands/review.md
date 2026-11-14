@@ -5,7 +5,7 @@ flowchart TD
     Tomori --> Soyo[爽世 Soyo<br/>對 rubric 嚴格 review]
     Soyo --> ModeCheck{mode =<br/>design-preview?}
     ModeCheck -- 是 --> Skip[Taki skipped<br/>標 Verification: Skipped]
-    ModeCheck -- 否 --> Taki[立希 Taki<br/>checkout + 驗證]
+    ModeCheck -- 否 --> Taki[立希 Taki<br/>worktree 驗證]
     Skip --> Report([輸出 review report])
     Taki --> Report
     Report --> Decide{有 Soyo findings?<br/>裁決 gate}

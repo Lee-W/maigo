@@ -166,6 +166,43 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   看到另一顆 PR 的 snowflake 改動，就誤判成「main 在 session 中途被 fast-forward」；查 `git reflog`
   才確認 main 根本沒動。
 
+## 立希的驗證 worktree（單 PR 與批次共用）
+
+立希跑 test / lint / type check 一律在獨立的 detached worktree 裡，**不切換使用者目前的 branch**——
+PR 入口與 branch 入口都一樣，不用 `gh pr checkout`、不用 `git checkout`。下面只是把上面已寫的規則
+（`-verify` 後綴路徑、具名 ref fetch、HEAD 對 `headRefOid`、只清自己建的）落成指令順序，沒有新規則。
+下列指令由 orchestrator 執行，立希只拿到建好的絕對路徑。
+
+1. **主 worktree 根目錄與前置檢查**：`root` 取 `git worktree list --porcelain` 的第一筆 `worktree` 路徑；
+   `git -C "$root" check-ignore -q .worktrees/probe` 必須通過，不通過就停下請使用者處理
+   （見 [`worktree-automation`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)
+   的 1a 節）；並先查剩餘磁碟（每個約 2GB+，Airflow 這類大 repo 尤其要看）。
+2. **取得目標 commit**：
+   - PR 入口：orchestrator 自己 `git fetch <remote> +pull/<N>/head:refs/review/pr-<N>-latest`
+     （`<remote>` 與 [`/maigo:go`](https://github.com/Lee-W/maigo/blob/main/commands/go.md) 一致：
+     `git remote get-url upstream` 成功就用 `upstream`，否則用 `origin`），
+     再讓 `git rev-parse refs/review/pr-<N>-latest` 與 `gh pr view <N> --json headRefOid` 比對，
+     不一致就停下重抓。
+   - branch 入口：`git rev-parse <branch>` 取 SHA，確認它是使用者要審的那個 tip。
+3. **算路徑**：`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" --topic "review-<N>-verify" --cwd "$root"`，
+   取輸出的 `path:`；輸出的 `branch:` 忽略（detached 不用 branch）。branch 入口把 `<N>` 換成 branch 名。
+4. **建立**：`git worktree add --detach <path> <ref 或 SHA>`。回 `already exists`，或建好後
+   `git -C <path> rev-parse HEAD` 與目標不符，就停手回報——不刪、不沿用既有的 `review-<N>`。
+5. **交辦立希**：只對立希寫該 worktree 的絕對路徑為 cwd；🐱 樂奈、🟡 爽世仍讀主 checkout，
+   用 `git show <sha>:<file>` 或 diff，不讀工作樹。
+6. **產物**：新 worktree 沒有 `.maigo`（symlink 由 SessionStart 的 `ensure_link` 建，
+   `git worktree add` 不會產生它）。review 產物（rubric、review、草稿、board）一律由 orchestrator
+   從主 checkout 的 `.maigo` 寫；立希的 log 與 PoC 放 scratchpad 的絕對路徑；
+   不得在驗證 worktree 內建立實體 `.maigo/`。
+7. **收尾**：只處理本次自己建的那一個路徑，逐條列出指令後再執行，不鏈一大串；`refs/review/*` 不刪。
+   - `git worktree remove <本次自己建的絕對路徑>`。
+   - 立希跑完測試後 worktree 常有 untracked 或 modified 檔，git 會回
+     `fatal: '<path>' contains modified or untracked files, use --force to delete it`。
+     這時先 `git -C <path> status --short` 確認內容只是驗證產物（測試快取、build 輸出、log），
+     再對**同一個路徑**執行 `git worktree remove --force <path>`；內容不像驗證產物就不要強制，照下一條回報。
+   - 仍移除失敗，或流程中途中斷（session 結束、立希失敗、停手）：不刪其他任何東西，
+     在最終報告列出殘留的 worktree 路徑與 `refs/review/pr-<N>-latest`，讓使用者決定。
+
 ## 持久 Work Board（跨 session 追蹤）
 
 上面的 queue 是 **per-run、跑完即棄**。跨 session 追蹤已併入單一

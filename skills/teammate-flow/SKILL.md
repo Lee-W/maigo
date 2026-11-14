@@ -236,7 +236,7 @@ Commit message 草擬完後，依
 適用範圍：用 `Workflow` tool 對**多個 PR** 做並行 fan-out（🐱 樂奈 → 🩵 燈 → 🟡 爽世）
 的場景——跟 `/maigo:review` 的多 PR queue（預設平行審完全部、立希各用獨立 worktree；逐顆模式需使用者明講；同一份 2–3 個 worktree 的磁碟上限也適用，見 batch-queue 步驟 2）
 （[`skills/strict-review/references/review-batch-queue.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)）
-是不同的路徑。
+是不同的路徑。單一 PR 的 `/maigo:review` 同樣讓立希在獨立 detached worktree 驗證，措辭見 batch-queue 的「立希的驗證 worktree」；本節對 `git checkout`／`gh pr checkout` 的禁令不變。
 
 **規則：並行 batch review 只能 read-only** —— agent 只用 `gh pr diff` /
 `gh pr view` / `gh api graphql` 抓資料；不開 `git worktree`，任何 agent 都不能

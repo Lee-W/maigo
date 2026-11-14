@@ -110,7 +110,7 @@ Anon 不上場，Raana → Tomori → Soyo → Taki；report 後可從既有真�
 | 1 | Raana | 抓 diff + 周邊 context（用 `gh pr view`、`gh pr diff` 或 `git diff`） |
 | 2 | Tomori | **寫 `.maigo/review/<id>/rubric.md`**（自己的 PR 是 `.maigo/pr/<id>/rubric.md`；不是實作計畫，是 reviewer 對照基準） |
 | 3 | Soyo | 拿 rubric 對 diff 嚴格 review |
-| 4 | Taki | checkout 變更，跑 test / lint / type check |
+| 4 | Taki | 在獨立 worktree 驗證，跑 test / lint / type check |
 | 4.5 | Orchestrator | 裁決 gate——有 findings 才觸發，逐條表態；只有「不適用+理由」才寫記憶 |
 | 5 | Orchestrator | 學習收尾——GitHub PR 有既有 review 才觸發，萃取慣例候選、使用者勾選後寫記憶 |
 
