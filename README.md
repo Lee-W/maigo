@@ -117,12 +117,14 @@ command 裡的 review 與 verification 步驟，但不宣稱 SubagentStop / Stop
 
 ## 產出檔案
 
-計畫與 rubric 寫在 `.maigo/`（repo root 下，跨 session 留存）。
+計畫與 rubric 寫在 repo root 的 `.maigo/`，它預設是指向本機集中 root 的 symlink，實體在
+`~/.local/share/maigo/state/<owner>/<repo>/`，同一 repo 的所有 worktree 共用，跨 session 留存。
 Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`）會在
-偵測到 git repo 時，把 `.maigo/` 寫進該 repo 的 `.git/info/exclude`（不是
-被追蹤的 `.gitignore`），所以不會污染 host repo、也不會被 commit 進去；若你
-已用 global excludesfile 或 repo `.gitignore` 忽略 `.maigo/`，則 hook 視為
-已忽略、不再重複寫入。
+偵測到 git repo 時，把 `.maigo`（不帶斜線，因為 symlink 不被 `.maigo/` 規則匹配）寫進該 repo 的
+`.git/info/exclude`（不是被追蹤的 `.gitignore`），所以不會污染 host repo、也不會被
+commit 進去；若你已用 global excludesfile 或 repo `.gitignore` 忽略 `.maigo`，則 hook
+視為已忽略、不再重複寫入。
+詳見 [`.maigo/` 集中儲存](docs/reference/state-storage.md)；跨機器同步見 [跨機器同步](docs/reference/state-sync.md)。
 
 ## 文件
 
@@ -130,6 +132,9 @@ Artefact 在本機保留直到手動清除。SessionStart hook（`repo_detect`�
 - [Commands reference](docs/reference/commands.md) — 每個命令的完整流程、合流邏輯、場景對照
 - [Memory reference](docs/reference/memory.md) — 跨專案記憶層的 storage / schema / 讀寫
 - [Hooks reference](docs/reference/hooks.md) — SessionStart / SubagentStop / Stop hook 完整行為與設定
+- [State storage](docs/reference/state-storage.md) — `.maigo/` 集中儲存、repo identity、遷移既有目錄
+- [State sync](docs/reference/state-sync.md) — 跨機器同步
+- [Artifacts reference](docs/reference/artifacts.md) — `.maigo/` 內各類產物的型錄與生命週期
 - [Skills reference](docs/reference/skills.md) — skill 機制與完整 catalog（`strict-review`、`teammate-flow`、`commit-message`、`doc-link-convention`、`copyable-deliverable`、`failure-handling` 等）
 - [Agents reference](docs/reference/agents.md) — 角色模型 profile、單一模型用法與 Claude Code 隨附預設
 - [Contributing](docs/guides/contributing.md) — 修 Maigo 本身的設定、原則、validator

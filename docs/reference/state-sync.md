@@ -22,6 +22,19 @@
 identity 解成同一個 `owner/repo` 不代表可以同步。公司或私人內容不要加進 allowlist；
 board 與 review 報告是你尚未發佈的意見，放上私有 repo 也要自己先決定。
 
+### 移出 allowlist
+
+沒有 `disallow` 指令，要移出得手動編輯 `<root>/allowlist`。排除規則只擋**未追蹤**的檔案：
+已經 commit 的檔仍在 index 與 git 歷史裡。`push` 檢查的是「被追蹤的檔」加上「尚未推送的本機 commit 碰過的每個路徑」，
+任何一個落在 allowlist 外就拒絕（exit 1、什麼都不推）。
+
+- **沒有任何尚未推送的本機 commit 碰過該路徑**：`git -C <root> rm --cached <路徑>` 後**不要自己 commit**，直接跑 `push`；
+  `push` 自己的 commit 會帶走這次移除。若你自己 commit 了這次移除，那個移除 commit 也碰過該路徑，`push` 會照樣拒絕。
+- **有尚未推送的本機 commit 碰過該路徑**（即使舊版本已推到 remote；`pull` 留下的 snapshot commit 也算）：
+  `rm --cached` 沒用，那些 commit 碰過的路徑仍在檢查範圍內，`push` 會拒絕。maigo 不改寫歷史，得自行處理那些尚未推送的 commit。
+
+已推到 remote 的歷史不會因此消失；要從歷史抹掉得自行改寫歷史並 force push，maigo 不代跑。
+
 ## 指令
 
 ```text
@@ -49,6 +62,15 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state_sync.py" push
 既有筆記裡的絕對路徑不會被改寫；它們在另一台機器上只是失效的文字。
 
 ## 第一次設定
+
+同步的是集中 root 底下的內容。既有的實體 `.maigo/` 目錄不會自動搬進去（SessionStart 只在 `.maigo` 不存在時建 symlink）；
+沒搬的 repo，其 `.maigo/` 是 repo 內的真目錄、不在集中 root 之下，`allow` 了也沒有東西可同步。
+先對每個 repo 跑 `migrate`（預設 dry-run，沒有衝突再加 `--apply`），再 `allow`；細節見[遷移既有 `.maigo/`](state-storage.md)：
+
+```text
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state.py" migrate [--cwd DIR]
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state.py" migrate [--cwd DIR] --apply
+```
 
 `gh repo create` 與第一次 `git push` 由你親手執行，maigo 不會代跑。
 

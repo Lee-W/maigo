@@ -86,7 +86,7 @@ ignore_missing_imports = true
 1. **Reviewer 嚴謹度是核心特點**。任何 review 相關修改都不能放鬆 Soyo 的標準。
 2. **Skill 優先於 agent prompt**。如果你想加給 reviewer 的「規則」，先想能不能進 `strict-review` skill，而不是直接塞 Soyo.md。
 3. **Hook 防禦深度**。重要規格在多層擋（agent prompt + skill + hook validator + Stop hook），讓 orchestrator 偷雞跳關時還有最後一道。
-4. **Artefact 寫到 `.maigo/`**（repo root 下，gitignored），不要污染使用者 repo。
+4. **Artefact 寫到 `.maigo/`**（repo root 的 symlink，實體在集中 state root，被 git 忽略；見 [集中儲存](../reference/state-storage.md)），不要污染使用者 repo。
 5. **agent 個性與 process 解耦**——人設、語氣 → agent 檔；做事方法 → skill 或 command。
 6. **Skill 文件語言慣例**——Engineering-facing skills **MUST** be written in English;
    user-facing utility skills **SHOULD** be written in Taiwanese Mandarin unless

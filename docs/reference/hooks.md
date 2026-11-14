@@ -51,8 +51,8 @@ approve。讓 contributor 進到熟悉的 codebase 時，自動拿到該 repo �
 不分 project，每次 SessionStart 都跑（在 rule 偵測之前）。maigo 的所有 command
 （go / quick / team / review / address-comments）都把 plan（`pr/<id>/plan.md` /
 `issue/<id>/plan.md` / `topic/<slug>/plan.md`）、review rubric、review 報告（`review/<id>/review.md` 或 `pr/<id>/review.md`）、
-pr-comments、retry log 等 artefact 寫進 repo root 的 `.maigo/`，這些絕不該被
-commit。
+pr-comments、retry log 等 artefact 寫進 repo root 的 `.maigo/`（該路徑是指向集中 root 的 symlink，見上節
+`ensure_maigo_linked`），這些絕不該被 commit。
 
 為了不動到 host repo 被追蹤的 `.gitignore`（例如 apache/airflow 的 `.gitignore`
 是上游檔案），hook 改寫該 repo 的 `info/exclude`——路徑用

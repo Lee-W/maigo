@@ -19,7 +19,7 @@ Maigo 是 Claude Code plugin，把開發任務拆給五個 agent 接力處理。
 
 跟自己一個人開 Claude Code 比，多出來的價值是：reviewer / verifier 不會被
 orchestrator 偷雞跳過（hook 會擋），plan 與 review rubric 會寫到
-`.maigo/`（repo root 下，gitignored）留存，跨 session 可查。
+repo root 的 `.maigo/`（預設是指向本機集中儲存的 symlink，被 git 忽略；見 [集中儲存](../reference/state-storage.md)）留存，跨 session 可查。
 
 ## 2. Prerequisites
 
@@ -54,7 +54,7 @@ claude --plugin-dir /path/to/maigo
 
 預期會看到 Raana → Tomori → Anon → Soyo → Taki 順序輸出；中途 plan 會寫到
 `.maigo/topic/<slug>/plan.md`（有 PR / issue URL 時是 `.maigo/pr/<id>/plan.md` / `.maigo/issue/<id>/plan.md`），review rubric 寫到
-`.maigo/review/<id>/rubric.md`（別人的 PR；自己的 PR 是 `.maigo/pr/<id>/rubric.md`；均在 repo root 下 `.maigo/`，gitignored；`<id>` 由
+`.maigo/review/<id>/rubric.md`（別人的 PR；自己的 PR 是 `.maigo/pr/<id>/rubric.md`；均在 repo root 的 `.maigo/`（symlink，被 git 忽略）；`<id>` 由
 `scripts/artifact_path.py` 依 branch / PR 編號算出）。Soyo 若 verdict 是
 `NEEDS_CHANGES` / `BLOCKED`，會留 must-fix 清單；Taki 結尾必貼 `exit <N>` 與
 `PASS` / `FAIL`。
