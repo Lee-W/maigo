@@ -5,6 +5,8 @@
 這一頁只描述儲存層；它不同步任何東西，也不決定哪些內容可以離開這台機器。
 跨機器同步見 [`.maigo/` 跨機器同步](state-sync.md)。
 
+入口是從 repo root 開 `.maigo/board.md`：`.maigo` 是 symlink，從集中目錄無法用檔案相對路徑指到原始碼，所以指向原始碼的路徑維持 repo root 相對，`.maigo/` 內產物之間的連結則用檔案相對路徑（見 [`vim-friendly-artifacts`](../skills/vim-friendly-artifacts.md)）。
+
 ## 位置與 repo identity
 
 ```text
