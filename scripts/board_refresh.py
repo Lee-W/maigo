@@ -53,7 +53,7 @@ WEIGHTS_FILENAME = "board-weights.txt"
 WEIGHT_PREFIXES = ("author", "title")
 NOTE_MAX = 80
 JUDGMENT_HEADING = "## 判斷"
-NEW_PRESERVED = "## 判斷\n\n\n## 筆記\n\n<!-- 手寫區 -->\n"
+NEW_PRESERVED = "## 判斷\n\n## 筆記\n\n<!-- 手寫區 -->\n"
 UNREACHABLE = "抓不到"
 ERROR_NOTE_PREFIX = "（gh 失敗："
 _DETAIL_H1_RE = re.compile(r"^# \S+ (?P<status>.+?) — ")
@@ -226,7 +226,7 @@ def render_board(
     )
     if learn_pending_count > 0:
         header += f" ｜ 🧠 待學習盤點 {learn_pending_count}"
-    out = [f"# Work Board — {repo}", header, ""]
+    out = [f"# Work Board — {repo}", "", header, ""]
     blocks: list[list[str]] = []
     for section in SECTIONS:
         rows = rows_by_section.get(section, [])
@@ -336,7 +336,7 @@ def render_detail_facts(
     acknowledged_at: str | None,
 ) -> str:
     """The fact section (everything before `## 判斷`), SKILL.md §1a; ends with a blank line."""
-    lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：{url}"]
+    lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
     is_pr = type != "🐛"
     if is_pr and additions is not None and deletions is not None:
         size = f"- 規模：Δ+{additions}/-{deletions}"

@@ -60,6 +60,31 @@ def test_publish_keeps_body_headings_verbatim_without_anchors_or_toc(tmp_path):
     assert len(html_lines) == 1 and report._METADATA.match(html_lines[0])
 
 
+def test_same_source_reads_legacy_pr_line_bare_or_autolink():
+    for written in (URL, f"<{URL}>", f"<{URL}/>"):
+        legacy = f"# Review: Fix\n\n**PR:** {written}\n\n## Context\nA fix.\n"
+        assert report.same_source(legacy, URL)
+    assert not report.same_source("# Review: Fix\n\n**PR:** <" + URL + "9>\n", URL)
+
+
+def test_published_header_writes_url_source_as_autolink_and_branch_as_is(tmp_path):
+    text = Path(publish(tmp_path)["path"]).read_text()
+    assert f"\n**Source:** <{URL}>\n" in text
+    assert report.same_source(text, URL)
+    branch = Path(
+        report.publish(
+            tmp_path,
+            "feature/x",
+            "owner/project",
+            "Branch review",
+            BODY,
+            HEAD,
+            "APPROVE",
+        )["path"]
+    ).read_text()
+    assert "\n**Source:** feature/x\n" in branch
+
+
 def test_legacy_report_with_anchors_and_toc_still_parses_and_acknowledges(tmp_path):
     path = Path(publish(tmp_path)["path"])
     record = report.metadata(path.read_text())

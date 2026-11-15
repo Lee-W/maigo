@@ -280,6 +280,35 @@ class TestDetailUrl:
         assert sync.detail_url(maigo, "i/6.md", REPO, "🐛") == url(6, "issues")
         assert sync.detail_url(maigo, "i/repo-6.md", REPO) is None
 
+    @pytest.mark.parametrize(
+        "written",
+        [
+            pytest.param("https://github.com/x/y/pull/5", id="bare"),
+            pytest.param("<https://github.com/x/y/pull/5>", id="autolink"),
+            pytest.param("<https://github.com/x/y/pull/5/>", id="autolink-slash"),
+        ],
+    )
+    def test_bare_and_autolink_urls_read_back_the_same(self, tmp_path, written):
+        maigo = tmp_path / ".maigo"
+        (maigo / "i").mkdir(parents=True)
+        (maigo / "i" / "repo-5.md").write_text(f"- 連結：{written}\n")
+        assert (
+            sync.detail_url(maigo, "i/repo-5.md", REPO)
+            == "https://github.com/x/y/pull/5"
+        )
+
+    def test_resolve_lines_accepts_autolink_detail_for_non_numeric_name(self, tmp_path):
+        maigo = tmp_path / ".maigo"
+        (maigo / "i").mkdir(parents=True)
+        (maigo / "i" / "repo-6.md").write_text(f"- 連結：<{url(6)}>\n")
+        parsed = {"lines": [{"detail": "i/repo-6.md", "type": "👀", "line_no": 3}]}
+        assert sync._resolve_lines(parsed, maigo, REPO) == []
+        assert parsed["lines"][0]["url"] == url(6)
+
+    def test_legacy_pr_line_accepts_autolink(self):
+        for line in (f"**PR:** {url(6)}\n", f"**PR:** <{url(6)}>\n"):
+            assert sync._LEGACY_PR_RE.search(line)[1] == url(6)
+
 
 def test_ref_key_treats_pull_and_issues_alike_and_ignores_case():
     assert sync.ref_key("https://github.com/O/R/pull/3/") == sync.ref_key(

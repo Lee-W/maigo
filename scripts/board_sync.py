@@ -109,7 +109,7 @@ def note_has_author_pending(note: str | None) -> bool:
 
 _DETAIL_ANYWHERE_RE = re.compile(r"i/\S+?\.md")
 _LINK_RE = re.compile(r"^- 連結：(\S+)", re.MULTILINE)
-_LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*(\S+)", re.MULTILINE)
+_LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*<?(\S+?)>?(?=\s|$)", re.MULTILINE)
 _SECTIONS = {
     "## 🎯 下一件": "🎯",
     "## ⏳ 等別人": "⏳",
@@ -254,6 +254,13 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
     }
 
 
+def _unwrap_angle(value: str) -> str:
+    """`<URL>` autolink and bare URL both read back as the bare URL."""
+    if value.startswith("<") and value.endswith(">"):
+        return value[1:-1]
+    return value
+
+
 def detail_url(
     maigo_dir: Path, detail: str, repo: str, item_type: str | None = None
 ) -> str | None:
@@ -262,8 +269,10 @@ def detail_url(
         found = _LINK_RE.search((maigo_dir / detail).read_text())
     except OSError:
         found = None
-    if found and ref_key(found[1]):
-        return found[1].rstrip("/")
+    if found:
+        link = _unwrap_angle(found[1]).rstrip("/")
+        if ref_key(link):
+            return link
     numeric = re.fullmatch(r"i/(\d+)\.md", detail)
     if numeric and repo:
         kind = "issues" if item_type == "🐛" else "pull"

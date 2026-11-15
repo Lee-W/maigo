@@ -287,13 +287,18 @@ def current_diff_sha(source: str, kind: str, base: str) -> str:
     return hashlib.sha256(diff.encode("utf-8")).hexdigest()
 
 
+def _autolink(source: str) -> str:
+    """A URL source is written as `<URL>`; branch and range sources stay as-is."""
+    return f"<{source}>" if source.startswith(("http://", "https://")) else source
+
+
 def render_cache(f: dict[str, str]) -> str:
     """Render the machine-readable cache section from the field dict."""
     return (
         f"{CACHE_START}\n"
         "## PR Context (cached)\n"
         "\n"
-        f"- **Source**: {f['source']}\n"
+        f"- **Source**: {_autolink(f['source'])}\n"
         f"- **Fetched at**: {f['fetched_at']}\n"
         f"- **PR number**: {f['pr_number']}\n"
         f"- **Title**: {f['title']}\n"
@@ -321,6 +326,7 @@ def render_cache(f: dict[str, str]) -> str:
         "```diff\n"
         f"{f['diff']}\n"
         "```\n"
+        "\n"
         f"{CACHE_END}"
     )
 
@@ -337,7 +343,12 @@ def find_cache_section(rubric_text: str) -> str | None:
 def parse_cached_field(section: str, field: str) -> str:
     """Extract a one-line `- **<field>**: value` from the cached section."""
     m = re.search(rf"^- \*\*{re.escape(field)}\*\*: (.*)$", section, re.MULTILINE)
-    return m.group(1).strip() if m else ""
+    if not m:
+        return ""
+    value = m.group(1).strip()
+    if re.fullmatch(r"<https?://[^<>\s]+>", value):
+        return value[1:-1]
+    return value
 
 
 def write_cache(rubric_path: Path, section: str) -> None:

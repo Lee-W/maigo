@@ -1338,6 +1338,39 @@ class TestSplitOwnPrs:
         assert "## 判斷\n\nsee review/9301/review.md and review.md" in text
         assert "- .maigo/pr/9301/review.md\n- plain review.md stays" in text
 
+    def test_file_relative_link_is_rewritten_keeping_its_prefix(self, tmp_path: Path):
+        repo = _make_repo(tmp_path)
+        _put(repo, "review/9301/review.md", _review_text("feature/x"))
+        detail = _put(
+            repo,
+            "i/9301.md",
+            "# 🔀 x\n\n## 筆記\n\n- ../review/9301/review.md\n"
+            "- ../../review/9301/review.md\n- ../review/4242/review.md\n",
+        )
+        actions, _notes = _plan_split(repo, author_lookup=_no_lookup)
+        rewrites = mla.plan_link_rewrites(repo, actions)
+        assert [(r.old_token, r.new_token) for r in rewrites] == [
+            ("../review/9301/review.md", "../pr/9301/review.md"),
+            ("../../review/9301/review.md", "../../pr/9301/review.md"),
+        ]
+        assert mla.find_path_qualified_mentions(repo, actions) == [
+            (".maigo/i/9301.md", 7, "../review/4242/review.md")
+        ]
+        mla.apply_migration(repo, actions)
+        mla.apply_link_rewrites(repo, rewrites)
+        assert detail.read_text().endswith(
+            "- ../pr/9301/review.md\n- ../../pr/9301/review.md\n"
+            "- ../review/4242/review.md\n"
+        )
+
+    def test_legacy_pr_line_accepts_autolink(self):
+        for written in (
+            "https://github.com/o/r/pull/9",
+            "<https://github.com/o/r/pull/9>",
+        ):
+            match = mla._LEGACY_PR_LINE_RE.search(f"**PR:** {written}\n")
+            assert match[1] == "https://github.com/o/r/pull/9"
+
     def test_old_and_new_link_forms_mixed_new_form_not_rewritten_twice(
         self, tmp_path: Path
     ):

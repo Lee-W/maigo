@@ -58,6 +58,11 @@ def metadata(text: str) -> dict:
     return value
 
 
+def _autolink(source: str) -> str:
+    """External URLs are written as `<URL>`; local branch/range sources stay as-is."""
+    return f"<{source}>" if source.startswith(("http://", "https://")) else source
+
+
 def same_source(text: str, source: str) -> bool:
     """Accept managed identity or the exact PR field of a legacy report."""
     record = metadata(text)
@@ -67,7 +72,7 @@ def same_source(text: str, source: str) -> bool:
         source.startswith("https://github.com/")
         and re.search(r"^# Review:", text, re.MULTILINE)
         and re.search(
-            r"^\*\*PR:\*\*\s*" + re.escape(source) + r"/?(?:\s|$)",
+            r"^\*\*PR:\*\*\s*<?" + re.escape(source) + r"/?>?(?:\s|$)",
             text,
             re.MULTILINE,
         )
@@ -175,7 +180,7 @@ def render_report(title: str, body: str, record: dict) -> str:
     return (
         f"# Review: {' '.join(title.split())}\n\n"
         f"<!-- maigo-review: {json.dumps(record, ensure_ascii=False)} -->\n\n"
-        f"**Source:** {record['source']}\n\n"
+        f"**Source:** {_autolink(record['source'])}\n\n"
         f"{author_line}"
         f"**最後 review：** {record['reviewed_at']}\n\n"
         f"**Reviewed commit:** `{record['head_sha']}`\n\n"

@@ -78,6 +78,41 @@ class TestRenderAndParse:
             == hashlib.sha256(b"diff content").hexdigest()
         )
 
+    def test_url_source_is_written_as_autolink_and_parsed_back_bare(self):
+        url = "https://github.com/o/r/pull/42"
+        section = pcc.render_cache(_fields(source=url))
+        assert f"- **Source**: <{url}>\n" in section
+        assert pcc.parse_cached_field(section, "Source") == url
+
+    def test_parse_leaves_other_angle_bracket_values_untouched(self):
+        section = "- **Title**: <b>bold</b>\n- **Body**: <not a url>\n"
+        assert pcc.parse_cached_field(section, "Title") == "<b>bold</b>"
+        assert pcc.parse_cached_field(section, "Body") == "<not a url>"
+
+    def test_closing_fence_is_followed_by_a_blank_line_before_end_marker(self):
+        section = pcc.render_cache(_fields())
+        assert section.endswith(f"```\n\n{pcc.CACHE_END}")
+
+    def test_multiline_body_keeps_block_structure_markers(self):
+        section = pcc.render_cache({**_fields(), "body": "first\n\n- item\nlast"})
+        assert section.startswith(f"{pcc.CACHE_START}\n## PR Context (cached)\n\n")
+        assert section.endswith(f"```\n\n{pcc.CACHE_END}")
+        assert section.count("```diff\n") == 1
+
+    def test_cache_without_blank_line_before_end_marker_is_still_replaced(
+        self, tmp_path: Path
+    ):
+        rubric = tmp_path / "review-rubric.md"
+        old = pcc.render_cache(_fields(diff="old diff")).replace(
+            f"```\n\n{pcc.CACHE_END}", f"```\n{pcc.CACHE_END}"
+        )
+        rubric.write_text(old + "\n\n# Rubric body\n", encoding="utf-8")
+        pcc.write_cache(rubric, pcc.render_cache(_fields(diff="new diff")))
+        text = rubric.read_text(encoding="utf-8")
+        assert text.count(pcc.CACHE_START) == 1 and text.count(pcc.CACHE_END) == 1
+        assert "new diff" in text and "old diff" not in text
+        assert text.endswith("\n\n# Rubric body\n")
+
     def test_parse_missing_field_returns_empty(self):
         section = pcc.render_cache(_fields())
         assert pcc.parse_cached_field(section, "Nonexistent") == ""
@@ -139,7 +174,7 @@ class TestWriteCache:
             "<details>\n<summary>Full diff (cached, first 2000 lines)</summary>",
         )
         legacy = legacy.replace(
-            f"```\n{pcc.CACHE_END}", f"```\n\n</details>\n{pcc.CACHE_END}"
+            f"```\n\n{pcc.CACHE_END}", f"```\n\n</details>\n{pcc.CACHE_END}"
         )
         assert "<details>" in legacy and "</details>" in legacy
         handwritten = "\n\n# Review rubric: mine\n\n## Acceptance\n1. keep me\n"

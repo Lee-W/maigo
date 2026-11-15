@@ -173,12 +173,15 @@ _PATH_QUALIFIED_OLD_ARTIFACT_TOKEN_RE = re.compile(
 # 階段三的連結 token：`review/<id>/<f>.md`（舊形，相對 `.maigo/`）或帶前綴的
 # `.maigo/review/<id>/<f>.md`（repo root 相對）；key 是去前綴後的路徑（不是檔名）。
 _NESTED_ARTIFACT_TOKEN_RE = re.compile(
-    r"(?<![\w./-])(?:\.maigo/)?review/[A-Za-z0-9][\w.-]*/[\w-][\w.-]*\.md(?![\w./-])"
+    r"(?<![\w./-])(?:\.maigo/|(?:\.\./)+)?review/[A-Za-z0-9][\w.-]*/[\w-][\w.-]*\.md(?![\w./-])"
 )
+_RELATIVE_PREFIX_RE = re.compile(r"(?:\.\./)+")
 # 階段三的搬移來源：`.maigo/review/<id>/<f>`。
 _NESTED_OLD_PATH_RE = re.compile(r"\.maigo/review/[^/]+/[^/]+")
 _PR_URL_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/\d+")
-_LEGACY_PR_LINE_RE = re.compile(r"^\*\*PR:\*\*\s*(https://\S+)", re.MULTILINE)
+_LEGACY_PR_LINE_RE = re.compile(
+    r"^\*\*PR:\*\*\s*<?(https://\S+?)>?(?=\s|$)", re.MULTILINE
+)
 _BARE_PR_NUMBER_RE = re.compile(r"^#?\d+$")
 _REVIEW_WRITE_LOCK = ".review-write-lock"
 
@@ -905,7 +908,12 @@ def plan_link_rewrites(
             )
         for match in _NESTED_ARTIFACT_TOKEN_RE.finditer(line):
             name = match.group(0)
-            new_token = nested_mapping.get(name.removeprefix(".maigo/"))
+            relative_prefix = _RELATIVE_PREFIX_RE.match(name)
+            key = name[len(relative_prefix[0]) :] if relative_prefix else name
+            new_token = nested_mapping.get(key.removeprefix(".maigo/"))
+            if new_token is not None and relative_prefix:
+                # 檔案相對寫法（`../review/…`）保留原本的 `../` 前綴。
+                new_token = relative_prefix[0] + new_token.removeprefix(".maigo/")
             if new_token is None or new_token == name:
                 continue
             rewrites.append(
@@ -953,11 +961,18 @@ def find_path_qualified_mentions(
     """
     nested_keys = _nested_link_mapping(actions or [])
     rewritten = nested_keys.keys() | {f".maigo/{key}" for key in nested_keys}
+
+    def is_rewritten(token: str) -> bool:
+        prefix = _RELATIVE_PREFIX_RE.match(token)
+        return token in rewritten or (
+            prefix is not None and token[len(prefix[0]) :] in nested_keys
+        )
+
     return [
         (detail_path, line_no, match.group(0))
         for detail_path, line_no, line in _iter_notes_lines(Path(repo_root))
         for match in _PATH_QUALIFIED_OLD_ARTIFACT_TOKEN_RE.finditer(line)
-        if match.group(0) not in rewritten
+        if not is_rewritten(match.group(0))
     ]
 
 

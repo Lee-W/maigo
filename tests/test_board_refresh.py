@@ -191,6 +191,7 @@ def board_lines(root: Path) -> list[str]:
 
 SKILL_BOARD = """\
 # Work Board — Lee-W/maigo
+
 > 最後刷新：2026-08-18 14:30 ｜ 🎯 3 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1
 
 ## 🎯 下一件（3）
@@ -409,8 +410,42 @@ def test_t4_judgment_and_notes_survive_byte_for_byte(tmp_path, gh):
     after = (tmp_path / ".maigo/i/1.md").read_bytes().decode()
     facts, preserved = refresh.split_detail(after)
     assert preserved == preserved_before
-    assert facts.startswith("# 👀 待 review — PR 1\n\n- 連結：" + url(1))
+    assert facts.startswith("# 👀 待 review — PR 1\n\n- 連結：<" + url(1) + ">")
     assert "- 規模：Δ+10/-2 ｜ 作者：carol" in facts
+
+
+def test_detail_facts_write_autolink_and_refresh_converts_bare_url_keeping_hand_written(
+    tmp_path, gh
+):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1, judgment="keep", notes="note")
+    gh.prs[1] = pr_meta(1)
+    assert "- 連結：" + url(1) + "\n" in (tmp_path / ".maigo/i/1.md").read_text()
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    after = (tmp_path / ".maigo/i/1.md").read_text()
+    assert f"- 連結：<{url(1)}>\n" in after
+    assert "- 連結：" + url(1) + "\n" not in after
+    assert after.endswith("## 判斷\n\nkeep\n\n## 筆記\n\nnote\n")
+
+
+def test_new_detail_file_has_single_blank_lines_and_autolink(tmp_path, gh):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    gh.prs[1] = pr_meta(1)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    text = (tmp_path / ".maigo/i/1.md").read_text()
+    assert f"- 連結：<{url(1)}>\n" in text
+    assert text.endswith("## 判斷\n\n## 筆記\n\n<!-- 手寫區 -->\n")
+    assert "\n\n\n" not in text
+
+
+def test_board_header_is_separated_from_h1_by_a_blank_line(tmp_path, gh):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    lines = board_lines(tmp_path)
+    assert lines[0] == f"# Work Board — {REPO}" and lines[1] == ""
+    assert lines[2].startswith("> 最後刷新：")
 
 
 def test_t4_missing_judgment_line_rejects_without_writing(tmp_path, gh, capsys):
@@ -491,7 +526,7 @@ def test_t7_sort_and_counts(tmp_path, gh):
     gh.prs[6] = pr_meta(6, author="me", updated="2026-09-20T00:00:00Z")
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     lines = board_lines(tmp_path)
-    assert lines[1] == "> 最後刷新：2026-10-01 12:00 ｜ 🎯 4 ｜ ⏳ 2 ｜ ✅ 0"
+    assert lines[2] == "> 最後刷新：2026-10-01 12:00 ｜ 🎯 4 ｜ ⏳ 2 ｜ ✅ 0"
     order = [
         ln.split(" i/")[1].split(".md")[0]
         for ln in lines
