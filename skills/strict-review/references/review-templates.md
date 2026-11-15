@@ -15,21 +15,28 @@ file when writing the rubric or assembling the final report.
 # Review rubric: <PR title>
 
 ## 這個 PR 應該做到什麼（acceptance）
+
 從「為什麼要有這個改動」推導，與報告的 PR 摘要一致；動機查不到就照實寫「PR 沒說明動機」，不代編。
+
 1. <期待行為 1>
 2. <期待行為 2>
 
 ## 應該涵蓋的 edge case
+
 - <case 1>
 - <case 2>
 
 ## 可接受 / 不可接受的 trade-off
+
 - 可接受：<例：暫時 hardcode 設定值，下個 PR 抽出來>
 - 不可接受：<例：略過 input validation>
 
 ## Description 沒講清楚的地方（需要 author 補答）
+
 - <模糊點 1>
 ```
+
+骨架的標題與清單前後各留一個空行（版面規則 6）；這是範本約束，沒有 script 或 hook 擋，寫的人要自己守。
 
 ## 輸出
 
@@ -70,6 +77,7 @@ file when writing the rubric or assembling the final report.
 
 ```markdown
 ## 這個 PR 改了什麼、為什麼
+
 **為什麼：** <問題或動機；標明出處（PR 描述／issue／commit message），並標明是「作者的說法」還是「我們核對過」；疊在別的 PR 上時一併說明>
 
 改動前（紅色是會壞掉的地方）：
@@ -98,24 +106,31 @@ flowchart LR
 **作者自己列的 known issues：** <PR 描述有列才寫；沒有就省略這行>
 
 ## Context（🐱 樂奈）
+
 <PR 摘要以外的周邊 context 一段：base 的狀態、相關 PR／thread、CI 狀況；不重複 PR 摘要>
 
 ## Rubric（🩵 燈）
+
 <rubric 摘要——詳見本次 review rubric 檔（pr-context-cache 印出的 rubric: 路徑）>
 
 ## Verdict（🟡 爽世）
+
 APPROVE | REQUEST_CHANGES | BLOCKED
 
 ### Must-fix
+
 - ...（對應 rubric 哪一條）
 
 ### Nit / Evidence pending
+
 - ...
 
 ## Verification（🟣 立希）
+
 - `<cmd>` — exit <n> — <result>
 
 ## Bottom line
+
 <一句話總結>
 ```
 
@@ -178,7 +193,7 @@ How to apply: if the user explicitly asks for the nits to be in the review, do t
 Rules for `draft.md`, `inline-comments.md` and the other drafts under `review/<id>/`:
 
 1. **No first-person execution claims.** Runs and measurements were done by the verification and review roles or other tools, not by the user who will post the draft. Write neutral phrasing: "Running X gives Y", "A local run shows…", "Diffing against #N shows only…". Do not write "I ran / measured / fetched / diffed / reproduced / confirmed". Judgment and suggestion voice stays ("I'd suggest", "Could you…", "as far as I can tell from reading X"). When the evidence comes from an earlier round on the same head, say "against this head", not as if it were newly run. A `Drafted-by` footer does not offset a first-person claim.
-2. **No backup or extra files; integrate into one latest state.** When re-reviewing, rewrite the existing file in place: keep findings that still hold (re-check their line numbers against the new head), drop the resolved ones, add the new ones. Do not create `*.bak-<date>`, `*.old`, `-premerge` or `b`-suffixed copies. Make the file say what it is based on: which head, which findings are resolved or still open. A file with nothing to paste states why in one line ("no new finding; 3 nits already posted last round") instead of leaving a bare head line that looks like lost content. History lives in git and in the resolved / open list inside `review.md`.
+2. **No backup or extra files; start from the existing file and edit it in place.** When re-reviewing or re-running, read the existing `draft.md`, `inline-comments.md` and `reply-draft.md` first and use them as the base, because the user may have hand-edited them. Change them with `Edit`, never a whole-file `Write`. Keep every entry that still holds verbatim and update only what changed (line numbers against the new head, the head SHA, links); append new entries after the existing ones; list the entries you are about to remove in the conversation before removing them. This is the same discipline as the Tomori rule "edit an existing artifact with `Edit`" and the work-board detail files that keep their hand-written sections. Do not create `*.bak-<date>`, `*.old`, `-premerge` or `b`-suffixed copies. Make the file say what it is based on: which head, which findings are resolved or still open. A file with nothing to paste states why in one line ("no new finding; 3 nits already posted last round") instead of leaving a bare head line that looks like lost content. History lives in git and in the resolved / open list inside `review.md`.
 3. **Head SHAs come from the tools, never retyped.** The `--head` of `review_report.py publish` and the "Based on head" line of a draft come from `gh pr view <n> --json headRefOid --jq .headRefOid` or `git -C <repo root> rev-parse refs/review/pr-<n>-latest`; do not copy 40 hex characters from an earlier report or the conversation (one character off recorded a head that did not exist, and the board then misjudged the PR). `git -C` matters because a delegated drafter's cwd may not be the repo, and a bare `git rev-parse` there silently returns empty. Before publishing, compare the current head with the head that was reviewed; if they differ, say so in the report and keep recording the head actually reviewed. After drafting or publishing, check programmatically (draft's SHA == `git rev-parse` == `gh` head; each `## <path>:<line>` anchor lands on an added line of the PR diff); the drafter's own statement is not verification. After a whole batch finishes, also re-check every `review.md`'s `head_sha` against the live `gh` `headRefOid`, since a retyped or stale SHA only shows up in this full pass. In zsh, write `${var}:` in a refspec, because `$var:` is read as a modifier.
 4. **Review body stays empty; every anchorable finding goes inline.** The body segment of a draft is a summary for the user, not something to send. Naming findings (verb naming, a private underscore) are a plain ```` ```suggestion ```` block without a sentence quoting the naming rule. Body-level items (merge order, conflicts, changelog gaps, "No blockers") are not sent. What to send at all still follows the nit and first-round rules above.
 
@@ -200,12 +215,12 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 
 ### 雙語版（`--bilingual` 或 repo-detect 觸發）
 
-正文最前面加 Taiwanese Mandarin 快結（位於共用檔頭之後） + horizontal rule，後面接既有英文 detail：
+正文最前面加 Taiwanese Mandarin 快結（位於共用檔頭之後） + horizontal rule，後面接既有英文 detail（`**PR:**` 行實際寫出的是 `<URL>` autolink，下方 `<PR URL>` 只是占位符）：
 
 ```markdown
 ## 台灣漢語快速結論
 
-**PR:** <url>
+**PR:** <PR URL>
 
 **PR #<N> — <short title>**
 

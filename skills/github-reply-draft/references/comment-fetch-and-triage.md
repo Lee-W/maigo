@@ -68,46 +68,53 @@ or writing the triage file.
 ```markdown
 # PR comments: <PR title> (#<number>)
 
-- **PR**: <url>
+- **PR**: <https://github.com/OWNER/REPO/pull/NUMBER>
 - **Branch**: <head> → <base>
 - **Fetched at**: <ISO8601 UTC，用 `date -u +%Y-%m-%dT%H:%M:%SZ`>
 
 ## 選中的意見
-- **C1** — inline src/auth.py:42 @reviewer — 「<截斷的 body>」 — <url>
-- **C2** — review REQUEST_CHANGES @reviewer — 「<截斷的 body>」 — <url>
-- **C3** — conversation @reviewer — 「<截斷的 body>」 — <url>
+
+- **C1** — inline src/auth.py:42 @reviewer — 「<截斷的 body>」 — <https://github.com/OWNER/REPO/pull/NUMBER#discussion_rID>
+- **C2** — review REQUEST_CHANGES @reviewer — 「<截斷的 body>」 — <https://github.com/OWNER/REPO/pull/NUMBER#pullrequestreview-ID>
+- **C3** — conversation @reviewer — 「<截斷的 body>」 — <https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID>
 
 ## Work items
+
 ### W1 — 補 src/auth.py 的 None 檢查
+
 - **Comments**: C1
 - **Route**: /maigo:quick  ← rationale: 單檔、局部、機械性
 - **Status**: pending
 
 ### W2 — error path 補測試
+
 - **Comments**: C2
 - **Route**: /maigo:go  ← rationale: 跨檔、要先看既有 test 結構
 - **Status**: pending
 ```
+
+範本裡的外部 URL 一律包成 `<URL>`（`OWNER`、`REPO`、`NUMBER`、`ID` 是占位符）；標題與清單前後留空行。這些版面只是範本約束，沒有 script 或 hook 擋。
 
 ## 回覆草稿檔模板
 
 [`commands/address-comments.md`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
 步驟 6 把每條已處理 comment 的回覆草稿**寫成檔案**（檔案是正本；對話只印路徑與「在哪裡回」對照表）。
 路徑 `.maigo/pr/<id>/reply-draft.md`（別人的 PR 是 `.maigo/review/<id>/reply-draft.md`），
-由 `scripts/artifact_path.py reply-draft --owner mine|others` 算出。`status: same_topic` 時整份依本輪
-重抓的結果重寫，不累加。
+由 `scripts/artifact_path.py reply-draft --owner mine|others` 算出。`status: same_topic` 時以既有檔為底稿：先讀、用 `Edit` 局部更新，不整份 `Write`；仍成立的條目逐字保留，只更新事實，
+新的 comment 附加在後，要移除的先在對話列出再移除（見 `commands/address-comments.md` 步驟 6）。
 
 版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)；回覆內文放在 `text` fenced block 裡，一段一行。
 
 ````markdown
 # Reply drafts: <PR title> (#<number>)
 
-- **PR**: <url>
+- **PR**: <https://github.com/OWNER/REPO/pull/NUMBER>
 - **Drafted at**: <ISO8601 UTC>  ·  **Local HEAD**: <sha>  ·  **Pushed head**: <headRefOid>
 
 ## C1 — inline · `src/auth.py:42` · @reviewer
+
 - **在哪裡回**：inline thread——開下方連結，在該 thread 底下的回覆框貼上（不要開新的 review comment）
-- **連結**：<thread 第一則 comment 的 url>
+- **連結**：<https://github.com/OWNER/REPO/pull/NUMBER#discussion_rID>（thread 第一則 comment）
 - **位置**：`src/auth.py:42`
 - **前置條件**：先 push 再貼（修正只在本機）／無
 - **Thread 狀態**：unresolved（產稿時重抓）
@@ -117,8 +124,9 @@ or writing the triage file.
 ```
 
 ## C2 — review 摘要 · REQUEST_CHANGES · @reviewer
+
 - **在哪裡回**：PR conversation 底部——review 摘要沒有獨立的回覆串，開頭寫 `@reviewer`，並引用要回應的那段
-- **連結**：<review 的 url>
+- **連結**：<https://github.com/OWNER/REPO/pull/NUMBER#pullrequestreview-ID>（該 review）
 - **位置**：（整體 review，無行號）
 - **前置條件**：無
 - **Thread 狀態**：n/a
@@ -128,8 +136,9 @@ or writing the triage file.
 ```
 
 ## C3 — conversation · @reviewer
+
 - **在哪裡回**：PR conversation 底部，可用該留言的 Quote reply
-- **連結**：<conversation comment 的 url>
+- **連結**：<https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID>（該 conversation comment）
 - **位置**：（對話串，無行號）
 - **前置條件**：無
 - **Thread 狀態**：n/a

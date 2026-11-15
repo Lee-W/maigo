@@ -149,24 +149,25 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 選完後 orchestrator 依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
 起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號）,呼叫
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Review draft: <PR title>"`
-取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並寫進 board 細節檔的
+取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並把檔案相對的路徑（`../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`）寫進 board 細節檔的
 `## 筆記`。只起草、不送出。
 board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
 
-inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題，標題下一行放該位置的 Files 分頁連結，空一行後接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號並重產連結。
+inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題，標題後空一行放該位置的 Files 分頁連結（寫成 `<URL>`），再空一行接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號並重產連結。
 
-連結格式是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(repo 相對路徑)>R<行號>`（hash 是路徑字串的 SHA-256 hex），獨立成行、不放進標題——放進標題會讓標題太長難讀。範例：
+連結寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(repo 相對路徑)>R<行號>`（hash 是路徑字串的 SHA-256 hex），獨立成行、不放進標題——放進標題會讓標題太長難讀。範例：
 
 ```markdown
 ## providers/common/ai/docs/tool_approval.rst:260
-https://github.com/apache/airflow/pull/76882/files#diff-cdba9dcc211e01826fce2f72acddddd2b4416513506ca40d8a42104f8f96ca18R260
+
+<https://github.com/apache/airflow/pull/76882/files#diff-cdba9dcc211e01826fce2f72acddddd2b4416513506ca40d8a42104f8f96ca18R260>
 
 Must-fix (docs): ...
 ```
 
-**重審同一顆 PR：直接改寫 `draft.md`、`inline-comments.md`、`rubric.md` 成單一最新狀態**——仍成立的 finding 保留並對新 head 重核行號，已解的移除，新的加入。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
+**重審同一顆 PR：以既有的 `draft.md`、`inline-comments.md`、`rubric.md` 為底稿，先讀再用 `Edit` 修改，不整份 `Write`**——使用者可能手改過。仍成立的 finding 逐字保留，只更新行號、head SHA 與連結；新的 finding 附加在後；要移除的（已解）先在對話列出再移除。共用規則見 [`review-templates` 的 Draft hygiene 第 2 條](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
 
 **每則 inline comment 1–3 句**：must-fix 只寫「壞在哪＋一個證據＋改法（用問句提出）」；推導過程、旁支說明（例如「這個問題 base 上其實也存在」）、行號引用與完整程式碼建議都不放——那些留在 `review.md`。nit 只寫結論。（2026-11-12 實例：#76862、#76882 兩份草稿各三段的 must-fix 被退回「太長」，砍到每則 1–3 句才收。）
 
@@ -176,7 +177,8 @@ Must-fix (docs): ...
 
 ````markdown
 ## providers/common/ai/src/airflow/providers/common/ai/operators/agent.py:278
-https://github.com/apache/airflow/pull/76882/files#diff-97860ef93cc1e228b433cb355ce258bfe2083ff7787994a54e2f16130eecfb7eR278
+
+<https://github.com/apache/airflow/pull/76882/files#diff-97860ef93cc1e228b433cb355ce258bfe2083ff7787994a54e2f16130eecfb7eR278>
 
 ```suggestion
 def _fingerprint_call_content(call: ToolCallPart) -> str | None:
@@ -284,15 +286,15 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" publish \
   `--head` 仍填原本審查的 commit，不填新 head。（2026-11-12 實例：30 份未送 review 套新版型後，「最後 review」全變成當天。）
 
 source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保留舊檔；不要直接 Write 繞過。
-舊版（沒有 metadata 的）報告只有在含 `# Review:` 標題**且**有一行 `**PR:** <canonical-url>` 時，
+舊版（沒有 metadata 的）報告只有在含 `# Review:` 標題**且**有一行 `**PR:** <PR URL>` 時，
 才會被認成同一個 source。標題寫成 `# Review: <owner/repo>#<n> — …`、卻少了 `**PR:**` 那一行的舊報告，
 會被判成 `Review ownership conflict`。先確認該檔確實是同一顆 PR 的舊報告，在 H1 下方補一行
-`**PR:** <canonical-url>`，再重新 publish；不要改用 Write 覆寫。
+`**PR:** <PR URL>`，再重新 publish；不要改用 Write 覆寫。
 此 publisher 是 `review` kind 的寫入入口，其餘 kind 繼續使用 artifact_path 的 ownership
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
-成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`；寫進筆記時用檔案相對的 `../review/<id>/review.md` 或 `../pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
 時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
@@ -321,7 +323,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 上面 publisher 回傳的 `path`（即
   `.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
-  的 `## 筆記` 區，一行路徑連結（repo root 相對，例如 `.maigo/review/9301/review.md`；為什麼用這個基準見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
+  的 `## 筆記` 區，一行路徑連結（檔案相對，例如 `../review/9301/review.md`，自己的 PR 為 `../pr/9301/review.md`；規則與理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
   不再寫進索引行
 
 回寫時必須保留原 checkbox 與 `🧠` / `🔖` 標記。刷新 / 查看 board 用 `/maigo:board`；

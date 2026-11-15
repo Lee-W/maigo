@@ -71,16 +71,16 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
 | `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |
-| `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` §4.5） | `scripts/artifact_path.py`（kind `inline-comments`，`_KNOWN_KINDS`）＋ [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) 的草稿格式規則 | 待手動貼上 GitHub 的 inline comment 草稿，不送出；重審同一顆 PR 時直接改寫成最新狀態；隨 PR 目錄一起被 `/maigo:tidy` 封存 |
+| `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` §4.5） | `scripts/artifact_path.py`（kind `inline-comments`，`_KNOWN_KINDS`）＋ [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) 的草稿格式規則 | 待手動貼上 GitHub 的 inline comment 草稿，不送出；重審同一顆 PR 時以既有檔為底稿用 Edit 更新；隨 PR 目錄一起被 `/maigo:tidy` 封存 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
 
 ### `inline-comments.md` 格式
 
 - 路徑：別人的 PR 在 `.maigo/review/<id>/inline-comments.md`，自己的 PR 在 `.maigo/pr/<id>/inline-comments.md`。
-- 第一行寫明所依據的 head SHA；其後每則留言一個 `## <repo 相對路徑>:<行號>` 標題；標題下一行是該位置的 Files 分頁連結（`https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(路徑)>R<行號>`）；空一行後是要貼上的留言內文。
+- 第一行寫明所依據的 head SHA；其後每則留言一個 `## <repo 相對路徑>:<行號>` 標題；標題後空一行是該位置的 Files 分頁連結，寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(路徑)>R<行號>`；再空一行後是要貼上的留言內文。
 - 標題的行號只供你定位貼上；內文以 symbol 指涉、不寫行號。作者再 push 後要對新 head 重核行號並重產連結。
 - 每則 1 到 3 句。
-- 重審同一顆 PR 直接改寫成單一最新狀態，不留 `.bak-<日期>`、`.old` 或加後綴的副本、不另開檔；沒有可貼的 comment 時，head 那行下補一行原因。
+- 重審同一顆 PR 以既有檔為底稿，先讀再用 Edit 修改（不整份 Write）：仍成立的條目逐字保留，只更新行號、head SHA 與連結，新條目附加在後，要移除的先在對話列出；不留 `.bak-<日期>`、`.old` 或加後綴的副本、不另開檔；沒有可貼的 comment 時，head 那行下補一行原因。
 - 只起草、不送出；結案隨 PR 目錄封存（見下方生命週期表）。
 - 舊固定檔名 `.maigo/inline-comments.md` 會被 `legacy_artifact_path_check` 擋。
 

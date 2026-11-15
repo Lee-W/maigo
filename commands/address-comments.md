@@ -266,7 +266,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
    - 呼叫 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" reply-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Reply drafts: <PR title> (#<number>)"`
      取得路徑（自己的 PR 是 `.maigo/pr/<id>/reply-draft.md`，別人的是 `.maigo/review/<id>/reply-draft.md`）；
      歸屬判斷同步驟 4（`status: new` 直接寫、`conflict` 停下問、`same_topic` 續寫）。
-     `same_topic` 時**整份依本輪重抓的結果重寫**——草稿是從 triage 檔加現況重新產生的，不是累加的。
+     `same_topic` 時**以既有的 `reply-draft.md` 為底稿**：先讀、用 `Edit` 局部更新，不整份 `Write`——使用者可能手改過措辭。仍成立的條目逐字保留，只更新事實（thread 狀態、連結、head）；本輪新增的 comment 附加在後；要移除的先在對話列出再移除（共用規則見 [`review-templates` 的 Draft hygiene 第 2 條](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)）。
      目錄不存在先 `mkdir -p` 父目錄。
    - 檔案內容依
      `skills/github-reply-draft/references/comment-fetch-and-triage.md`「回覆草稿檔模板」：
@@ -343,7 +343,7 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 步驟 7、8 會跟使用者多輪互動並寫檔，步驟 6 的回覆草稿路徑因此被推出視線。全部步驟走完後，**最後一則總結要再印一次
 回覆草稿檔的路徑與步驟 6 的「在哪裡回」對照表**（不重貼回覆內文——檔案是正本），不要寫「草稿在上一則訊息」。
 回覆草稿是這個命令唯一要使用者拿去貼的交付物，路徑與對照表不能只留在中途的訊息裡。草稿若已隔過 rebase 或新
-commit，先重驗檔案裡點名的符號與全稱陳述，過期就整份重寫（`same_topic`）再印。
+commit，先重驗檔案裡點名的符號與全稱陳述，過期的句子用 `Edit` 局部改（`same_topic`，不整份重寫）再印。
 
 ## Memory propose confirm flow
 

@@ -40,22 +40,28 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 # Triage rubric: <issue title> (#<N>)
 
 ## Category
+
 <bug | feature | question | documentation | other>
 
 ## Why this category（一句話）
+
 <從 body 的哪段判斷出來的；引用具體片段>
 
 ## Existing labels
+
 <repo 已標的 label 清單，或「(none)」>
 
 ## Missing info（若 category=bug）
+
 - <缺什麼 1>
 - <缺什麼 2>
 
 ## Potential duplicates
+
 - #<N> <Raana grep 找到的疑似重複；無 → 「(none found)」>
 
 ## Suggested next step
+
 <one-line 給 Soyo 參考，例：「ask author for repro」/「close as dup of #N」/「label as good-first-issue」>
 ```
 
@@ -155,25 +161,32 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 # Plan: <task name>
 
 ## Goal
+
 <為什麼要做這件事——一兩句話>
 
 ## Honoured memory（optional，有相關 project / user entry 才加）
+
 - 使用者偏好 integration test 而非 mock（project）→ Step 3 要求 Anon 不用 mock
 - 使用者語言偏好：漢語溝通（user）→ 本 plan 用漢語寫說明
 
 ## Steps
+
 1. [Anon] <步驟一> — acceptance: <怎樣算完成>
 2. [Anon] <步驟二>（依賴 1）— acceptance: ...
 3. [Taki] 跑 <X test>，必須全綠
 
 ## Decisions needed（optional，有需要使用者點頭的選擇才加）
+
 這些是 blocking。使用者可一句「go」批准全部。
+
 1. <決定一>？ [**default**]
 2. <決定二>？ [**default**]
 
 ## Risks / Open questions
+
 - <風險或需要使用者確認的事>
 
 ## Handoff to 🎀 Anon
+
 - <第一步從哪裡開始、哪些 boundary 不能越過、哪些 output 要貼給 🟡 Soyo / 🟣 Taki>
 ```
