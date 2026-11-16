@@ -197,7 +197,7 @@ python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply   # 寫回
 
 在 nvim 裡開著 board 時：先 `:w`，再 `:!python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply`，最後
 `:e` 重新載入。script 讀的是磁碟，refresh 之後沒 `:e` 就存檔會用舊 buffer 蓋掉刷新結果（nvim 會先跳
-W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。一律從 repo root 開 `.maigo/board.md`，索引行與筆記裡的連結才解得到。
+W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。開檔的 cwd 不拘（repo root、`.maigo` 裡面都行）：索引行與筆記裡的 `.maigo` 內部連結是檔案相對，`gf` 不依賴 cwd。
 
 | exit code | 意思 |
 |-----------|------|

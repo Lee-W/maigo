@@ -2146,6 +2146,17 @@ def test_old_shape_board_refreshes_to_new_shape_and_is_a_fixed_point(tmp_path, g
     assert (tmp_path / ".maigo/board.md").read_text() == first
 
 
+def test_detail_next_action_line_carries_the_file_relative_draft_hint():
+    hint = "尚無草稿：先起草 `../review/1/draft.md`（`/maigo:review` §4.5 裁決 gate）"
+    facts = refresh.render_detail_facts(
+        type="👀", status="待送出", title="t", url="https://github.com/o/r/pull/1",
+        additions=1, deletions=1, author="a", next_action=hint, number=1,
+        last_reviewed_at=None, review_time_source=None, acknowledged_at=None,
+    )  # fmt: skip
+    assert f"- 下一步：`{hint}`" in facts.splitlines()
+    assert ".maigo/" not in facts
+
+
 def test_render_line_puts_result_before_size_and_drops_size_first_when_over_budget():
     line = refresh.render_line(
         **_fields(status="待送出", author="a", result="NEEDS_CHANGES", size="+68/-1")

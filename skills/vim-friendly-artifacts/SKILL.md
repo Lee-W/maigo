@@ -42,11 +42,13 @@ description: This skill should be used whenever writing, templating or generatin
 
 ## 「預設可用」的前提
 
-下面每一條 nvim 行為宣稱，都是在 Neovim 核心預設、cwd 為 repo root 下實測的（NVIM v0.12.6，`-u NONE` 為最嚴基線，`path` 為預設的 `.,,`）。`gO` 另外需要 filetype plugin 開啟，這是一般使用者的預設，`-u NONE` 下不成立。
+下面每一條 nvim 行為宣稱，都是在 Neovim 核心預設下實測的（NVIM v0.12.6，`-u NONE` 為最嚴基線，`path` 為預設的 `.,,`），涵蓋的 cwd 包含 repo root、`.maigo`（symlink）、state 真目錄與家目錄，不只 repo root；同目錄與跨目錄檔案相對寫法的 4 種寫法 × 4 種 cwd 矩陣見路徑規則第 1 條。`gO` 另外需要 filetype plugin 開啟，這是一般使用者的預設，`-u NONE` 下不成立。
 
 使用者自己的 nvim 設定（`path`、`autochdir`、treesitter、fold）可能讓結果不同；規範只承諾預設下可用，不替使用者改設定。沒有實測的行為一律標「未確認」，不寫成規則的依據，也不宣稱其他編輯器的行為。
 
-**入口契約**：從 repo root 開 `.maigo/board.md`。`.maigo` 是指向 state 目錄的 symlink，所以從 state 目錄不可能用檔案相對路徑指到原始碼；指向原始碼的路徑因此維持 repo-root 相對，也只在 cwd 為 repo root 時 `gf`／`gF` 開得到。
+**不再有入口契約**：可以從 repo root、`cd .maigo` 之後、或任何其他 cwd 開 `.maigo` 裡的檔案——`.maigo` 內部的互連（細節檔、報告、rubric、board 索引行）都是**相對於檔案自己的位置**，`gf` 不依賴 cwd。唯一的限制是**原始碼路徑**（`commitizen/commands/bump.py:347`）：它維持 repo-root 相對，在 `.maigo` 裡面開檔時 `gf`／`gF` 開不了，要先 `:cd` 到 repo root。這沒有被解決，只是誠實寫明。
+
+**不是 `gf` 對象的路徑**（維持 repo-root 相對，不要改成檔案相對）：要貼到 repo root 執行的 shell 指令字串（`gh pr review … --body-file .maigo/review/N/draft.md`）、script 印出給程式讀的 stdout（`rubric:`／`path:`）、`/maigo:tidy` 與對話裡印給使用者看的 `.maigo/…` 清單。這些是終端機輸出或指令參數，不是在 nvim 裡游標跳轉的目標。
 
 ## 版面規則
 
@@ -77,7 +79,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 ## 路徑規則
 
-1. **指向其他 `.maigo/` 產物的路徑，用相對於檔案自己位置的路徑；指向原始碼維持 repo-root 相對。** 例：細節檔指向報告寫 `../review/9301/review.md`，報告指向細節檔寫 `../../i/<slug>.md`，同目錄寫 `rubric.md`。理由（實測，nvim 0.12.6 `-u NONE`，`.maigo` 為 symlink）：`../review/x/review.md` 在 cwd 為 repo root、別處、state 真目錄三種下 `gf` 都開得到；repo-root 寫法 `.maigo/review/x/review.md` 只有 cwd 為 repo root 才開得到，相對 `.maigo/` 的 `review/x/review.md` 只有 cwd 為 state 真目錄才開得到。檔案相對路徑在封存同批搬移 `i/` 與 `review/` 後仍有效，repo-root 寫法則立刻失效。
+1. **指向其他 `.maigo/` 產物的路徑，用相對於檔案自己位置的路徑；指向原始碼維持 repo-root 相對。** 例：細節檔指向報告寫 `../review/9301/review.md`，報告指向細節檔寫 `../../i/<slug>.md`，同目錄寫裸檔名 `rubric.md`（不加 `./`）。理由（實測，nvim 0.12.6，`.maigo` 為 symlink）：同目錄裸檔名 `rubric.md`、`./rubric.md`、`../<自己目錄>/rubric.md` 與跨目錄 `../../review/2/x.md` 四種寫法，在 cwd 為 repo root、`.maigo`（symlink 進入）、state 真目錄、放了同名干擾檔的家目錄四種下，`gf` 全 16 格都開到檔案相對的那一份（`-u NONE` 與 `--clean` 兩輪皆同；同名干擾檔不會搶先，因為 `path` 的 `.` 是目前檔案所在目錄），所以選最短的裸檔名；使用者自己的設定未載入驗證，標未確認。另：`../review/x/review.md` 在 cwd 為 repo root、別處、state 真目錄三種下 `gf` 都開得到；repo-root 寫法 `.maigo/review/x/review.md` 只有 cwd 為 repo root 才開得到，相對 `.maigo/` 的 `review/x/review.md` 只有 cwd 為 state 真目錄才開得到。檔案相對路徑在封存同批搬移 `i/` 與 `review/` 後仍有效，repo-root 寫法則立刻失效。
 2. **board.md 索引行的 `i/<slug>.md` 維持相對檔案所在目錄，不改，並放在行尾最後一欄。** 理由：預設 `path` 的 `.` 就是目前檔案所在目錄，board.md 在 `.maigo/` 第一層，`i/<slug>.md` 解得到；補充實測在 cwd 為 repo root 與 cwd 在別處兩種下都成立。放行尾是因為 `j`／`k` 移動後游標在行首（落在 `1.` 上，`gf` 得到 E447）：先按 `$` 游標就停在路徑上；路徑與前一字之間是單一半形空格，標題以全形標點或 emoji 結尾也不會黏住。
 3. **要指到某一行時寫 `路徑:行號`，用 `gF` 跳。** 理由：實測 `scripts/x.py:3` 用 `gF` 開檔並落在第 3 行，用 `gf` 也開得了檔但落在第 1 行。
 4. **反引號包住的路徑允許，不禁用。** 理由：實測游標在路徑字元上或開頭反引號上 `gf` 成立；只有游標停在結尾反引號時失敗（E446）。plan 與 review 大量使用反引號路徑，禁用成本高、收益為零。board 索引行維持不加反引號，是既有行文法與 parser 的格式慣例，不是 `gf` 的限制（行尾路徑不加反引號，`$` 後 `gf` 即成立）。

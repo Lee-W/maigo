@@ -37,7 +37,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source> \
 - 在 maigo repo 自身工作時，直接 `python3 scripts/pr_context_cache.py` 即可
 - 省略 `--rubric` 是預設用法——script 自動算路徑；只有需要覆寫既有檔案時才傳 `--rubric`
 
-stdout 第一行是 `cache_hit: true|false`，第二行 `rubric: <path>`，其後是 cache 區段全文——
+stdout 第一行是 `cache_hit: true|false`，第二行 `rubric: <path>`（repo-root 相對、給程式讀；把它寫進任何給人讀的檔案——報告正文、細節檔筆記——時要轉成檔案相對路徑，例如同目錄的 `rubric.md`），其後是 cache 區段全文——
 含 Source / PR number / Title / Reviewed head（本次 PR commit SHA）/ Body（截 500 行）/ Linked issues / CI status /
 Diff stat / **Review threads（inline review thread，含 resolve 狀態）/ Review
 summaries（`gh pr view --json reviews`）/ Conversation comments（`gh pr view

@@ -90,6 +90,7 @@ AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答
 `--repo` 取目前 repo 的 `owner/name`（即 `pr_context_cache.py` 的 `repo_slug()`，來源是 `gh repo view --json nameWithOwner -q .nameWithOwner`；它是 cwd 所屬 repo、不是目標 PR 的 repo，與下方「## 輸出」段 `review_report.py publish --repo` 同值）；本地 branch / commit range 沒有 PR url，省略 `--url`/`--repo`/`--owner` 即可，路徑落在 `.maigo/pr/<id>/rubric.md`；有 PR 時自己的 PR 是 `.maigo/pr/<id>/rubric.md`、別人的是 `.maigo/review/<id>/rubric.md`），
 歸屬規則見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)
 （目錄不存在由 orchestrator 先建立該路徑的父目錄），再把絕對路徑、原樣 H1 與 ownership status 交給 🩵 燈。她沒有 Bash，不執行 helper 或 `mkdir`。
+`rubric:` 印出的是 repo-root 相對路徑，給程式讀；報告正文（`review.md`）要引用 rubric 時改寫成檔案相對的 `rubric.md`（同目錄），不照抄那個路徑——見 [`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)。
 
 **派燈之前，先給她一份可讀的 diff 檔**：燈沒有 Bash，跑不了 `git diff` / `git show`，只靠
 樂奈的摘要加讀現檔分不出一行是不是這個 commit 新增的。orchestrator 把 diff 存成
@@ -237,7 +238,7 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 ## 輸出
 
 單一 PR / branch / range（預設）輸出 PR 摘要（為什麼 → 改動前後圖 → 改了什麼）/ Context / Rubric / Verdict /
-Verification / Bottom line 六段；PR 摘要先講 PR 本身（為什麼要有、做了哪些改動、每項改在哪些檔案），再進 findings。
+Verification / Bottom line 六段（Rubric 段引用 rubric 時寫檔案相對的 `rubric.md`，不寫 `.maigo/…` 開頭的路徑）；PR 摘要先講 PR 本身（為什麼要有、做了哪些改動、每項改在哪些檔案），再進 findings。
 每項改動以行為描述，括號標出改在哪些檔案（路徑或 `file:line`），並附一句為什麼；為什麼之後、條列之前放改動前、改動後兩個獨立的 mermaid
 fenced block（上下排、各有一行小標，每塊只一張圖、不用 subgraph 並排；改動前會壞掉的節點標紅、改動後改動或新增的節點標綠，其餘不上色，小標寫明顏色意思）的對照圖（行為改動很小——純 rename、docs typo、依賴升級——時省略並寫明原因；節點只放 PR 描述或
 diff 能證實的東西）。動機查不到就寫「PR 沒說明動機」並列進 rubric 待作者補答，不代編。
@@ -301,7 +302,7 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 
 只有別人的 PR（`owner: others`）會有 👀 行；自己的 PR 與本地 source 的報告在 `pr/<id>/`，不進 👀 對帳，
 所以 `owner: mine` 時略過下面 👀 專屬的列（`待送出`、⏳、`↩︎ 回你的球` 等狀態轉移）；若該 PR 在 board 上有其他行，
-publisher 回傳的 `path`（`.maigo/pr/<id>/review.md`）照樣寫進對應細節檔 `## 筆記`。
+publisher 回傳的 `path`（`.maigo/pr/<id>/review.md`）照樣寫進對應細節檔 `## 筆記`（寫成檔案相對的 `../pr/<id>/review.md`，獨立成清單項）。
 GitHub PR review 每跑完一顆並輸出 report 後，依
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：

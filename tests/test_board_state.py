@@ -886,10 +886,16 @@ class TestShortActionAndSize:
         (out,) = self._evaluate([self._unposted(url)], tmp_path, "apache/airflow")
         assert out["status"] == "待送出"
         assert out["short_action"] == "起草"
+        # a hint written into a detail file under `.maigo/i/`: file-relative, not repo-root
+        assert "../review/58543/draft.md" in out["next_action"]
+        assert ".maigo/" not in out["next_action"]
         draft = tmp_path / ".maigo" / "review" / "58543" / "draft.md"
         draft.parent.mkdir(parents=True)
         draft.write_text("body\n")
         (out,) = self._evaluate([self._unposted(url)], tmp_path, "apache/airflow")
+        # the shell command stays repo-root relative (it is pasted at the repo root)
+        assert "--body-file .maigo/review/58543/draft.md" in out["next_action"]
+        assert "../review" not in out["next_action"]
         assert out["short_action"] == "送出"
 
     # --- 結果欄（review verdict 取代 →動作）---
@@ -1338,7 +1344,7 @@ class TestMain:
         self, monkeypatch, capsys, tmp_path
     ):
         assert self._run_with_root(monkeypatch, capsys, tmp_path) == (
-            "尚無草稿：先起草 `.maigo/review/58543/draft.md`（`/maigo:review` §4.5 裁決 gate）"
+            "尚無草稿：先起草 `../review/58543/draft.md`（`/maigo:review` §4.5 裁決 gate）"
         )
 
 

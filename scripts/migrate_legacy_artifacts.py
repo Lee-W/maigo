@@ -8,7 +8,7 @@
 是 0%——這支腳本原本只搬舊固定檔名；`scripts/artifact_path.py` 改成按
 PR/issue 分資料夾後，同一批舊檔又多了一種要搬的形狀，這支腳本擴充成兩階段都
 處理，並順手把 `.maigo/i/*.md` 的 `## 筆記` 段裡指到舊檔名的連結改成新的
-repo root 相對路徑（`.maigo/…`，nvim 在 repo root 開檔時 `gf` 解得到）。跟 `hooks/legacy_artifact_path_check.py`（擋新的寫入）是同一問題的兩端。
+repo root 相對路徑（`.maigo/…`，nvim 在 repo root 開檔時 `gf` 解得到；在 `.maigo` 裡面開檔就解不到，之後請跑 `scripts/rewrite_note_paths.py` 整理成檔案相對寫法）。跟 `hooks/legacy_artifact_path_check.py`（擋新的寫入）是同一問題的兩端。
 
 **只在 `tmp_path` 假 repo 上跑過 `--apply` 測試——不對任何真實 repo 執行
 `--apply`**，那是跨出本 repo 範圍的不可逆操作，需要使用者逐一確認範圍與

@@ -107,13 +107,15 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 
 ### 筆記裡讓 `gf` 失效的路徑（`rewrite_note_paths.py`）
 
-細節檔 `## 筆記` 裡舊寫法的裸路徑（`review/<id>/…`、`.maigo/review/…`），以及緊貼中文字或全形標點的路徑
+細節檔 `## 筆記` 與 `review/<id>/`、`pr/<id>/` 的報告類檔案（`review.md`、`rubric.md`、`pr-comments.md`）裡，
+舊寫法的裸路徑（`review/<id>/…`）、repo-root 寫法（`.maigo/review/…`，在 `.maigo` 裡面開檔解析不到），以及緊貼中文字或全形標點的路徑
 （`報告：../review/1/review.md（舊）`——Neovim 會把標籤一起當檔名），可用
 [`scripts/rewrite_note_paths.py`](https://github.com/Lee-W/maigo/blob/main/scripts/rewrite_note_paths.py) 整理：
 `python3 scripts/rewrite_note_paths.py [--repo-list FILE] [--apply] [repo ...]`。預設乾跑，每一處印出檔案、行號、
-改前整行與改後整行；加 `--apply` 才寫檔。它只改路徑字串本身（舊寫法換成檔案相對的 `../review/…`、緊貼的路徑補反引號），
-只處理 `## 判斷` 之後、目標檔確實存在的路徑，不碰 fenced code block、含空白的反引號片段（shell 指令字串）與 URL；
-指不到實際存在的檔的路徑列為「略過」。只改「筆記引用檔案」形狀的路徑（行首、緊貼／接在中文字與全形標點之後、或接在 `Review report:` 這類英文冒號標籤之後）；前一個詞是其他 ASCII 的（指令、旗標、重導向、英文散文，例如 `see .maigo/review/1/review.md`）不改並列為略過——寧可少改；它是啟發式，套用前請先看乾跑清單與略過清單。refresh 與其他命令不會自動改寫既有筆記。
+改前整行與改後整行，並印「未掃描：N」；加 `--apply` 才寫檔。它只改路徑字串本身（舊寫法換成相對於該檔的路徑，同目錄寫裸檔名 `rubric.md`、
+跨目錄寫 `../review/…`；緊貼的路徑補反引號），細節檔只處理 `## 判斷` 之後、目標檔確實存在的路徑；報告檔整檔掃描但**只改落在 `.maigo` 內的路徑**
+（原始碼路徑不動、不記錄），`draft.md`、`inline-comments.md`、`reply-draft.md`、`follow-up-issue.md` 這類會貼到 GitHub 的草稿不掃。不碰 fenced code block、HTML 註解與 `pr-context-cache` 區段、含空白的反引號片段（shell 指令字串）與 URL；
+指不到實際存在的檔的路徑列為「略過」。只改「筆記引用檔案」形狀的路徑（行首、緊貼／接在中文字與全形標點之後、或接在 `Review report:` 這類英文冒號標籤之後）；前一個詞是其他 ASCII 的（指令、旗標、重導向、英文散文，例如 `see .maigo/review/1/review.md`）不改並列為略過——寧可少改；它是啟發式，套用前請先看乾跑清單與略過清單。套用時保留原檔的修改時間；**套用期間不要同時編輯這些檔**——寫入前的比對是盡力而為，最後一次檢查與換檔之間仍有極短的視窗。refresh 與其他命令不會自動改寫既有筆記。
 
 ## Work Board（`board.md` + `i/<slug>.md`）
 

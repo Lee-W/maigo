@@ -275,7 +275,8 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
      fenced block 規則依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)
      （內文若可能含三個 backtick 就用四個 backtick 外層，不加 `>` blockquote）。
    - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
-   - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**：
+   - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**（這行是印給終端機的 repo-root 相對路徑，不是 `gf` 的對象；
+     要把回覆草稿記進細節檔 `## 筆記` 時寫檔案相對的 `../pr/<id>/reply-draft.md`〔別人的 PR 是 `../review/<id>/reply-draft.md`〕，獨立成清單項）：
 
      ```
      回覆草稿：

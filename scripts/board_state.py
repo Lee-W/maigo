@@ -59,6 +59,9 @@ function-level import 把它換成 `artifact_path("review-draft", ref)` 算出�
 真實路徑（👀 項目固定是別人的 PR，傳 `owner="others"`；見 `main()` 內註解說明為何不能在模組頂層 import `artifact_path`）；
 `url` 缺失或無法解析時保留佔位字，不假造路徑。有給 `--maigo-root` 而該草稿檔不存在時，
 `next_action` 改為「尚無草稿：先起草 …」提示，不給一條照跑會失敗的 `gh pr review` 指令。
+這句提示是寫進細節檔（`.maigo/i/<id>.md`）的內容、不是 shell 指令，所以路徑寫成相對於細節檔的
+`../review/<id>/draft.md`（`gf` 不依賴 cwd）；草稿存在時的 `gh pr review … --body-file .maigo/…` 是要
+貼到 repo root 執行的指令字串，維持 repo-root 相對。
 """
 
 from __future__ import annotations
@@ -232,8 +235,13 @@ def shows_result(item_type: ItemType, status: BoardStatus, section: Section) -> 
 
 
 def _missing_draft_action(draft: str) -> str:
-    """`待送出` hint when `--maigo-root` shows the draft was never written."""
-    return f"尚無草稿：先起草 `{draft}`（`/maigo:review` §4.5 裁決 gate）"
+    """`待送出` hint when `--maigo-root` shows the draft was never written.
+
+    `draft` is the repo-root-relative `.maigo/…` path; the hint lands in a detail file under
+    `.maigo/i/`, so it is written relative to that file (`../review/<id>/draft.md`).
+    """
+    relative = f"../{draft.removeprefix('.maigo/')}"
+    return f"尚無草稿：先起草 `{relative}`（`/maigo:review` §4.5 裁決 gate）"
 
 
 _STATUS_META: dict[BoardStatus, StatusMeta] = {

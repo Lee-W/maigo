@@ -111,7 +111,7 @@ flowchart LR
 
 ## Rubric（🩵 燈）
 
-<rubric 摘要——詳見本次 review rubric 檔（pr-context-cache 印出的 rubric: 路徑）>
+<rubric 摘要——詳見同目錄的 rubric.md>
 
 ## Verdict（🟡 爽世）
 
@@ -133,6 +133,8 @@ APPROVE | REQUEST_CHANGES | BLOCKED
 
 <一句話總結>
 ```
+
+**報告正文引用同一次 review 的 rubric 時，寫檔案相對路徑**：rubric 與 review 同目錄，所以寫裸檔名 `rubric.md`（獨立成行、成為清單項、或包反引號，不緊貼中文標點）。不要照抄 pr-context-cache 印出的 `rubric:` 行——那是給程式讀的 repo-root 相對路徑（`.maigo/review/<id>/rubric.md`），在 `.maigo` 裡面開檔時 `gf` 解析不到。正例：`- 詳見 rubric.md`；反例：`- 詳見 .maigo/review/1/rubric.md`。已寫成後者的舊報告用 `scripts/rewrite_note_paths.py` 整理（預設乾跑）。
 
 PR 摘要的規則（單一 PR 與雙語版的英文 detail 都適用）：
 

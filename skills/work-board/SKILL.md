@@ -700,11 +700,12 @@ mtime 或刷新 board 不會改最後 review 時間。cleanup 刪掉同 source �
 
 真相層永遠是純 markdown 的 `.maigo/board.md`——agent 跟人都直接改它，不為排版
 混入 HTML wrapper。**maigo 不提供任何呈現層，也不會建議你裝 nvim plugin**：
-`.maigo/board.md` 就是最終產物，`:e` 開檔即讀即改。**入口契約**：從 repo root 開 `.maigo/board.md`
-（`.maigo` 是指向 state 目錄的 symlink，原始碼路徑只在 cwd 為 repo root 時 `gf`／`gF` 開得到）。
+`.maigo/board.md` 就是最終產物，`:e` 開檔即讀即改。**沒有入口契約**：從 repo root、`cd .maigo` 之後或任何 cwd 開都行——
+`.maigo` 內部的連結（索引行、細節檔筆記）都是檔案相對，`gf` 不依賴 cwd。唯一的例外是原始碼路徑（`src/x.py:12`）：
+它維持 repo-root 相對，在 `.maigo` 裡開不了，要先 `:cd` 到 repo root（沒有被解決，只是寫明）。
 
 本節是 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 在 board.md 與 i/ 細節檔上的具體應用；
-nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）都在那份規範。
+nvim 行為的前提與實測依據（Neovim 核心預設；實測涵蓋 repo root、`.maigo`、state 目錄與其他 cwd）都在那份規範。
 
 1. **用 `/` 與 `gO` 在四個區之間移動**：四個 `## ` section 標題是純文字，`/我的下一件`、`/待我 review`、`/等別人`
    直接命中；filetype plugin 開啟時（一般預設）`gO` 會列出標題大綱。Neovim 預設**沒有** fold
@@ -727,7 +728,8 @@ nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）
    或包反引號、不緊貼中文／全形標點（緊貼時 `gf` 會把標籤一起當檔名，見
    [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 路徑規則第 6 條）；
    `檔案:行號` 的原始碼路徑用 `gF`，游標停在路徑部分。舊寫法 `.maigo/review/9301/review.md`
-   只在 cwd 為 repo root 時可跳、`review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔；
+   只在 cwd 為 repo root 時可跳（在 `.maigo` 裡面開就解析不到）、`review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔；
+   報告正文裡指向 rubric 的路徑也一樣要寫檔案相對（同目錄的 `rubric.md`），`gh … --body-file .maigo/…` 這類要貼到 repo root 執行的指令字串則維持原樣、不是 `gf` 的對象；
    命令不會改寫既有筆記，要整理用 `python3 <maigo-root>/scripts/rewrite_note_paths.py <repo root>`（預設乾跑，印出改前改後整行與「未掃描：N」；
    `--apply` 才寫；詳見 `--help`）。
    範圍：`i/*.md` 細節檔（`## 判斷` 起）與 `review/<id>/`、`pr/<id>/` 底下的報告類檔案（`review.md`、`rubric.md`、`pr-comments.md`，

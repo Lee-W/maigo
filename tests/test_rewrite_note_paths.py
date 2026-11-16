@@ -295,7 +295,7 @@ def _facts(**over) -> str:
 
 def test_script_written_fact_lines_have_no_glued_paths():
     missing = (
-        "尚無草稿：先起草 `.maigo/review/1/draft.md`（`/maigo:review` §4.5 裁決 gate）"
+        "尚無草稿：先起草 `../review/1/draft.md`（`/maigo:review` §4.5 裁決 gate）"
     )
     variants = [
         _facts(),
