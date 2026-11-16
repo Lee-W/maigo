@@ -728,8 +728,11 @@ nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）
    [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 路徑規則第 6 條）；
    `檔案:行號` 的原始碼路徑用 `gF`，游標停在路徑部分。舊寫法 `.maigo/review/9301/review.md`
    只在 cwd 為 repo root 時可跳、`review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔；
-   命令不會改寫既有筆記，要整理用 `python3 <maigo-root>/scripts/rewrite_note_paths.py <repo root>`（預設乾跑，印出改前改後整行；
+   命令不會改寫既有筆記，要整理用 `python3 <maigo-root>/scripts/rewrite_note_paths.py <repo root>`（預設乾跑，印出改前改後整行與「未掃描：N」；
    `--apply` 才寫；詳見 `--help`）。
+   範圍：`i/*.md` 細節檔（`## 判斷` 起）與 `review/<id>/`、`pr/<id>/` 底下的報告類檔案（`review.md`、`rubric.md`、`pr-comments.md`，
+   整檔扣除 code fence、HTML 註解與 `pr-context-cache` 區段）；報告檔**只改解析後落在 `.maigo` 內且存在的路徑**，原始碼路徑一個字都不動；
+   `draft.md`、`inline-comments.md`、`reply-draft.md`、`follow-up-issue.md` 等會貼到 GitHub 的草稿與其他未登記檔名不掃。
    script 只改「筆記引用檔案」形狀的路徑（行首、緊貼／接在中文字與全形標點之後、或接在 `Review report:` 這類英文冒號標籤之後）；前一個詞是其他 ASCII 的（指令、旗標、重導向、英文散文）不改並列為略過，寧可少改；它是啟發式，套用前仍請看乾跑清單。
 6. **勾 `[x]` 觸發 ack 與 `--learn`**：把 `- [ ]` 或 `1. [ ]` 改成 `[x]` 存檔即完成（見 §4a、§5），
    不需要額外命令；下次 `/maigo:board` 刷新會 ack 該 report，並列出「(`[x]` 或 `🔖`) 且沒有 `🧠`」的項目。
