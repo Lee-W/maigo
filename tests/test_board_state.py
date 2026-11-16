@@ -256,7 +256,7 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, None)
         assert result.status is bs.BoardStatus.PENDING_REVIEW
-        assert result.section is bs.Section.NEXT
+        assert result.section is bs.Section.REVIEW
         assert result.rank is bs.Rank.P4
         assert result.next_action == "/maigo:review <n>"
 
@@ -275,7 +275,7 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.BLOCKED)
         assert result.status is bs.BoardStatus.BALL_BACK
-        assert result.section is bs.Section.NEXT
+        assert result.section is bs.Section.REVIEW
         assert result.rank is bs.Rank.P2
         assert result.next_action == "/maigo:review <n>"
 
@@ -316,7 +316,7 @@ class TestClassifyReviewPr:
         }
         result = _classify(bs.ItemType.REVIEW_PR, gh_meta, bs.BoardStatus.APPROVE)
         assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
-        assert result.section is bs.Section.NEXT
+        assert result.section is bs.Section.REVIEW
         assert result.rank is bs.Rank.P1
         assert (
             result.next_action
@@ -366,7 +366,7 @@ class TestClassifyReviewPrLocalVerdictAt:
             local_verdict_at="2026-09-29T00:00:00Z",
         )
         assert result.status is bs.BoardStatus.UNPOSTED_VERDICT
-        assert result.section is bs.Section.NEXT
+        assert result.section is bs.Section.REVIEW
         assert result.rank is bs.Rank.P1
 
     def test_review_after_local_verdict_with_no_author_activity_keeps_verdict(self):
@@ -414,7 +414,7 @@ class TestClassifyReviewPrLocalVerdictAt:
             local_verdict_at="2026-09-29T00:00:00Z",
         )
         assert result.status is bs.BoardStatus.BALL_BACK
-        assert result.section is bs.Section.NEXT
+        assert result.section is bs.Section.REVIEW
         assert result.rank is bs.Rank.P2
 
     def test_missing_local_verdict_at_keeps_legacy_behavior(self):
@@ -771,9 +771,27 @@ class TestRankTotality:
             assert status in bs._STATUS_META
             assert isinstance(bs._STATUS_META[status].rank, bs.Rank)
 
-    def test_section_for_rank_is_total(self):
+    def test_section_for_is_total(self):
         for rank in bs.Rank:
-            assert bs._section_for_rank(rank) in set(bs.Section)
+            for item_type in bs.ItemType:
+                assert bs.section_for(rank, item_type) in set(bs.Section)
+
+    def test_review_items_in_action_ranks_land_in_review_section(self):
+        for rank in range(bs.Rank.P0, bs.Rank.P7 + 1):
+            assert (
+                bs.section_for(bs.Rank(rank), bs.ItemType.REVIEW_PR)
+                is bs.Section.REVIEW
+            )
+
+    def test_own_items_never_land_in_review_section(self):
+        for rank in bs.Rank:
+            for item_type in (bs.ItemType.OWN_PR, bs.ItemType.ISSUE):
+                assert bs.section_for(rank, item_type) is not bs.Section.REVIEW
+
+    def test_waiting_and_done_ranks_ignore_item_type(self):
+        for item_type in bs.ItemType:
+            assert bs.section_for(bs.Rank.P8, item_type) is bs.Section.WAITING
+            assert bs.section_for(bs.Rank.P9, item_type) is bs.Section.DONE
 
 
 class TestUnpostedVerdictRankOrder:

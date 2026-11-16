@@ -257,6 +257,29 @@ class TestParseBoard:
         assert sync.parse_board("## 🎯 你的球\n- [ ] x\n")["legacy"] is True
         assert sync.parse_board("## 🎯 下一件\n### 已 review\n")["legacy"] is True
 
+    def test_new_section_headings_parse(self):
+        text = (
+            "## 🎯 我的下一件（1）\n1. [ ] 🔀 WIP @me i/4.md — own\n\n"
+            "## 👀 待我 review（1）\n1. [ ] 👀 待 review @a i/5.md — theirs\n"
+        )
+        parsed = sync.parse_board(text)
+        assert parsed["legacy"] is False and parsed["errors"] == []
+        assert [(row["section"], row["type"]) for row in parsed["lines"]] == [
+            ("🎯", "🔀"),
+            ("👀", "👀"),
+        ]
+
+    def test_old_next_heading_is_alias_not_legacy(self):
+        parsed = sync.parse_board(
+            "## 🎯 下一件（1）\n1. [ ] 👀 待 review @a i/5.md — t\n"
+        )
+        assert parsed["legacy"] is False and parsed["errors"] == []
+        assert parsed["lines"][0]["section"] == "🎯"
+
+    def test_subheading_under_new_section_is_legacy(self):
+        assert sync.parse_board("## 👀 待我 review\n### 已 review\n")["legacy"] is True
+        assert sync.parse_board("## 🎯 我的下一件\n### x\n")["legacy"] is True
+
     def test_plan_refuses_legacy_board(self, tmp_path, gh):
         (tmp_path / ".maigo").mkdir()
         (tmp_path / ".maigo" / "board.md").write_text("## 🎯 你的球\n")

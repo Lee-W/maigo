@@ -139,7 +139,7 @@ Queue 還剩 **#Y**, **#Z** — 說 next（「好」/繼續/ok 都行）我再�
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 的 upsert 合約
 更新 `.maigo/board.md`：
 
-- `READY` → 🐛 行進 🎯 下一件（對應細節檔的 `## 判斷` 區留空，狀態詞已經講清楚下一步是接工）
+- `READY` → 🐛 行進 🎯 我的下一件（對應細節檔的 `## 判斷` 區留空，狀態詞已經講清楚下一步是接工）
 - `NEEDS_INFO` → 🐛 行進 ⏳ 等別人（`## 判斷` 區留空；缺什麼資訊寫進狀態詞後面的旁註，
   不是判斷句）
 - `DUP` / `CLOSE` → 🐛 行進 ✅ 最近結案，duplicate / close 理由寫進狀態詞後面的旁註

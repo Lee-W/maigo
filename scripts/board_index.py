@@ -5,11 +5,11 @@
 [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)），
 但這代表「現在該我動哪些」這句話沒有單一答案——13 個裝了 maigo 的 repo 各自
 一份 board，實測其中 maigo / commitizen / pycon-etl 三份互不相通且過期。這支
-腳本不重寫 board 的行文法，只把每個 repo 的「🎯 下一件」原樣抄一份到單一檔案。
+腳本不重寫 board 的行文法，只把每個 repo 的「🎯 我的下一件」與「👀 待我 review」原樣抄一份到單一檔案。
 
 **全程唯讀**：只讀 `<repo>/.maigo/board.md`，不寫回任何被掃描 repo 的 `board.md`
-內容本身，也不重新解析每一行的欄位或合併排序——只逐字複製 `## 🎯 下一件`
-整段。唯一的寫入動作是整份重寫 `~/.config/maigo/board-index.md`（這份索引檔
+內容本身，也不重新解析每一行的欄位或合併排序——只逐字複製 `## 🎯 我的下一件`（舊標題 `## 🎯 下一件` 也收）與
+`## 👀 待我 review` 兩段。唯一的寫入動作是整份重寫 `~/.config/maigo/board-index.md`（這份索引檔
 本身沒有手寫區、沒有 upsert 語意，每次重新產生，用 `Write` 沒有樂觀鎖疑慮）。
 
 **格式假設已用真實 board.md 驗證過、且證實不成立時要能安全失敗**：本 session
@@ -47,14 +47,17 @@ from pathlib import Path
 _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
 _DEFAULT_OUTPUT = Path("~/.config/maigo/board-index.md").expanduser()
 
-# 例：`> 最後刷新：2026-08-18 14:30 ｜ 🎯 3 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1`
-# 只抽日期與三個計數；`🧠` 欄位是 optional，不強制要求存在。
+# 例：`> 最後刷新：2026-08-18 14:30 ｜ 🎯 3 ｜ 👀 5 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1`
+# 只抽日期與計數；`👀`（四分區版才有）與 `🧠` 欄位是 optional，不強制要求存在。
 _HEADER_RE = re.compile(
     r"^>\s*最後刷新：\s*(?P<date>\S+(?:\s+\S+)?)\s*｜\s*🎯\s*(?P<todo>\d+)"
+    r"(?:\s*｜\s*👀\s*(?P<review>\d+))?"
     r"\s*｜\s*⏳\s*(?P<waiting>\d+)\s*｜\s*✅\s*(?P<done>\d+)",
     re.MULTILINE,
 )
-_NEXT_SECTION_HEADING_RE = re.compile(r"^## 🎯 下一件.*$", re.MULTILINE)
+# `## 🎯 我的下一件` 是現行標題，`## 🎯 下一件` 是三分區時代的舊標題，兩者都收。
+_NEXT_SECTION_HEADING_RE = re.compile(r"^## 🎯 (?:我的)?下一件.*$", re.MULTILINE)
+_REVIEW_SECTION_HEADING_RE = re.compile(r"^## 👀 待我 review.*$", re.MULTILINE)
 _ANY_SECTION_HEADING_RE = re.compile(r"^## .*$", re.MULTILINE)
 
 
@@ -64,19 +67,21 @@ class BoardHeader:
     todo: int
     waiting: int
     done: int
+    review: int | None = None  # 三分區舊版 board 沒有 `👀` 計數
 
 
 @dataclass(frozen=True)
 class BoardParseResult:
     ok: bool
     header: BoardHeader | None
-    next_section_lines: list[str] | None  # `## 🎯 下一件` 原始內容，逐字保留
+    next_section_lines: list[str] | None  # `## 🎯 …下一件` 原始內容，逐字保留
+    review_section_lines: list[str] | None = None  # `## 👀 待我 review`；舊版為 None
 
 
 def parse_board_text(text: str) -> BoardParseResult:
-    """解析 `board.md` 的 header 計數 ＋ `## 🎯 下一件` 整段原文。純函式。
+    """解析 `board.md` 的 header 計數 ＋ `## 🎯 …下一件` 與 `## 👀 待我 review` 兩段原文。純函式。
 
-    header 抽不到、或找不到 `## 🎯 下一件` 這個 heading（含舊版三分區行文法，
+    header 抽不到、或找不到 `## 🎯 我的下一件`／`## 🎯 下一件` 這個 heading（含舊版三分區行文法，
     heading 是 `## 🎯 你的球`）→ `ok=False`，兩個欄位都是 `None`——整份視為
     無法解析，不回傳只有一半資料的結果。
     """
@@ -90,15 +95,30 @@ def parse_board_text(text: str) -> BoardParseResult:
         todo=int(header_match.group("todo")),
         waiting=int(header_match.group("waiting")),
         done=int(header_match.group("done")),
+        review=(
+            int(header_match.group("review"))
+            if header_match.group("review") is not None
+            else None
+        ),
     )
 
-    body_start = heading_match.end()
+    review_match = _REVIEW_SECTION_HEADING_RE.search(text)
+    return BoardParseResult(
+        ok=True,
+        header=header,
+        next_section_lines=_section_body(text, heading_match),
+        review_section_lines=(
+            _section_body(text, review_match) if review_match is not None else None
+        ),
+    )
+
+
+def _section_body(text: str, heading: re.Match[str]) -> list[str]:
+    """heading 之後、下一個 `## ` 之前的原文行（逐字保留）。"""
+    body_start = heading.end()
     next_heading = _ANY_SECTION_HEADING_RE.search(text, pos=body_start)
     body_end = next_heading.start() if next_heading else len(text)
-    body = text[body_start:body_end]
-    lines = body.strip("\n").splitlines()
-
-    return BoardParseResult(ok=True, header=header, next_section_lines=lines)
+    return text[body_start:body_end].strip("\n").splitlines()
 
 
 @dataclass(frozen=True)
@@ -156,12 +176,24 @@ def build_index(entries: list[RepoBoardEntry], generated_at: str) -> str:
         assert entry.result.header is not None
         assert entry.result.next_section_lines is not None
         header = entry.result.header
+        review_count = f"👀 {header.review} ｜ " if header.review is not None else ""
         lines.append(
-            f"> 🎯 {header.todo} ｜ ⏳ {header.waiting} ｜ ✅ {header.done} "
-            f"｜ 最後刷新：{header.date}"
+            f"> 🎯 {header.todo} ｜ {review_count}⏳ {header.waiting} ｜ "
+            f"✅ {header.done} ｜ 最後刷新：{header.date}"
         )
         lines.append("")
+        review_lines = entry.result.review_section_lines
+        if review_lines is None:  # 三分區舊版：只有一段
+            lines.extend(entry.result.next_section_lines)
+            lines.append("")
+            continue
+        lines.append("**🎯 我的下一件**")
+        lines.append("")
         lines.extend(entry.result.next_section_lines)
+        lines.append("")
+        lines.append("**👀 待我 review**")
+        lines.append("")
+        lines.extend(review_lines)
         lines.append("")
 
     return "\n".join(lines).rstrip("\n") + "\n"

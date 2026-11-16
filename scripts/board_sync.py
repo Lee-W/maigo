@@ -110,8 +110,11 @@ def note_has_author_pending(note: str | None) -> bool:
 _DETAIL_ANYWHERE_RE = re.compile(r"i/\S+?\.md")
 _LINK_RE = re.compile(r"^- 連結：(\S+)", re.MULTILINE)
 _LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*<?(\S+?)>?(?=\s|$)", re.MULTILINE)
+# `## 🎯 下一件` 是舊版（三區時代）標題，只當讀取別名；寫出一律用 `## 🎯 我的下一件`。
 _SECTIONS = {
+    "## 🎯 我的下一件": "🎯",
     "## 🎯 下一件": "🎯",
+    "## 👀 待我 review": "👀",
     "## ⏳ 等別人": "⏳",
     "## ✅ 最近結案": "✅",
 }

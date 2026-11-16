@@ -88,9 +88,10 @@ class Rank(IntEnum):
 
 
 class Section(str, Enum):
-    """board.md 的三個區塊。永遠由 rank 推導，不獨立儲存。"""
+    """board.md 的四個區塊。永遠由 rank 與型別推導，不獨立儲存。"""
 
     NEXT = "🎯"
+    REVIEW = "👀"
     WAITING = "⏳"
     DONE = "✅"
 
@@ -208,10 +209,13 @@ _STATUS_META: dict[BoardStatus, StatusMeta] = {
 assert set(_STATUS_META) == set(BoardStatus), "每個 BoardStatus 都必須有 rank"
 
 
-def _section_for_rank(rank: Rank) -> Section:
-    """Rank → section：P0–P7 進 🎯、P8 進 ⏳、P9 進 ✅。"""
+def section_for(rank: Rank, item_type: ItemType) -> Section:
+    """
+    (Rank, 型別) → section：P0–P7 中 👀 進 `REVIEW`、🔀／🐛 進 `NEXT`；
+    P8 進 ⏳、P9 進 ✅（不分型別）。
+    """
     if rank <= Rank.P7:
-        return Section.NEXT
+        return Section.REVIEW if item_type is ItemType.REVIEW_PR else Section.NEXT
     if rank == Rank.P8:
         return Section.WAITING
     return Section.DONE
@@ -606,7 +610,7 @@ def classify(
         raise ValueError(f"unknown item_type: {item_type!r}")
     meta = _STATUS_META[status]
     return ClassifyResult(
-        section=_section_for_rank(meta.rank),
+        section=section_for(meta.rank, item_type),
         rank=meta.rank,
         status=status,
         next_action=meta.next_action,

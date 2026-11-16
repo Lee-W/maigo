@@ -1,5 +1,5 @@
 ---
-description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「下一件 / 等別人 / 最近結案」三區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
+description: 讀寫 `.maigo/board.md` Work Board——混合追蹤 issue、自己的 PR、在審的 PR，依單一優先序階梯排進「我的下一件 / 待我 review / 等別人 / 最近結案」四區，供 nvim 直接開檔閱讀。orchestrator 直跑，不 delegate 五人。
 allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_state.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/maigo_state_sync.py status:*), Read, Write, Edit
 ---
 
@@ -14,7 +14,7 @@ allowed-tools: Bash(gh api:*), Bash(gh issue view:*), Bash(gh pr view:*), Bash(g
 > 本檔的 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/…` 刻意不加引號：為了讓 `allowed-tools` 的前綴放行與替換後的命令字串字面一致；plugin 安裝路徑含空白時不支援。
 
 Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR、正在 review 的 PR
-全都放進 `.maigo/board.md`，依單一優先序排名（下一件事排最上面）分成三個 section。
+全都放進 `.maigo/board.md`，依單一優先序排名（下一件事排最上面）分成四個 section：自己要動手的（🎯 我的下一件）與輪到你審別人的（👀 待我 review）各一區，自己的在最上面。
 
 命令由 orchestrator 直跑，不動員五人；正典規格在
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
@@ -22,8 +22,8 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 ## 使用
 
 ```
-/maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新全板、印 🎯
-/maigo:board                # 無參數：對帳 .maigo/ 產物＋discovery 該 repo 指名你審的 PR，刷新全板、印 🎯 + 其他區計數
+/maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新全板、印 🎯 與 👀
+/maigo:board                # 無參數：對帳 .maigo/ 產物＋discovery 該 repo 指名你審的 PR，刷新全板、印 🎯 與 👀 + 其他區計數
 /maigo:board --all          # 刷新後印整板
 /maigo:board --reviews      # 只顯示現在需要我看的 PR（標題、貢獻者、最後 review）
 /maigo:board --reviewed <n...> # 等同在 board 勾 [x]：本地 ack 這版 report、勾上、加 🔖；不送 GitHub
@@ -71,7 +71,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 - URL 直接解析 owner / repo / issue-or-PR / number
 - 裸編號用 `gh api repos/<owner>/<repo>/issues/<n>`；有 `pull_request` key 就是 PR
 - PR 再比對 `gh api user --jq .login` 與 author，分成 🔀 你的 PR / 👀 在審的 PR
-- 抓不到就標狀態詞 `抓不到`（rank P0，併進 🎯 最上面），附錯誤末行
+- 抓不到就標狀態詞 `抓不到`（rank P0，併進 🎯 或 👀 最上面，依型別），附錯誤末行
 
 加入時以 `#<n>` 或 `owner/repo#<n>` 為 key upsert；既有 checkbox 與 `🧠` 狀態必須保留。
 使用者明確加入的 target 要**先**呼叫 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py revive --reason manual <url...>`
@@ -150,8 +150,8 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
 5. **寫回**——用 `Edit`（不整份 `Write`）：依 rank 升序 ＋ 同 rank 內加權（`board-weights.txt`，可選，
    只在同 rank 內調整、不改 rank／section，規則見
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
-   ＋ 同 rank 同加權內 `updatedAt` 升序寫回 🎯 的編號清單
-   （`⏳`/`✅` 依 `updatedAt` 降序、無編號）；行內容用 `index_entry`，加最終 checkbox、badge、編號。
+   ＋ 同 rank 同加權內 `updatedAt` 升序寫回 🎯 與 👀 的編號清單（兩區各自從 1 編號；🔀／🐛 進 🎯、👀 進 👀）
+   （`⏳`/`✅` 自己的在前、👀 在後，各群內 `updatedAt` 降序、無編號）；行內容用 `index_entry`，加最終 checkbox、badge、編號。
    - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）。checkbox 一律以 `board_state` 回傳
      的 `checked` 為準：👀 勾了卻回 `no_report` 或 `head_changed`，若分類結果仍是待看
      （`needs_review`），該行自動取消勾，並在對話警告「#n 沒有本版 report／head 已變，未標記已看完；
@@ -209,7 +209,7 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。�
 
 無參數與 `<targets...>` 先印「現在要看的 PR」：從完整分類結果取 `needs_review=true`，
 列出 PR 標題、貢獻者、狀態、最後 review 時間；沒有就明說目前沒有待看的 PR。
-再印 🎯「下一件」的前幾行 ＋ 其他區計數 ＋ board.md 路徑；另外**只在有內容時**列出以下摘要
+再印 🎯「我的下一件」與 👀「待我 review」的前幾行 ＋ 其他區計數 ＋ board.md 路徑；另外**只在有內容時**列出以下摘要
 （對話是拋棄式的，真相仍在 board.md，不另造閱讀層）：
 
 - `overflow`：超過 `--max-new` 沒補進來的項目（編號、標題、作者），下次刷新接著補；
@@ -292,7 +292,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maig
 
 印出輸出檔 `~/.config/maigo/board-index.md` 的路徑。**不影響本地 `board.md`
 的行文法／upsert 規則**——`board_index.py` 全程唯讀，只讀各 repo 的
-`board.md`、逐字複製 `## 🎯 下一件` 整段，不重寫任何被掃描 repo 的內容，也不
+`board.md`、逐字複製 `## 🎯 我的下一件`（舊標題 `## 🎯 下一件` 也收）與 `## 👀 待我 review` 兩段，不重寫任何被掃描 repo 的內容，也不
 新增獨立命令（併入這個 flag）。正典規格見
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
 

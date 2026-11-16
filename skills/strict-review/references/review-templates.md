@@ -174,7 +174,7 @@ How to apply: fetch threads via GraphQL `reviewThreads` (REST has no `isResolved
 per thread, whether it is resolved and who wrote the last comment. Also list what the
 user's pending (unsubmitted) review already contains, so inline comments aren't queued
 twice. The Work Board's possession rules (a submitted review, approve included, with no
-new activity afterwards parks the PR in ⏳; new author activity flips it back to 🎯) are in
+new activity afterwards parks the PR in ⏳; new author activity flips it back to 👀) are in
 [`work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) §2 and
 already cover the board side — this note covers only what a *draft* should keep.
 

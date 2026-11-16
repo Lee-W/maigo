@@ -28,6 +28,28 @@ _NEW_STYLE_BOARD = """\
 - [x] 👀 APPROVE（merged 07-12） 🧠 i/9303.md — Add structured review verdicts
 """
 
+_FOUR_SECTION_BOARD = """\
+# Work Board — Lee-W/maigo
+> 最後刷新：2026-11-16 09:30 ｜ 🎯 1 ｜ 👀 2 ｜ ⏳ 1 ｜ ✅ 1
+
+## 🎯 我的下一件（1）
+
+1. [ ] 🔀 CI 紅 @me i/9201.md — Own PR
+
+## 👀 待我 review（2）
+
+1. [ ] 👀 待 review @a i/9301.md — Review one
+2. [ ] 👀 ↩︎ 回你的球 @b i/9302.md — Review two
+
+## ⏳ 等別人（1）
+
+- [ ] 🔀 等 review @me i/9202.md — Waiting
+
+## ✅ 最近結案（1）
+
+- [x] 👀 APPROVE @a 🧠 i/9303.md — Done
+"""
+
 # 真實抽樣（2026-09-08，commitizen 的 .maigo/board.md）——舊版三分區行文法，
 # heading 是「## 🎯 你的球」而非「## 🎯 下一件」，header 計數仍抽得到。
 _OLD_STYLE_BOARD = """\
@@ -63,6 +85,37 @@ class TestParseBoardText:
         assert any("i/9101.md" in line for line in result.next_section_lines)
         # 只到下一個 section 為止，不吃進 ⏳ 等別人 的內容
         assert not any("i/9202.md" in line for line in result.next_section_lines)
+
+    def test_three_section_board_still_parses(self):
+        result = bi.parse_board_text(_NEW_STYLE_BOARD)
+
+        assert result.ok is True
+        assert result.header.review is None
+        assert result.review_section_lines is None
+
+    def test_four_section_board_copies_both_action_sections(self):
+        result = bi.parse_board_text(_FOUR_SECTION_BOARD)
+
+        assert result.ok is True
+        assert (result.header.todo, result.header.review) == (1, 2)
+        assert (result.header.waiting, result.header.done) == (1, 1)
+        assert [ln for ln in result.next_section_lines if "i/" in ln] == [
+            "1. [ ] 🔀 CI 紅 @me i/9201.md — Own PR"
+        ]
+        assert len([ln for ln in result.review_section_lines if "i/" in ln]) == 2
+        assert not any("i/9202" in ln for ln in result.review_section_lines)
+
+    def test_four_section_board_is_rendered_with_both_sections(self, tmp_path: Path):
+        repo = tmp_path / "maigo"
+        (repo / ".maigo").mkdir(parents=True)
+        (repo / ".maigo" / "board.md").write_text(_FOUR_SECTION_BOARD, encoding="utf-8")
+
+        index = bi.build_index([bi.scan_repo_board(repo)], "2026-11-16 00:00 UTC")
+
+        assert "> 🎯 1 ｜ 👀 2 ｜ ⏳ 1 ｜ ✅ 1" in index
+        assert index.index("**🎯 我的下一件**") < index.index("i/9201.md")
+        assert index.index("i/9201.md") < index.index("**👀 待我 review**")
+        assert index.index("**👀 待我 review**") < index.index("i/9301.md")
 
     def test_old_style_three_section_board_is_unparseable(self):
         result = bi.parse_board_text(_OLD_STYLE_BOARD)

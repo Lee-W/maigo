@@ -192,13 +192,16 @@ def board_lines(root: Path) -> list[str]:
 SKILL_BOARD = """\
 # Work Board — Lee-W/maigo
 
-> 最後刷新：2026-08-18 14:30 ｜ 🎯 3 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1
+> 最後刷新：2026-08-18 14:30 ｜ 🎯 2 ｜ 👀 1 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1
 
-## 🎯 下一件（3）
+## 🎯 我的下一件（2）
 
 1. [ ] 🔀 CHANGES_REQUESTED @Lee-W i/9201.md — Redesign Work Board reading view
-2. [x] 👀 ↩︎ 回你的球 @contributor i/9301.md — Avoid duplicate GitHub requests
-3. [ ] 🐛 待 triage @reporter 💤 i/9101.md — CLI 在空設定檔時會 crash
+2. [ ] 🐛 待 triage @reporter 💤 i/9101.md — CLI 在空設定檔時會 crash
+
+## 👀 待我 review（1）
+
+1. [x] 👀 ↩︎ 回你的球 @contributor i/9301.md — Avoid duplicate GitHub requests
 
 ## ⏳ 等別人（2）
 
@@ -218,7 +221,7 @@ EXTRA_LINES = [
 
 
 def _as_board(line: str) -> str:
-    heading = "## 🎯 下一件（1）" if line[0].isdigit() else "## ⏳ 等別人（1）"
+    heading = "## 🎯 我的下一件（1）" if line[0].isdigit() else "## ⏳ 等別人（1）"
     return f"# Work Board — {REPO}\n\n{heading}\n\n{line}\n"
 
 
@@ -260,8 +263,7 @@ def test_t1_author_pending_line_round_trips():
 
 def test_t2_whole_file_round_trip_is_byte_identical():
     parsed = sync.parse_board(SKILL_BOARD)
-    rows = {s: [ln for ln in parsed["lines"] if ln["section"] == s] for s in "🎯⏳✅"}
-    rows = {"🎯": rows["🎯"], "⏳": rows["⏳"], "✅": rows["✅"]}
+    rows = {s: [ln for ln in parsed["lines"] if ln["section"] == s] for s in "🎯👀⏳✅"}
     flat = [r for section in rows.values() for r in section]
     rendered = refresh.render_board(
         repo="Lee-W/maigo",
@@ -339,7 +341,8 @@ def test_overflow_never_prints_bare_at():
     assert refresh.author_token("octocat") == "@octocat"
     summary = {
         "applied": False, "board_path": "b", "pending_reviews": [], "top": [],
-        "counts": {"🎯": 0, "⏳": 0, "✅": 0}, "warnings": [], "errors": [],
+        "top_review": [],
+        "counts": {"🎯": 0, "👀": 0, "⏳": 0, "✅": 0}, "warnings": [], "errors": [],
         "pending_orphans": [], "removed": [], "revived": [], "unattributed": [],
         "excluded_detail_files": [], "detail_writes": [], "detail_deletes": [],
         "ledger_events": [], "learn_pending": 0,
@@ -526,7 +529,7 @@ def test_t7_sort_and_counts(tmp_path, gh):
     gh.prs[6] = pr_meta(6, author="me", updated="2026-09-20T00:00:00Z")
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     lines = board_lines(tmp_path)
-    assert lines[2] == "> 最後刷新：2026-10-01 12:00 ｜ 🎯 4 ｜ ⏳ 2 ｜ ✅ 0"
+    assert lines[2] == "> 最後刷新：2026-10-01 12:00 ｜ 🎯 1 ｜ 👀 3 ｜ ⏳ 2 ｜ ✅ 0"
     order = [
         ln.split(" i/")[1].split(".md")[0]
         for ln in lines
@@ -537,7 +540,131 @@ def test_t7_sort_and_counts(tmp_path, gh):
         ln.split(" i/")[1].split(".md")[0] for ln in lines if ln.startswith("- [")
     ]
     assert waiting == ["6", "5"]  # newest first
-    assert "## 🎯 下一件（4）" in lines and "## ✅ 最近結案（0）" in lines
+    assert "## 🎯 我的下一件（1）" in lines and "## 👀 待我 review（3）" in lines
+    assert "## ✅ 最近結案（0）" in lines
+
+
+# --- sections: own work and reviews are separate --------------------------------
+
+
+def section_rows(root: Path) -> dict[str, list[str]]:
+    """Item lines of the written board, grouped by `## ` heading glyph."""
+    out: dict[str, list[str]] = {}
+    current = ""
+    for ln in board_lines(root):
+        if ln.startswith("## "):
+            current = ln[3]
+            out[current] = []
+        elif current and ln[:1] in {"-", "1", "2", "3", "4", "5", "6", "7", "8", "9"}:
+            if "[" in ln[:8]:
+                out[current].append(ln)
+    return out
+
+
+def test_airflow_scale_own_rows_head_the_file(tmp_path, gh):
+    reviews = list(range(1, 56))
+    focus = [row(n, numbered=True) for n in reviews]
+    focus += [
+        row(101, icon="🔀", status="CI 紅", author="me"),
+        row(102, icon="🔀", status="有衝突", author="me"),
+        row(103, icon="🐛", status="待 triage", author="rep"),
+    ]
+    write_board(tmp_path, board_text(focus=focus))
+    for n in reviews + [101, 102]:
+        put_detail(tmp_path, n)
+    put_detail(tmp_path, 103, kind="issues", icon="🐛", status="待 triage")
+    for n in reviews:
+        gh.prs[n] = pr_meta(n, updated=f"2026-09-{1 + n % 28:02d}T00:00:00Z")
+    gh.prs[101] = pr_meta(
+        101, author="me", statusCheckRollup=[{"conclusion": "FAILURE"}]
+    )
+    gh.prs[102] = pr_meta(102, author="me", mergeable="CONFLICTING")
+    gh.issues[103] = issue_meta(103)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    sections = section_rows(tmp_path)
+    first_item = next(ln for ln in board_lines(tmp_path) if sync._ITEM_RE.match(ln))
+    assert " 🔀 " in first_item or " 🐛 " in first_item
+    assert len(sections["🎯"]) == 3
+    assert all("👀" not in ln.split(" i/")[0] for ln in sections["🎯"])
+    assert [ln.split(".")[0] for ln in sections["🎯"]] == ["1", "2", "3"]
+    assert len(sections["👀"]) == 55
+    assert [ln.split(".")[0] for ln in sections["👀"]] == [str(i) for i in range(1, 56)]
+    assert all("👀" in ln.split(" i/")[0] for ln in sections["👀"])
+
+
+def test_boost_reorders_within_review_section(tmp_path, gh):
+    setup_weight_prs(tmp_path, gh, AUTHORS)
+    (tmp_path / ".maigo" / "board-weights.txt").write_text("author:kaxil\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    review = section_rows(tmp_path)["👀"]
+    assert [int(ln.split(" i/")[1].split(".md")[0]) for ln in review] == [3, 1, 2, 4]
+
+
+def test_waiting_and_done_list_own_rows_first(tmp_path, gh):
+    old = "2026-09-29T00:00:00Z"
+    wait = [
+        row(1, icon="👀", status="已看完", numbered=False),
+        row(2, icon="🔀", status="等 review", author="me", numbered=False),
+    ]
+    done = [
+        row(3, icon="👀", status="merged", numbered=False),
+        row(4, icon="🔀", status="merged", author="me", numbered=False),
+    ]
+    write_board(tmp_path, board_text(wait=wait, done=done))
+    for n in (1, 2, 3, 4):
+        put_detail(tmp_path, n)
+    gh.prs[1] = pr_meta(
+        1,
+        updated="2026-09-30T10:00:00Z",
+        reviews=[{"author": {"login": "me"}, "state": "COMMENTED", "submittedAt": old}],
+    )
+    gh.prs[2] = pr_meta(2, author="me", updated="2026-09-01T00:00:00Z")
+    gh.prs[3] = pr_meta(
+        3, state="MERGED", mergedAt=RECENT, updated="2026-09-30T10:00:00Z"
+    )
+    gh.prs[4] = pr_meta(
+        4, author="me", state="MERGED", mergedAt=RECENT, updated="2026-09-01T00:00:00Z"
+    )
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    sections = section_rows(tmp_path)
+    for glyph, own, theirs in (("⏳", 2, 1), ("✅", 4, 3)):
+        order = [int(ln.split(" i/")[1].split(".md")[0]) for ln in sections[glyph]]
+        assert order == [own, theirs]  # own first even though it is older
+
+
+def test_unreachable_review_row_goes_to_review_section(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(focus=[row(1), row(2, icon="🔀", status="CI 紅", author="me")]),
+    )
+    put_detail(tmp_path, 1)
+    put_detail(tmp_path, 2)
+    gh.prs[2] = pr_meta(2, author="me")
+    gh.fail = {1}
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    sections = section_rows(tmp_path)
+    assert [ln for ln in sections["👀"] if "抓不到" in ln and "i/1.md" in ln]
+    assert all("i/1.md" not in ln for ln in sections["🎯"])
+
+
+def test_old_three_section_board_normalizes_to_four_sections(tmp_path, gh, capsys):
+    focus = [row(n) for n in (1, 2)] + [row(3, icon="🔀", status="CI 紅", author="me")]
+    write_board(tmp_path, board_text(focus=focus))
+    for n in (1, 2, 3):
+        put_detail(tmp_path, n)
+    for n in (1, 2):
+        gh.prs[n] = pr_meta(n)
+    gh.prs[3] = pr_meta(3, author="me", statusCheckRollup=[{"conclusion": "FAILURE"}])
+    before = tree_hash(tmp_path)
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert tree_hash(tmp_path) == before  # preview writes nothing
+    diff = summary["diff"]
+    assert "+## 👀 待我 review（2）" in diff and "+## 🎯 我的下一件（1）" in diff
+    assert "-## 🎯 下一件（3）" in diff
+    for n in (1, 2, 3):  # no row lost, only moved
+        assert f"i/{n}.md" in diff
+    assert summary["counts"] == {"🎯": 1, "👀": 2, "⏳": 0, "✅": 0}
 
 
 # --- board-weights: same-rank boost ---------------------------------------------

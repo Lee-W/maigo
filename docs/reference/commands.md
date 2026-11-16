@@ -208,13 +208,13 @@ orchestrator 判斷兩條路徑：
 ## `/maigo:board` — 跨 session Work Board
 
 把 issue、自己的 PR、正在 review 的 PR 放進同一份 `.maigo/board.md`，依單一優先序階梯排進
-🎯 下一件 / ⏳ 等別人 / ✅ 最近結案三個 section——真相層就是最終產物，`:e` 開檔即讀即改，
-maigo 不提供任何呈現層。🎯 區是編號清單，第一行就是下一件事；⏳ / ✅ 區是查閱用的
+🎯 我的下一件 / 👀 待我 review / ⏳ 等別人 / ✅ 最近結案四個 section——真相層就是最終產物，`:e` 開檔即讀即改，
+maigo 不提供任何呈現層。🎯 區（自己的 🔀／🐛）與 👀 區（別人的 PR）都是編號清單，第一行就是下一件事，自己的工作永遠在檔案最上面；⏳ / ✅ 區是查閱用的
 checkbox 清單。
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新
-/maigo:board                # 對帳 .maigo/ 產物、discovery 指名你審的 PR，刷新全板、只印 🎯 + 計數
+/maigo:board                # 對帳 .maigo/ 產物、discovery 指名你審的 PR，刷新全板、只印 🎯／👀 + 計數
 /maigo:board --all          # 印整板
 /maigo:board --reviews      # 現在要看的 PR：標題、貢獻者、最後 review 時間
 /maigo:board --reviewed <n...> # 等同勾 [x]：本地 ack 這版（不送 GitHub）、加 🔖

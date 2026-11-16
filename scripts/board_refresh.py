@@ -44,8 +44,14 @@ else:  # run as a script: scripts/ is on sys.path
     import board_sync as sync  # type: ignore[no-redef]  # noqa: E402
     import review_report  # type: ignore[no-redef]  # noqa: E402
 
-SECTIONS = ("🎯", "⏳", "✅")
-SECTION_TITLES = {"🎯": "## 🎯 下一件", "⏳": "## ⏳ 等別人", "✅": "## ✅ 最近結案"}
+SECTIONS = ("🎯", "👀", "⏳", "✅")
+SECTION_TITLES = {
+    "🎯": "## 🎯 我的下一件",
+    "👀": "## 👀 待我 review",
+    "⏳": "## ⏳ 等別人",
+    "✅": "## ✅ 最近結案",
+}
+ACTION_SECTIONS = ("🎯", "👀")  # numbered, rank-sorted; the other two are reference
 BADGE_ORDER = "🧠🔖💤"
 AGE_LIMIT = timedelta(days=7)
 BACKUP_KEEP = 10
@@ -202,6 +208,21 @@ def render_line(
     return line.rstrip()
 
 
+def render_row(row: dict, number: int | None) -> str:
+    """`render_line` for one row dict (shared by the board body and the summary)."""
+    return render_line(
+        number=number,
+        checked=row["checked"],
+        type=row["type"],
+        status=row["status"],
+        note=row.get("note"),
+        author=row.get("author"),
+        badges=row["badges"],
+        detail=row["detail"],
+        title=row["title"],
+    )
+
+
 def count_learn_pending(rows: list[dict]) -> int:
     """Rows that are (`[x]` or `🔖`) and have no `🧠` (SKILL.md §1, §5)."""
     return sum(
@@ -218,10 +239,10 @@ def render_board(
     rows_by_section: dict[str, list[dict]],
     learn_pending_count: int,
 ) -> str:
-    """Whole board.md per SKILL.md §1「Sections」; 🎯 is numbered from 1."""
+    """Whole board.md per SKILL.md §1「Sections」; 🎯 and 👀 are each numbered from 1."""
     counts = {s: len(rows_by_section.get(s, [])) for s in SECTIONS}
     header = (
-        f"> 最後刷新：{refreshed_at_local} ｜ 🎯 {counts['🎯']} ｜ "
+        f"> 最後刷新：{refreshed_at_local} ｜ 🎯 {counts['🎯']} ｜ 👀 {counts['👀']} ｜ "
         f"⏳ {counts['⏳']} ｜ ✅ {counts['✅']}"
     )
     if learn_pending_count > 0:
@@ -235,17 +256,7 @@ def render_board(
             block.append("")
             for index, row in enumerate(rows, start=1):
                 block.append(
-                    render_line(
-                        number=index if section == "🎯" else None,
-                        checked=row["checked"],
-                        type=row["type"],
-                        status=row["status"],
-                        note=row.get("note"),
-                        author=row.get("author"),
-                        badges=row["badges"],
-                        detail=row["detail"],
-                        title=row["title"],
-                    )
+                    render_row(row, index if section in ACTION_SECTIONS else None)
                 )
         blocks.append(block)
     for index, block in enumerate(blocks):
@@ -280,7 +291,8 @@ def compute_boost(row: dict, rules: list[WeightRule]) -> int:
 def sort_rows(
     section: str, rows: list[dict], rules: list[WeightRule] | None = None
 ) -> list[dict]:
-    """🎯: rank asc, boost asc, updated_at asc. ⏳/✅: updated_at desc (no boost).
+    """🎯/👀: rank asc, boost asc, updated_at asc. ⏳/✅: own rows (🔀/🐛) before 👀 rows,
+    each group updated_at desc (no boost).
 
     Missing time = oldest. Boost only reorders within one rank; it never moves a row
     across ranks or sections.
@@ -289,7 +301,7 @@ def sort_rows(
     def tiebreak(row: dict) -> tuple:
         return row.get("key") or ("", "", 0)
 
-    if section == "🎯":
+    if section in ACTION_SECTIONS:
         active = rules or []
         return sorted(
             rows,
@@ -300,7 +312,14 @@ def sort_rows(
                 tiebreak(r),
             ),
         )
-    return sorted(rows, key=lambda r: (-_epoch(r.get("updated_at")), tiebreak(r)))
+    return sorted(
+        rows,
+        key=lambda r: (
+            r.get("type") == "👀",
+            -_epoch(r.get("updated_at")),
+            tiebreak(r),
+        ),
+    )
 
 
 def split_detail(text: str) -> tuple[str, str]:
@@ -698,6 +717,13 @@ def _status_rank(status: str) -> int:
         return int(board_state.Rank.P9)
 
 
+def _section_of(item_type: str, rank: int) -> str:
+    """Section glyph for a (type, rank) pair; same rule as `board_state.section_for`."""
+    return board_state.section_for(
+        board_state.Rank(rank), board_state.ItemType(item_type)
+    ).value
+
+
 def _row_from_line(entry: Entry, g: Gathered) -> dict:
     line = entry.line
     assert line is not None
@@ -707,7 +733,8 @@ def _row_from_line(entry: Entry, g: Gathered) -> dict:
         "type": line["type"], "status": line["status"], "note": line["note"],
         "author": line["author"], "badges": list(line["badges"]),
         "detail": line["detail"], "title": line["title"], "checked": line["checked"],
-        "section": line["section"], "rank": _status_rank(line["status"]),
+        "section": _section_of(line["type"], _status_rank(line["status"])),
+        "rank": _status_rank(line["status"]),
         "updated_at": last_drop, "mode": "keep", "gh_meta": None,
     }  # fmt: skip
 
@@ -745,18 +772,21 @@ def _unreachable_row(entry: Entry, g: Gathered) -> dict:
         if row["note"] and not _is_error_note(row["note"]):
             note = row["note"]  # keep the hand-written / command-written note
         row.update(
-            error=entry.fetch["error"], status=UNREACHABLE, note=note, section="🎯", rank=0,
+            error=entry.fetch["error"], status=UNREACHABLE, note=note,
+            section=_section_of(row["type"], 0), rank=0,
             updated_at=None, mode="keep",
         )  # fmt: skip
         return row
     detail = board_state.detail_path(entry.url, g.repo) or ""
     hint = (entry.addition or {}).get("type_hint")
     kind_issue = "/issues/" in entry.url
+    item_type = hint or ("🐛" if kind_issue else "👀")
     return {
         "origin": entry.origin, "url": entry.url, "key": entry.key,
-        "type": hint or ("🐛" if kind_issue else "👀"), "status": UNREACHABLE,
+        "type": item_type, "status": UNREACHABLE,
         "note": note, "author": "", "badges": [], "detail": detail,
-        "title": sync._short_ref(entry.url), "checked": False, "section": "🎯",
+        "title": sync._short_ref(entry.url), "checked": False,
+        "section": _section_of(item_type, 0),
         "rank": 0, "updated_at": None, "mode": "new-unreachable", "gh_meta": None,
         "error": entry.fetch["error"],
     }  # fmt: skip
@@ -1254,27 +1284,20 @@ def run_refresh(
 
 def summarize(g: Gathered, built: Built) -> dict:
     sections = built.rows_by_section
-    top = [
-        render_line(
-            number=i,
-            checked=r["checked"],
-            type=r["type"],
-            status=r["status"],
-            note=r.get("note"),
-            author=r.get("author"),
-            badges=r["badges"],
-            detail=r["detail"],
-            title=r["title"],
-        )  # fmt: skip
-        for i, r in enumerate(sections["🎯"][:5], start=1)
-    ]
+    top = {
+        section: [
+            render_row(row, i) for i, row in enumerate(sections[section][:5], start=1)
+        ]
+        for section in ACTION_SECTIONS
+    }
     return {
         "exit_reason": "ok",
         "board_path": str(g.board_path),
         "counts": {s: len(sections[s]) for s in SECTIONS},
         "learn_pending": built.learn_pending,
         "pending_reviews": built.pending_reviews,
-        "top": top,
+        "top": top["🎯"],
+        "top_review": top["👀"],
         "warnings": built.warnings,
         "ack_results": [
             {k: v for k, v in r.items() if k != "simulated_review"}
@@ -1317,11 +1340,14 @@ def format_summary(summary: dict) -> str:
             out.append(f"- {p['title']}{who} ｜ {p['status']} ｜ 最後 review：{when}")
     else:
         out.append("\n目前沒有待看的 PR。")
-    out.append("\n🎯 下一件（前 5 行）")
+    out.append("\n🎯 我的下一件（前 5 行）")
     out.extend(summary["top"] or ["（空）"])
+    out.append("\n👀 待我 review（前 5 行）")
+    out.extend(summary["top_review"] or ["（空）"])
     c = summary["counts"]
     out.append(
-        f"\n🎯 {c['🎯']} ｜ ⏳ {c['⏳']} ｜ ✅ {c['✅']} ｜ {summary['board_path']}"
+        f"\n🎯 {c['🎯']} ｜ 👀 {c['👀']} ｜ ⏳ {c['⏳']} ｜ ✅ {c['✅']}"
+        f" ｜ {summary['board_path']}"
     )
     if summary["overflow"]:
         out.append(f"\noverflow（{len(summary['overflow'])}，下次刷新接著補）")

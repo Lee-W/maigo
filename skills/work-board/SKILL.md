@@ -1,6 +1,6 @@
 ---
 name: work-board
-description: This skill should be used when reading, writing, or migrating `.maigo/board.md` — the single cross-session Work Board that tracks issues to triage, your own PRs, and PRs you're reviewing, ranked into a single priority ladder (🎯 下一件 / ⏳ 等別人 / ✅ 最近結案). Covers the line grammar, possession-判定 tables per item type, the upsert contract each writing command follows, the review-board.md migration path, and the checkbox → `--learn` memory gate.
+description: This skill should be used when reading, writing, or migrating `.maigo/board.md` — the single cross-session Work Board that tracks issues to triage, your own PRs, and PRs you're reviewing, ranked into a single priority ladder (🎯 我的下一件 / 👀 待我 review / ⏳ 等別人 / ✅ 最近結案). Covers the line grammar, possession-判定 tables per item type, the upsert contract each writing command follows, the review-board.md migration path, and the checkbox → `--learn` memory gate.
 ---
 
 <!-- mkdocs-include-start -->
@@ -22,7 +22,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 `scripts/board_index.py`（`/maigo:board --cross-repo` 觸發）產生——回答「這台
 機器裝了 maigo 的所有 repo，現在該我動哪些」這句話，**不是另一份 `board.md`
 正典**。每次重新產生、沒有手寫區、沒有 upsert 語意；只逐字複製各 repo
-`board.md` 的 `## 🎯 下一件` 整段，不重新解析或合併排序。跟本節下面講的
+`board.md` 的 `## 🎯 我的下一件`（舊版標題 `## 🎯 下一件` 也收）與 `## 👀 待我 review` 兩段，不重新解析或合併排序。跟本節下面講的
 `board.md` 單一 repo 內的行文法、upsert 合約是完全不同的東西。
 
 ## Why this skill exists
@@ -34,18 +34,21 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ## 1. `.maigo/board.md` 格式規格
 
-### Sections（固定順序，三個 `## ` section）
+### Sections（固定順序，四個 `## ` section）
 
 ```markdown
 # Work Board — Lee-W/maigo
 
-> 最後刷新：2026-08-18 14:30 ｜ 🎯 3 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1
+> 最後刷新：2026-08-18 14:30 ｜ 🎯 2 ｜ 👀 1 ｜ ⏳ 2 ｜ ✅ 1 ｜ 🧠 待學習盤點 1
 
-## 🎯 下一件（3）
+## 🎯 我的下一件（2）
 
 1. [ ] 🔀 CHANGES_REQUESTED @Lee-W i/9201.md — Redesign Work Board reading view
-2. [x] 👀 ↩︎ 回你的球 @contributor i/9301.md — Avoid duplicate GitHub requests
-3. [ ] 🐛 待 triage @reporter 💤 i/9101.md — CLI 在空設定檔時會 crash
+2. [ ] 🐛 待 triage @reporter 💤 i/9101.md — CLI 在空設定檔時會 crash
+
+## 👀 待我 review（1）
+
+1. [x] 👀 ↩︎ 回你的球 @contributor i/9301.md — Avoid duplicate GitHub requests
 
 ## ⏳ 等別人（2）
 
@@ -78,11 +81,16 @@ description: This skill should be used when reading, writing, or migrating `.mai
 細節檔格式規格見 §1a；欄位省略規則（`作者`／`規模`／`下一步` 何時整行不寫）與 upsert
 生命週期（建立/更新/回收/孤兒偵測）也在該節。
 
-- **🎯 下一件**：Rank P0–P7，**編號清單**（`1. [ ]`），第 1 行就是下一件事。
+- **🎯 我的下一件**：Rank P0–P7 的 🔀／🐛（你自己開的 PR、你在處理的 issue），**編號清單**
+  （`1. [ ]`），第 1 行就是下一件事。自己的工作永遠在檔案最上面，不會被一長串 review 淹沒。
+- **👀 待我 review**：Rank P0–P7 的 👀（別人的 PR，輪到你審），同樣是**編號清單**、獨立從 1 編號。
+  區落點只看 rank 與型別：`section_for(rank, 型別)`——P0–P7 時 👀 進這區、🔀／🐛 進 🎯。
 - **⏳ 等別人**：Rank P8，checkbox 清單、無編號——球不在你手上，這區是查閱，不是待辦。
+  區內自己的（🔀／🐛）排前面、再排 👀，各群內 `updatedAt` 降序。
 - **✅ 最近結案**：Rank P9，checkbox 清單、無編號，7 天後自動清（待盤點未完成的行——(`[x]` 或 `🔖`) 且沒有 `🧠`——不清）。
+  區內同樣自己的排前面、再排 👀。
 - 舊版另外兩個獨立 section（收 `gh` 抓不到的項目、收軟刪項目的那兩區）**已取消**：
-  `gh` 抓不到的項目改判 `抓不到`（P0），併進 🎯 最上面；`--drop` 改成把該行移進 ✅ 最近結案、狀態詞
+  `gh` 抓不到的項目改判 `抓不到`（P0），併進 🎯 或 👀 最上面（依型別）；`--drop` 改成把該行移進 ✅ 最近結案、狀態詞
   `已放棄`，跟其他結案行共用同一條 7 天老化規則，同時寫入排除紀錄（§3a），之後刷新不再補回。
 
 ### 行文法
@@ -96,7 +104,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 本節文法的程式鏡像，由 `tests/test_board_refresh.py` 的 round-trip 測試守著；改文法時兩邊一起改。
 
 ```text
-🎯 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
+🎯／👀 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
 ⏳/✅ 區：- [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
 ```
 
@@ -104,7 +112,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 - **一行一項、絕不換行**：`/` 搜尋與 `dd` 刪除都以行為單位；換行會讓兩者都失準。
 - **型別 emoji**：🐛 issue ｜ 🔀 你的 PR ｜ 👀 在審的 PR
-- **編號 ＋ checkbox 混排（僅 🎯 區）**：`1. [ ]`。使用者選定編號清單，checkbox 是學習閘門
+- **編號 ＋ checkbox 混排（僅 🎯、👀 兩區，各自從 1 編號）**：`1. [ ]`。使用者選定編號清單，checkbox 是學習閘門
   的唯一訊號（§5），兩者都要留；⏳/✅ 區是查閱不是待辦，維持無編號的 `- [ ]`。
 - **旁註**（沿用 review board 慣例，optional）：branch 名、closed 理由、linked PR、DRAFT、
   他人 review decision 這類「per-item 事實」寫在狀態詞後面的括弧裡
@@ -247,7 +255,11 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 會用 `prior_status` 重算每一行，未知或已停用的狀態詞視為 `None`（等同剛加入），自動
 正規化成新表的對應狀態——不需要手動遷移步驟，沿用既有「刷新即正規化」的遷移慣例。
 讀到舊版任何 section 標題（球權三分區時代的四個舊標題）時同樣吃得進來：取 checkbox /
-`🧠` / 狀態詞後，整檔以新骨架（三個 section）重寫，不做逐行 in-place 遷移。
+`🧠` / 狀態詞後，整檔以新骨架（四個 section）重寫，不做逐行 in-place 遷移。
+
+**`## 🎯 下一件`（三區時代的標題）是讀取別名，不是舊格式**：parser 把它當 🎯 區，所以三區的 board
+不會被判成舊格式、`refresh` 照常處理；寫出時一律改成 `## 🎯 我的下一件`，並把 👀 行重新分到
+`## 👀 待我 review`——script 就能完成這次遷移（有 CAS），不必走下面的整檔正規化。
 
 **但整檔重寫與 §3(a) 的「禁止整份 `Write`」會直接對撞——併發安全優先。** 舊格式遷移必然是
 整檔重寫，而 board 是跨 session 共用、不帶任務識別碼、且 `.maigo/` 被 gitignore（輾掉沒有
@@ -259,10 +271,14 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
 - **舊格式正規化**仍由 Claude 的 `/maigo:board` 完整刷新做——它本來就要重算每一行，是唯一有理由
   持有整檔的 Claude 寫入者；因為 script 看不到 `🔍 本批佇列` 的重判，也看不到其他 session。
 - **五個 delegate 命令的收尾 upsert**（review / triage-issue / take-issue / describe-pr /
-  address-comments）遇到舊格式時，**只 `Edit` 自己那一行，並沿用該檔當下的舊行文法**，把正規化
-  留給下一次 `/maigo:board`。**不要把一行新格式混進舊格式檔**——那會讓檔案同時有兩種文法，比
-  整檔仍是舊格式更難解析。寫完在回覆裡告訴使用者「board 仍是舊格式，正規化留給
+  address-comments）遇到真正的舊格式（球權三分區時代的舊標題）時，**只 `Edit` 自己那一行，並沿用該檔
+  當下的舊行文法**，把正規化留給下一次 `/maigo:board`。**不要把一行新格式混進舊格式檔**——那會讓檔案
+  同時有兩種文法，比整檔仍是舊格式更難解析。寫完在回覆裡告訴使用者「board 仍是舊格式，正規化留給
   `/maigo:board`」，不要靜默略過。
+- **新標題缺席時**（board 是三區、`## 🎯 下一件` 開頭，檔內沒有 `## 👀 待我 review`；這不是舊格式，
+  `refresh` 讀得進去）：👀 行照舊 append 到 `## 🎯` 開頭的那一區，不自己插入新標題、不整檔重寫；回覆裡
+  告訴使用者「board 還是三區，下次刷新會自動分區」。新骨架（檔內已有 `## 👀 待我 review`）下，👀 的
+  P0–P7 行 append 到 👀 區，🔀／🐛 的 P0–P7 行 append 到 🎯 區。
 - Claude 做舊格式整檔重寫前先確認沒有其他 session 正在寫（`ListAgents`；同一台機器多個 worktree
   各跑一個 session 時，它們共用這一份 board）。不確定就當作有。`refresh --apply` 不需要這一步，
   CAS 會在衝突時自己中止。
@@ -273,11 +289,11 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 
 ### 排序
 
-- 🎯 區：**rank 升序 → 同 rank 內加權（boost）升序 → `updatedAt` 升序**——排名先分先後，
+- 🎯／👀 區：**rank 升序 → 同 rank 內加權（boost）升序 → `updatedAt` 升序**——排名先分先後，
   同一級內先看使用者設定的加權，再看最久沒動的（沿用舊「責任感排序」的精神，但改成明確的
   `updatedAt`）。編號 `1. 2. 3.` 就是這個排序結果，排名本身不顯示在行內。
 - **同 rank 內加權**（使用者可設定）：只在同一個 rank 內調整先後，**不改 rank、不改 section**，
-  所以 P1 永遠排在 P4 的加權項目前面；⏳ / ✅ 區不套用；`--reviews` 檢視（`board_state.py`）只依
+  所以 P1 永遠排在 P4 的加權項目前面；加權在 👀 區照樣生效（👀 區就是它的主戰場）；⏳ / ✅ 區不套用；`--reviews` 檢視（`board_state.py`）只依
   rank 排序，**不套用加權**。加權規則放持久設定檔、由 `refresh` 每次重算，不把手動順序寫進
   `board.md`，所以刷新不會洗掉。設定檔（兩者都不存在＝無加權，行為與沒有這個功能時完全相同）：
   - repo 層：`<maigo-root>/.maigo/board-weights.txt`
@@ -299,7 +315,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
   author:FrankYang0529
   title:common\.ai|PydanticAI|LLMOperator|AgentOperator|DocumentLoader
   ```
-- ⏳ / ✅ 區：`updatedAt` 降序（這兩區是查閱，不是待辦）。
+- ⏳ / ✅ 區：自己的（🔀／🐛）在前、👀 在後，各群內 `updatedAt` 降序（這兩區是查閱，不是待辦）。
 - ✅ 區超過 7 天的行在刷新時自動清掉，清掉時同時寫入排除紀錄（`reason: aged`，§3a）
   （唯一例外：待盤點未完成的行〔(`[x]` 或 `🔖`) 且沒有 `🧠`〕不清，學完才走）。
   老化基準時間（`refresh` 實作）依序取 `mergedAt` → `closedAt` →（排除項目）排除紀錄的 `last_drop_at`
@@ -314,7 +330,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 1. URL → 直接解析 owner/repo + 型別 + 編號
 2. 裸編號 → `gh api repos/<owner>/<repo>/issues/<n>`，有 `pull_request` key ＝ PR
 3. PR 再看 `author.login` 是否等於 `gh api user --jq .login` → 🔀 vs 👀
-4. `gh` 抓不到 → 狀態詞 `抓不到`（P0，orchestrator 指派），併進 🎯 最上面，附錯誤末行
+4. `gh` 抓不到 → 狀態詞 `抓不到`（P0，orchestrator 指派），併進 🎯（🐛／🔀）或 👀（別人的 PR）最上面，附錯誤末行
 
 ### 刷新時抓的欄位
 
@@ -375,11 +391,11 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 |---|---|---|---|
 | merged / closed | `merged` / `closed` | ✅ | P9 |
 | `isDraft == true` | `他人草稿` | ⏳ | P8 |
-| report 的 head 與目前 head 不同，或最後 review／已看完／送出後有新 commit、作者留言 | `↩︎ 回你的球` → `/maigo:review <n>` | 🎯 | P2 |
+| report 的 head 與目前 head 不同，或最後 review／已看完／送出後有新 commit、作者留言 | `↩︎ 回你的球` → `/maigo:review <n>` | 👀 | P2 |
 | 使用者明確 `--reviewed` 本版 report，之後無新活動 | `已看完`；本地確認，不代表送出 GitHub | ⏳ | P8 |
-| 有本地 report / verdict，尚未確認且沒有這輪送出的 GitHub review | `待送出`；先看 report，再決定送出或 `--reviewed` | 🎯 | P1 |
+| 有本地 report / verdict，尚未確認且沒有這輪送出的 GitHub review | `待送出`；先看 report，再決定送出或 `--reviewed` | 👀 | P1 |
 | GitHub 已送出這輪 review，且無新活動 | 本地 verdict（若有）；否則 `已看完` | ⏳ | P8 |
-| 沒有本地 report 或已送出 review | `待 review` → `/maigo:review <n>` | 🎯 | P4 |
+| 沒有本地 report 或已送出 review | `待 review` → `/maigo:review <n>` | 👀 | P4 |
 
 `board_state.py --maigo-root <repo-root>` 讀 report 的明確時間與 head；舊報告才退回 mtime。
 `待送出` 的下一步：`.maigo/review/<id>/draft.md` 存在才給 `gh pr review --body-file` 指令，不存在時
@@ -463,7 +479,7 @@ board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔�
 
 | 命令 | 回寫時機 | 行為 |
 |---|---|---|
-| `/maigo:review` | 每顆 PR publish 後 | 依 report metadata + GitHub 重新 classify；待看／待送出 → 🎯，已看完／已送且無新活動 → ⏳；同步 title、貢獻者與審查時間 |
+| `/maigo:review` | 每顆 PR publish 後 | 依 report metadata + GitHub 重新 classify；待看／待送出 → 👀，已看完／已送且無新活動 → ⏳；同步 title、貢獻者與審查時間 |
 | `/maigo:triage-issue` | 每個 verdict 出爐 | `READY`→🎯（next: take）；`NEEDS_INFO`→⏳；`DUP`/`CLOSE`→✅，duplicate / close 理由放狀態旁註。board 是本地檔，不違反 triage「不主動寫 GitHub」原則 |
 | `/maigo:take-issue` | 開工時＋收尾 | 開工：issue 行標 `IN_PROGRESS` ＋ branch 名；收尾若開了 PR：新增 🔀 行、issue 行旁註 linked PR |
 | `/maigo:describe-pr` | PR 開出後（若使用者說已開） | 新增/更新對應 🔀 行 → ⏳ `等 review` |
@@ -565,7 +581,7 @@ head 已變 → `head_changed`；`unchecked` → `acknowledge --undo`。最終 �
 首次跑 `/maigo:board`（或某回寫命令要寫 board 時）偵測到 `.maigo/review-board.md`
 存在且 `board.md` 不存在：
 
-1. 讀舊檔，按分區映射搬行：`Active` + `↩︎ 回你的球` → 🎯；`Off-board` → ⏳；
+1. 讀舊檔，按分區映射搬行：`Active` + `↩︎ 回你的球` → 👀；`Off-board` → ⏳；
    `Merged/closed` → ✅；`🔍 本批佇列` → 依 §2 重判
 2. 解析舊行的 author / URL / 規模（`- #<PR> (<author>) …` 這個舊尾註形狀）→ 用
    [`detail_path()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
@@ -622,10 +638,10 @@ mtime 或刷新 board 不會改最後 review 時間。cleanup 刪掉同 source �
 本節是 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 在 board.md 與 i/ 細節檔上的具體應用；
 nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）都在那份規範。
 
-1. **用 `/` 與 `gO` 在三個區之間移動**：三個 `## ` section 標題是純文字，`/下一件`、`/等別人`
+1. **用 `/` 與 `gO` 在四個區之間移動**：四個 `## ` section 標題是純文字，`/我的下一件`、`/待我 review`、`/等別人`
    直接命中；filetype plugin 開啟時（一般預設）`gO` 會列出標題大綱。Neovim 預設**沒有** fold
    （實測 markdown 的 `foldmethod=manual`），所以 board 不依賴收合；自己設了 treesitter fold
-   的人，三個 `## ` 標題會是邊界，那是你的設定，不是 maigo 的承諾。
+   的人，四個 `## ` 標題會是邊界，那是你的設定，不是 maigo 的承諾。
 2. **`/狀態詞` 搜尋**：狀態詞是純文字（`待 triage`、`CHANGES_REQUESTED`……），
    `/待送出` 之類直接命中；細節檔路徑內含編號（`i/9201.md`），`/9201` 一樣命中對應行。
 3. **只找現在要看的 PR**：`/maigo:board --reviews`，看完報告後直接在 board 勾 `[x]`

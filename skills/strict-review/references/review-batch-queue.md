@@ -84,7 +84,7 @@ Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠�
    怎麼處理）；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者必須先決定才不會白做」的
    前提（例如範圍需要改審）才提前問。draft PR 預設跳過，不問。
 4. **board 單一寫手**：Work Board 由**單一** agent 以 `Edit` 回寫（不要每顆各寫一次、也不整份
-   覆寫；規則見 `skills/work-board`），這批 PR 的行放 🎯 最前面。
+   覆寫；規則見 `skills/work-board`），這批 PR 的行放 👀 最前面。
 5. 最後走 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）。
 
 Why：一次五顆 PR 照舊預設審完第一顆就停下等 go-ahead，使用者的回應是「一次看完，都寫 board，
@@ -207,15 +207,15 @@ PR 入口與 branch 入口都一樣，不用 `gh pr checkout`、不用 `git chec
 
 上面的 queue 是 **per-run、跑完即棄**。跨 session 追蹤已併入單一
 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)：
-`.maigo/board.md` 同時收 issue、你的 PR、在審的 PR，依單一優先序排名分進 🎯 下一件 /
-⏳ 等別人 / ✅ 最近結案三個 section。
+`.maigo/board.md` 同時收 issue、你的 PR、在審的 PR，依單一優先序排名分進 🎯 我的下一件 / 👀 待我 review /
+⏳ 等別人 / ✅ 最近結案四個 section。
 
 review 特有 verdict 詞彙仍沿用本 skill：`BLOCKED` / `NEEDS_CHANGES` /
 `APPROVE_WITH_NITS` / `APPROVE`，首次未審標 `待 review`；本地 verdict 尚未送 GitHub 標
 `待送出`。在 Work Board 裡（判定邏輯正典見
 [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)）：
 `待 review`（從未 review）、`待送出`（verdict 未送出）與 `↩︎ 回你的球`（你 review 後
-author 有新活動）對應 🎯 下一件；verdict 已下且無新 author 活動（`BLOCKED` /
+author 有新活動）對應 👀 待我 review；verdict 已下且無新 author 活動（`BLOCKED` /
 `NEEDS_CHANGES` / `APPROVE_WITH_NITS` / `APPROVE` 原樣保留）與 `他人草稿` 對應 ⏳ 等別人；
 merged / closed 對應 ✅ 最近結案。
 
