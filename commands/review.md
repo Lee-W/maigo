@@ -185,6 +185,15 @@ def _fingerprint_call_content(call: ToolCallPart) -> str | None:
 
 （2026-11-12 實例：五份草稿的命名 nit 原本都是一則「`a` → `b`、`c` → `d`……」的文字清單，使用者要的是可一鍵套用的 suggestion。）
 
+**草稿寫完先查核，通過才說可以送**：`draft.md` 與 `inline-comments.md` 落檔後，交給沒參與起草的查核者（有 subagents 時用 fresh context；沒有時依 model-dispatch 的 inline 流程並明示未獨立查核）逐項對照：
+
+- 每個 inline 錨點都在 reviewed head 的 diff `+` 行範圍內（`git diff -U0 <base> <head> -- <path>`），而且 `git show <head>:<path>` 那一行的內容就是留言在講的東西。
+- Files 分頁連結的 hash 等於該路徑字串的 SHA-256，行號與標題一致。
+- 草稿裡每句事實陳述都能在 `review.md` 找到，措辭不超過報告的證據等級（實跑、讀碼推論、未驗證），也沒有重複其他 reviewer 已提過的點。
+- 上面各段的格式規則（1–3 句、內文不寫行號與 SHA、命名只給 `suggestion` block、footer 只在 `draft.md`）。
+
+有任何一項不過就修正，再送回查核，到通過為止；修正本身也會出錯。向使用者列送出清單時，沒走過查核的草稿要標明。（2026-11-15 實例：15 份草稿多數第一輪沒過；#74421 修正時把測試涵蓋範圍寫過頭，複驗才抓到。）
+
 **只有「標記不適用 + 理由」才觸發 propose + 寫記憶**；其餘選項不寫任何記憶。
 
 **gate 不 block report、不改 verdict**——report 出完後純收集意願，不影響 Soyo 的 APPROVE / REQUEST_CHANGES / BLOCKED 結論。
