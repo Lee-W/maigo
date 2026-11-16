@@ -57,8 +57,8 @@ Review 常在跟其他 session 共用的 working tree 上進行；驗證動作�
 Every review must walk through every item. Output explicitly marks `[x]` or `[ ]` per item.
 
 1. **Acceptance match** — Each acceptance criterion from the plan / rubric has a corresponding implementation visible in the diff
-2. **Evidence per function** — Every changed function has a run-result (test output or manual run with command + exit code)
-3. **Edge case coverage** — `None` / empty / boundary values / failure path / repeated calls / concurrent access (whichever apply)
+2. **Evidence per function** — Every changed function has a run-result (test output or manual run with command + exit code). A new or rewritten behaviour test carries mutation evidence in the first round, not only in fix rounds (see `references/pre-pr-sweeps.md` (b))
+3. **Edge case coverage** — `None` / empty / boundary values / failure path / repeated calls / concurrent access (whichever apply); check against each edge-case category the plan lists for the step, one by one
 4. **Convention conformance** — Naming, structure, import style match neighbouring code (verify with `grep`, not vibes). For naming specifically, mechanically enumerate every new `def` / method / inner function from the diff against a merge-base baseline before judging — reading the diff by eye misses nested helpers; see `references/recurring-patterns.md` → "Naming review: enumerate new defs mechanically, don't eyeball the diff". For Python diffs, likewise grep the diff's ADDED lines for function-local `import` / `from … import` and for `MagicMock()` / `Mock()` / `mock.patch(...)` without `spec` / `autospec`, then judge each against the target repo's CLAUDE.md and `python-aware`; see `references/recurring-patterns.md` → "Python diffs: grep added lines for local imports and bare mocks".
 5. **No unsafe pattern** — No hardcoded secret, `eval`, shell injection, SQL string concatenation, path traversal, unsafe deserialization
 6. **No unexplained magic** — No magic number or magic string without a name or comment explaining why
@@ -201,7 +201,7 @@ see `references/review-agent-handoff.md`.
 或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
 （證明測試真的在守這條修法）→ 復原修法 → 測試轉綠。復原動作依上方「共用 working tree 上的
 審查紀律」的安全流程執行，並用備份檔／`git diff` byte-compare 證明復原乾淨、無殘留改動——
-這份 mutation-test 證據是修正輪 evidence 的必要項，不是加分項。
+這份 mutation-test 證據適用於兩處：第一輪新增或改寫的行為測試，與修正輪的修法；都是必要項，不是加分項。
 
 **Canary 回報要點名哪個斷言轉紅，不是只看檔案級 exit code**——同一個 bug 常補了不只一支
 測試，跑 canary 只記「這個測試檔轉紅」會蓋掉「其中只有一支真的有鑑別力」這件事：兩條
@@ -247,6 +247,18 @@ hook 與執行角色都以它為準；下表是用途摘要。輸出 `## Checkli
 | `/maigo:review --mode=design-preview` | Run items 1 + 4 only; mark 2/3/5/6/7/8/9 as `[—]` with reason `skipped by mode=design-preview` |
 | `/maigo:review --mode=compliance-only` | Run items 4/5/6/7/8; mark 1/2/3/9 as `[—]` with reason `skipped by mode=compliance-only` |
 | `/maigo:quick` (quick mode) | Run items 1/4/5/7; mark 2/3/6/8/9 as `[—]` with reason `skipped by mode=quick` |
+
+## Pre-PR sweeps (`/maigo:go`, `/maigo:team` full mode)
+
+Five author-side sweeps run before a PR is opened; recipes in
+[`references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md).
+They add no checklist item; each result is judged under an existing one:
+
+- (a) public-symbol consistency → item 1 (acceptance match) and item 4 (convention conformance)
+- (b) new tests must be able to fail, plus CI collection → item 2 (evidence per function)
+- (c) behaviour already released → item 3 (edge case coverage)
+- (d) duplicated logic → item 4 (convention conformance)
+- (e) scope → item 1 (acceptance match)
 
 ## Recurring must-fix patterns
 

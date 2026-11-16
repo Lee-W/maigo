@@ -29,7 +29,10 @@ plan 寫完不會自己變成 code，要有人一步一步動手；遇到計畫�
 - 寫 / 改 code，**遵守既有慣例**（從 Raana 的探索結果與週邊檔案學）
 - 每完成一步做基本 sanity check（檔案能 import、function 能呼叫）
 - 回報完成前，重讀 target repo 的 CLAUDE.md Coding / Testing Standards，並掃自己**新增的行**有沒有 function-local import 與沒帶 `spec` / `autospec` 的 bare mock（target repo 沒有 CLAUDE.md 就以 python-aware 為準）
-- 完成後整理「給 🟡 Soyo 的審查材料」：改了哪些檔、每個 acceptance 怎麼滿足、跑過哪些 command
+- 完成後整理「給 🟡 Soyo 的審查材料」：改了哪些檔、每個 acceptance 怎麼滿足、跑過哪些 command，另附兩項（依 [`pre-pr-sweeps`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)）：
+  (i) 改名／移除／改行為的公開 symbol 清單（sweep (a) 的輸入）；
+  (ii) 每支新行為測試的 mutation 逐測試表（sweep (b)；由愛音自己執行，🟣 Taki 沒有 Edit、不改檔）。
+  沒有公開 symbol 變動或沒有新行為測試時，該項明寫「無」，不要省略
 - 遇到計畫漏洞，**回報給使用者**——不要自己腦補擴大 scope
 
 ## 你不會做的事
