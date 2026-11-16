@@ -149,8 +149,8 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 選完後 orchestrator 依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)
 起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號）,呼叫
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Review draft: <PR title>"`
-取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並把檔案相對的路徑（`../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`）寫進 board 細節檔的
-`## 筆記`。只起草、不送出。
+取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並把檔案相對的路徑（`../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`）獨立成一個清單項寫進 board 細節檔的
+`## 筆記`（標籤放路徑後面、或路徑包反引號，不要寫成「標籤：路徑」緊貼）。只起草、不送出。
 board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
@@ -294,7 +294,7 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
-成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`；寫進筆記時用檔案相對的 `../review/<id>/review.md` 或 `../pr/<id>/review.md`），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`；寫進筆記時用檔案相對的 `../review/<id>/review.md` 或 `../pr/<id>/review.md`，路徑獨立成清單項或包反引號），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
 時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫
@@ -325,7 +325,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 - 上面 publisher 回傳的 `path`（即
   `.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
   [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
-  的 `## 筆記` 區，一行路徑連結（檔案相對，例如 `../review/9301/review.md`，自己的 PR 為 `../pr/9301/review.md`；規則與理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
+  的 `## 筆記` 區，一行路徑連結（獨立成清單項 `- ../review/9301/review.md`，或標籤後接反引號路徑；不要寫成緊貼中文冒號的 `報告：../review/…`。檔案相對，自己的 PR 為 `../pr/9301/review.md`；規則與理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
   不再寫進索引行
 
 回寫時必須保留原 checkbox 與 `🧠` / `🔖` 標記。刷新 / 查看 board 用 `/maigo:board`；

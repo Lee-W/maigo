@@ -82,7 +82,7 @@ email、另一個 repo），且含多個區塊（多則回覆草稿、報告、�
   [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)
   §4.5 的 `.maigo/review/<id>/draft.md`，自己的 PR 則是 `.maigo/pr/<id>/draft.md`），不要落到目標 repo 自己的 output
   convention——maigo 的產物本來就集中在 `.maigo/`（review、rubric、board、`i/`
-  細節檔），同時把新產物的路徑（檔案相對，例 `../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`）記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
+  細節檔），同時把新產物的路徑（檔案相對，例 `../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`；獨立成清單項或包反引號，不緊貼中文標點）記到 board 細節檔（`.maigo/i/<n>.md`）的 `## 筆記`。
 - 沒有成文慣例的情境用 scratchpad。
 
 對話裡給：檔案路徑、它包含哪幾節、以及**最該先看的那一節是哪一節**。

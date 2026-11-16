@@ -228,9 +228,9 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
   的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
 - **舊 `📄 <產物路徑>`**（`review/<n>/review.md` / triage 筆記等本地產物）：改寫進 `## 筆記`
-  區裡的一行路徑連結（檔案相對，例：`../review/9301/review.md`，自己的 PR 為 `../pr/9301/review.md`；
+  區裡的一行路徑連結（檔案相對、獨立成清單項或包反引號，例：`- ../review/9301/review.md`，自己的 PR 為 `../pr/9301/review.md`；不要寫成緊貼中文冒號的 `報告：../review/…`；
   細節檔在 `.maigo/i/` 底下，理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)），不佔事實區欄位。
-  既有筆記裡的舊寫法（`.maigo/review/…`、`review/…`）不改寫，新舊混用可接受。
+  既有筆記裡的舊寫法（`.maigo/review/…`、`review/…`、緊貼中文標點的路徑）refresh 與命令不會改寫，新舊混用可接受；要整理時跑 `scripts/rewrite_note_paths.py`（預設乾跑，見 §6）。
 - **資料缺失時的降級**（與上面三條「刻意省略」不同）：某欄位該有值但當下拿不到
   （例：遷移進來的 👀 項目沒有 `Δ+A/-D`，因為舊格式本來就沒記），就**只寫拿得到的部分**
   ——`- 規模：` 整行只剩作者時退化成 `- 作者：<author>`，不要填 `?` 或 `N/A` 佔位。
@@ -565,7 +565,7 @@ identity 與遷移細節見 [`.maigo/` 集中儲存](https://github.com/Lee-W/ma
 **報告與 board 在同一份 `.maigo/` 底下（已遷移的 repo）。** `review/<id>/review.md` 與
 `draft.md` 由 `artifact_path.py` 落在 `.maigo/` 下，不論哪個 worktree 執行，`board_state.py`
 的 `--maigo-root` 讀到的都是同一份，細節檔 `## 筆記` 用檔案相對路徑
-（`../review/<id>/review.md`，自己的 PR 為 `../pr/<id>/…`）就夠了，不必改寫成絕對路徑，也不必複製目錄；既有筆記裡的舊寫法不改寫。
+（`../review/<id>/review.md`，自己的 PR 為 `../pr/<id>/…`）就夠了，不必改寫成絕對路徑，也不必複製目錄；既有筆記裡的舊寫法不由命令改寫（要整理用 `scripts/rewrite_note_paths.py`）。
 **尚未遷移的 repo** 才會發生報告落在執行命令的 worktree、board 在別處：`board_state.py`
 找不到就退回 GitHub reviews 與 `prior_status`；回寫時把筆記改寫成絕對路徑，或把
 `review/<id>/` 複製到 board 所在根的 `.maigo/review/`（2026-10-14 實例：6 顆 PR 在 topic
@@ -664,7 +664,7 @@ head 已變 → `head_changed`；`unchecked` → `acknowledge --undo`。最終 �
 
 新報告會清除上一版的確認；新 commit／作者留言也會重新排入待看（👀 行自動取消勾）。單純碰檔案
 mtime 或刷新 board 不會改最後 review 時間。cleanup 刪掉同 source 舊報告後，細節檔的舊 report
-連結要用 Edit 換成 canonical `../review/<id>/review.md`（自己的 PR 為 `../pr/<id>/review.md`，檔案相對）；只改路徑，保留其餘手寫內容。
+連結要用 Edit 換成 canonical `../review/<id>/review.md`（自己的 PR 為 `../pr/<id>/review.md`，檔案相對，獨立成清單項或包反引號）；只改路徑，保留其餘手寫內容。
 
 ## 5. 學習閘門（checkbox → `--learn` → 記憶層）
 
@@ -713,9 +713,14 @@ nvim 行為的前提與實測依據（Neovim 核心預設、cwd 為 repo root）
 5. **細節檔內 `gx` 開 GitHub**：真 URL 搬進了細節檔的「連結」那一行，游標移到該行 `gx`
    直接開瀏覽器到該 issue/PR（連結寫成 `<URL>` autolink：裸 URL 緊貼 `連結：` 的全形冒號時 `gx` 會連冒號一起取，
    `<URL>` 在無設定的 nvim 下取到乾淨的 URL）；「筆記」段落裡檔案相對的路徑
-   （例：`../review/9301/review.md`）不論 cwd 在哪都 `gf` 可跳；舊寫法 `.maigo/review/9301/review.md`
-   只在 cwd 為 repo root 時可跳、`review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔，
-   既有筆記不改寫。
+   （例：`../review/9301/review.md`）不論 cwd 在哪都 `gf` 可跳——前提是游標停在路徑字元上，且路徑獨立成行
+   或包反引號、不緊貼中文／全形標點（緊貼時 `gf` 會把標籤一起當檔名，見
+   [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 路徑規則第 6 條）；
+   `檔案:行號` 的原始碼路徑用 `gF`，游標停在路徑部分。舊寫法 `.maigo/review/9301/review.md`
+   只在 cwd 為 repo root 時可跳、`review/9301/review.md`（相對 `.maigo/`）從 `i/` 底下的檔案 `gf` 會找不到檔；
+   命令不會改寫既有筆記，要整理用 `python3 <maigo-root>/scripts/rewrite_note_paths.py <repo root>`（預設乾跑，印出改前改後整行；
+   `--apply` 才寫；詳見 `--help`）。
+   script 只改「筆記引用檔案」形狀的路徑（行首、緊貼／接在中文字與全形標點之後、或接在 `Review report:` 這類英文冒號標籤之後）；前一個詞是其他 ASCII 的（指令、旗標、重導向、英文散文）不改並列為略過，寧可少改；它是啟發式，套用前仍請看乾跑清單。
 6. **勾 `[x]` 觸發 ack 與 `--learn`**：把 `- [ ]` 或 `1. [ ]` 改成 `[x]` 存檔即完成（見 §4a、§5），
    不需要額外命令；下次 `/maigo:board` 刷新會 ack 該 report，並列出「(`[x]` 或 `🔖`) 且沒有 `🧠`」的項目。
 7. **一行一項**：`/` 搜尋與 `dd` 刪除都以行為單位，board.md 的每一行對應一個 item，

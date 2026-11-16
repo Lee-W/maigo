@@ -36,7 +36,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 不在範圍：`.maigo/_internal/` 與所有 jsonl／json 機器狀態檔，它們只給程式讀。
 
-本規範只約束**新寫入**的檔案。`.maigo/` 被 gitignore、多為一次性產物，既有檔案不回溯改寫；review 報告與 rubric 的 cache 區塊、細節檔事實區會在下次發佈或刷新時自然換成新格式。讀回端（`board_sync`、`review_report`、`pr_context_cache`、`migrate_legacy_artifacts`）同時接受裸 URL 與 `<URL>`；筆記裡舊的路徑寫法（相對 `.maigo/` 或 repo-root 相對）不改寫，新舊混用可接受。
+本規範只約束**新寫入**的檔案。`.maigo/` 被 gitignore、多為一次性產物，既有檔案不回溯改寫；review 報告與 rubric 的 cache 區塊、細節檔事實區會在下次發佈或刷新時自然換成新格式。讀回端（`board_sync`、`review_report`、`pr_context_cache`、`migrate_legacy_artifacts`）同時接受裸 URL 與 `<URL>`；筆記裡舊的路徑寫法（相對 `.maigo/` 或 repo-root 相對）不會被 refresh 或其他命令改寫，新舊混用可接受；要整理時用 `scripts/rewrite_note_paths.py`（預設乾跑、印出改前改後整行，確認後才 `--apply`，見路徑規則第 6 條）。
 
 **保證的界線**：下列由 script 寫出、有測試鎖住——`board.md`、`i/<slug>.md` 的事實區與新建骨架、`review.md` 檔頭、`rubric.md` 的 cache 區塊結構（欄位行、fence、marker 前後的空行）。cache 區塊裡 title、body、CI 狀態與 review thread／review／comment 的內容是 GitHub 原文逐字帶入，版面不保證（多行 body 會讓 formatter 在清單前補空行）。其餘（plan、rubric 骨架、`review.md` 正文、`draft.md`、`inline-comments.md`、`pr-comments.md`、`reply-draft.md`）只靠範本約束，沒有機器擋，模型落筆時可能漂移；`scripts/review_report.py` 的 `publish` 不對正文做正規化，維持逐字寫入。
 
@@ -82,6 +82,7 @@ description: This skill should be used whenever writing, templating or generatin
 3. **要指到某一行時寫 `路徑:行號`，用 `gF` 跳。** 理由：實測 `scripts/x.py:3` 用 `gF` 開檔並落在第 3 行，用 `gf` 也開得了檔但落在第 1 行。
 4. **反引號包住的路徑允許，不禁用。** 理由：實測游標在路徑字元上或開頭反引號上 `gf` 成立；只有游標停在結尾反引號時失敗（E446）。plan 與 review 大量使用反引號路徑，禁用成本高、收益為零。board 索引行維持不加反引號，是既有行文法與 parser 的格式慣例，不是 `gf` 的限制。
 5. **外部 URL 一律寫成 `<URL>` autolink**（例：`- 連結：<https://github.com/o/r/pull/1>`、`- **PR**: <https://github.com/o/r/pull/1>`），不寫裸 URL、不藏進 `[文字](URL)`；文件裡的占位符寫成 `<PR URL>` 這類帶空格的形狀，避免與尖括號寫法混淆。理由（實測，nvim 0.12.6，無設定）：裸 URL 緊貼全形字元時 `gx` 會連全形字元一起取（`連結：https://example.com/a/b` 取到 `連結：https://example.com/a/b`，URL 後接全形逗號也會把逗號取進去），`<URL>` 在同樣版面下取到乾淨的 URL；`[文字](URL)` 在沒有 treesitter 時游標停在文字上會把文字當檔名。formatter 會把裸 URL 包成 `<URL>`，連 inline code 內的也是，所以讀回端兩種都要接受。
+6. **路徑要嘛獨立成行（或獨立成一個清單項），要嘛包在反引號裡；路徑前後不得緊貼中文字或全形標點。** 例：``- ../review/9301/review.md`` 或 ``- 報告：`../review/9301/review.md`（舊）``，不要寫 `- 報告：../review/9301/review.md（舊）`。理由（實測，nvim 0.12.6 `-u NONE`）：大於等於 256 的字元一律算檔名字元，`報告：../review/1/review.md` 的 `<cfile>` 會變成含標籤的整串，開不到檔；路徑前面有空格（半形或全形）、或 ASCII 冒號加空格則正常；反引號、`<>`、markdown 連結寫法也正常。要加標籤時，標籤放在路徑後面並以空格隔開，或把路徑包反引號——反引號同時處理前後兩側緊貼，不必判斷要補空格還是移動標點。游標必須停在路徑字元上（停在清單符號 `1.`、標籤或行首會得到 E447）；`檔案:行號` 的原始碼路徑用 `gF`，游標停在路徑部分而不是行號數字上。script 寫出的細節檔事實區路徑都在反引號裡，有測試鎖住；既有筆記的舊寫法（裸 `review/<id>/…`、緊貼中文冒號的路徑）用 `scripts/rewrite_note_paths.py` 整理，預設乾跑，`--apply` 才寫。不要求任何 nvim 設定。
 
 ## 與 copyable-deliverable 的關係
 
