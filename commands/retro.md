@@ -120,7 +120,7 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
    - **無對應規則**：該類在 taxonomy 標「無對應規則」→ 候選
    - **屬 reviewer 領域知識**：需要 reviewer 自己的專業或專案內部知識才知道，作者無從套用 → **不收**
 
-4. 前兩種候選沿用路徑 A 的步驟 2–4：**一次一筆**、先判目的地、再走 `/maigo:remember`
+4. 步驟 3 判定中，除「屬 reviewer 領域知識」以外的各種（規則存在、規則存在卻漏擋、無對應規則）都是候選，沿用路徑 A 的步驟 2–4：**一次一筆**、先判目的地、再走 `/maigo:remember`
    步驟 5+6 寫檔。寫入時帶 `category` 與 `seen_in`（`<owner/repo>#<n>`），並先套用
    [`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
    步驟 7 的追加判定：已有同 `category` 且判定為同一教訓的條目，改為在其 `seen_in`

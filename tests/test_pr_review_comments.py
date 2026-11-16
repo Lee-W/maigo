@@ -216,7 +216,9 @@ class TestMain:
 
         monkeypatch.setattr(prc.subprocess, "run", fake_run)
         assert prc.main([URL]) == 1
-        assert "不是 JSON" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "不是 JSON" in err
+        assert "Traceback" not in err
 
     def test_main_bad_url_exits_1(self, capsys):
         assert prc.main(["nope"]) == 1
