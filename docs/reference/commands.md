@@ -197,9 +197,10 @@ session 快結束時，`/maigo:retro` 從對話 context 撈出偏好 / 約定 / 
 
 **寫檔機制 reuse `/maigo:remember`**——retro spec 本身不重複寫一份 storage / rollback / 同 slug 衝突處理，全部指向 remember 的步驟 5 + 6。
 
-orchestrator 判斷兩條路徑：
+orchestrator 判斷三條路徑：
 - **同 session**：直接從對話 context 撈候選，逐筆 propose。
 - **跨 session fallback**：context 不存在時先問使用者「剛剛做了什麼」，再從回覆撈候選跑同流程。
+- **`--pr <url> [<url> ...]`**：用唯讀腳本 `scripts/pr_review_comments.py` 讀 PR 上別人留的 comment，依 reviewer-comment taxonomy 歸類，判定「規則存在卻漏擋」或「無對應規則」的才成為候選（reviewer 領域知識不收），寫入時帶 `category` 與 `seen_in`；summary 多印各類別次數與「規則存在卻漏擋」清單。只讀 GitHub，不留言、不送 review。
 
 → [/maigo:remember](../commands/remember.md)
 

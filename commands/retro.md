@@ -1,6 +1,6 @@
 ---
 description: Session 結束時，把對話裡浮現的偏好 / 約定 / 學到的事，逐筆 AskUserQuestion 確認後寫進跨專案記憶層。寫檔流程 reuse /maigo:remember。
-allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(cat:*), Bash(ls:*), Bash(test:*), AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(cat:*), Bash(ls:*), Bash(test:*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pr_review_comments.py:*), AskUserQuestion
 ---
 
 <!-- mkdocs-include-start -->
@@ -16,9 +16,10 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
 
 ```
 /maigo:retro
+/maigo:retro --pr <url> [<url> ...]
 ```
 
-（無參數）
+（無參數＝路徑 A／B；帶 `--pr` ＝路徑 C）
 
 ## 流程
 
@@ -89,6 +90,44 @@ Session 快結束時，那些「使用者剛指出的偏好」、「約好的慣
    從**路徑 A 的步驟 2** 開始跑。
 
 4. 使用者回覆「沒有 / 算了」→ 印「了解，retro 結束，未寫入任何記憶」。
+
+### 路徑 C — `--pr <url> [<url> ...]`：從 PR 上別人留的 review comment 學
+
+reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**的 comment，歸類、計次，
+判斷「現行規則該不該擋到它」。**只讀 GitHub：不留言、不送 review、不改 PR。**
+
+1. 跑 [`scripts/pr_review_comments.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_review_comments.py)
+   （唯讀，只經 `gh api` 做 GET）：
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_review_comments.py" <url> [<url> ...]
+   ```
+
+   輸出 JSON：每個 PR 的作者，與非作者、非 bot 的 root inline comment（排除 reply）、
+   review body、issue comment，各附 URL 與 `path:line`。腳本失敗（exit 非 0）→ 印 stderr
+   原因並結束，不寫任何記憶。comment 為 0 → 印「這些 PR 沒有別人留的 comment」並結束。
+
+2. **歸類**：orchestrator 依
+   [`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
+   逐則把 comment 歸到一個 `category` key。純提問、純讚美、無法歸類的略過。
+
+3. **逐則判定「現行規則該擋到它嗎」**，三選一：
+   - **規則存在卻漏擋**：taxonomy 為該類列了對應規則，但 go 的第一輪沒做到 → 候選
+   - **無對應規則**：該類在 taxonomy 標「無對應規則」→ 候選
+   - **屬 reviewer 領域知識**：需要 reviewer 自己的專業或專案內部知識才知道，作者無從套用 → **不收**
+
+4. 前兩種候選沿用路徑 A 的步驟 2–4：**一次一筆**、先判目的地、再走 `/maigo:remember`
+   步驟 5+6 寫檔。寫入時帶 `category` 與 `seen_in`（`<owner/repo>#<n>`），並先套用
+   [`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
+   步驟 7 的追加判定：已有同 `category` 且判定為同一教訓的條目，改為在其 `seen_in`
+   追加本次 PR，不新建；使用者可改判。reviewer 與作者的人名不寫進記憶，只留 PR 號與類別。
+
+5. 結尾 summary 在路徑 A 的 summary 之外多印兩項：
+   - 一行「本次各類別次數」，例：`doc-claim-drift 3、test-cannot-fail 2、edge-case 1`
+   - 「規則存在卻漏擋」清單：每筆一行，`<category>（<PR 號>）→ <該擋到它的規則>`。
+     這份清單是 pre-PR sweeps 在第一輪是否生效的量測。
+
+   候選為 0 筆時仍印次數行；沒有任何漏擋寫「無」。
 
 ## 中斷處理
 
