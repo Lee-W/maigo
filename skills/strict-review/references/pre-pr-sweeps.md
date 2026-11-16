@@ -90,9 +90,9 @@ and its neighbours for an existing equivalent. If one exists, reuse it; if not r
 say why in the PR description.
 
 **Why.** Design and duplicate-logic comments were about 15 in the sample, and the
-duplicate half is catchable by the author with one search. (The sample comments
-concentrate in the four PRs named above; no single case is cited here because the
-classification notes do not tie the duplicate comments to a specific PR.)
+duplicate half is catchable by the author with one search (the rest, such as choosing
+between abstractions, is reviewer judgment). Case (apache/airflow #74695): a reviewer
+pointed at two new pieces of code that were "essentially the same" and asked to keep one.
 
 **How to check.**
 - Grep for the new name's likely synonyms and for the body's distinctive calls or
