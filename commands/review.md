@@ -308,6 +308,8 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
 
 - 本地 report 剛完成 → 先讀 report metadata 再跑 `board_state.py --maigo-root <repo-root>`。
   同步標題、`@貢獻者`、最後 review 時間與 report 路徑。
+- 不要手寫 `（本地 <verdict>）` 旁註：board 行的結果欄與細節檔的 `- 本地 review 結果：` 由 refresh 從報告 metadata 產生，
+  重複 verdict 的旁註 refresh 會自動移除。
 - 用 script 回寫時，單顆 PR 收尾一律 `python3 <maigo-root>/scripts/board_sync.py refresh --apply --add <PR url> --no-discovery`——
   不帶 `--no-discovery` 會順帶 discovery 全部待審 PR、把 board 從一行撐成幾十行（2026-10-29 實例：1 行變 45 行）；
   要掃全部待審 PR 是 `/maigo:board` 的事，不是 review 收尾的事。

@@ -8,7 +8,8 @@ declarative transition graph a property test checks `classify()` against —
 以及 `detail_path()`：把 issue/PR URL 算成 `.maigo/i/<slug>.md` 細節檔路徑的正典。
 完整的 `next_action` 與規模 `Δ+A/-D` 不進 board 索引行，是細節檔（`.maigo/i/<slug>.md`）的資料來源；
 行動區（🎯／👀）的索引行只帶短版——`short_action`（≤6 顯示欄的動作字詞）與 `size`
-（`+A/-D`，滿千縮成 `k`）。完整版放細節檔是因為索引行有 80 欄預算，一條指令放不下。
+（`+A/-D`，滿千縮成 `k`）；👀 區與「🔀 有新 comment」的列改以 `result`（本地 review verdict／
+對方 review 決定，見 `result_label()`）取代 `→動作`。完整版放細節檔是因為索引行有 80 欄預算，一條指令放不下。
 索引行格式見 `skills/work-board/SKILL.md`。
 
 跑（薄 CLI）：
@@ -33,7 +34,7 @@ optional `checked`（bool，現檔勾選）、`checkbox_change`（`checked`/`unc
 來自 `board_sync.py plan`）、`prior_badges`（list）：（任一出現才輸出）多三個欄位——`checked`（最終勾選，
 沒帶 `checked` 時為 `null`＝不要動 checkbox）、`learn_pending`（👀 剛被勾、且沒有 🧠）、
 `acked_current`（report 已由你在目前 head 之後 ack）。規則見 `checkbox_after_refresh()`。
-stdout：JSON 陣列；含 section/rank/status/next_action/short_action/size/badges/detail_path、title/author、
+stdout：JSON 陣列；含 section/rank/status/next_action/short_action/result/shows_result/size/badges/detail_path、title/author、
 last_reviewed_at/review_time_source/acknowledged_at、needs_review 與 index_entry。
 `--reviews` 僅輸出待看 PR 並依 rank 排序；不可拿過濾後的結果覆寫整份 board。
 （`rank` 是整數，數字越小優先序越高，呼叫端直接用它排序；`detail_path` 無 `url`
@@ -180,6 +181,14 @@ def display_width(text: str) -> int:
 _MISSING_DRAFT_SHORT_ACTION = "起草"
 
 
+# 結果欄詞彙：與 `review_report.VERDICTS` 同步（測試鎖相等）。
+RESULT_VERDICTS = ("APPROVE", "APPROVE_WITH_NITS", "NEEDS_CHANGES", "BLOCKED")
+RESULT_APPROVED = "已核准"
+RESULT_CHANGES_REQUESTED = "要求修改"
+RESULT_LAST_PREFIX = "上次 "
+RESULT_WORDS = (*RESULT_VERDICTS, RESULT_APPROVED, RESULT_CHANGES_REQUESTED)
+
+
 def format_size(additions: object, deletions: object) -> str | None:
     """`+A/-D`；任一數字 ≥1000 時縮成一位小數加 `k`（`+1.2k/-340`）。缺數字回 None。"""
     if not isinstance(additions, int) or not isinstance(deletions, int):
@@ -189,6 +198,37 @@ def format_size(additions: object, deletions: object) -> str | None:
         return f"{(n + 50) // 100 / 10:.1f}k" if n >= 1000 else str(n)
 
     return f"+{compact(additions)}/-{compact(deletions)}"
+
+
+def result_label(
+    item_type: ItemType,
+    status: BoardStatus,
+    section: Section,
+    gh_meta: dict,
+    verdict: str | None,
+) -> str | None:
+    """
+    索引行的「結果」欄：👀 區且本地報告有 verdict → verdict 原詞，回你的球時前綴 `上次 `；
+    🔀 `有新 comment` 依 `reviewDecision` 顯示 `已核准`／`要求修改`；其餘 None。
+    """
+    if item_type is ItemType.REVIEW_PR and section is Section.REVIEW:
+        if verdict not in RESULT_VERDICTS:
+            return None
+        prefix = RESULT_LAST_PREFIX if status is BoardStatus.BALL_BACK else ""
+        return f"{prefix}{verdict}"
+    if item_type is ItemType.OWN_PR and status is BoardStatus.NEW_COMMENT:
+        return {
+            "APPROVED": RESULT_APPROVED,
+            "CHANGES_REQUESTED": RESULT_CHANGES_REQUESTED,
+        }.get(gh_meta.get("reviewDecision") or "")
+    return None
+
+
+def shows_result(item_type: ItemType, status: BoardStatus, section: Section) -> bool:
+    """該列的行尾位置是否改放結果欄（不論有沒有結果）：👀 區，或 🔀 有新 comment。"""
+    return (item_type is ItemType.REVIEW_PR and section is Section.REVIEW) or (
+        item_type is ItemType.OWN_PR and status is BoardStatus.NEW_COMMENT
+    )
 
 
 def _missing_draft_action(draft: str) -> str:
@@ -782,13 +822,16 @@ def index_entry(
     author: str,
     short_action: str | None = None,
     size: str | None = None,
+    result: str | None = None,
 ) -> str:
     """One-line display text; checkbox, badges and numbering belong to the caller.
 
     `short_action` / `size` 只該在行動區（🎯／👀）傳入，呼叫端決定。
+    `result` 佔 `→動作` 的位置（呼叫端有結果欄時不傳 `short_action`）。
     """
     contributor = f" @{author}" if author else ""
     action = f" →{short_action}" if short_action else ""
+    action += f" {result}" if result else ""
     delta = f" {size}" if size else ""
     return f"{item_type.value} {status.value}{contributor}{action}{delta}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
 
@@ -887,6 +930,16 @@ def evaluate_items(
             else None
         )
         in_action_section = result.section in (Section.NEXT, Section.REVIEW)
+        row_shows_result = in_action_section and shows_result(
+            item_type, result.status, result.section
+        )
+        result_text = (
+            result_label(
+                item_type, result.status, result.section, gh_meta, review.get("verdict")
+            )
+            if row_shows_result
+            else None
+        )
         extra: dict = {}
         if {"checked", "checkbox_change", "prior_badges"} & item.keys():
             extra = {
@@ -902,6 +955,8 @@ def evaluate_items(
                 "status": result.status.value,
                 "next_action": next_action,
                 "short_action": short_action,
+                "result": result_text,
+                "shows_result": row_shows_result,
                 "size": size,
                 "badges": badges,
                 "detail_path": detail,
@@ -917,8 +972,11 @@ def evaluate_items(
                     detail,
                     title,
                     author,
-                    short_action if in_action_section else None,
+                    short_action
+                    if in_action_section and not row_shows_result
+                    else None,
                     size if in_action_section else None,
+                    result_text,
                 ),
             }
         )

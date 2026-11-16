@@ -152,7 +152,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    只在同 rank 內調整、不改 rank／section，規則見
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
    ＋ 同 rank 同加權內 `updatedAt` 升序寫回 🎯 與 👀 的編號清單（兩區各自從 1 編號；🔀／🐛 進 🎯、👀 進 👀）
-   （`⏳`/`✅` 自己的在前、👀 在後，各群內 `updatedAt` 降序、無編號）；行內容用 `index_entry`（行動區已含 `→動作` 與 `+A/-D`），加最終 checkbox、badge、編號；✅ 行另加結案日期 `MM-DD`。
+   （`⏳`/`✅` 自己的在前、👀 在後，各群內 `updatedAt` 降序、無編號）；行內容用 `index_entry`（行動區已含 `→動作`（👀 區與 🔀 `有新 comment` 是 review 結果）與 `+A/-D`），加最終 checkbox、badge、編號；✅ 行另加結案日期 `MM-DD`。
    - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）。checkbox 一律以 `board_state` 回傳
      的 `checked` 為準：👀 勾了卻回 `no_report` 或 `head_changed`，若分類結果仍是待看
      （`needs_review`），該行自動取消勾，並在對話警告「#n 沒有本版 report／head 已變，未標記已看完；

@@ -154,6 +154,49 @@ class TestParseBoard:
         statuses = [line["status"] for line in sync.parse_board(text)["lines"]]
         assert statuses == ["↩︎ 回你的球", "APPROVE", "抓不到"]
 
+    @pytest.mark.parametrize(
+        ("body", "status", "result", "action", "size"),
+        [
+            (
+                "待送出 @a 💤 NEEDS_CHANGES +68/-1",
+                "待送出",
+                "NEEDS_CHANGES",
+                None,
+                "+68/-1",
+            ),
+            (
+                "↩︎ 回你的球 @a 上次 APPROVE_WITH_NITS",
+                "↩︎ 回你的球",
+                "上次 APPROVE_WITH_NITS",
+                None,
+                None,
+            ),
+            ("待送出 @a →送出 +68/-1", "待送出", None, "送出", "+68/-1"),
+            ("BLOCKED @a", "BLOCKED", None, None, None),
+            ("待送出 @a BLOCKED", "待送出", "BLOCKED", None, None),
+            ("有新 comment @a 已核准 +1/-1", "有新 comment", "已核准", None, "+1/-1"),
+        ],
+    )
+    def test_result_column_is_read_back_without_confusing_status(
+        self, body, status, result, action, size
+    ):
+        text = f"## 🎯 下一件\n1. [ ] 👀 {body} i/2120.md — t\n"
+        parsed = sync.parse_board(text)
+        assert parsed["errors"] == []
+        line = parsed["lines"][0]
+        assert (line["status"], line["result"], line["action"], line["size"]) == (
+            status,
+            result,
+            action,
+            size,
+        )
+
+    def test_legacy_note_line_still_parses(self):
+        text = "## 🎯 下一件\n1. [ ] 👀 待送出（本地 NEEDS_CHANGES） @a →送出 +68/-1 i/2120.md — t\n"
+        line = sync.parse_board(text)["lines"][0]
+        assert line["note"] == "（本地 NEEDS_CHANGES）"
+        assert line["status"] == "待送出" and line["result"] is None
+
     def test_missing_space_after_note_is_tolerated(self):
         text = "## 🎯 下一件\n1. [ ] 🔀 WIP（分支 x）@me🧠i/4.md — t\n"
         line = sync.parse_board(text)["lines"][0]

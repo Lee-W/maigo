@@ -87,11 +87,22 @@ _URL_RE = re.compile(
     r"^https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/(?P<kind>pull|issues)/(?P<number>\d+)/?$"
 )
 _ITEM_RE = re.compile(r"^(?:(?P<number>\d+)\.|-) \[(?P<mark>[ xX])\] (?P<rest>.*)$")
+# 結果欄（見 `board_state.result_label`）：詞表固定、後面必須是空白。與狀態詞不重疊——狀態詞只在
+# 型別之後的開頭比對，`_BODY_RE` 跑在已切掉狀態詞的剩餘字串上，結果欄在作者與 badges 之後；
+# `→動作` 有箭頭、結果欄有固定詞表，互不吞噬。長詞排前（APPROVE_WITH_NITS 先於 APPROVE）。
+_RESULT_PATTERN = (
+    f"(?:{re.escape(board_state.RESULT_LAST_PREFIX)})?(?:"
+    + "|".join(
+        re.escape(w) for w in sorted(board_state.RESULT_WORDS, key=len, reverse=True)
+    )
+    + ")"
+)
 _BODY_RE = re.compile(
     r"\s*(?P<note>（[^）]*）)?"
     r"\s*(?:@(?P<author>[A-Za-z0-9_/-]+(?:\[bot\])?))?"
     r"\s*(?P<badges>(?:[🧠💤🔖]\s*)*)"
     r"(?:→(?P<action>\S+)\s*)?"
+    rf"(?:(?P<result>{_RESULT_PATTERN})(?=\s)\s*)?"
     r"(?:(?P<size>\+\d+(?:\.\d)?k?/-\d+(?:\.\d)?k?)\s*)?"
     r"(?:(?P<ended>\d{2}-\d{2})\s*)?"
     r"(?P<detail>i/\S+?\.md)?"
@@ -247,6 +258,7 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
                 "author": parsed["author"],
                 "badges": re.findall(r"[🧠💤🔖]", parsed["badges"]),
                 "action": parsed["action"],
+                "result": parsed["result"],
                 "size": parsed["size"],
                 "ended": parsed["ended"],
                 "detail": parsed["detail"],

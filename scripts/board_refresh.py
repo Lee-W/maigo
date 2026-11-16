@@ -271,6 +271,25 @@ def _merge_author_pending(note: str | None, has_author: bool) -> str | None:
     return f"（{'；'.join(parts)}）" if parts else None
 
 
+def strip_duplicate_verdict_note(note: str | None, verdict: str | None) -> str | None:
+    """
+    Drop the segments of a `（a；b）` note that merely repeat the report verdict.
+
+    A segment goes only when, trimmed, it equals `本地 <verdict>` exactly (`verdict` is the
+    report's current one). Everything else — `本地 NEEDS_CHANGES，must-fix 5`, a different
+    verdict word, ASCII parens — stays byte for byte; remaining segments rejoin with `；`
+    and an empty note disappears.
+    """
+    if not note or not verdict:
+        return note
+    segments = sync.note_segments(note)
+    kept = [seg for seg in segments if seg.strip() != f"本地 {verdict}"]
+    if len(kept) == len(segments):
+        return note
+    kept = [seg for seg in kept if seg.strip()]  # 退場後留下的空段不留空括號
+    return f"（{'；'.join(kept)}）" if kept else None
+
+
 def author_token(author: str | None) -> str:
     """`@login` when known, else the pending marker; never a bare `@`."""
     return f"@{author}" if author else f"（{sync.AUTHOR_PENDING}）"
@@ -290,6 +309,7 @@ def render_line(
     action: str | None = None,
     size: str | None = None,
     ended: str | None = None,
+    result: str | None = None,
 ) -> str:
     """One board line per SKILL.md §1「行文法」.
 
@@ -297,6 +317,9 @@ def render_line(
     detail path. The part before ` — ` is kept within `LINE_BUDGET` display columns by
     dropping `→action` first; note, author, size, detail and title are never cut, so a
     line with a very long note can still run over (the budget is best effort).
+    `result` (review verdict / 已核准, in the `→action` slot) takes priority over size: a row
+    with a result drops `+A/-D` first when over budget and never cuts the result (nor its
+    `上次 ` prefix, which would turn a stale verdict into a current-looking one).
     """
     prefix = f"{number}. " if number is not None else "- "
     note = _merge_author_pending(note, bool(author))
@@ -307,12 +330,15 @@ def render_line(
     if shown:
         line += f" {shown}"
 
-    def head(act: str | None) -> str:
-        extras = [f"→{act}" if act else None, size, ended]
+    def head(act: str | None, shown_size: str | None = size) -> str:
+        extras = [f"→{act}" if act else None, result, shown_size, ended]
         return line + "".join(f" {extra}" for extra in extras if extra) + f" {detail}"
 
     lead = head(action)
-    if action and board_state.display_width(lead) > LINE_BUDGET:
+    if result:
+        if board_state.display_width(lead) > LINE_BUDGET:
+            lead = head(action, None)
+    elif action and board_state.display_width(lead) > LINE_BUDGET:
         lead = head(None)
     return f"{lead} — {' '.join(title.split())}".rstrip()
 
@@ -335,6 +361,7 @@ def render_row(row: dict, number: int | None, section: str) -> str:
         detail=row["detail"],
         title=row["title"],
         action=row.get("action") if actionable else None,
+        result=row.get("result") if actionable else None,
         size=row.get("size") if actionable else None,
         ended=row.get("ended") if section == "✅" else None,
     )
@@ -473,6 +500,7 @@ def render_detail_facts(
     review_time_source: str | None,
     acknowledged_at: str | None,
     load_command: str | None = None,
+    result: str | None = None,
 ) -> str:
     """The fact section (everything before `## 判斷`), SKILL.md §1a; ends with a blank line."""
     lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
@@ -488,6 +516,8 @@ def render_detail_facts(
     if load_command:
         lines.append(f"- 載入：`{load_command}`")
     if type == "👀":
+        if result:
+            lines.append(f"- 本地 review 結果：{result}")
         if last_reviewed_at:
             suffix = "（舊檔時間推估）" if review_time_source == "mtime" else ""
             lines.append(f"- 最後 review：{last_reviewed_at}{suffix}")
@@ -858,7 +888,7 @@ def _row_from_line(entry: Entry, g: Gathered) -> dict:
         "origin": entry.origin, "url": entry.url, "key": entry.key,
         "type": line["type"], "status": line["status"], "note": line["note"],
         "author": line["author"], "badges": list(line["badges"]),
-        "action": line["action"], "size": line["size"],
+        "action": line["action"], "result": line["result"], "size": line["size"],
         "ended": line["ended"] or _ended_label({"updatedAt": last_drop}),
         "detail": line["detail"], "title": line["title"], "checked": line["checked"],
         "section": _section_of(line["type"], _status_rank(line["status"])),
@@ -901,6 +931,7 @@ def _unreachable_row(entry: Entry, g: Gathered) -> dict:
             note = row["note"]  # keep the hand-written / command-written note
         row.update(
             error=entry.fetch["error"], status=UNREACHABLE, note=note, action=None,
+            result=None,
             section=_section_of(row["type"], 0), rank=0,
             updated_at=None, mode="keep",
         )  # fmt: skip
@@ -913,7 +944,7 @@ def _unreachable_row(entry: Entry, g: Gathered) -> dict:
         "origin": entry.origin, "url": entry.url, "key": entry.key,
         "type": item_type, "status": UNREACHABLE,
         "note": note, "author": "", "badges": [], "detail": detail,
-        "action": None, "size": None, "ended": None,
+        "action": None, "result": None, "size": None, "ended": None,
         "title": sync._short_ref(entry.url), "checked": False,
         "section": _section_of(item_type, 0),
         "rank": 0, "updated_at": None, "mode": "new-unreachable", "gh_meta": None,
@@ -1012,6 +1043,10 @@ def build(
         note = line["note"] if line else None
         if line and _is_error_note(note):
             note = None
+        result = r["result"] if r["shows_result"] else None
+        report_verdict = (result or "").removeprefix(board_state.RESULT_LAST_PREFIX)
+        if r["shows_result"] and report_verdict in board_state.RESULT_VERDICTS:
+            note = strip_duplicate_verdict_note(note, report_verdict)
         rows.append(
             {
                 "origin": entry.origin, "url": entry.url, "key": entry.key,
@@ -1019,7 +1054,8 @@ def build(
                 "status": r["status"], "note": note, "author": r["author"],
                 "badges": sorted(badges), "detail": line["detail"] if line else r["detail_path"],
                 "title": r["title"],
-                "action": r["short_action"], "size": r["size"],
+                "action": None if r["shows_result"] else r["short_action"],
+                "result": result, "size": r["size"],
                 "ended": _ended_label(entry.fetch["gh_meta"]),
                 "checked": line["checked"]
                 if line and entry.url in unprocessed
@@ -1106,6 +1142,7 @@ def build(
                 load_command=load_command_for(
                     row, load_templates or {}, load_warnings
                 ),
+                result=row.get("result") if row["type"] == "👀" else None,
             )  # fmt: skip
         if old is None:
             preserved = NEW_PRESERVED

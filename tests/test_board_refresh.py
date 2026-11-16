@@ -236,6 +236,7 @@ def _render(parsed_line: dict) -> str:
         badges=parsed_line["badges"], detail=parsed_line["detail"],
         title=parsed_line["title"], action=parsed_line["action"],
         size=parsed_line["size"], ended=parsed_line["ended"],
+        result=parsed_line["result"],
     )  # fmt: skip
 
 
@@ -679,7 +680,7 @@ def test_action_rows_show_action_and_size_and_done_rows_the_closing_date(tmp_pat
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     sections = section_rows(tmp_path)
     assert sections["🎯"][0].endswith("→修CI +10/-2 i/2.md — PR 2")
-    assert sections["👀"][0].endswith("→審 +1.2k/-340 i/1.md — PR 1")
+    assert sections["👀"][0].endswith("待 review @carol +1.2k/-340 i/1.md — PR 1")
     assert sections["✅"][0].endswith("merged @me 09-28 i/3.md — PR 3")
     # the full facts stay in the detail file
     assert "- 規模：Δ+1210/-340" in (tmp_path / ".maigo/i/1.md").read_text()
@@ -1891,3 +1892,138 @@ def test_apply_refuses_maigo_symlink_outside_state_root(tmp_path, capsys):
 
     assert tree_hash(outside) == before
     assert "outside the maigo state root" in capsys.readouterr().err
+
+
+# --- review verdict replaces the action on 👀 rows ---------------------------------
+
+
+def _after_report(tmp_path, hours: int) -> str:
+    """A timestamp `hours` after the published report's `reviewed_at`."""
+    text = (tmp_path / ".maigo/review/1/review.md").read_text()
+    reviewed = datetime.fromisoformat(report.metadata(text)["reviewed_at"])
+    return (reviewed + timedelta(hours=hours)).isoformat()
+
+
+def _verdict_board(tmp_path, gh, line, *, verdict="NEEDS_CHANGES", **over):
+    write_board(tmp_path, board_text(focus=[line]))
+    put_detail(tmp_path, 1, status="待送出", judgment="手寫判斷", notes="手寫筆記")
+    gh.prs[1] = pr_meta(1, additions=68, deletions=1, **over)
+    if verdict:
+        report.publish(
+            tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, verdict, owner="others"
+        )
+
+
+def _line_1(tmp_path):
+    return [ln for ln in board_lines(tmp_path) if "i/1.md" in ln][0]
+
+
+def test_unposted_row_shows_verdict_and_old_duplicate_note_retires(tmp_path, gh):
+    legacy = (
+        "1. [ ] 👀 待送出（本地 NEEDS_CHANGES） @carol →送出 +68/-1 i/1.md — Title 1"
+    )
+    _verdict_board(tmp_path, gh, legacy)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _line_1(tmp_path) == (
+        "1. [ ] 👀 待送出 @carol NEEDS_CHANGES +68/-1 i/1.md — PR 1"
+    )
+    assert sync.parse_board((tmp_path / ".maigo/board.md").read_text())["errors"] == []
+    detail = (tmp_path / ".maigo/i/1.md").read_text()
+    facts, _, rest = detail.partition("## 判斷")
+    assert "- 本地 review 結果：NEEDS_CHANGES\n- 最後 review：" in facts
+    assert "手寫判斷" in rest and "手寫筆記" in rest
+    again = board_lines(tmp_path)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert board_lines(tmp_path) == again  # fixed point
+
+
+@pytest.mark.parametrize(
+    ("note", "expected"),
+    [
+        ("（本地 NEEDS_CHANGES；等作者回覆）", "（等作者回覆）"),
+        ("（本地 BLOCKED）", "（本地 BLOCKED）"),
+        ("（本地 NEEDS_CHANGES，must-fix 5）", "（本地 NEEDS_CHANGES，must-fix 5）"),
+        ("（本地 BLOCKED；本地 NEEDS_CHANGES）", "（本地 BLOCKED）"),
+        ("（NEEDS_CHANGES）", "（NEEDS_CHANGES）"),
+        ("（本地 NEEDS_CHANGES）", None),
+        ("（本地 NEEDS_CHANGES；）", None),
+        ("（；本地 NEEDS_CHANGES）", None),
+    ],
+)
+def test_strip_duplicate_verdict_note(note, expected):
+    assert refresh.strip_duplicate_verdict_note(note, "NEEDS_CHANGES") == expected
+
+
+def test_hand_written_note_survives_verdict_row_refresh(tmp_path, gh):
+    legacy = "1. [ ] 👀 待送出（手寫 x） @carol →送出 +68/-1 i/1.md — Title 1"
+    _verdict_board(tmp_path, gh, legacy)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "（手寫 x） @carol NEEDS_CHANGES +68/-1" in _line_1(tmp_path)
+
+
+def test_ball_back_row_says_last_verdict(tmp_path, gh):
+    legacy = "1. [ ] 👀 ↩︎ 回你的球 @carol →重審 +68/-1 i/1.md — Title 1"
+    _verdict_board(tmp_path, gh, legacy)
+    gh.prs[1]["reviews"] = [
+        {"author": {"login": YOU}, "submittedAt": _after_report(tmp_path, 1)}
+    ]
+    gh.prs[1]["comments"] = [
+        {"author": {"login": "carol"}, "createdAt": _after_report(tmp_path, 2)}
+    ]
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _line_1(tmp_path)
+    assert "回你的球" in line and " 上次 NEEDS_CHANGES " in line and "→" not in line
+
+
+def test_review_row_without_report_shows_neither_result_nor_action(tmp_path, gh):
+    legacy = "1. [ ] 👀 待 review @carol →審 +68/-1 i/1.md — Title 1"
+    _verdict_board(tmp_path, gh, legacy, verdict=None)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _line_1(tmp_path) == "1. [ ] 👀 待 review @carol +68/-1 i/1.md — PR 1"
+    assert "本地 review 結果" not in (tmp_path / ".maigo/i/1.md").read_text()
+
+
+def test_own_pr_new_comment_shows_approval_and_ci_red_keeps_action(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            focus=[
+                row(1, icon="🔀", status="有新 comment", author="me"),
+                row(2, icon="🔀", status="CI 紅", author="me"),
+            ]
+        ),
+    )
+    for n in (1, 2):
+        put_detail(tmp_path, n)
+    gh.prs[1] = pr_meta(
+        1, author="me", reviewDecision="APPROVED",
+        comments=[{"author": {"login": "carol"}, "createdAt": "2026-09-30T05:00:00Z"}],
+    )  # fmt: skip
+    gh.prs[2] = pr_meta(2, author="me", statusCheckRollup=[{"conclusion": "FAILURE"}])
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    first = [ln for ln in board_lines(tmp_path) if "i/1.md" in ln][0]
+    second = [ln for ln in board_lines(tmp_path) if "i/2.md" in ln][0]
+    assert "已核准" in first and "→" not in first
+    assert "→修CI" in second
+
+
+def test_excluded_legacy_action_line_is_kept_byte_for_byte():
+    line = "1. [ ] 👀 待送出 @a →送出 +68/-1 i/2120.md — t"
+    parsed = sync.parse_board(_as_board(line))["lines"][0]
+    assert _render(parsed) == line
+
+
+def test_render_line_puts_result_before_size_and_drops_size_first_when_over_budget():
+    line = refresh.render_line(
+        **_fields(status="待送出", author="a", result="NEEDS_CHANGES", size="+68/-1")
+    )
+    assert line == "1. [ ] 👀 待送出 @a NEEDS_CHANGES +68/-1 i/1.md — t"
+    wide = _fields(
+        status="待送出", author="a" * 22, badges=["💤"], result="上次 APPROVE_WITH_NITS",
+        size="+1.2k/-340",
+    )  # fmt: skip
+    cut = refresh.render_line(**wide)
+    assert "上次 APPROVE_WITH_NITS" in cut and "+1.2k/-340" not in cut
+    assert board_state_width(cut.split(" — ")[0]) <= refresh.LINE_BUDGET + 12
+    short = refresh.render_line(**{**wide, "author": "a"})
+    assert "+1.2k/-340" in short

@@ -48,7 +48,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ## 👀 待我 review（1）
 
-1. [x] 👀 ↩︎ 回你的球 @contributor →重審 +1.2k/-340 i/9301.md — Avoid duplicate GitHub requests
+1. [x] 👀 ↩︎ 回你的球 @contributor 上次 NEEDS_CHANGES +1.2k/-340 i/9301.md — Avoid duplicate GitHub requests
 
 ## ⏳ 等別人（2）
 
@@ -96,17 +96,17 @@ description: This skill should be used when reading, writing, or migrating `.mai
 
 ### 行文法
 
-**設計原則：索引直接回答「哪顆 PR、誰貢獻、現在要做什麼、多大」。**
+**設計原則：索引直接回答「哪顆 PR、誰貢獻、現在要做什麼（或 review 的結果）、多大」。**
 狀態詞後必填 `@貢獻者`（GitHub `author.login`），裸細節檔路徑供 `gf`，完整 title 放最後、不截斷。
-行動區（🎯／👀）的行另帶一個短動作 `→<動作>` 與改動規模 `+A/-D`；URL、完整下一步指令（`Δ+A/-D`
+行動區（🎯／👀）的行另帶一個短動作 `→<動作>`（👀 區與 🔀 `有新 comment` 改帶 review 結果）與改動規模 `+A/-D`；URL、完整下一步指令（`Δ+A/-D`
 規模、`下一步`）與判斷句仍放細節檔（§1a）——索引行只帶短版，所以不必為了放指令擠掉 title 或貢獻者。
-`board_state.py` 回傳 `index_entry`（含 `short_action` 與 `size`）是可重用的行內容；orchestrator 加原 checkbox、badges
-與編號（badges 放在貢獻者之後、`→動作` 之前）；缺作者的行在刷新取得 GitHub author 後補上，拿不到就標 `作者待補`，不臆造作者。
+`board_state.py` 回傳 `index_entry`（含 `short_action`／`result` 與 `size`）是可重用的行內容；orchestrator 加原 checkbox、badges
+與編號（badges 放在貢獻者之後、`→動作`／結果之前）；缺作者的行在刷新取得 GitHub author 後補上，拿不到就標 `作者待補`，不臆造作者。
 完整刷新的行與整檔由 `scripts/board_refresh.py` 的 `render_line` / `render_board` 渲染——這兩個函式是
 本節文法的程式鏡像，由 `tests/test_board_refresh.py` 的 round-trip 測試守著；改文法時兩邊一起改。
 
 ```text
-🎯／👀 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>][ →<動作>][ +A/-D] <細節檔路徑> — <title>
+🎯／👀 區：<n>. [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>][ →<動作> | <結果>][ +A/-D] <細節檔路徑> — <title>
 ⏳ 區：- [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>] <細節檔路徑> — <title>
 ✅ 區：- [ ] <型別emoji> <狀態詞>[（旁註）] @<contributor>[ <badges>][ MM-DD] <細節檔路徑> — <title>
 ```
@@ -121,25 +121,36 @@ description: This skill should be used when reading, writing, or migrating `.mai
   動作是短字詞（無空白、≤6 顯示欄），由 `_STATUS_META` 的 `short_action` 決定：`有衝突`→`解衝突`、
   `CI 紅`→`修CI`、`CHANGES_REQUESTED`→`修改`、`待送出`→`送出`（草稿不存在時改 `起草`）、`↩︎ 回你的球`→`重審`、
   `有新回覆`→`重判`、`有新 comment`→`回覆`、`可合併`→`merge`、`待 review`→`審`、`待 triage`→`triage`、
-  `READY`→`接手`；`抓不到`、`WIP`、`IN_PROGRESS` 不顯示。規模是 `+A/-D`，任一數字 ≥1000 時縮成一位小數加 `k`
+  `READY`→`接手`；`抓不到`、`WIP`、`IN_PROGRESS` 不顯示。**👀 區的列不帶動作**（`待 review` 的 `→審` 也不帶——
+  使用者看 board 要的是 review 的結果，動作資訊全在細節檔的「下一步」），改帶**結果**，佔動作的位置：
+  本地報告 metadata 有 verdict 時顯示原詞（`APPROVE`／`APPROVE_WITH_NITS`／`NEEDS_CHANGES`／`BLOCKED`），
+  狀態是 `↩︎ 回你的球` 時前綴 `上次 `（那是舊 head 的 verdict，不是現況）；沒有本地報告就什麼都不顯示。
+  🔀 `有新 comment` 的 `→回覆` 也換成對方的 review 決定（`已核准`／`要求修改`；`REVIEW_REQUIRED` 與空值不顯示）——
+  但 `CHANGES_REQUESTED` 本來就會先判成自己的狀態，所以實際只會看到 `已核准`。其他 🎯 列（`解衝突`、`修CI`、`修改`、
+  `merge`）與 🐛 的動作不變。⏳ 的 `BLOCKED` 等本來就是狀態詞，不重複。規模是 `+A/-D`，任一數字 ≥1000 時縮成一位小數加 `k`
   （`+1.2k/-340`）；issue 沒有規模、不顯示。細節檔仍是完整的 `Δ+A/-D` 與完整下一步指令。
-  這兩欄是**衍生值**：refresh 每次從狀態與 gh 資料重算，parser 讀回來只為了 round-trip（排除列沿用讀到的值；抓不到的列沿用讀到的規模，但**不顯示動作**——動作是建議你現在做什麼，抓不到時這個建議不可信，所以刷新時清掉）。
+  這幾欄是**衍生值**：refresh 每次從狀態與 gh 資料重算，parser 讀回來只為了 round-trip（排除列沿用讀到的值；抓不到的列沿用讀到的規模，但**不顯示動作**——動作是建議你現在做什麼，抓不到時這個建議不可信，所以刷新時清掉）。
 - **✅ 區的結案日期 `MM-DD`（optional）**：放在同一個位置（badges 之後、細節檔路徑之前），讓「還會留多久」看得見；
   日期取 `mergedAt` → `closedAt` → `updatedAt`（本機時區）。⏳ 區不帶這三個欄位。
 - **行長預算**：`—` 之前的部分以顯示寬度計（East Asian Wide/Fullwidth 與 emoji 算 2 欄、組合字元與變體選擇符算 0、
   其餘含 `→`／`Δ` 算 1），預算 80 欄；超出時**先拿掉 `→動作`**（狀態詞本身已大致說明下一步），規模保留；
+  帶**結果**的列相反：結果優先於規模，超出時先拿掉 `+A/-D`，結果與 `上次 ` 前綴永不截（規模可以從 GitHub 看到；
+  `上次` 一旦被縮掉，舊 head 的 verdict 會被讀成現況）；
   旁註、作者、細節檔、title 一律不截（title 不截斷是既有規則；旁註是手寫事實）。所以預算是盡力而為，不是硬上限——
   一行帶超長旁註時仍可能超過，這是刻意的。欄寬是近似值，不是 nvim 實際欄寬。
 - **旁註**（沿用 review board 慣例，optional）：branch 名、closed 理由、linked PR、DRAFT、
   他人 review decision 這類「per-item 事實」寫在狀態詞後面的括弧裡
   （例：`IN_PROGRESS（分支 fix/xxx）`）——旁註記事實，判斷句記決定，兩者不是同一件事；
   判斷句本身已搬進細節檔（§1a）。`（gh 失敗：…）` 開頭的旁註是 `refresh` 專用的抓料錯誤標記，恢復時
-  會被清掉；手寫旁註請勿用這個開頭。
+  會被清掉；手寫旁註請勿用這個開頭。結果欄已經顯示本地 verdict，所以**不要手寫 `（本地 <verdict>）` 旁註**；
+  refresh 寫入 👀 列時會把重複的那一段移除：旁註依 `；` 切段，只有「去掉前後空白後完整等於 `本地 <目前報告的 verdict>`」
+  的段才算純重複，只移除那一段、其餘接回，全沒了就不寫旁註。含其他內容的段（`本地 NEEDS_CHANGES，must-fix 5`）、
+  verdict 與目前報告不同的段、半形括號寫法一律原樣保留。
 - **貢獻者（必填）**：從 GitHub `author.login` 取得，包含自己的 PR；放狀態詞／旁註後、badges 前。
   舊行缺作者視為待遷移，刷新時必補；補不到（gh 沒給、前一輪也沒有）就標 `作者待補`，不臆造 login、
   不留光禿的 `@`。其餘消費者（`plan`／`snapshot` 等）讀到缺 `@` 又沒標 `作者待補` 的行會報錯；只有 `refresh`
   讀現檔時放寬，好把作者補回去。作者補到後，下一輪刷新會拿掉 `作者待補`。
-- **badges**（`🧠`/`💤`/`🔖`，optional）：緊接在貢獻者（缺值時為旁註）之後、`→動作`／規模／結案日期與細節檔路徑之前，用一個空格分隔；
+- **badges**（`🧠`/`💤`/`🔖`，optional）：緊接在貢獻者（缺值時為旁註）之後、`→動作`／結果／規模／結案日期與細節檔路徑之前，用一個空格分隔；
   §2 vocabulary 表下方有各自的觸發規則。
 - **細節檔路徑（必填、裸相對路徑、不加反引號）**：相對 board.md 所在的 `.maigo/`，由
   [`detail_path()`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
@@ -168,7 +179,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 ### 1a. 細節檔格式 `.maigo/i/<slug>.md`
 
 索引行以外的細節（URL、規模 Δ+A/-D、完整作者資訊、完整下一步、審查時間、判斷句、舊 `📄 <產物路徑>`）全部
-收進這份細節檔；索引行的行動區只帶短版的 `→動作` 與 `+A/-D`（§1），細節檔維持完整版：
+收進這份細節檔；索引行的行動區只帶短版的 `→動作`（👀 區為結果）與 `+A/-D`（§1），細節檔維持完整版：
 
 ```markdown
 # <型別emoji> <狀態詞> — <title>
@@ -177,6 +188,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 - 規模：Δ+A/-D ｜ 作者：<author>
 - 下一步：`<next_action>`
 - 載入：`<依 board-load.txt 樣板代入的指令；沒設定樣板就整行省略>`
+- 本地 review 結果：<與 board 行相同的結果字串>
 - 最後 review：<ISO 8601 時間，含時區>
 - 已看完：<ISO 8601 時間，含時區；尚未確認時省略>
 
@@ -205,6 +217,8 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
 欄位省略規則：
 
 - **作者**：索引行必填 `@login`（拿不到時標 `作者待補`）；細節檔可重複完整 login，不寫含糊的「你」。
+- **本地 review 結果**：只有 👀 且本地報告 metadata 有 verdict 時才寫（字串與 board 行的結果欄相同，含 `上次 ` 前綴）；
+  沒有報告或不是 👀 就省略整行。H1 不放結果（refresh 靠 H1 的狀態詞復原 prior 狀態）。
 - **最後 review / 已看完**：使用 report 的 `reviewed_at` / `acknowledged_at`，不能用
   board 刷新時間取代。沒有 report 時寫「尚未 review」；舊檔 mtime fallback 註明「舊檔時間推估」。
 - **規模**：issue 省略整行（沒有 additions/deletions 可言）。

@@ -865,7 +865,8 @@ class TestShortActionAndSize:
         assert waiting_out["section"] == "⏳"
         assert "→" not in waiting_out["index_entry"]
         assert "+7/-1" not in waiting_out["index_entry"]
-        assert action_out["index_entry"].startswith("👀 待 review →審 +7/-1")
+        assert action_out["index_entry"].startswith("👀 待 review +7/-1")
+        assert "→" not in action_out["index_entry"]
 
     def _unposted(self, url):
         return {
@@ -890,6 +891,118 @@ class TestShortActionAndSize:
         draft.write_text("body\n")
         (out,) = self._evaluate([self._unposted(url)], tmp_path, "apache/airflow")
         assert out["short_action"] == "送出"
+
+    # --- 結果欄（review verdict 取代 →動作）---
+
+    def _review_item(self, **extra):
+        return {
+            "type": "👀",
+            "gh_meta": {
+                "state": "OPEN",
+                "additions": 68,
+                "deletions": 1,
+                "reviews": [],
+                "comments": [],
+                "author": {"login": "other"},
+            },
+            "prior_status": "APPROVE",
+            "review": {"verdict": "NEEDS_CHANGES"},
+            **extra,
+        }
+
+    def test_result_words_match_review_report_verdicts(self):
+        from scripts import review_report
+
+        assert bs.RESULT_VERDICTS == review_report.VERDICTS
+
+    def test_result_words_do_not_collide_with_status_words_except_verdicts(self):
+        statuses = {s.value for s in bs.BoardStatus}
+        assert {bs.RESULT_APPROVED, bs.RESULT_CHANGES_REQUESTED} & statuses == set()
+
+    def test_unposted_shows_verdict_instead_of_action(self):
+        (out,) = self._evaluate([self._review_item()])
+        assert out["status"] == "待送出"
+        assert out["result"] == "NEEDS_CHANGES"
+        assert out["short_action"] == "送出"
+        assert out["shows_result"] is True
+        assert "→" not in out["index_entry"]
+        assert out["index_entry"] == "👀 待送出 @other NEEDS_CHANGES +68/-1 —"
+
+    def test_ball_back_prefixes_last(self):
+        item = self._review_item()
+        item["gh_meta"].update(
+            {
+                "createdAt": "2026-01-01T00:00:00Z",
+                "reviews": [
+                    {"author": {"login": YOU}, "submittedAt": "2026-09-29T12:00:00Z"}
+                ],
+                "comments": [
+                    {"author": {"login": "other"}, "createdAt": "2026-09-29T13:00:00Z"}
+                ],
+            }
+        )
+        item["local_verdict_at"] = "2026-09-29T00:00:00Z"
+        (out,) = self._evaluate([item])
+        assert out["status"] == "↩︎ 回你的球"
+        assert out["result"] == "上次 NEEDS_CHANGES"
+        assert "→" not in out["index_entry"]
+
+    def test_no_report_shows_neither_result_nor_action(self):
+        item = self._review_item()
+        item["review"] = {}
+        (out,) = self._evaluate([item])
+        assert out["result"] is None
+        assert out["shows_result"] is True
+        assert out["index_entry"] == "👀 待送出 @other +68/-1 —"
+
+    def test_own_pr_new_comment_shows_review_decision(self):
+        assert (
+            bs.result_label(
+                bs.ItemType.OWN_PR,
+                bs.BoardStatus.NEW_COMMENT,
+                bs.Section.NEXT,
+                {"reviewDecision": "APPROVED"},
+                None,
+            )
+            == "已核准"
+        )
+        assert (
+            bs.result_label(
+                bs.ItemType.OWN_PR,
+                bs.BoardStatus.NEW_COMMENT,
+                bs.Section.NEXT,
+                {"reviewDecision": "CHANGES_REQUESTED"},
+                None,
+            )
+            == "要求修改"
+        )
+        for decision in ("REVIEW_REQUIRED", None, ""):
+            assert (
+                bs.result_label(
+                    bs.ItemType.OWN_PR,
+                    bs.BoardStatus.NEW_COMMENT,
+                    bs.Section.NEXT,
+                    {"reviewDecision": decision},
+                    None,
+                )
+                is None
+            )
+
+    def test_own_pr_ci_red_keeps_action(self):
+        item = {
+            "type": "🔀",
+            "gh_meta": {
+                "state": "OPEN",
+                "author": {"login": YOU},
+                "additions": 1,
+                "deletions": 1,
+                "statusCheckRollup": [{"conclusion": "FAILURE"}],
+            },
+        }
+        (out,) = self._evaluate([item])
+        if out["status"] == "CI 紅":
+            assert out["shows_result"] is False
+            assert "→修CI" in out["index_entry"]
 
 
 class TestUnpostedVerdictRankOrder:
@@ -1068,6 +1181,8 @@ class TestMain:
                 "status": "待 triage",
                 "next_action": "/maigo:triage-issue <n>",
                 "short_action": "triage",
+                "result": None,
+                "shows_result": False,
                 "size": None,
                 "badges": [],
                 "detail_path": None,
