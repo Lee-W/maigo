@@ -373,6 +373,7 @@ def test_overflow_never_prints_bare_at():
     summary = {
         "applied": False, "board_path": "b", "pending_reviews": [], "top": [],
         "top_review": [],
+        "capped": [], "learn_expiring": [],
         "counts": {"🎯": 0, "👀": 0, "⏳": 0, "✅": 0}, "warnings": [], "errors": [],
         "pending_orphans": [], "removed": [], "revived": [], "unattributed": [],
         "excluded_detail_files": [], "detail_writes": [], "detail_deletes": [],
@@ -979,6 +980,87 @@ def test_t8_aging_removes_deletes_backs_up_and_logs(tmp_path, gh):
     assert backups and backups[0].read_bytes() == detail_one
     aged = [e for e in ledger(tmp_path) if e["reason"] == "aged"]
     assert {e["url"] for e in aged} == {url(1), url(3)}
+
+
+def _ago(**delta) -> str:
+    return (NOW - timedelta(**delta)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _done_board(root, gh, specs):
+    """`specs`: (n, icon, mark, ended-ago kwargs) rows, all already merged."""
+    done = [
+        row(n, mark, icon=icon, status="merged", numbered=False, author=author)
+        for n, icon, mark, author, _ in specs
+    ]
+    write_board(root, board_text(done=done))
+    for n, icon, _, author, ago in specs:
+        put_detail(root, n, status="merged")
+        gh.prs[n] = pr_meta(
+            n, author=author, state="MERGED", mergedAt=_ago(**ago), updated=RECENT
+        )
+
+
+def _aged_urls(root) -> set[str]:
+    return {e["url"] for e in ledger(root) if e["reason"] == "aged"}
+
+
+def test_done_section_capped_at_ten_newest(tmp_path, gh):
+    specs = [(n, "🔀", " ", "me", {"hours": n}) for n in range(1, 13)]
+    _done_board(tmp_path, gh, specs)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    kept = section_rows(tmp_path)["✅"]
+    assert len(kept) == refresh.DONE_CAP
+    assert [int(ln.split(" i/")[1].split(".md")[0]) for ln in kept] == list(
+        range(1, 11)
+    )
+    assert _aged_urls(tmp_path) == {url(11), url(12)}  # the two oldest
+    assert not (tmp_path / ".maigo/i/12.md").exists()
+    assert (tmp_path / ".maigo/i/10.md").exists()
+    assert "## ✅ 最近結案（10）" in board_lines(tmp_path)
+
+
+def test_review_rows_age_after_three_days_own_after_seven(tmp_path, gh):
+    specs = [
+        (1, "👀", " ", "carol", {"days": 4}),
+        (2, "👀", " ", "carol", {"days": 2}),
+        (3, "🔀", " ", "me", {"days": 4}),
+        (4, "🔀", " ", "me", {"days": 8}),
+    ]
+    _done_board(tmp_path, gh, specs)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    text = (tmp_path / ".maigo/board.md").read_text()
+    assert "i/1.md" not in text and "i/4.md" not in text
+    assert "i/2.md" in text and "i/3.md" in text
+    assert _aged_urls(tmp_path) == {url(1), url(4)}
+
+
+def test_learn_pending_exemption_expires_after_thirty_days(tmp_path, gh, capsys):
+    specs = [
+        (1, "👀", "x", "carol", {"days": 20}),
+        (2, "👀", "x", "carol", {"days": 31}),
+        (3, "👀", "x", "carol", {"days": 26}),
+    ]
+    _done_board(tmp_path, gh, specs)
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert [(e["url"], e["days_left"]) for e in summary["learn_expiring"]] == [
+        (url(3), 4)
+    ]  # only rows within a week of expiry are listed
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    text = (tmp_path / ".maigo/board.md").read_text()
+    assert "i/1.md" in text and "i/3.md" in text
+    assert "i/2.md" not in text  # exemption lapsed: ages like any other row
+    assert _aged_urls(tmp_path) == {url(2)}
+
+
+def test_learn_pending_rows_do_not_count_against_cap_before_expiry(tmp_path, gh):
+    specs = [(n, "🔀", " ", "me", {"hours": n}) for n in range(1, 11)]
+    specs += [(n, "👀", "x", "carol", {"days": n - 4}) for n in (11, 12, 13)]
+    _done_board(tmp_path, gh, specs)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    kept = section_rows(tmp_path)["✅"]
+    assert len(kept) == 13  # ten capped rows plus three learning-pending ones
+    assert _aged_urls(tmp_path) == set()
 
 
 def test_t9_closed_artifact_is_not_added_but_logged(tmp_path, gh):

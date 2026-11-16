@@ -63,8 +63,8 @@ checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不
 
 targets 直接交給 script：`refresh --apply --add <targets>`（§3）。型別偵測（URL 解析、裸編號查
 `gh api …/issues/<n>`、PR 作者比對、抓不到標 `抓不到`）、`revive --reason manual` 都由 script 處理，
-revive 事件在 CAS 通過、寫回成功之後才寫。`--add` 的項目只在那一輪不受 7 天老化影響；下一輪它已是
-board 上的一般行，結案超過 7 天就會照常被清掉。以下是 script 無法執行時的手動流程（§3 的 fallback）要照做的規則。
+revive 事件在 CAS 通過、寫回成功之後才寫。`--add` 的項目只在那一輪不受老化與筆數上限影響；下一輪它已是
+board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7 天）或超出 ✅ 區 10 行的上限就會照常被清掉。以下是 script 無法執行時的手動流程（§3 的 fallback）要照做的規則。
 
 每個 target 先做型別偵測：
 
@@ -161,7 +161,7 @@ board 上的一般行，結案超過 7 天就會照常被清掉。以下是 scri
      已勾的 👀 行以推斷模式補 ack（同 head 已 ack 則不重打）。
    - 由 artifact 對帳補進來、但分類結果是 `merged` / `closed` 的項目**不寫入 board**，改呼叫
      `board_sync.py drop --reason closed <url...>`，否則 `review/<id>/review.md` 還在時每次刷新都會補回。
-   - ✅ 區超過 7 天老化清掉的行，清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
+   - ✅ 區老化清掉的行（別人的 PR 結案超過 3 天、自己的超過 7 天，或超出 10 行上限；待盤點未完成的行最多留到 30 天），清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
    - **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
      `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
      `## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格見
@@ -216,7 +216,8 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。�
 - `unattributed`：未歸屬產物（頂層 `plan-*`、`topic/<slug>/plan.md`、舊固定檔名、沒有可靠 PR 對應的本地 review 等），依類別計數＋檔名；
 - ack 警告（`no_report` / `head_changed` / `locked` / `error`）與 `errors` 原文；
 - `pending_orphans`（寬限期內，本輪未判）、`removed`（本輪判為 dd 的項目）、`excluded_detail_files`
-  （等你確認是否刪除）。
+  （等你確認是否刪除）；
+- `capped`（本輪因 ✅ 區 10 行上限清掉的行數）與 `learn_expiring`（學習盤點 7 天內將到期、之後照一般規則清掉的行與剩餘天數）。
 
 輸出沿用 [`/maigo:doctor`](https://github.com/Lee-W/maigo/blob/main/commands/doctor.md)
 的 emoji 分段慣例。`--all` 印完整 board。
@@ -275,10 +276,10 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 ### 7. `--drop`
 
 `--drop <n...>` 表示「不追了」：依 `#<n>` 或 `owner/repo#<n>` 找到對應行後，狀態詞改為
-`已放棄`，整行移進 `✅ 最近結案`——跟其他結案行共用同一條 7 天老化規則，不再有獨立的
+`已放棄`，整行移進 `✅ 最近結案`——跟其他結案行共用同一組老化規則（保留期與上限見 `skills/work-board`），不再有獨立的
 留痕區。保留原 checkbox 與 `🧠` 狀態；**並呼叫 `board_sync.py drop --reason drop <url...>`
 寫入排除紀錄**，之後的 discovery 與 artifact 對帳都不再補回，刷新也不會把 `已放棄` 洗回 `待 review`
-（該行 `excluded: true`）。對應細節檔不動，等 7 天老化清除時跟索引行一起刪
+（該行 `excluded: true`）。對應細節檔不動，等老化清除時跟索引行一起刪
 （見 [`skills/work-board` §3 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 
 ### 8. `--cross-repo`

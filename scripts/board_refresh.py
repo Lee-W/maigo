@@ -54,7 +54,13 @@ SECTION_TITLES = {
 ACTION_SECTIONS = ("🎯", "👀")  # numbered, rank-sorted; the other two are reference
 LINE_BUDGET = 80  # display columns for everything before ` — <title>` (best effort)
 BADGE_ORDER = "🧠🔖💤"
-AGE_LIMIT = timedelta(days=7)
+# ✅ retention: how long a closed row stays, by whose it is; learning-pending rows are
+# exempt until LEARN_PENDING_LIMIT; the section keeps at most DONE_CAP of the rest.
+AGE_LIMIT_REVIEW = timedelta(days=3)  # 👀: someone else's PR
+AGE_LIMIT_OWN = timedelta(days=7)  # 🔀 / 🐛
+LEARN_PENDING_LIMIT = timedelta(days=30)
+LEARN_PENDING_WARN = timedelta(days=7)  # list rows expiring within this much
+DONE_CAP = 10
 BACKUP_KEEP = 10
 WEIGHTS_FILENAME = "board-weights.txt"
 WEIGHT_PREFIXES = ("author", "title")
@@ -527,6 +533,10 @@ class Built:
     aged: list[dict]
     closed_drops: list[dict]
     snapshot_overrides: dict[str, bool | None] = field(default_factory=dict)
+    capped: list[dict] = field(
+        default_factory=list
+    )  # subset of `aged`: cut by DONE_CAP
+    learn_expiring: list[dict] = field(default_factory=list)
 
 
 # --- gather (reads and gh only) -------------------------------------------------
@@ -929,21 +939,40 @@ def build(
         )  # fmt: skip
 
     aged: list[dict] = []
+    capped: list[dict] = []
+    learn_expiring: list[dict] = []
+    candidates: list[tuple[datetime, dict]] = []  # ✅ rows subject to the cap
     kept: list[dict] = []
     for row in rows:
         if row["section"] == "✅" and row["origin"] != "manual":
             ended = _ended_at(row)
-            learn_pending = (row["checked"] or "🔖" in row["badges"]) and (
-                "🧠" not in row["badges"]
-            )
-            if (
-                ended
-                and not learn_pending
-                and g.now - board_state._parse_ts(ended) > AGE_LIMIT
-            ):
-                aged.append(row)
+            if ended:
+                ended_at = board_state._parse_ts(ended)
+                age = g.now - ended_at
+                learn_pending = (row["checked"] or "🔖" in row["badges"]) and (
+                    "🧠" not in row["badges"]
+                )
+                if learn_pending and age <= LEARN_PENDING_LIMIT:
+                    left = LEARN_PENDING_LIMIT - age
+                    if left <= LEARN_PENDING_WARN:
+                        learn_expiring.append(
+                            {"url": row["url"], "title": row["title"],
+                             "days_left": left.days}
+                        )  # fmt: skip
+                    kept.append(row)  # exempt from both the age limit and the cap
+                    continue
+                limit = AGE_LIMIT_REVIEW if row["type"] == "👀" else AGE_LIMIT_OWN
+                if age > limit:
+                    aged.append(row)
+                    continue
+                candidates.append((ended_at, row))
                 continue
         kept.append(row)
+    candidates.sort(key=lambda c: (-c[0].timestamp(), c[1].get("key") or ("", "", 0)))
+    kept.extend(row for _, row in candidates[:DONE_CAP])
+    for _, row in candidates[DONE_CAP:]:
+        aged.append(row)
+        capped.append(row)
 
     rows_by_section = {
         s: sort_rows(s, [r for r in kept if r["section"] == s], rules) for s in SECTIONS
@@ -1096,6 +1125,7 @@ def build(
         ack_results, warnings, pending, count_learn_pending(all_rows),
         [{"url": r["url"], "detail": r["detail"]} for r in aged], closed_drops,
         snapshot_overrides,
+        [{"url": r["url"], "detail": r["detail"]} for r in capped], learn_expiring,
     )  # fmt: skip
 
 
@@ -1364,6 +1394,8 @@ def summarize(g: Gathered, built: Built) -> dict:
             for u in built.manual_revive_urls
         ],
         "aged": built.aged,
+        "capped": built.capped,
+        "learn_expiring": built.learn_expiring,
         "closed_drops": [d["url"] for d in built.closed_drops],
         "backup": None,
     }
@@ -1428,6 +1460,18 @@ def format_summary(summary: dict) -> str:
         out.append("\n" + (summary.get("diff") or "（board.md 無變動）"))
     elif summary.get("backup"):
         out.append(f"\n備份：{summary['backup']}")
+    if summary["capped"]:
+        out.append(
+            f"\n✅ 超過 {DONE_CAP} 行上限，本輪清掉 {len(summary['capped'])} 行（最舊的先走）"
+        )
+    if summary["learn_expiring"]:
+        out.append(f"\n🧠 學習盤點將到期（{len(summary['learn_expiring'])}）")
+        for e in summary["learn_expiring"]:
+            n = _URL_RE.match(e["url"])
+            ref = f"#{n['number']}" if n else e["url"]
+            out.append(
+                f"- {ref} {e['title']} ｜ 剩 {e['days_left']} 天（過期後照一般老化清掉）"
+            )
     if summary["learn_pending"]:
         out.append(
             f"\n🧠 有 {summary['learn_pending']} 項你勾了還沒盤點 → /maigo:board --learn"
