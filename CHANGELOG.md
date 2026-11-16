@@ -5,6 +5,46 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.75.0 (2026-11-16)
+
+### Feat
+
+- **scripts**: extend rewrite_note_paths to review and pr reports, internal paths only
+- **board**: put the detail path last on board lines so $gf lands on it
+- **scripts**: add rewrite_note_paths to fix legacy and CJK-adjacent paths in detail notes
+- **board**: show the local review verdict instead of send and redo actions on review lines
+- **retro**: keep reviewer domain knowledge as a candidate under its own category
+- **retro**: add a --pr path that classifies reviewer comments and counts missed rules
+- **scripts**: read other people's PR review comments through a read-only gh api script
+- **memory**: tag reviewer lessons with a category and the PRs they appeared in
+- **go**: draft the PR title and description at wrap-up when no PR exists yet
+- **plan**: propose splitting by review unit and list edge-case categories per step
+- **review**: run five pre-PR sweeps in the first go round and hand mutation tables to review
+- **board**: add a configurable load-locally command to detail files
+- **board**: cap the done section and age reviews faster than own work
+- **board**: show a short next action and change size on actionable lines
+- **board**: split own work and reviews into separate sections
+- **artifacts**: write script-made markdown as a formatter fixed point and read both URL forms
+
+### Fix
+
+- **remember**: let callers pass default triggers so domain-knowledge entries load only for their repo
+- **retro**: count every non-domain-knowledge verdict as a candidate in --pr path
+- **scripts**: restrict PR URL owner/repo to GitHub characters and report non-JSON gh output cleanly
+- **remember**: let callers write category and seen_in, and append a PR to an existing entry
+- **review**: pick the pre-PR base from upstream before origin and bring new tests into the base worktree
+- **review**: give each pre-pr sweep an executor, scope the mutation rule, and make PR drafting non-fatal at wrap-up
+- **board**: say four sections when normalizing old boards and tighten unreachable rows
+- **review**: verify single PRs in a detached worktree instead of switching branches
+- **hooks**: treat negated zero-count phrasings like the already-allowed negations
+- **hooks**: kill the whole process group when the Stop test run times out
+- **catalog**: classify pr and issue plan files as nested in scan
+- **state**: reject maigo symlinks that point at the state root or a wrong-depth directory
+- **tidy**: absorb confirmed children under a confirmed parent
+- **hooks**: stop treating a bare git diff as scoped in the criteria check
+- **hooks**: read legacy and new machine logs together
+- **hooks**: skip Stop test run while a subagent is still running
+
 ## v0.74.0 (2026-11-13)
 
 ### Feat
