@@ -22,7 +22,7 @@ and record each PR the same lesson appeared in under `seen_in`.
 | key | Definition | Rule that should have caught it |
 |---|---|---|
 | `doc-claim-drift` | A doc, docstring, changelog line or PR description says X while the code or a sibling doc says Y; a released changelog section rewritten. | [`pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md) sweep (a); strict-review item 1; [`claims-and-evidence-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md) section 6. |
-| `edge-case` | A boundary the author's tests did not exercise (empty or duplicate input, nested or list forms, variant implementations, time zone or locale, retry or concurrency). | strict-review item 3, checked against the edge-case categories the plan lists per step. Facts that need the reviewer's domain knowledge are not covered. |
+| `edge-case` | A boundary the author's tests did not exercise (empty or duplicate input, nested or list forms, variant implementations, time zone or locale, retry or concurrency). | strict-review item 3, checked against the edge-case categories the plan lists per step. Facts that need the reviewer's domain knowledge belong to `domain-knowledge`, not here. |
 | `test-cannot-fail` | A test that cannot fail, is too weak, is redundant, or is not collected by CI. | `pre-pr-sweeps.md` sweep (b); strict-review item 2 and the Mutation test section of [`SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md). |
 | `design-duplication` | The same helper, constant or paragraph exists twice. | `pre-pr-sweeps.md` sweep (d). Direction choices (abstraction, public versus private, protocol versus duck typing) are reviewer taste: no rule. |
 | `released-compat` | A change that affects users of an already-released version (removed alias, changed default, edited released changelog section, stability policy). | `pre-pr-sweeps.md` sweep (c); for apache/airflow, [`review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md) release-tag section. |
@@ -32,10 +32,13 @@ and record each PR the same lesson appeared in under `seen_in`.
 | `pr-conflict` | The change conflicts with the base branch or with another in-flight PR touching the same text. | No existing rule. |
 | `translation` | Wording of a translated string. | No existing rule; needs a native reviewer. |
 | `perf` | A measured performance regression. | No existing rule; the reviewer ran the measurement. |
+| `domain-knowledge` | A fact true only for one repo, module or external system that the author could not have known without being told (a library's internal behaviour, a project policy, a platform constraint). | No general rule: it cannot be written as a repo-independent self-review rule. Belongs to the matching repo's aware skill (for apache/airflow, [`airflow-aware`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/SKILL.md)). |
 
-A comment that needs the reviewer's own domain knowledge (library internals, a policy the
-author could not have read) fits a key above only by topic. Record it as seen, but do not
-turn it into a rule: the lesson is the reviewer's, not a convention the author can apply.
+`domain-knowledge` is kept apart from the other keys on purpose. Once a reviewer has said it, the
+fact is no longer only the reviewer's, and the next change to the same code can check it first, so
+it is worth recording. But it is not a missed rule: it does not count toward the "rule exists" or
+"rule existed but missed" tallies, and it does not graduate into the general `strict-review` or
+`python-aware` skills.
 
 Do not write reviewer or author names or GitHub logins into a memory entry, a skill or a
 reference; keep the PR number and the category only.

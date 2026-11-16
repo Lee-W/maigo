@@ -111,28 +111,41 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
    [`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
    逐則把 comment 歸到一個 `category` key。純提問、純讚美、無法歸類的略過。
 
-3. **逐則判定「現行規則該擋到它嗎」**，擇一（同一則同時符合「屬 reviewer 領域知識」與「無對應規則」時，
-   以領域知識為準，不收）：
+3. **逐則判定「現行規則該擋到它嗎」**，擇一。先分流「能不能寫成通用規則」：這類問題換到另一個
+   repo 仍成立、可以寫成不分 repo 的自審規則 → 走前三種；只在特定 repo／模組／外部系統成立、
+   寫不成通用規則 → 走第四種「領域知識」。
    - **規則存在（未確認當時是否經 go、是否在規則落地之後）**：taxonomy 為該類列了對應規則 → 候選。
      go 的 review 不落檔，沒有資料能證明這個 PR 是經 go 開的、或開在規則落地之後，所以預設判這一種，
      **不宣稱「漏擋」**
    - **規則存在卻漏擋**：僅限使用者確認該 PR 是在規則存在之後、經 go／team 開出的，才從上一種升格 → 候選
-   - **無對應規則**：該類在 taxonomy 標「無對應規則」→ 候選
-   - **屬 reviewer 領域知識**：需要 reviewer 自己的專業或專案內部知識才知道，作者無從套用 → **不收**
+   - **無對應規則**：可以寫成通用規則（例：「改了公開函式的預設值，要檢查已發佈版本的使用者」），但該類在
+     taxonomy 標「無對應規則」→ 候選
+   - **領域知識**：只在特定 repo／模組／外部系統成立的事實（例：「某外部套件的某個 callback 在
+     retry 時會被呼叫兩次」），寫不成通用規則 → **候選**。reviewer 講過一次之後，這件事就不再是他獨有的
+     知識，下次碰同一塊 code 可以事先檢查，而且這類只能靠記下來學。它**不是**「規則漏擋」：不計入
+     「規則存在」與「規則存在卻漏擋」的任何清單或統計，也不畢業進通用 skill（見步驟 4）
 
-4. 步驟 3 判定中，除「屬 reviewer 領域知識」以外的各種（規則存在、規則存在卻漏擋、無對應規則）都是候選，沿用路徑 A 的步驟 2–4：**一次一筆**、先判目的地、再走 `/maigo:remember`
+4. 步驟 3 的四種判定都是候選，沿用路徑 A 的步驟 2–4：**一次一筆**、先判目的地、再走 `/maigo:remember`
    步驟 5+6 寫檔。寫入時帶 `category` 與 `seen_in`（`<owner/repo>#<n>`），並先套用
    [`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
    步驟 7 的追加判定：已有同 `category` 且判定為同一教訓的條目，改為在其 `seen_in`
    追加本次 PR（走 remember 的「追加模式」），不新建；使用者可改判。reviewer 與作者的人名與 GitHub login 不寫進記憶，只留 PR 號與類別。
 
-5. 結尾 summary 在路徑 A 的 summary 之外多印兩項：
-   - 一行「本次各類別次數」，例：`doc-claim-drift 3、test-cannot-fail 2、edge-case 1`
+   **領域知識的寫入**：`type: project`、`category: domain-knowledge`、帶 `seen_in`，並在
+   `/maigo:remember` 的第四題（triggered skills）預填該 repo 對應的 aware skill（例：apache/airflow →
+   `airflow-aware`），使用者可改；該 repo 沒有對應的 aware skill 就不預填，`triggers` 維持 remember
+   現行規則（空則不加欄位）。這類條目日後只畢業進該 repo 的 aware skill，見
+   [`skill-graduation`](https://github.com/Lee-W/maigo/blob/main/skills/maigo-self-check/references/skill-graduation.md)。
+
+5. 結尾 summary 在路徑 A 的 summary 之外多印三項：
+   - 一行「本次各類別次數」，例：`doc-claim-drift 3、test-cannot-fail 2、edge-case 1`；**只計前三種判定
+     （規則存在、規則存在卻漏擋、無對應規則）的 comment**，不含領域知識
    - 「規則存在」清單：每筆一行，`<category>（<PR 號>）→ <對應規則>`；使用者確認過「規則落地後
      經 go／team 開出」的，標為「規則存在卻漏擋」。未確認的不得算成漏擋——這份清單是 pre-PR sweeps
-     在第一輪是否生效的量測，混進未確認的會高估漏擋。
+     在第一輪是否生效的量測，混進未確認的會高估漏擋。領域知識不進這份清單
+   - 一行「領域知識 N 筆」（N 為歸為領域知識的 comment 數，含使用者未存的）
 
-   候選為 0 筆時仍印次數行；沒有任何一筆規則存在寫「無」。
+   候選為 0 筆時仍印次數行與領域知識行；沒有任何一筆規則存在寫「無」。
 
 ## 中斷處理
 

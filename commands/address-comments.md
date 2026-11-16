@@ -301,6 +301,8 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 
 - reviewer 指出的是**通用慣例 / 設計原則**（命名、結構、錯誤處理風格、測試策略…），非單點 bug
 - 描述帶「以後 / 每次 / 慣例 / 一律 / 都要」語氣，或同類 comment 在這次 PR 出現多筆
+- reviewer 指出的是**只在特定 repo／模組／外部系統成立的領域知識**（寫不成通用規則）：照樣收，
+  `category` 用 `domain-knowledge`，`triggers` 預填該 repo 的 aware skill（若有）
 
 排除（不收）：
 

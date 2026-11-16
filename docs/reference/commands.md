@@ -200,7 +200,7 @@ session 快結束時，`/maigo:retro` 從對話 context 撈出偏好 / 約定 / 
 orchestrator 判斷三條路徑：
 - **同 session**：直接從對話 context 撈候選，逐筆 propose。
 - **跨 session fallback**：context 不存在時先問使用者「剛剛做了什麼」，再從回覆撈候選跑同流程。
-- **`--pr <url> [<url> ...]`**：用唯讀腳本 `scripts/pr_review_comments.py` 讀 PR 上別人留的 comment，依 reviewer-comment taxonomy 歸類，判定「規則存在（未確認當時是否經 go）」或「無對應規則」的才成為候選；只有使用者確認為規則落地後經 go／team 開出的才記為「規則存在卻漏擋」（reviewer 領域知識不收），寫入時帶 `category` 與 `seen_in`；summary 多印各類別次數與「規則存在」清單。只讀 GitHub，不留言、不送 review。
+- **`--pr <url> [<url> ...]`**：用唯讀腳本 `scripts/pr_review_comments.py` 讀 PR 上別人留的 comment，依 reviewer-comment taxonomy 歸類，判定「規則存在（未確認當時是否經 go）」、「無對應規則」或「領域知識」，四種都是候選；只有使用者確認為規則落地後經 go／team 開出的才記為「規則存在卻漏擋」。領域知識（只在特定 repo 成立、寫不成通用規則的事實）以 `category: domain-knowledge` 寫入並預填該 repo 的 aware skill 為 trigger，不計入規則統計、只畢業進該 repo 的 aware skill；寫入時帶 `category` 與 `seen_in`；summary 多印各類別次數、「規則存在」清單與領域知識筆數。只讀 GitHub，不留言、不送 review。
 
 → [/maigo:remember](../commands/remember.md)
 

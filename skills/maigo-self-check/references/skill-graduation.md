@@ -49,6 +49,10 @@ Read this file when executing the corresponding crystallize step.
   隱私檢查與公開性檢查照常執行；PR 號屬公開資訊，私人細節仍依閘門處理；reviewer 與作者的
   人名與 GitHub login 不寫進記憶、skill 或 reference 的內容，只留 PR 號與類別。
 
+  **`category: domain-knowledge` 的條目**：畢業時只能進對應 repo 的 aware skill（或其
+  `references/`），不進通用的 `skills/strict-review`、`skills/python-aware`；沒有對應 aware skill 就
+  留在記憶層。上面的隱私檢查與公開性檢查不因此放寬。
+
   **併進優先**：落點預設先試「併進既有 skill / references」，新建 standalone skill 是
   last resort——避免 skill 增殖、控 context 成本。連「自成一群的新慣例」也先問能否掛進
   相近的既有 skill，而不是一律新建。
