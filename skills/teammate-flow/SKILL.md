@@ -211,9 +211,19 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
 的 staging（不用 `git add -A`）、不 `cd`、unreleased commit 的 amend 慣例。
 
-Commit message 草擬完後，依
+**PR 草稿（`/maigo:go` 與 `/maigo:team` 共用這一段；`/maigo:quick` 不做）**：commit 落地之後，
+若當前 branch 尚無 PR，orchestrator 依
+[`draft-bundle`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/draft-bundle.md)
+抓料，另附 plan 路徑、🟡 爽世最後一輪的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
+describe-pr 模式產出草稿，依 [`commands/describe-pr.md`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)
+步驟 3 的格式，在 final summary 給出可整段複製的 description 與 title。素材怎麼對應到
+Design rationale、Known limitations 與 Test Plan，見
+[`github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md)
+的素材對照。**只產草稿，不開 PR、不 push**；使用者自己貼到 GitHub。
+
+已有 PR 時不產草稿，順序改為：commit → `pr-sync-check`。依
 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
-核對當前 branch 若已開 PR，其 title/description 是否仍符合現在的實際改動；沒有對應 PR 就跳過，不算失敗。
+核對當前 branch 已開 PR 的 title/description 是否仍符合現在的實際改動；沒有對應 PR 就走上一段的草稿，不算失敗。
 
 ### `/maigo:go` vs `/maigo:team` — 選哪個
 

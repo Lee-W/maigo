@@ -81,17 +81,18 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 
 - `## Why` ≤ 2 句。
 - `## What` ≤ 1 段 + 1 個 code example（僅限 core API 改動這種需要秀 signature/呼叫方式的情況）——不要寫成逐檔案條列。
-- `## Test Plan` 維持條列、一行一個 bullet，描述測到什麼，**不要**貼 test 檔內容進去。至多 3 條：跑了什麼指令、結論是什麼；逐項的筆數、計數與驗證過程留在 review thread，不進 description。
+- `## Test Plan` 維持條列、一行一個 bullet，描述測到什麼，**不要**貼 test 檔內容進去。至多 3 條：跑了什麼指令、結論是什麼；有實跑證據時寫出命令與結論，做過 mutation 驗證就加一句摘要（拿掉哪裡、哪支測試轉紅）；逐項的筆數、計數與驗證過程留在 review thread，不進 description。
 - PR 涵蓋多個主題時，`## What` 改用條列，**至多 4–5 條、每條一句**；同一類的小修併成一條（「修了 pre-commit 安裝與 livereload 兩個 dev task」），不要一個修正一條、每條三句。
 - 未驗證的事項併成 `## Test Plan` 最後**一條** bullet（`Not checked: A, and B.`），只留 reviewer 需要自己確認的；不另開小節、不逐項解釋為什麼沒驗。
 - **整份 description 以一個螢幕內讀完為準**（約 25 行以內，不含 template 自帶的 checklist）。寫超過就刪，不要靠排版擠——太長的 description 沒有人會讀完。
+- **例外：出現 `## Design rationale` 或 `## Known limitations` 時，放寬到約 40 行**，且兩段各有上限（Design rationale ≤3 句、Known limitations ≤5 條且每條一句）。放寬只為這兩段，不是讓 Why / What / Test Plan 變長；沒有這兩段就維持約 25 行。
 - caller 給的事實清單是**可用的素材，不是必須全部寫進去的清單**：只挑 reviewer 判斷「要不要合併」用得到的，其餘捨棄。
 
 ### Description anti-patterns
 
 | Anti-pattern | 問題 |
 |---|---|
-| 版本演進敘事（「v1 是這樣做，後來因為 Z 改成 Y」） | 這種討論屬於 PR review thread，不屬於 description |
+| 版本演進敘事（「v1 是這樣做，後來因為 Z 改成 Y」） | 這種討論屬於 PR review thread，不屬於 description。與 `## Design rationale` 的界線：rationale 講**最終設計為何如此**（選了什麼、放棄哪個替代方案、一句理由），不講改了幾版、哪一版先試過 |
 | `## What` 逐檔案條列（「改了 a.py / 改了 b.py / 改了 c.py」） | reviewer 自己看 diff 就有檔案清單；description 該講行為改變，不是檔案清單 |
 | `## Test Plan` 貼整段 test 檔內容 | reviewer 要的是「測了什麼」的摘要，不是原始碼；貼檔案內容讓 test plan 難掃 |
 | 帶確切 commit sha（`(a8910e8)`、`見 306feea`） | rebase / squash 後 sha 失效，對 reviewer 也沒有資訊量；改用描述性文字（「移除 exclude-newer 豁免」）。**永遠不帶**，不因為「方便對照」而例外 |
@@ -99,6 +100,12 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 **可選段（有才加，不要為了塞而塞）**：
 
 ```markdown
+## Design rationale
+<選了什麼、放棄了哪個替代方案、一句理由。≤3 句。>
+
+## Known limitations
+- <作者已知、刻意不處理的邊界或後續。≤5 條，每條一句。>
+
 ## Breaking changes
 <API / config / behaviour 改了什麼會打破既有 caller。沒有就不加這段。>
 
@@ -143,6 +150,20 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 | Related issues | commit message 裡的 `#<n>` / `Closes #<n>` / `Refs #<n>` |
 
 **找不到 signal 不要編造**——標記 `<待補：...>` 留給使用者填，不要 hallucinate。
+
+### 有 plan 與 go／team 產物時的素材對照
+
+caller 另附 plan 路徑與審查／驗證摘要時，可選段與 Test Plan 依下表取料；沒有對應素材就省略該段，不要自己補寫：
+
+| 段落 | 素材來源 |
+|------|---------|
+| Design rationale | plan 的 `## Decisions needed` 與使用者的選擇（選了什麼、另一選項為何放棄） |
+| Known limitations | plan 的 `## Risks / Open questions`、🟡 Soyo 的 Nit 與 Evidence pending、🟣 Taki 回報的未驗項目 |
+| Test Plan | 🟣 Taki 的 command 與 exit code；🎀 Anon 附的 mutation 逐測試表（只寫一句摘要） |
+
+兩段的價值在於先講限制與被否決的方案，不在篇幅；長度以上方的上限為準。
+
+**target repo 有自己的 PR 撰寫規範時**（例：[`skills/airflow-aware/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/SKILL.md) 指向的 repo skill、PR template），repo 規範優先；這兩段放進 template 的自由描述區（標題層級依上方「若 repo 有 PR template」處理）。
 
 ## Output format
 

@@ -27,6 +27,9 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 
 審查與驗證為**順序**進行（先 🟡 爽世擋，通過後才跑 🟣 立希）。
 
+收尾時若當前 branch 尚無 PR，會在 final summary 附上可整段複製的 PR title 與 description 草稿
+（不開 PR、不 push），見 teammate-flow 的「Commit message draft + 落地」段。
+
 ## `--worktree`（opt-in，預設不開）
 
 帶這個旗標時，在 🐱 樂奈開始之前，orchestrator 親自跑：
