@@ -38,7 +38,18 @@ Loaded on demand by [`/maigo:describe-pr`](https://github.com/Lee-W/maigo/blob/m
    exit 非 0 或無對應 PR，或 `state` 為 `MERGED`／`CLOSED`，視為「尚無 PR」）。已有開啟中的 PR
    時不產草稿，改走 `pr-sync-check`。
 2. **base**：go／team 沒有 `--base`。依序取：使用者在任務裡明講的 base；
-   `git symbolic-ref --short refs/remotes/origin/HEAD`（去掉 `origin/` 前綴）；再不行才試 `main`、`master`。
+   `<remote>` 的預設分支；再不行才試 `main`、`master`。
+   - `<remote>` 判定與
+     [`commands/go.md`](https://github.com/Lee-W/maigo/blob/main/commands/go.md)
+     的 `--worktree` 段一致：先試 `upstream`，否則退回 `origin`（`git remote` 列得出 `upstream`
+     才算有）。fork 工作流的 base 在 `upstream`，只看 `origin` 會拿錯基準。
+   - 預設分支：`git symbolic-ref --short refs/remotes/<remote>/HEAD`，得到 `<remote>/<branch>`。
+     實測（本 repo 與暫存 repo）：remote 不存在、與 remote 存在但 HEAD 未設定，兩種情況都印
+     `fatal: ref refs/remotes/<remote>/HEAD is not a symbolic ref` 並 exit 128，無法從這條指令
+     分辨，所以先用 `git remote` 判定 remote 再取 HEAD；exit 非 0 就當「預設分支未知」，
+     接著試 `main`、`master`。
+   - diff／log 的基準用 remote-tracking ref（`<remote>/<branch>`，例：`upstream/main`），
+     不要去掉前綴改用本機 `<branch>`：本機分支可能落後 remote，會把別人已合併的 commit 算進來。
    base 在 final summary 的草稿旁寫明，讓使用者能發現猜錯。
 3. **失敗分支一律改為略過**：找不到 base、HEAD 就在 base 上、`<base>..HEAD` 沒有 commit、
    `gh` 不可用或其他任何抓料失敗，都**略過草稿**，在 summary 印一行原因（例：「PR 草稿略過：找不到 base

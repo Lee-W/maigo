@@ -131,6 +131,12 @@ and asked whether they belonged in it.
   <base>`, removes it with `git worktree remove` afterwards, and attaches the
   `git worktree list` output showing it is gone. A pass on the base means the test does not
   belong to this change.
+- `<base>` is the remote-tracking ref decided by the wrap-up base rule in
+  [`draft-bundle.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/draft-bundle.md)
+  (收尾情境); do not restate it here.
+- A new test file does not exist on the base, so copy the new test files into the detached
+  worktree before running them, or the run fails at collection instead of showing whether the
+  test passes on the base.
 - 🟡 Soyo reads the per-test base-branch result and the worktree-removal proof; she does not
   open a worktree herself.
 - List changed files that the plan's subject does not mention.
