@@ -85,5 +85,13 @@ live in [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/nar
   在原 session 裡「試跑看看」等於在驗舊快照——會誤判成「改動沒生效」，更糟的是
   誤以為驗過了。要實際驗證命令流程的改動，開新 session；同 session 內只能驗
   底層 script（`scripts/*.py` 是執行時才讀，不受快照影響）。
+- **`scripts/` 的 commit 對其他 session 立即生效**：plugin 直接從這個 checkout 載入時，
+  上一條的反面是——script 一落進工作樹，其他正在跑的 session 下一次呼叫就會用到它。
+  改的是會寫狀態的 script（`board_refresh.py`、`board_sync.py` 這類會改寫 `.maigo/`
+  的）而且拆成多顆 commit 時，別的 session 可能拿中間版本去改寫真實狀態。動工前先想
+  「只落前幾顆時跑一次會寫出什麼」：中間版本寫出的格式要能被最終版本讀回，否則改在
+  worktree 裡做完再一次進 main。實例（2026-11-16）：board 版面改造逐顆 commit 進 main
+  的期間，另一個 repo 的真實 board 被刷新成新版面；結果剛好與最終版本一致，刷新前也
+  留有備份，但那次刷新是誰觸發的沒有查證。
 - **Version bump 由 CI 執行**：`cz bump` 是 CI 的職責，不屬於任何 plan / 任務步驟 /
   open question——規劃或交辦時不得把手動 bump 列為待辦項目。
