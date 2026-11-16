@@ -6,8 +6,10 @@ Defines the detail-state enum (with rank / section / default next_action),
 the pure `classify()` transition function, `ALLOWED_TRANSITIONS` — the
 declarative transition graph a property test checks `classify()` against —
 以及 `detail_path()`：把 issue/PR URL 算成 `.maigo/i/<slug>.md` 細節檔路徑的正典。
-`next_action` / badges 這些欄位不再直接進 board 索引行，是細節檔（`.maigo/i/<slug>.md`）
-的資料來源；索引行格式見 `skills/work-board/SKILL.md`。
+完整的 `next_action` 與規模 `Δ+A/-D` 不進 board 索引行，是細節檔（`.maigo/i/<slug>.md`）的資料來源；
+行動區（🎯／👀）的索引行只帶短版——`short_action`（≤6 顯示欄的動作字詞）與 `size`
+（`+A/-D`，滿千縮成 `k`）。完整版放細節檔是因為索引行有 80 欄預算，一條指令放不下。
+索引行格式見 `skills/work-board/SKILL.md`。
 
 跑（薄 CLI）：
 
@@ -31,7 +33,7 @@ optional `checked`（bool，現檔勾選）、`checkbox_change`（`checked`/`unc
 來自 `board_sync.py plan`）、`prior_badges`（list）：（任一出現才輸出）多三個欄位——`checked`（最終勾選，
 沒帶 `checked` 時為 `null`＝不要動 checkbox）、`learn_pending`（👀 剛被勾、且沒有 🧠）、
 `acked_current`（report 已由你在目前 head 之後 ack）。規則見 `checkbox_after_refresh()`。
-stdout：JSON 陣列；含 section/rank/status/next_action/badges/detail_path、title/author、
+stdout：JSON 陣列；含 section/rank/status/next_action/short_action/size/badges/detail_path、title/author、
 last_reviewed_at/review_time_source/acknowledged_at、needs_review 與 index_entry。
 `--reviews` 僅輸出待看 PR 並依 rank 排序；不可拿過濾後的結果覆寫整份 board。
 （`rank` 是整數，數字越小優先序越高，呼叫端直接用它排序；`detail_path` 無 `url`
@@ -64,6 +66,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
@@ -150,12 +153,42 @@ class BoardStatus(str, Enum):
 class StatusMeta:
     rank: Rank
     next_action: str | None
+    # 索引行用的短動作：無空白、顯示寬度 ≤6；None ＝ 這個狀態不需要使用者動手
+    short_action: str | None = None
 
 
 # 待送出的 next_action 模板佔位字：`main()` 在 url 可解析時，用
 # function-level import 的 `artifact_path("review-draft", ref)` 換掉這段
 # （見 `main()` 內的 circular-import 註解）；url 缺失時保留佔位字，不假造路徑。
 _REVIEW_DRAFT_PLACEHOLDER = "<review-draft>"
+
+
+def display_width(text: str) -> int:
+    """
+    近似終端顯示欄寬：East Asian Wide/Fullwidth（含 emoji）算 2、組合字元與變體選擇符
+    （如 `↩︎` 的 VS15）算 0、其餘（含 Ambiguous 如 `→`、`Δ`）算 1。是近似值，不是 nvim 實際欄寬。
+    """
+    width = 0
+    for char in text:
+        if unicodedata.category(char) in ("Mn", "Me", "Cf"):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+    return width
+
+
+# `待送出` 草稿不存在時的短動作（與 `_missing_draft_action` 同一個判斷）
+_MISSING_DRAFT_SHORT_ACTION = "起草"
+
+
+def format_size(additions: object, deletions: object) -> str | None:
+    """`+A/-D`；任一數字 ≥1000 時縮成一位小數加 `k`（`+1.2k/-340`）。缺數字回 None。"""
+    if not isinstance(additions, int) or not isinstance(deletions, int):
+        return None
+
+    def compact(n: int) -> str:
+        return f"{(n + 50) // 100 / 10:.1f}k" if n >= 1000 else str(n)
+
+    return f"+{compact(additions)}/-{compact(deletions)}"
 
 
 def _missing_draft_action(draft: str) -> str:
@@ -167,27 +200,33 @@ _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P0：抓不到
     BoardStatus.UNREACHABLE: StatusMeta(Rank.P0, None),
     # P1：卡住的，以及報告已寫好只差送出的（待送出要快點送，排在回你的球之前）
-    BoardStatus.CONFLICT: StatusMeta(Rank.P1, "/maigo:address-comments"),
-    BoardStatus.CI_RED: StatusMeta(Rank.P1, "gh pr checks <n>"),
-    BoardStatus.CHANGES_REQUESTED: StatusMeta(Rank.P1, "/maigo:address-comments"),
+    BoardStatus.CONFLICT: StatusMeta(Rank.P1, "/maigo:address-comments", "解衝突"),
+    BoardStatus.CI_RED: StatusMeta(Rank.P1, "gh pr checks <n>", "修CI"),
+    BoardStatus.CHANGES_REQUESTED: StatusMeta(
+        Rank.P1, "/maigo:address-comments", "修改"
+    ),
     BoardStatus.UNPOSTED_VERDICT: StatusMeta(
-        Rank.P1, f"gh pr review <n> --comment --body-file {_REVIEW_DRAFT_PLACEHOLDER}"
+        Rank.P1,
+        f"gh pr review <n> --comment --body-file {_REVIEW_DRAFT_PLACEHOLDER}",
+        "送出",
     ),
     # P2：球被打回
-    BoardStatus.BALL_BACK: StatusMeta(Rank.P2, "/maigo:review <n>"),
-    BoardStatus.NEW_REPLY: StatusMeta(Rank.P2, "/maigo:triage-issue <n>"),
-    BoardStatus.NEW_COMMENT: StatusMeta(Rank.P2, "/maigo:address-comments"),
+    BoardStatus.BALL_BACK: StatusMeta(Rank.P2, "/maigo:review <n>", "重審"),
+    BoardStatus.NEW_REPLY: StatusMeta(Rank.P2, "/maigo:triage-issue <n>", "重判"),
+    BoardStatus.NEW_COMMENT: StatusMeta(Rank.P2, "/maigo:address-comments", "回覆"),
     # P3：一步就結束
-    BoardStatus.MERGEABLE: StatusMeta(Rank.P3, "gh pr merge <n>"),
+    BoardStatus.MERGEABLE: StatusMeta(Rank.P3, "gh pr merge <n>", "merge"),
     # P4：等你審
-    BoardStatus.PENDING_REVIEW: StatusMeta(Rank.P4, "/maigo:review <n>"),
+    BoardStatus.PENDING_REVIEW: StatusMeta(Rank.P4, "/maigo:review <n>", "審"),
     # P5：手上正在做
     BoardStatus.IN_PROGRESS: StatusMeta(Rank.P5, None),
     BoardStatus.WIP: StatusMeta(Rank.P5, None),
     # P6：沒判過
-    BoardStatus.PENDING_TRIAGE: StatusMeta(Rank.P6, "/maigo:triage-issue <n>"),
+    BoardStatus.PENDING_TRIAGE: StatusMeta(
+        Rank.P6, "/maigo:triage-issue <n>", "triage"
+    ),
     # P7：可以開工
-    BoardStatus.READY: StatusMeta(Rank.P7, "/maigo:take-issue <n>"),
+    BoardStatus.READY: StatusMeta(Rank.P7, "/maigo:take-issue <n>", "接手"),
     # P8：等別人
     BoardStatus.AWAITING_REVIEW: StatusMeta(Rank.P8, None),
     BoardStatus.CI_PENDING: StatusMeta(Rank.P8, None),
@@ -741,10 +780,17 @@ def index_entry(
     detail: str | None,
     title: str,
     author: str,
+    short_action: str | None = None,
+    size: str | None = None,
 ) -> str:
-    """One-line display text; checkbox, badges and numbering belong to the caller."""
+    """One-line display text; checkbox, badges and numbering belong to the caller.
+
+    `short_action` / `size` 只該在行動區（🎯／👀）傳入，呼叫端決定。
+    """
     contributor = f" @{author}" if author else ""
-    return f"{item_type.value} {status.value}{contributor}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
+    action = f" →{short_action}" if short_action else ""
+    delta = f" {size}" if size else ""
+    return f"{item_type.value} {status.value}{contributor}{action}{delta}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
 
 
 def evaluate_items(
@@ -798,6 +844,7 @@ def evaluate_items(
         badges = compute_badges(gh_meta, now, stale_days)
 
         next_action = result.next_action
+        short_action = _STATUS_META[result.status].short_action
         if result.status is BoardStatus.UNPOSTED_VERDICT and next_action is not None:
             ref = github_ref(item_url, repo)
             if ref is not None:
@@ -805,6 +852,7 @@ def evaluate_items(
                 draft = artifact_path("review-draft", ref, owner="others")
                 if maigo_root and not (Path(maigo_root) / draft).is_file():
                     next_action = _missing_draft_action(draft)
+                    short_action = _MISSING_DRAFT_SHORT_ACTION
                 else:
                     next_action = next_action.replace(_REVIEW_DRAFT_PLACEHOLDER, draft)
 
@@ -833,6 +881,12 @@ def evaluate_items(
         title = gh_meta.get("title") or item.get("title") or ""
         author = (gh_meta.get("author") or {}).get("login") or item.get("author") or ""
         detail = detail_path(item_url, repo)
+        size = (
+            format_size(gh_meta.get("additions"), gh_meta.get("deletions"))
+            if item_type is not ItemType.ISSUE
+            else None
+        )
+        in_action_section = result.section in (Section.NEXT, Section.REVIEW)
         extra: dict = {}
         if {"checked", "checkbox_change", "prior_badges"} & item.keys():
             extra = {
@@ -847,6 +901,8 @@ def evaluate_items(
                 "rank": int(result.rank),
                 "status": result.status.value,
                 "next_action": next_action,
+                "short_action": short_action,
+                "size": size,
                 "badges": badges,
                 "detail_path": detail,
                 "title": title,
@@ -856,7 +912,13 @@ def evaluate_items(
                 "acknowledged_at": review.get("acknowledged_at"),
                 "needs_review": needs_review,
                 "index_entry": index_entry(
-                    item_type, result.status, detail, title, author
+                    item_type,
+                    result.status,
+                    detail,
+                    title,
+                    author,
+                    short_action if in_action_section else None,
+                    size if in_action_section else None,
                 ),
             }
         )

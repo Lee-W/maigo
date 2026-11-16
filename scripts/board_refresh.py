@@ -52,6 +52,7 @@ SECTION_TITLES = {
     "✅": "## ✅ 最近結案",
 }
 ACTION_SECTIONS = ("🎯", "👀")  # numbered, rank-sorted; the other two are reference
+LINE_BUDGET = 80  # display columns for everything before ` — <title>` (best effort)
 BADGE_ORDER = "🧠🔖💤"
 AGE_LIMIT = timedelta(days=7)
 BACKUP_KEEP = 10
@@ -194,8 +195,17 @@ def render_line(
     badges: list[str],
     detail: str,
     title: str,
+    action: str | None = None,
+    size: str | None = None,
+    ended: str | None = None,
 ) -> str:
-    """One board line per SKILL.md §1「行文法」."""
+    """One board line per SKILL.md §1「行文法」.
+
+    `action` / `size` (🎯/👀 rows) and `ended` (✅ rows) sit between the badges and the
+    detail path. The part before ` — ` is kept within `LINE_BUDGET` display columns by
+    dropping `→action` first; note, author, size, detail and title are never cut, so a
+    line with a very long note can still run over (the budget is best effort).
+    """
     prefix = f"{number}. " if number is not None else "- "
     note = _merge_author_pending(note, bool(author))
     line = f"{prefix}[{'x' if checked else ' '}] {type} {status}{note or ''}"
@@ -204,12 +214,24 @@ def render_line(
     shown = "".join(b for b in BADGE_ORDER if b in badges)
     if shown:
         line += f" {shown}"
-    line += f" {detail} — {' '.join(title.split())}"
-    return line.rstrip()
+
+    def head(act: str | None) -> str:
+        extras = [f"→{act}" if act else None, size, ended]
+        return line + "".join(f" {extra}" for extra in extras if extra) + f" {detail}"
+
+    lead = head(action)
+    if action and board_state.display_width(lead) > LINE_BUDGET:
+        lead = head(None)
+    return f"{lead} — {' '.join(title.split())}".rstrip()
 
 
-def render_row(row: dict, number: int | None) -> str:
-    """`render_line` for one row dict (shared by the board body and the summary)."""
+def render_row(row: dict, number: int | None, section: str) -> str:
+    """`render_line` for one row dict (shared by the board body and the summary).
+
+    The section decides which derived fields show: `→action` and size only in 🎯/👀,
+    the closing date only in ✅, none in ⏳.
+    """
+    actionable = section in ACTION_SECTIONS
     return render_line(
         number=number,
         checked=row["checked"],
@@ -220,6 +242,9 @@ def render_row(row: dict, number: int | None) -> str:
         badges=row["badges"],
         detail=row["detail"],
         title=row["title"],
+        action=row.get("action") if actionable else None,
+        size=row.get("size") if actionable else None,
+        ended=row.get("ended") if section == "✅" else None,
     )
 
 
@@ -256,7 +281,9 @@ def render_board(
             block.append("")
             for index, row in enumerate(rows, start=1):
                 block.append(
-                    render_row(row, index if section in ACTION_SECTIONS else None)
+                    render_row(
+                        row, index if section in ACTION_SECTIONS else None, section
+                    )
                 )
         blocks.append(block)
     for index, block in enumerate(blocks):
@@ -732,6 +759,8 @@ def _row_from_line(entry: Entry, g: Gathered) -> dict:
         "origin": entry.origin, "url": entry.url, "key": entry.key,
         "type": line["type"], "status": line["status"], "note": line["note"],
         "author": line["author"], "badges": list(line["badges"]),
+        "action": line["action"], "size": line["size"],
+        "ended": line["ended"] or _ended_label({"updatedAt": last_drop}),
         "detail": line["detail"], "title": line["title"], "checked": line["checked"],
         "section": _section_of(line["type"], _status_rank(line["status"])),
         "rank": _status_rank(line["status"]),
@@ -785,11 +814,23 @@ def _unreachable_row(entry: Entry, g: Gathered) -> dict:
         "origin": entry.origin, "url": entry.url, "key": entry.key,
         "type": item_type, "status": UNREACHABLE,
         "note": note, "author": "", "badges": [], "detail": detail,
+        "action": None, "size": None, "ended": None,
         "title": sync._short_ref(entry.url), "checked": False,
         "section": _section_of(item_type, 0),
         "rank": 0, "updated_at": None, "mode": "new-unreachable", "gh_meta": None,
         "error": entry.fetch["error"],
     }  # fmt: skip
+
+
+def _ended_label(meta: dict) -> str | None:
+    """`MM-DD` (local time) of when a closed item ended; None when unknown."""
+    ended = meta.get("mergedAt") or meta.get("closedAt") or meta.get("updatedAt")
+    if not ended:
+        return None
+    try:
+        return board_state._parse_ts(ended).astimezone().strftime("%m-%d")
+    except ValueError:
+        return None
 
 
 def _ended_at(row: dict) -> str | None:
@@ -876,6 +917,8 @@ def build(
                 "status": r["status"], "note": note, "author": r["author"],
                 "badges": sorted(badges), "detail": line["detail"] if line else r["detail_path"],
                 "title": r["title"],
+                "action": r["short_action"], "size": r["size"],
+                "ended": _ended_label(entry.fetch["gh_meta"]),
                 "checked": line["checked"]
                 if line and entry.url in unprocessed
                 else bool(r["checked"]),
@@ -1286,7 +1329,8 @@ def summarize(g: Gathered, built: Built) -> dict:
     sections = built.rows_by_section
     top = {
         section: [
-            render_row(row, i) for i, row in enumerate(sections[section][:5], start=1)
+            render_row(row, i, section)
+            for i, row in enumerate(sections[section][:5], start=1)
         ]
         for section in ACTION_SECTIONS
     }

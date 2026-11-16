@@ -91,6 +91,9 @@ _BODY_RE = re.compile(
     r"\s*(?P<note>（[^）]*）)?"
     r"\s*(?:@(?P<author>[A-Za-z0-9_/-]+(?:\[bot\])?))?"
     r"\s*(?P<badges>(?:[🧠💤🔖]\s*)*)"
+    r"(?:→(?P<action>\S+)\s*)?"
+    r"(?:(?P<size>\+\d+(?:\.\d)?k?/-\d+(?:\.\d)?k?)\s*)?"
+    r"(?:(?P<ended>\d{2}-\d{2})\s*)?"
     r"(?P<detail>i/\S+?\.md)?"
     r"\s*—\s?(?P<title>.*)$"
 )
@@ -243,6 +246,9 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
                 "note": parsed["note"],
                 "author": parsed["author"],
                 "badges": re.findall(r"[🧠💤🔖]", parsed["badges"]),
+                "action": parsed["action"],
+                "size": parsed["size"],
+                "ended": parsed["ended"],
                 "detail": parsed["detail"],
                 "title": parsed["title"].strip(),
                 "raw": raw,

@@ -174,7 +174,19 @@ class TestParseBoard:
         assert line["title"] == "[main] Upgrade CI"
 
     @pytest.mark.parametrize("author", ["app/github-actions", "me"])
-    def test_render_parse_render_round_trip_is_stable(self, author):
+    @pytest.mark.parametrize(
+        ("action", "size", "ended"),
+        [
+            (None, None, None),
+            ("審", "+12/-3", None),
+            (None, "+1.2k/-340", None),
+            ("解衝突", "+86/-12", None),
+            (None, None, "11-14"),
+        ],
+    )
+    def test_render_parse_render_round_trip_is_stable(
+        self, author, action, size, ended
+    ):
         def render(line):
             return refresh.render_line(
                 number=None,
@@ -186,6 +198,9 @@ class TestParseBoard:
                 badges=line["badges"],
                 detail=line["detail"],
                 title=line["title"],
+                action=line.get("action"),
+                size=line.get("size"),
+                ended=line.get("ended"),
             )
 
         first = render(
@@ -194,13 +209,21 @@ class TestParseBoard:
                 "status": "已看完",
                 "note": None,
                 "author": author,
-                "badges": [],
+                "badges": ["🧠"],
                 "detail": "i/73822.md",
                 "title": "Upgrade CI",
+                "action": action,
+                "size": size,
+                "ended": ended,
             }
         )
         parsed = sync.parse_board(f"## 🎯 下一件\n{first}\n")
         assert parsed["errors"] == []
+        assert (parsed["lines"][0]["action"], parsed["lines"][0]["size"]) == (
+            action,
+            size,
+        )
+        assert parsed["lines"][0]["ended"] == ended
         assert render(parsed["lines"][0]) == first
 
     @pytest.mark.parametrize(

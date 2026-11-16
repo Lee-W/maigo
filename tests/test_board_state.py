@@ -794,6 +794,104 @@ class TestRankTotality:
             assert bs.section_for(bs.Rank.P9, item_type) is bs.Section.DONE
 
 
+class TestShortActionAndSize:
+    def test_every_actionable_status_has_short_action(self):
+        for status, meta in bs._STATUS_META.items():
+            if meta.next_action is None:
+                assert meta.short_action is None, status
+                continue
+            assert meta.short_action, status
+            assert not any(c.isspace() for c in meta.short_action), status
+            assert bs.display_width(meta.short_action) <= 6, status
+
+    def test_display_width_counts_wide_chars_and_ignores_variation_selectors(self):
+        assert bs.display_width("abc") == 3
+        assert bs.display_width("解衝突") == 6
+        assert bs.display_width("🔀") == 2
+        assert bs.display_width("↩︎ 回你的球") == 1 + 1 + 8
+
+    @pytest.mark.parametrize(
+        ("additions", "deletions", "expected"),
+        [
+            (86, 12, "+86/-12"),
+            (1210, 340, "+1.2k/-340"),
+            (999, 1000, "+999/-1.0k"),
+            (12345, 0, "+12.3k/-0"),
+            (None, 3, None),
+            (3, None, None),
+        ],
+    )
+    def test_size_compacts_thousands(self, additions, deletions, expected):
+        assert bs.format_size(additions, deletions) == expected
+
+    def _evaluate(self, items, tmp_path=None, repo=""):
+        return bs.evaluate_items(
+            items,
+            you=YOU,
+            repo=repo,
+            maigo_root=str(tmp_path) if tmp_path else "",
+            now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+        )
+
+    def test_evaluate_reports_size_for_prs_but_not_issues(self):
+        pr = {
+            "type": "👀",
+            "gh_meta": {"state": "OPEN", "additions": 1210, "deletions": 340},
+        }
+        issue = {
+            "type": "🐛",
+            "gh_meta": {"state": "OPEN", "additions": 5, "deletions": 5},
+        }
+        pr_out, issue_out = self._evaluate([pr, issue])
+        assert pr_out["size"] == "+1.2k/-340"
+        assert pr_out["short_action"] == "審"
+        assert issue_out["size"] is None
+
+    def test_index_entry_carries_action_and_size_only_in_action_sections(self):
+        waiting = {
+            "type": "🔀",
+            "gh_meta": {
+                "state": "OPEN",
+                "additions": 7,
+                "deletions": 1,
+                "author": {"login": YOU},
+            },
+        }
+        action = {
+            "type": "👀",
+            "gh_meta": {"state": "OPEN", "additions": 7, "deletions": 1},
+        }
+        waiting_out, action_out = self._evaluate([waiting, action])
+        assert waiting_out["section"] == "⏳"
+        assert "→" not in waiting_out["index_entry"]
+        assert "+7/-1" not in waiting_out["index_entry"]
+        assert action_out["index_entry"].startswith("👀 待 review →審 +7/-1")
+
+    def _unposted(self, url):
+        return {
+            "type": "👀",
+            "gh_meta": {
+                "state": "OPEN",
+                "reviews": [],
+                "comments": [],
+                "author": {"login": "other"},
+            },
+            "prior_status": "APPROVE",
+            "url": url,
+        }
+
+    def test_unposted_without_draft_suggests_drafting(self, tmp_path):
+        url = "https://github.com/apache/airflow/pull/58543"
+        (out,) = self._evaluate([self._unposted(url)], tmp_path, "apache/airflow")
+        assert out["status"] == "待送出"
+        assert out["short_action"] == "起草"
+        draft = tmp_path / ".maigo" / "review" / "58543" / "draft.md"
+        draft.parent.mkdir(parents=True)
+        draft.write_text("body\n")
+        (out,) = self._evaluate([self._unposted(url)], tmp_path, "apache/airflow")
+        assert out["short_action"] == "送出"
+
+
 class TestUnpostedVerdictRankOrder:
     def test_unposted_verdict_ranks_before_ball_back(self):
         meta = bs._STATUS_META
@@ -969,6 +1067,8 @@ class TestMain:
                 "rank": 6,
                 "status": "待 triage",
                 "next_action": "/maigo:triage-issue <n>",
+                "short_action": "triage",
+                "size": None,
                 "badges": [],
                 "detail_path": None,
                 "title": "",
@@ -977,7 +1077,7 @@ class TestMain:
                 "review_time_source": None,
                 "acknowledged_at": None,
                 "needs_review": False,
-                "index_entry": "🐛 待 triage —",
+                "index_entry": "🐛 待 triage →triage —",
             }
         ]
 

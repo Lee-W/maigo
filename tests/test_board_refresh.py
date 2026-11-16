@@ -196,12 +196,12 @@ SKILL_BOARD = """\
 
 ## 🎯 我的下一件（2）
 
-1. [ ] 🔀 CHANGES_REQUESTED @Lee-W i/9201.md — Redesign Work Board reading view
-2. [ ] 🐛 待 triage @reporter 💤 i/9101.md — CLI 在空設定檔時會 crash
+1. [ ] 🔀 CHANGES_REQUESTED @Lee-W →修改 +286/-74 i/9201.md — Redesign Work Board reading view
+2. [ ] 🐛 待 triage @reporter 💤 →triage i/9101.md — CLI 在空設定檔時會 crash
 
 ## 👀 待我 review（1）
 
-1. [x] 👀 ↩︎ 回你的球 @contributor i/9301.md — Avoid duplicate GitHub requests
+1. [x] 👀 ↩︎ 回你的球 @contributor →重審 +1.2k/-340 i/9301.md — Avoid duplicate GitHub requests
 
 ## ⏳ 等別人（2）
 
@@ -210,13 +210,16 @@ SKILL_BOARD = """\
 
 ## ✅ 最近結案（1）
 
-- [x] 👀 APPROVE（merged 07-12） @contributor 🧠 i/9303.md — Add structured review verdicts
+- [x] 👀 APPROVE（merged 07-12） @contributor 🧠 07-12 i/9303.md — Add structured review verdicts
 """
 
 EXTRA_LINES = [
     "1. [ ] 🔀 CI 紅 @octocat i/airflow-70724.md — Run CI on release-branch pull requests",
     "2. [ ] 👀 抓不到（GraphQL: Could not resolve） @octocat i/foo-3.md — owner/foo#3",
     "3. [x] 👀 已看完 @dev 🧠🔖💤 i/55.md — All three badges",
+    "4. [ ] 🔀 CI 紅 @octocat 💤 →修CI +1.2k/-340 i/56.md — Action, size and badge",
+    "5. [ ] 👀 待 review（手寫旁註） @octocat +86/-12 i/57.md — Size without action",
+    "- [x] 🔀 merged @octocat 🧠 11-14 i/58.md — Closing date",
 ]
 
 
@@ -231,7 +234,8 @@ def _render(parsed_line: dict) -> str:
         type=parsed_line["type"], status=parsed_line["status"],
         note=parsed_line["note"], author=parsed_line["author"],
         badges=parsed_line["badges"], detail=parsed_line["detail"],
-        title=parsed_line["title"],
+        title=parsed_line["title"], action=parsed_line["action"],
+        size=parsed_line["size"], ended=parsed_line["ended"],
     )  # fmt: skip
 
 
@@ -241,7 +245,7 @@ def test_t1_every_line_shape_round_trips():
         for ln in SKILL_BOARD.splitlines()
         if ln.startswith(("1. ", "2. ", "3. ", "- ["))
     ] + EXTRA_LINES
-    assert len(lines) == 9
+    assert len(lines) == 12
     for line in lines:
         parsed = sync.parse_board(_as_board(line))
         assert parsed["errors"] == [], line
@@ -272,6 +276,33 @@ def test_t2_whole_file_round_trip_is_byte_identical():
         learn_pending_count=refresh.count_learn_pending(flat),
     )
     assert rendered == SKILL_BOARD
+
+
+SKILL_MD = Path(__file__).resolve().parent.parent / "skills" / "work-board" / "SKILL.md"
+
+
+def test_skill_grammar_examples_parse():
+    """The example board in SKILL.md §1 parses cleanly and re-renders byte-identically."""
+    text = SKILL_MD.read_text(encoding="utf-8")
+    start = text.index("### Sections")
+    fence = text.index("```markdown\n", start) + len("```markdown\n")
+    example = text[fence : text.index("\n```", fence)] + "\n"
+    parsed = sync.parse_board(example)
+    assert parsed["errors"] == [] and parsed["legacy"] is False
+    fields = [(ln["action"], ln["size"], ln["ended"]) for ln in parsed["lines"]]
+    assert any(action and size for action, size, _ in fields)
+    assert any(ended for _, _, ended in fields)
+    rows = {s: [ln for ln in parsed["lines"] if ln["section"] == s] for s in "🎯👀⏳✅"}
+    header = example.splitlines()[2]
+    rendered = refresh.render_board(
+        repo="Lee-W/maigo",
+        refreshed_at_local=header.split("：")[1].split(" ｜")[0],
+        rows_by_section=rows,
+        learn_pending_count=refresh.count_learn_pending(
+            [r for section in rows.values() for r in section]
+        ),
+    )
+    assert rendered == example
 
 
 def test_t3_real_board_shape_survives_parse_render_parse():
@@ -542,6 +573,118 @@ def test_t7_sort_and_counts(tmp_path, gh):
     assert waiting == ["6", "5"]  # newest first
     assert "## 🎯 我的下一件（1）" in lines and "## 👀 待我 review（3）" in lines
     assert "## ✅ 最近結案（0）" in lines
+
+
+# --- line fields: short action, size, closing date; width budget ----------------
+
+
+def _fields(**over):
+    base = dict(
+        number=1, checked=False, type="👀", status="待 review", note=None,
+        author="octocat", badges=[], detail="i/1.md", title="t",
+    )  # fmt: skip
+    base.update(over)
+    return base
+
+
+def test_render_line_places_action_size_and_date_between_badges_and_detail():
+    line = refresh.render_line(
+        **_fields(badges=["🧠"], action="審", size="+1.2k/-340", ended="11-14")
+    )
+    assert line == "1. [ ] 👀 待 review @octocat 🧠 →審 +1.2k/-340 11-14 i/1.md — t"
+
+
+def test_render_line_drops_action_when_prefix_over_budget():
+    status = "CHANGES_REQUESTED"
+    # exactly 80 columns without the action; the action (+8) pushes it past the budget
+    author = "a" * 33
+    line = refresh.render_line(
+        **_fields(type="🔀", status=status, author=author, action="解衝突",
+                  size="+10/-2", detail="i/12345.md")
+    )  # fmt: skip
+    assert "→" not in line and "+10/-2" in line
+    fits = refresh.render_line(
+        **_fields(type="🔀", status=status, author="a" * 5, action="解衝突",
+                  size="+10/-2", detail="i/12345.md")
+    )  # fmt: skip
+    assert "→解衝突" in fits
+    assert board_state_width(fits.split(" — ")[0]) <= refresh.LINE_BUDGET
+
+
+def board_state_width(text: str) -> int:
+    return refresh.board_state.display_width(text)
+
+
+def test_render_line_keeps_size_and_title_when_over_budget():
+    title = "A very long title " * 8
+    line = refresh.render_line(
+        **_fields(
+            note="（手寫的很長很長很長很長很長很長很長很長很長很長很長很長的旁註）",
+            action="審",
+            size="+1/-1",
+            title=title,
+        )
+    )
+    head, _, tail = line.partition(" — ")
+    assert "→" not in head and "+1/-1" in head
+    assert tail == " ".join(title.split())
+    assert board_state_width(head) > refresh.LINE_BUDGET  # best effort, not a hard cap
+
+
+def test_line_without_new_fields_still_parses():
+    text = (
+        "## 🎯 我的下一件（1）\n\n"
+        "1. [ ] 🔀 CI 紅 @octocat 💤 i/9.md — Old shape\n\n"
+        "## ✅ 最近結案（1）\n\n- [x] 🔀 merged @octocat i/8.md — Old closed\n"
+    )
+    parsed = sync.parse_board(text)
+    assert parsed["errors"] == []
+    assert [(ln["action"], ln["size"], ln["ended"]) for ln in parsed["lines"]] == [
+        (None, None, None)
+    ] * 2
+    assert (
+        _render(parsed["lines"][0]) == "1. [ ] 🔀 CI 紅 @octocat 💤 i/9.md — Old shape"
+    )
+
+
+def test_waiting_section_lines_have_no_action_or_size(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            wait=[row(1, icon="🔀", status="等 review", author="me", numbered=False)]
+        ),
+    )
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1, author="me")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    waiting = section_rows(tmp_path)["⏳"]
+    assert len(waiting) == 1
+    assert "→" not in waiting[0] and "+10/-2" not in waiting[0]
+
+
+def test_action_rows_show_action_and_size_and_done_rows_the_closing_date(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            focus=[row(1), row(2, icon="🔀", status="CI 紅", author="me")],
+            done=[row(3, icon="🔀", status="merged", author="me", numbered=False)],
+        ),
+    )
+    for n in (1, 2, 3):
+        put_detail(tmp_path, n)
+    gh.prs[1] = pr_meta(1, additions=1210, deletions=340)
+    gh.prs[2] = pr_meta(2, author="me", statusCheckRollup=[{"conclusion": "FAILURE"}])
+    gh.prs[3] = pr_meta(3, author="me", state="MERGED", mergedAt="2026-09-28T08:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    sections = section_rows(tmp_path)
+    assert sections["🎯"][0].endswith("→修CI +10/-2 i/2.md — PR 2")
+    assert sections["👀"][0].endswith("→審 +1.2k/-340 i/1.md — PR 1")
+    assert sections["✅"][0].endswith("merged @me 09-28 i/3.md — PR 3")
+    # the full facts stay in the detail file
+    assert "- 規模：Δ+1210/-340" in (tmp_path / ".maigo/i/1.md").read_text()
+    again = board_lines(tmp_path)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert board_lines(tmp_path) == again  # fixed point
 
 
 # --- sections: own work and reviews are separate --------------------------------
