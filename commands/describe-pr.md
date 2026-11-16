@@ -48,7 +48,7 @@ description: 從當前 branch 的 commits / diff 產 GitHub PR title 與 descrip
 
 4. **偵測 PR template**：
    - 依序找：`.github/PULL_REQUEST_TEMPLATE.md` → `.github/pull_request_template.md` → `.github/PULL_REQUEST_TEMPLATE/` 目錄內第一個 `.md` 檔
-   - 找到 → 讀取 template 內容，作為描述框架傳給燈（template 其餘區塊照用，但 `## Why` / `## What` 標題仍須保留，見 skill 的「若 repo 有 PR template」）
+   - 找到 → 讀取 template 內容，作為描述框架傳給燈（template 其餘區塊照用，但 Why / What 標題仍須保留、層級依 template 的容器 section 往下降，見 skill 的「若 repo 有 PR template」）
    - 找不到 → 用 skill 預設結構
 
 把 1–4 的結果整理成一份 bundle，連同「不 hallucinate」守則一起寫進啟動燈的 Task prompt。

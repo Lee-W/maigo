@@ -37,7 +37,7 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
    有明文禁用 CC 的慣例 → 跟 repo 走自由格式；皆無訊號 → 預設 Conventional Commits）。
    **這只影響 commit message 風格參考；PR title 本身永不套 `type:` prefix。**
 6. **PR template（若存在）**：caller 在 `.github/PULL_REQUEST_TEMPLATE.md`（含大小寫變體與 `.github/PULL_REQUEST_TEMPLATE/` 目錄）找到的 template 內容。
-   - 找到 → 以 template 結構作為描述框架，填入從 commits / diff 萃取的內容；`## Why` / `## What` 標題照樣保留（見「若 repo 有 PR template」）
+   - 找到 → 以 template 結構作為描述框架，填入從 commits / diff 萃取的內容；Why / What 標題照樣保留，標題層級依 template 調整（見「若 repo 有 PR template」）
    - 找不到 → 用本 skill 預設結構
 
 ## Title 規則（user-impact 句子）
@@ -81,7 +81,11 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 
 - `## Why` ≤ 2 句。
 - `## What` ≤ 1 段 + 1 個 code example（僅限 core API 改動這種需要秀 signature/呼叫方式的情況）——不要寫成逐檔案條列。
-- `## Test Plan` 維持條列、一行一個 bullet，描述測到什麼，**不要**貼 test 檔內容進去。
+- `## Test Plan` 維持條列、一行一個 bullet，描述測到什麼，**不要**貼 test 檔內容進去。至多 3 條：跑了什麼指令、結論是什麼；逐項的筆數、計數與驗證過程留在 review thread，不進 description。
+- PR 涵蓋多個主題時，`## What` 改用條列，**至多 4–5 條、每條一句**；同一類的小修併成一條（「修了 pre-commit 安裝與 livereload 兩個 dev task」），不要一個修正一條、每條三句。
+- 未驗證的事項併成 `## Test Plan` 最後**一條** bullet（`Not checked: A, and B.`），只留 reviewer 需要自己確認的；不另開小節、不逐項解釋為什麼沒驗。
+- **整份 description 以一個螢幕內讀完為準**（約 25 行以內，不含 template 自帶的 checklist）。寫超過就刪，不要靠排版擠——太長的 description 沒有人會讀完。
+- caller 給的事實清單是**可用的素材，不是必須全部寫進去的清單**：只挑 reviewer 判斷「要不要合併」用得到的，其餘捨棄。
 
 ### Description anti-patterns
 
@@ -126,6 +130,7 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 - template 內原有的 checklist / 說明文字保留在適當位置（template 開頭的 HTML 註解可省）
 - 不要增加 template 沒有的 section；不要刪掉 template 要求的 section
 - **Why / What 必須保留，且必須帶 `## Why` / `## What` 標題**：即使 template 沒有這兩個 section，也要把它們加在 template 開頭的自由描述區（通常在第一條 `---` 分隔線之前），不能寫成無標題散文。Why/What 是 reviewer 理解改動的最低資訊，不能因 template 不含它們就省略。這是上一條「不要增加 template 沒有的 section」的明確例外；`## Test Plan` 同樣加在那一區（template 已有等價的測試說明 section 時，用 template 的）。
+- **標題層級跟著 template 走**：template 若已有承載自由描述的 section（例如 `## Description`），Why / What / Test Plan 是它的**內容**，要降一級寫成 `### Why` / `### What` / `### Test Plan` 掛在該 section 底下，不可與它同級並列成 `## Why`。只有 template 沒有這種容器 section 時，才用 `##`。寫完對照一次：每個標題的層級是否反映它在 template 結構裡的從屬關係。
 
 ## 怎麼從 commits / diff 萃取這四段
 
