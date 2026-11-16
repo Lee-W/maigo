@@ -176,6 +176,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 - 連結：<https://github.com/OWNER/REPO/pull/NUMBER>
 - 規模：Δ+A/-D ｜ 作者：<author>
 - 下一步：`<next_action>`
+- 載入：`<依 board-load.txt 樣板代入的指令；沒設定樣板就整行省略>`
 - 最後 review：<ISO 8601 時間，含時區>
 - 已看完：<ISO 8601 時間，含時區；尚未確認時省略>
 
@@ -207,6 +208,8 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
 - **最後 review / 已看完**：使用 report 的 `reviewed_at` / `acknowledged_at`，不能用
   board 刷新時間取代。沒有 report 時寫「尚未 review」；舊檔 mtime fallback 註明「舊檔時間推估」。
 - **規模**：issue 省略整行（沒有 additions/deletions 可言）。
+- **載入**：只有設定了 `board-load.txt` 樣板（見〈排序〉之後的「載到本機的指令」）、且該項目是開著的同 repo PR 時才寫；
+  🐛 issue、跨 repo 項目（`i/<repo>-<n>.md`）、✅ 結案項目、抓不到的列一律省略整行。delegate 命令寫細節檔時可省略這行，下一次刷新補上。
 - **下一步**：`next_action` 為 `null` 時省略整行——狀態沒有對應下一步，見
   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
   的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
@@ -331,6 +334,27 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
   author:FrankYang0529
   title:common\.ai|PydanticAI|LLMOperator|AgentOperator|DocumentLoader
   ```
+- **載到本機的指令（`board-load.txt`）**：細節檔的 `- 載入：` 那一行，游標在索引行的路徑上 `gf` 進去、
+  `yi`＋反引號即可複製到終端機。樣板由使用者設定，**maigo 不內建任何預設、也不執行它**——board 只顯示。
+  沒設定就整行省略。設定檔沿用 `board-weights.txt` 的兩層慣例：
+  - repo 層：`<maigo-root>/.maigo/board-load.txt`
+  - 使用者層：`~/.config/maigo/board-load.txt`
+  - 同一個 key 兩層都有時 repo 層優先（逐 key 覆蓋）。
+
+  格式一行一條，空行與 `#` 開頭忽略：
+  - `pr:<樣板>`：給 PR 用，可用佔位字 `{number}`；
+  - `branch:<樣板>`：給自己的 🔀 用，可用 `{branch}`（PR 的 `headRefName`）與 `{number}`。
+
+  誰拿到哪條：👀 用 `pr`；🔀 優先用 `branch`，沒設 `branch`（或 gh 沒給 branch 名）時退回 `pr`；兩條都沒設就不顯示。
+  未知 key、未知佔位字、空樣板會以 `檔名:行號` 大聲失敗（`refresh` exit 1，未寫任何檔）。`headRefName` 由 PR 作者決定，
+  代入前會驗證只含 git branch 的安全字元，不合格就省略那一行並在刷新摘要警告。範例（使用者設定檔內容，
+  工具與指令依你自己的環境調整，這裡只是示意）：
+
+  ```text
+  # 載到本機的指令樣板（範例）
+  pr:wt switch pr:{number}
+  branch:wt switch {branch}
+  ```
 - ⏳ / ✅ 區：自己的（🔀／🐛）在前、👀 在後，各群內 `updatedAt` 降序（這兩區是查閱，不是待辦）。
 - ✅ 區在刷新時自動清掉過期與超量的行，清掉時同時寫入排除紀錄（`reason: aged`，§3a）。規則依序是：
   1. **保留期**：👀（別人的 PR）結案超過 **3 天**清掉，🔀／🐛（自己的）超過 **7 天**（`AGE_LIMIT_REVIEW`／`AGE_LIMIT_OWN`）。
@@ -359,7 +383,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 # issue
 gh issue view <n> --repo <r> --json title,state,stateReason,assignees,author,comments,createdAt,updatedAt,labels,closedByPullRequestsReferences
 # PR（自己的與在審的同一組）
-gh pr view <n> --repo <r> --json title,state,isDraft,mergedAt,mergeable,reviewDecision,createdAt,updatedAt,headRefOid,commits,reviews,comments,author,statusCheckRollup,additions,deletions
+gh pr view <n> --repo <r> --json title,state,isDraft,mergedAt,mergeable,reviewDecision,createdAt,updatedAt,headRefOid,headRefName,commits,reviews,comments,author,statusCheckRollup,additions,deletions
 ```
 
 「你」＝ `gh api user --jq .login`（沿用 review board 既有做法）。

@@ -147,6 +147,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    三張球權判定表、排序與 ✅ 保留天數見
    [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)；
    `classify()` 是判定邏輯的唯一正典。
+   細節檔的 `- 載入：` 行由可選的 `board-load.txt` 樣板（repo 層 `.maigo/`、使用者層 `~/.config/maigo/`，兩層逐 key 覆蓋，key 是 `pr:` 與 `branch:`）代入產生，沒設定就省略；board 只顯示、不執行，格式見 `skills/work-board`。
 5. **寫回**——用 `Edit`（不整份 `Write`）：依 rank 升序 ＋ 同 rank 內加權（`board-weights.txt`，可選，
    只在同 rank 內調整、不改 rank／section，規則見
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）

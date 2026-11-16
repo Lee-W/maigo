@@ -811,6 +811,163 @@ def test_old_three_section_board_normalizes_to_four_sections(tmp_path, gh, capsy
     assert summary["counts"] == {"🎯": 1, "👀": 2, "⏳": 0, "✅": 0}
 
 
+# --- board-load.txt: the `載入` line in detail files ---------------------------
+
+
+def _set_load(root, text, *, user=None, home=None):
+    (root / ".maigo").mkdir(parents=True, exist_ok=True)
+    if text is not None:
+        (root / ".maigo" / "board-load.txt").write_text(text)
+    if user is not None:
+        folder = home / ".config" / "maigo"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "board-load.txt").write_text(user)
+
+
+def _detail(root, n):
+    return (root / ".maigo" / "i" / f"{n}.md").read_text()
+
+
+def _load_line(root, n):
+    return next(
+        (ln for ln in _detail(root, n).splitlines() if ln.startswith("- 載入")), None
+    )
+
+
+def _load_board(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            focus=[
+                row(1),
+                row(2, icon="🔀", status="CI 紅", author="me"),
+                row(4, icon="🐛", status="待 triage", author="rep"),
+            ],
+            done=[row(3, icon="👀", status="merged", numbered=False)],
+        ),
+    )
+    for n in (1, 2, 3):
+        put_detail(tmp_path, n)
+    put_detail(tmp_path, 4, kind="issues", icon="🐛", status="待 triage")
+    gh.prs[1] = pr_meta(1, headRefName="theirs/topic")
+    gh.prs[2] = pr_meta(
+        2, author="me", headRefName="feat/mine",
+        statusCheckRollup=[{"conclusion": "FAILURE"}],
+    )  # fmt: skip
+    gh.prs[3] = pr_meta(3, state="MERGED", mergedAt=RECENT)
+    gh.issues[4] = issue_meta(4)
+
+
+def test_pr_fields_include_head_ref_name():
+    assert "headRefName" in refresh.PR_FIELDS.split(",")
+
+
+def test_review_row_uses_pr_template(tmp_path, gh):
+    _load_board(tmp_path, gh)
+    _set_load(tmp_path, "pr:wt switch pr:{number}\nbranch:wt switch {branch}\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _load_line(tmp_path, 1) == "- 載入：`wt switch pr:1`"
+
+
+def test_own_pr_prefers_branch_template_with_head_ref_name(tmp_path, gh):
+    _load_board(tmp_path, gh)
+    _set_load(tmp_path, "pr:wt switch pr:{number}\nbranch:wt switch {branch}\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _load_line(tmp_path, 2) == "- 載入：`wt switch feat/mine`"
+
+
+def test_own_pr_falls_back_to_pr_template(tmp_path, gh):
+    _load_board(tmp_path, gh)
+    _set_load(tmp_path, "pr:wt switch pr:{number}\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _load_line(tmp_path, 2) == "- 載入：`wt switch pr:2`"
+
+
+def test_load_line_omitted_without_config(tmp_path, gh):
+    _load_board(tmp_path, gh)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert all(_load_line(tmp_path, n) is None for n in (1, 2, 3))
+    assert "wt" not in refresh.LOAD_FILENAME and not refresh.load_load_templates(
+        tmp_path
+    )  # no built-in default
+
+
+def test_load_line_omitted_for_issue_cross_repo_and_done_rows(tmp_path, gh):
+    _load_board(tmp_path, gh)
+    cross = "https://github.com/o/other/pull/9"
+    put_detail(tmp_path, 9, text=detail_text(9).replace(url(9), cross))
+    (tmp_path / ".maigo/i/9.md").rename(tmp_path / ".maigo/i/other-9.md")
+    text = (
+        (tmp_path / ".maigo/board.md")
+        .read_text()
+        .replace(
+            "## ⏳ 等別人",
+            "1. [ ] 👀 待 review @carol i/other-9.md — Cross\n\n## ⏳ 等別人",
+            1,
+        )
+    )
+    write_board(tmp_path, text)
+    gh.prs[9] = pr_meta(9)
+    _set_load(tmp_path, "pr:wt switch pr:{number}\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _load_line(tmp_path, 4) is None  # issue
+    assert _load_line(tmp_path, 3) is None  # closed
+    other = (tmp_path / ".maigo/i/other-9.md").read_text()
+    assert "- 載入" not in other  # cross-repo
+    assert _load_line(tmp_path, 1) is not None
+
+
+def test_repo_layer_overrides_user_layer_per_key(tmp_path, isolated_home):
+    _set_load(
+        tmp_path, "pr:repo {number}\n",
+        user="pr:user {number}\nbranch:user {branch}\n", home=isolated_home,
+    )  # fmt: skip
+    assert refresh.load_load_templates(tmp_path) == {
+        "pr": "repo {number}",
+        "branch": "user {branch}",
+    }
+
+
+@pytest.mark.parametrize(
+    ("content", "lineno"),
+    [
+        ("# c\nlabel:foo\n", 2),
+        ("pr:go {nubmer}\n", 1),
+        ("branch:go {repo}\n", 1),
+        ("pr:{branch}\n", 1),
+        ("pr:   \n", 1),
+    ],
+)
+def test_bad_load_template_fails_with_file_and_line(
+    tmp_path, gh, capsys, content, lineno
+):
+    _load_board(tmp_path, gh)
+    _set_load(tmp_path, content)
+    before = tree_hash(tmp_path)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 1
+    assert f"board-load.txt:{lineno}:" in capsys.readouterr().err
+    assert tree_hash(tmp_path) == before
+    assert not [c for c in gh.calls if c[:2] == ["gh", "pr"]]
+
+
+@pytest.mark.parametrize("branch", ["x; rm -rf ~", "$(id)", "a b", "-rf", "a/../b"])
+def test_unsafe_branch_name_omits_load_line(tmp_path, gh, capsys, branch):
+    _load_board(tmp_path, gh)
+    gh.prs[2]["headRefName"] = branch
+    _set_load(tmp_path, "pr:wt switch pr:{number}\nbranch:wt switch {branch}\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery", "--json") == 0
+    assert _load_line(tmp_path, 2) is None
+    assert any("不安全" in w for w in json.loads(capsys.readouterr().out)["warnings"])
+
+
+def test_skill_load_examples_parse():
+    text = SKILL_MD.read_text(encoding="utf-8")
+    start = text.index("# 載到本機的指令樣板（範例）")
+    fence = text.rindex("```text\n", 0, start) + len("```text\n")
+    example = text[fence : text.index("```", fence)]  # fence is indented in the list
+    assert set(refresh.parse_load_templates(example, "SKILL.md")) == {"pr", "branch"}
+
+
 # --- board-weights: same-rank boost ---------------------------------------------
 
 EXAMPLE_WEIGHTS = """\

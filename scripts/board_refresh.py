@@ -64,6 +64,12 @@ DONE_CAP = 10
 BACKUP_KEEP = 10
 WEIGHTS_FILENAME = "board-weights.txt"
 WEIGHT_PREFIXES = ("author", "title")
+LOAD_FILENAME = "board-load.txt"
+# `board-load.txt` keys and the placeholders each one may use
+LOAD_KEYS = {"pr": {"number"}, "branch": {"branch", "number"}}
+_PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
+_SAFE_BRANCH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._/-]*$")
+_SAME_REPO_DETAIL_RE = re.compile(r"^i/\d+\.md$")
 NOTE_MAX = 80
 JUDGMENT_HEADING = "## 判斷"
 NEW_PRESERVED = "## 判斷\n\n## 筆記\n\n<!-- 手寫區 -->\n"
@@ -72,8 +78,8 @@ ERROR_NOTE_PREFIX = "（gh 失敗："
 _DETAIL_H1_RE = re.compile(r"^# \S+ (?P<status>.+?) — ")
 PR_FIELDS = (
     "title,state,isDraft,mergedAt,closedAt,mergeable,reviewDecision,createdAt,"
-    "updatedAt,headRefOid,commits,reviews,comments,author,statusCheckRollup,"
-    "additions,deletions"
+    "updatedAt,headRefOid,headRefName,commits,reviews,comments,author,"
+    "statusCheckRollup,additions,deletions"
 )
 ISSUE_FIELDS = (
     "title,state,stateReason,closedAt,assignees,author,comments,createdAt,"
@@ -167,6 +173,86 @@ def load_weights(root: Path, explicit: Path | None = None) -> list[WeightRule]:
             raise RefreshError(1, f"{path}: 無法讀取加權檔（{error}）") from error
         rules.extend(parse_weights(text, str(path)))
     return rules
+
+
+def parse_load_templates(text: str, source: str) -> dict[str, str]:
+    """Parse one `board-load.txt`: `pr:<template>` / `branch:<template>` per line.
+
+    Unknown key, unknown placeholder or empty template is a RefreshError(1) naming
+    file:line. Templates are only ever displayed, never executed by maigo.
+    """
+    templates: dict[str, str] = {}
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip()
+        if key not in LOAD_KEYS or not value:
+            raise RefreshError(
+                1,
+                f"{source}:{number}: 無法解析載入樣板 {line!r}"
+                "（只接受 `pr:<樣板>` 或 `branch:<樣板>`，樣板不可為空）",
+            )
+        unknown = sorted(set(_PLACEHOLDER_RE.findall(value)) - LOAD_KEYS[key])
+        if unknown:
+            raise RefreshError(
+                1,
+                f"{source}:{number}: `{key}:` 樣板含未知佔位字 {unknown}"
+                f"（可用：{sorted(LOAD_KEYS[key])}）",
+            )
+        templates[key] = value
+    return templates
+
+
+def load_load_templates(root: Path, user_dir: Path | None = None) -> dict[str, str]:
+    """Merge the user layer under the repo layer, key by key (repo wins).
+
+    Neither file present means no templates: maigo ships no default load command.
+    """
+    user_dir = (user_dir or Path("~/.config/maigo")).expanduser()
+    merged: dict[str, str] = {}
+    for path in (user_dir / LOAD_FILENAME, root / ".maigo" / LOAD_FILENAME):
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeDecodeError) as error:
+            raise RefreshError(1, f"{path}: 無法讀取載入樣板檔（{error}）") from error
+        merged.update(parse_load_templates(text, str(path)))
+    return merged
+
+
+def load_command_for(
+    row: dict, templates: dict[str, str], warnings: list[str]
+) -> str | None:
+    """The `載入` command for one row, or None (nothing configured / not applicable).
+
+    👀 uses `pr`; own 🔀 prefers `branch` (falls back to `pr`); issues, cross-repo rows
+    and closed rows get none. An unsafe branch name omits the line and warns.
+    """
+    if not templates or row["section"] == "✅" or row["type"] == "🐛":
+        return None
+    if not _SAME_REPO_DETAIL_RE.match(row["detail"] or ""):
+        return None
+    match = _URL_RE.match(row["url"])
+    if not match:
+        return None
+    number = match["number"]
+    if row["type"] == "🔀" and "branch" in templates:
+        branch = (row.get("gh_meta") or {}).get("headRefName")
+        if branch:
+            if not _SAFE_BRANCH_RE.match(branch) or ".." in branch:
+                warnings.append(f"#{number} 的 branch 名含不安全字元，略過載入指令")
+                return None
+            return (
+                templates["branch"]
+                .replace("{branch}", branch)
+                .replace("{number}", number)
+            )
+    if "pr" in templates:
+        return templates["pr"].replace("{number}", number)
+    return None
 
 
 # --- pure rendering (no I/O) ---------------------------------------------------
@@ -386,6 +472,7 @@ def render_detail_facts(
     last_reviewed_at: str | None,
     review_time_source: str | None,
     acknowledged_at: str | None,
+    load_command: str | None = None,
 ) -> str:
     """The fact section (everything before `## 判斷`), SKILL.md §1a; ends with a blank line."""
     lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
@@ -398,6 +485,8 @@ def render_detail_facts(
     if next_action:
         action = next_action.replace("<n>", str(number)) if number else next_action
         lines.append(f"- 下一步：`{action}`")
+    if load_command:
+        lines.append(f"- 載入：`{load_command}`")
     if type == "👀":
         if last_reviewed_at:
             suffix = "（舊檔時間推估）" if review_time_source == "mtime" else ""
@@ -851,7 +940,10 @@ def _ended_at(row: dict) -> str | None:
 
 
 def build(
-    g: Gathered, ack_results: list[dict], rules: list[WeightRule] | None = None
+    g: Gathered,
+    ack_results: list[dict],
+    rules: list[WeightRule] | None = None,
+    load_templates: dict[str, str] | None = None,
 ) -> Built:
     overrides = {
         r["url"]: r["simulated_review"] for r in ack_results if "simulated_review" in r
@@ -985,6 +1077,7 @@ def build(
         learn_pending_count=count_learn_pending(all_rows),
     )
 
+    load_warnings: list[str] = []
     detail_writes: list[dict] = []
     for row in all_rows:
         if row["mode"] == "keep":
@@ -1010,6 +1103,9 @@ def build(
                 last_reviewed_at=r["last_reviewed_at"],
                 review_time_source=r["review_time_source"],
                 acknowledged_at=r["acknowledged_at"],
+                load_command=load_command_for(
+                    row, load_templates or {}, load_warnings
+                ),
             )  # fmt: skip
         if old is None:
             preserved = NEW_PRESERVED
@@ -1061,7 +1157,7 @@ def build(
     for drop in closed_drops:
         events.append({**drop, "at": at})
 
-    warnings: list[str] = []
+    warnings: list[str] = list(load_warnings)
     final_by_url = {r["url"]: r for r in all_rows}
     for result in ack_results:
         final = final_by_url.get(result["url"])
@@ -1328,6 +1424,7 @@ def run_refresh(
 ) -> dict:
     now = now or _now()
     rules = load_weights(root, weights_file)  # bad lines reject before any gh call
+    load_templates = load_load_templates(root)
     g = gather(
         root, repo, you, now=now, add=add, max_new=max_new, discovery=discovery,
         stale_days=stale_days, jobs=jobs,
@@ -1337,7 +1434,7 @@ def run_refresh(
     ):  # CAS #1: before any side effect
         raise RefreshError(2, CAS_MESSAGE.format(what="board.md"))
     ack_results = run_acks(g, dry_run=not apply)
-    built = build(g, ack_results, rules)
+    built = build(g, ack_results, rules, load_templates)
     summary = summarize(g, built)
     summary["applied"] = apply
     if not apply:
