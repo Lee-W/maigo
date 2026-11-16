@@ -106,4 +106,5 @@ claude --plugin-dir /path/to/maigo
 - 想知道每個 command 的完整 stage 與 artefact 落點 → [Commands reference](../reference/commands.md)
 - 想知道 reviewer / verifier 怎麼擋你的 → [Hooks reference](../reference/hooks.md)
 - 想知道跨專案記憶（每個 repo 累積的慣例與決策）怎麼運作 → [Memory reference](../reference/memory.md)
+- 想在編輯器裡讀 Work Board 與 `.maigo` 產物、用 `gf` 跳轉 → [在編輯器裡讀](reading-in-your-editor.md)
 - 想改 Maigo 本身、加新 skill / hook / project-aware rule → [Contributing](contributing.md)

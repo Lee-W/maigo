@@ -67,6 +67,7 @@ claude --plugin-dir /path/to/maigo
 ## 文件導覽
 
 - [Getting Started](guides/getting-started.md) — 第一次裝 Maigo 的 5 分鐘入門
+- [在編輯器裡讀 Work Board 與產物](guides/reading-in-your-editor.md) — 進入、跳轉、編輯與限制
 - [Commands reference](reference/commands.md) — 每個命令的完整流程、合流邏輯、場景對照
 - [Hooks reference](reference/hooks.md) — SessionStart / SubagentStop / Stop hook 行為與設定
 - [Skills reference](reference/skills.md) — skill 機制與目前 catalog

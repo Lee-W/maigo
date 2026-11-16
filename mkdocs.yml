@@ -29,6 +29,7 @@ nav:
       - Character colors: reference/character-colors.md
   - Guides:
       - Getting Started: guides/getting-started.md
+      - Reading in your editor: guides/reading-in-your-editor.md
       - Contributing: guides/contributing.md
       - Model Evaluation: guides/model-evaluation.md
   - Agents (source):
