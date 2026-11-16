@@ -2,9 +2,16 @@
 
 Loaded on demand by `skills/strict-review/SKILL.md`. Five self-checks the author runs
 **before** a PR is opened, so the first review round catches what a reviewer would otherwise
-catch later. `/maigo:go` and `/maigo:team` run them in full mode: 🎀 Anon produces the
-inputs, 🟡 Soyo checks them. Repo-agnostic; repo-specific recipes live in the matching
-domain skill.
+catch later. `/maigo:go` and `/maigo:team` run them in full mode. 🎀 Anon executes every
+sweep and puts one result line per sweep in the review material (a sweep with nothing to
+check is written "none", not omitted). 🟡 Soyo is read-only: she verifies by reading the
+result and re-running read-only commands (`grep`, `git show`, `git ls-tree`), never by
+editing files or opening worktrees. Repo-agnostic; repo-specific recipes live in the
+matching domain skill.
+
+The sweeps are an author-side duty of the `/maigo:go` and `/maigo:team` hand-off. When 🟡
+Soyo reviews someone else's PR (`/maigo:review`) or runs in another mode, a missing sweep
+result is not a must-fix; it is listed as Evidence pending or as a direction.
 
 Each sweep: the rule, why, how to check. Sweeps (a) and (c) apply only when the diff
 changes a public symbol or a documented promise; otherwise write "none" and move on.
@@ -27,10 +34,11 @@ description draft, one entry at a time.
 **Why.** Docs, changelog and description disagreeing with the code is the largest
 category in the sample (about 35 comments, most of them catchable by the author). Case
 (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while
-three toolsets had no such option, and another said "shipped in 0.10.0" while the release
+several toolsets had no such option, and another said "shipped in 0.10.0" while the release
 tag showed the class in an earlier release.
 
-**How to check.**
+**How to check.** Executed by 🎀 Anon; 🟡 Soyo re-derives a sample of the doc statements
+from the diff by reading.
 - Enumerate the symbols and their user-visible names with
   [`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md):
   implementation symbol names and user-visible names are scanned separately.
@@ -47,13 +55,14 @@ restore, and confirm the suite is green again. 🎀 Anon runs the mutation (Anon
 🟣 Taki does not edit files. Also confirm the repo's CI actually collects each new test
 file (the repo's test-path configuration, not only a local run).
 
-**Why.** "The test cannot fail" and "too weak to fail" together are the second-largest
-category (about 25 comments), and they are fully catchable by the author. Cases
+**Why.** "The test cannot fail" and "too weak to fail" together are a large category
+(about 25 comments), and they are fully catchable by the author. Cases
 (apache/airflow #76015): deleting the call under test left 44 tests green; a new test file
 was missing from the CI test-path list, so CI never ran it. Another PR drew the comment
 "This assertion can't fail" (#74626).
 
-**How to check.**
+**How to check.** Executed by 🎀 Anon (she edits, then restores and byte-compares); 🟡 Soyo
+reads the table and the repo's test-path configuration, and does not mutate anything.
 - Run the mutation per test (or with `-v`) and record a small baseline → post-mutation
   table; the recipe and the restore discipline (backup, byte-compare, shared working tree
   rules) are in the Mutation test section of
@@ -71,16 +80,21 @@ documented promise, look up what the latest release tag does and says at that sp
 write one line: what changes for users who already installed the released version.
 
 **Why.** Compatibility with released versions drew about 10 comments, partly catchable by
-the author. Case (apache/airflow #74695): tags ended at an `rc` while the final release
-was already on the package index, so the "not released yet" assumption was wrong.
+the author. Cases (apache/airflow #74695): a reviewer pointed out that the final 1.0.0 was
+already on the package index, so removing an alias was a breaking change on a minor upgrade
+and its changelog note landed inside the already-released 1.0.0 section; later, 1.1.0 had
+shipped and the PR's edits rewrote that released section so it described things the tag did
+not do.
 
-**How to check.**
+**How to check.** Executed by 🎀 Anon, using read-only git commands; 🟡 Soyo re-runs the same
+`git ls-tree` / `git show <tag>:<path>` lookup on one symbol.
 - Find the release that contains the symbol and compare the documented behaviour there
   with the new behaviour; do not date it from commit order or memory.
 - Airflow specifics (tag lookup, package-index check, stable-listed aliases) are owned by
   the release-tag check in
   [`airflow-aware/references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md);
-  this sweep is the repo-agnostic version and defers to it in Airflow repos.
+  this sweep is the repo-agnostic version and defers to it in Airflow repos (that section
+  links back here).
 - Nothing public or documented changed: write "none".
 
 ## (d) Duplicated logic
@@ -94,7 +108,8 @@ duplicate half is catchable by the author with one search (the rest, such as cho
 between abstractions, is reviewer judgment). Case (apache/airflow #74695): a reviewer
 pointed at two new pieces of code that were "essentially the same" and asked to keep one.
 
-**How to check.**
+**How to check.** Executed by 🎀 Anon, who lists each new helper with the equivalent found
+or "none"; 🟡 Soyo re-runs one or two of the greps (read-only).
 - Grep for the new name's likely synonyms and for the body's distinctive calls or
   literals, in the same file, sibling modules and the shared utilities.
 - For prose, grep the docs for the key phrase to find the existing paragraph.
@@ -106,10 +121,16 @@ plan's single subject. A test that already passes on the base branch, or a chang
 unrelated to the subject, is moved out or justified in the PR description.
 
 **Why.** Scope creep was a small category (about 3 comments) but cheap to avoid, and it
-inflates the review unit. Case (apache/airflow #76015, comment C5): a new test already
-passed on the base branch, so it guarded nothing the PR changed.
+inflates the review unit. Case (apache/airflow #76015): a reviewer pointed out that five
+new tests already passed against the base branch and covered paths the PR did not change,
+and asked whether they belonged in it.
 
-**How to check.**
-- Run each new test against the base branch (a detached worktree, not a checkout in the
-  shared tree); a pass there means it does not belong to this change.
+**How to check.** Executed by 🎀 Anon, because it needs a worktree and 🟡 Soyo is read-only.
+- Run each new test against the base branch in a detached worktree (never a checkout in the
+  shared tree). 🎀 Anon creates it with `git worktree add --detach <path outside the repo>
+  <base>`, removes it with `git worktree remove` afterwards, and attaches the
+  `git worktree list` output showing it is gone. A pass on the base means the test does not
+  belong to this change.
+- 🟡 Soyo reads the per-test base-branch result and the worktree-removal proof; she does not
+  open a worktree herself.
 - List changed files that the plan's subject does not mention.

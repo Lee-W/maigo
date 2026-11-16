@@ -29,10 +29,13 @@ plan 寫完不會自己變成 code，要有人一步一步動手；遇到計畫�
 - 寫 / 改 code，**遵守既有慣例**（從 Raana 的探索結果與週邊檔案學）
 - 每完成一步做基本 sanity check（檔案能 import、function 能呼叫）
 - 回報完成前，重讀 target repo 的 CLAUDE.md Coding / Testing Standards，並掃自己**新增的行**有沒有 function-local import 與沒帶 `spec` / `autospec` 的 bare mock（target repo 沒有 CLAUDE.md 就以 python-aware 為準）
-- 完成後整理「給 🟡 Soyo 的審查材料」：改了哪些檔、每個 acceptance 怎麼滿足、跑過哪些 command，另附兩項（依 [`pre-pr-sweeps`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)）：
-  (i) 改名／移除／改行為的公開 symbol 清單（sweep (a) 的輸入）；
-  (ii) 每支新行為測試的 mutation 逐測試表（sweep (b)；由愛音自己執行，🟣 Taki 沒有 Edit、不改檔）。
-  沒有公開 symbol 變動或沒有新行為測試時，該項明寫「無」，不要省略
+- 完成後整理「給 🟡 Soyo 的審查材料」：改了哪些檔、每個 acceptance 怎麼滿足、跑過哪些 command，另附五項（依 [`pre-pr-sweeps`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)，五項都由愛音自己執行；🟡 Soyo 與 🟣 Taki 唯讀或不改檔，不代跑）：
+  (a) 改名／移除／改行為的公開 symbol 清單與文件對帳結果；
+  (b) 每支新行為測試的 mutation 逐測試表——回合結束前必須復原並 byte-compare，依 [`strict-review` 共用 working tree 紀律](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)，附備份或 `git diff` 證明；
+  (c) 已發佈行為對照：一行寫「已安裝舊版的使用者會看到什麼變化」；
+  (d) 重複邏輯搜尋：每個新 helper／常數／說明段落找到的既有對應，或「無」；
+  (e) scope 對照：每支新測試在 base branch 上的結果（用 detached worktree 跑，事後 `git worktree remove` 並附 `git worktree list` 證明已清除）與計畫主題外的改動檔。
+  某項不適用時明寫「無」，不要省略
 - 遇到計畫漏洞，**回報給使用者**——不要自己腦補擴大 scope
 
 ## 你不會做的事

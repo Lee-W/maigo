@@ -57,7 +57,7 @@ Review 常在跟其他 session 共用的 working tree 上進行；驗證動作�
 Every review must walk through every item. Output explicitly marks `[x]` or `[ ]` per item.
 
 1. **Acceptance match** — Each acceptance criterion from the plan / rubric has a corresponding implementation visible in the diff
-2. **Evidence per function** — Every changed function has a run-result (test output or manual run with command + exit code). A new or rewritten behaviour test carries mutation evidence in the first round, not only in fix rounds (see `references/pre-pr-sweeps.md` (b))
+2. **Evidence per function** — Every changed function has a run-result (test output or manual run with command + exit code). In `/maigo:go` / `/maigo:team` full mode, a new or rewritten behaviour test also arrives with 🎀 Anon's mutation table in the first round, and a missing table is a must-fix; when reviewing someone else's PR or in other modes it is Evidence pending or a direction, not a must-fix (see "Pre-PR sweeps" below)
 3. **Edge case coverage** — `None` / empty / boundary values / failure path / repeated calls / concurrent access (whichever apply); check against each edge-case category the plan lists for the step, one by one
 4. **Convention conformance** — Naming, structure, import style match neighbouring code (verify with `grep`, not vibes). For naming specifically, mechanically enumerate every new `def` / method / inner function from the diff against a merge-base baseline before judging — reading the diff by eye misses nested helpers; see `references/recurring-patterns.md` → "Naming review: enumerate new defs mechanically, don't eyeball the diff". For Python diffs, likewise grep the diff's ADDED lines for function-local `import` / `from … import` and for `MagicMock()` / `Mock()` / `mock.patch(...)` without `spec` / `autospec`, then judge each against the target repo's CLAUDE.md and `python-aware`; see `references/recurring-patterns.md` → "Python diffs: grep added lines for local imports and bare mocks".
 5. **No unsafe pattern** — No hardcoded secret, `eval`, shell injection, SQL string concatenation, path traversal, unsafe deserialization
@@ -201,7 +201,7 @@ see `references/review-agent-handoff.md`.
 或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
 （證明測試真的在守這條修法）→ 復原修法 → 測試轉綠。復原動作依上方「共用 working tree 上的
 審查紀律」的安全流程執行，並用備份檔／`git diff` byte-compare 證明復原乾淨、無殘留改動——
-這份 mutation-test 證據適用於兩處：第一輪新增或改寫的行為測試，與修正輪的修法；都是必要項，不是加分項。
+這份 mutation-test 證據是修正輪 evidence 的必要項，不是加分項。（第一輪新行為測試的 mutation 表另見下方「Pre-PR sweeps」段，有自己的適用範圍。）
 
 **Canary 回報要點名哪個斷言轉紅，不是只看檔案級 exit code**——同一個 bug 常補了不只一支
 測試，跑 canary 只記「這個測試檔轉紅」會蓋掉「其中只有一支真的有鑑別力」這件事：兩條
@@ -259,6 +259,13 @@ They add no checklist item; each result is judged under an existing one:
 - (c) behaviour already released → item 3 (edge case coverage)
 - (d) duplicated logic → item 4 (convention conformance)
 - (e) scope → item 1 (acceptance match)
+
+**Where the first-round mutation requirement applies.** A missing mutation table for a new or
+rewritten behaviour test is a must-fix only in the `/maigo:go` / `/maigo:team` full-mode
+hand-off from 🎀 Anon, where she is the author and runs the sweeps. In `/maigo:review` of
+someone else's PR and in the other modes, list it under `## Evidence pending` (or as a
+direction) and, if the repo's tooling allows it, run the mutation yourself under the working-tree
+discipline above; do not block the PR on the author not having attached one.
 
 ## Recurring must-fix patterns
 

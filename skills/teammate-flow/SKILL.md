@@ -212,9 +212,11 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 的 staging（不用 `git add -A`）、不 `cd`、unreleased commit 的 amend 慣例。
 
 **PR 草稿（`/maigo:go` 與 `/maigo:team` 共用這一段；`/maigo:quick` 不做）**：commit 落地之後，
-若當前 branch 尚無 PR，orchestrator 依
+orchestrator 先依 [`pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
+步驟 1 判定當前 branch 有沒有開啟中的 PR；尚無 PR 時依
 [`draft-bundle`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/draft-bundle.md)
-抓料，另附 plan 路徑、🟡 爽世最後一輪的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
+抓料（base 的決定與失敗處理照該檔「收尾情境」一節：**任何失敗只略過草稿並在 summary 印一行原因，
+不中斷 final summary**），另附 plan 路徑、🟡 爽世最後一輪的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
 describe-pr 模式產出草稿，依 [`commands/describe-pr.md`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)
 步驟 3 的格式，在 final summary 給出可整段複製的 description 與 title。素材怎麼對應到
 Design rationale、Known limitations 與 Test Plan，見

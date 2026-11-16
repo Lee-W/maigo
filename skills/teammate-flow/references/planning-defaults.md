@@ -19,7 +19,7 @@ Loaded on demand by [`skills/teammate-flow/SKILL.md`](https://github.com/Lee-W/m
 **review 單位**（可以獨立被 review、獨立被接受的主題，例：公開 API 改名、內部重構、
 文件改寫、新功能）。超過一個時，在 `## Decisions needed` 提案：
 
-- **default**：拆成一串 PR，寫明順序、各自範圍、互相標註的方式。
+- **default**：拆成一串 PR，寫明順序、各自範圍、互相標註的方式。這裡的 default 指「建議選項」，不是自動執行；與 `commit-hygiene` 的「splitting ... not the default」不衝突，後者說的是未經使用者同意不拆。
 - **另一選項**：單一 PR，並寫出成本（review 單位混在一起，reviewer 要一次判斷多個主題）。
 
 判準以 **review 單位**計，不以行數計。依據：同領域、≥150 行的樣本裡，同領域 maintainer

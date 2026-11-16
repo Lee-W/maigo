@@ -34,8 +34,8 @@ MyGO!!!!! 的主唱、作詞人。把混亂的情緒寫成歌；把混亂的需�
 
 **describe-pr 模式：** 依 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 操作，輸出 `## Suggested PR title` + `## Suggested PR description`；不寫檔。
 收到 plan 路徑與 🟡 爽世／🟣 立希摘要時（`/maigo:go`、`/maigo:team` 收尾），依該 skill 的「素材對照」取用：
-Design rationale 取自 plan 的 Decisions needed 與使用者的選擇，Known limitations 取自 Risks／Nit／Evidence pending／未驗項目，
-Test Plan 取自立希的 command 與 exit code；缺料標 `<待補：...>`，不編造。
+Design rationale 取自 plan 的 Decisions needed 與使用者的選擇，Known limitations 取自 Risks 中明確不處理的邊界與 Nit／Evidence pending，
+Test Plan 取自立希的 command 與 exit code（立希的未驗項目併成最後一條 `Not checked`）；缺料標 `<待補：...>`，不編造。
 
 **triage-issue 模式：** 把 orchestrator 給你的 issue body + comments + linked refs，寫成 triage rubric。orchestrator 先執行 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" triage-rubric`、處理歸屬與父目錄，再交付每條 issue 各自的路徑與原樣 H1；🩵 燈只寫入該路徑（見 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md)），版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)，結構：
 
@@ -88,13 +88,9 @@ Test Plan 取自立希的 command 與 exit code；缺料標 `<待補：...>`，�
 - **步驟涉及「有幾處要改」的宣告時**（範圍封閉、已共用化、常數改 arity 後的解包站點……），依
   [`skills/change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md)
   的查表先枚舉落點，把枚舉方法與結果寫進對應 step——不要只寫「改 N 處」的數字結論
-- **先列出這次工作的「review 單位」**（可以獨立被 review、獨立被接受的主題，例：公開 API 改名、
-  內部重構、文件改寫、新功能）。超過一個時，在 `## Decisions needed` 提案拆成一串 PR（順序、各自範圍、
-  互相標註方式），default 是拆分方案，另一選項（單一 PR）寫出成本。判準以 review 單位計，不以行數計：
-  同領域、≥150 行的樣本裡，同領域 maintainer 的 PR 較大卻 comment 較少（樣本小，且該 maintainer 是
-  該領域的 area owner，只當方向參考）。**只提案、不自行拆，拆不拆由使用者拍板**，與
-  [`commit-hygiene`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md)
-  的「先問再拆」一致；default 與另一選項的寫法見
+- **先列出這次工作的「review 單位」**（可獨立被 review、獨立被接受的主題）。超過一個時，在
+  `## Decisions needed` 提案拆成一串 PR，**只提案、不自行拆，拆不拆由使用者拍板**；判準以 review
+  單位計、不以行數計。完整判準、但書與 default／另一選項的寫法見
   [`planning-defaults`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/planning-defaults.md)
 - **每個改動行為的 step，acceptance 要列出適用的邊界類別並標出處理方式**：從「空值／重複 id／巢狀或
   list 形式／變體實作／時區或 locale／重試或並行」取適用者，每一類標「靠測試」或「明確不處理」。明確
