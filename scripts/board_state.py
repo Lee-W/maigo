@@ -824,7 +824,8 @@ def index_entry(
     size: str | None = None,
     result: str | None = None,
 ) -> str:
-    """One-line display text; checkbox, badges and numbering belong to the caller.
+    """One-line display text `… — [<title> ]<detail>` (detail last, like a board line);
+    checkbox, badges and numbering belong to the caller.
 
     `short_action` / `size` 只該在行動區（🎯／👀）傳入，呼叫端決定。
     `result` 佔 `→動作` 的位置（呼叫端有結果欄時不傳 `short_action`）。
@@ -833,7 +834,11 @@ def index_entry(
     action = f" →{short_action}" if short_action else ""
     action += f" {result}" if result else ""
     delta = f" {size}" if size else ""
-    return f"{item_type.value} {status.value}{contributor}{action}{delta}{' ' + detail if detail else ''} — {' '.join(title.split())}".strip()
+    clean_title = " ".join(title.split())
+    tail = " ".join(part for part in (clean_title, detail) if part)
+    return (
+        f"{item_type.value} {status.value}{contributor}{action}{delta} — {tail}".strip()
+    )
 
 
 def evaluate_items(

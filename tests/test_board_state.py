@@ -1682,3 +1682,21 @@ class TestEvaluateItemsReviewOverrides:
                 maigo_root="",
                 now=datetime(2026, 2, 1, tzinfo=timezone.utc),
             )
+
+
+class TestIndexEntryPathLast:
+    def test_detail_closes_the_entry_after_the_title(self):
+        entry = bs.index_entry(
+            bs.ItemType.REVIEW_PR,
+            bs.BoardStatus.PENDING_REVIEW,
+            "i/1.md",
+            "My  title",
+            "carol",
+        )
+        assert entry == "👀 待 review @carol — My title i/1.md"
+
+    def test_empty_title_leaves_only_the_path(self):
+        entry = bs.index_entry(
+            bs.ItemType.REVIEW_PR, bs.BoardStatus.PENDING_REVIEW, "i/1.md", "", ""
+        )
+        assert entry == "👀 待 review — i/1.md"

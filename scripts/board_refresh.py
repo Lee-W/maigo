@@ -52,7 +52,9 @@ SECTION_TITLES = {
     "✅": "## ✅ 最近結案",
 }
 ACTION_SECTIONS = ("🎯", "👀")  # numbered, rank-sorted; the other two are reference
-LINE_BUDGET = 80  # display columns for everything before ` — <title>` (best effort)
+# Display columns budget, measured as if the detail path still sat before ` — ` (the path now
+# closes the line, but the threshold stays where it was; best effort).
+LINE_BUDGET = 80
 BADGE_ORDER = "🧠🔖💤"
 # ✅ retention: how long a closed row stays, by whose it is; learning-pending rows are
 # exempt until LEARN_PENDING_LIMIT; the section keeps at most DONE_CAP of the rest.
@@ -311,12 +313,13 @@ def render_line(
     ended: str | None = None,
     result: str | None = None,
 ) -> str:
-    """One board line per SKILL.md §1「行文法」.
+    """One board line per SKILL.md §1「行文法」: `… — [<title> ]<detail>`.
 
-    `action` / `size` (🎯/👀 rows) and `ended` (✅ rows) sit between the badges and the
-    detail path. The part before ` — ` is kept within `LINE_BUDGET` display columns by
-    dropping `→action` first; note, author, size, detail and title are never cut, so a
-    line with a very long note can still run over (the budget is best effort).
+    The detail path is the last token of the line (one ASCII space before it, nothing after
+    it), so `$` then `gf` lands on it. `action` / `size` (🎯/👀 rows) and `ended` (✅ rows)
+    sit between the badges and ` — `. The head plus ` <detail>` is kept within `LINE_BUDGET`
+    display columns by dropping `→action` first; note, author, size, detail and title are
+    never cut, so a line with a very long note can still run over (best effort).
     `result` (review verdict / 已核准, in the `→action` slot) takes priority over size: a row
     with a result drops `+A/-D` first when over budget and never cuts the result (nor its
     `上次 ` prefix, which would turn a stale verdict into a current-looking one).
@@ -332,15 +335,20 @@ def render_line(
 
     def head(act: str | None, shown_size: str | None = size) -> str:
         extras = [f"→{act}" if act else None, result, shown_size, ended]
-        return line + "".join(f" {extra}" for extra in extras if extra) + f" {detail}"
+        return line + "".join(f" {extra}" for extra in extras if extra)
+
+    def measured(act: str | None, shown_size: str | None = size) -> int:
+        return board_state.display_width(f"{head(act, shown_size)} {detail}")
 
     lead = head(action)
     if result:
-        if board_state.display_width(lead) > LINE_BUDGET:
+        if measured(action) > LINE_BUDGET:
             lead = head(action, None)
-    elif action and board_state.display_width(lead) > LINE_BUDGET:
+    elif action and measured(action) > LINE_BUDGET:
         lead = head(None)
-    return f"{lead} — {' '.join(title.split())}".rstrip()
+    clean_title = " ".join(title.split())
+    tail = f"{clean_title} {detail}" if clean_title else detail
+    return f"{lead} — {tail}".rstrip()
 
 
 def render_row(row: dict, number: int | None, section: str) -> str:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import os
 import subprocess
 import time
@@ -196,30 +197,30 @@ SKILL_BOARD = """\
 
 ## 🎯 我的下一件（2）
 
-1. [ ] 🔀 CHANGES_REQUESTED @Lee-W →修改 +286/-74 i/9201.md — Redesign Work Board reading view
-2. [ ] 🐛 待 triage @reporter 💤 →triage i/9101.md — CLI 在空設定檔時會 crash
+1. [ ] 🔀 CHANGES_REQUESTED @Lee-W →修改 +286/-74 — Redesign Work Board reading view i/9201.md
+2. [ ] 🐛 待 triage @reporter 💤 →triage — CLI 在空設定檔時會 crash i/9101.md
 
 ## 👀 待我 review（1）
 
-1. [x] 👀 ↩︎ 回你的球 @contributor →重審 +1.2k/-340 i/9301.md — Avoid duplicate GitHub requests
+1. [x] 👀 ↩︎ 回你的球 @contributor →重審 +1.2k/-340 — Avoid duplicate GitHub requests i/9301.md
 
 ## ⏳ 等別人（2）
 
-- [ ] 🔀 等 review @Lee-W i/9202.md — Document plugin installation flow
-- [ ] 🐛 NEEDS_INFO（已請補作業系統與完整 log） @reporter i/9103.md — Hook occasionally exits without output
+- [ ] 🔀 等 review @Lee-W — Document plugin installation flow i/9202.md
+- [ ] 🐛 NEEDS_INFO（已請補作業系統與完整 log） @reporter — Hook occasionally exits without output i/9103.md
 
 ## ✅ 最近結案（1）
 
-- [x] 👀 APPROVE（merged 07-12） @contributor 🧠 07-12 i/9303.md — Add structured review verdicts
+- [x] 👀 APPROVE（merged 07-12） @contributor 🧠 07-12 — Add structured review verdicts i/9303.md
 """
 
 EXTRA_LINES = [
-    "1. [ ] 🔀 CI 紅 @octocat i/airflow-70724.md — Run CI on release-branch pull requests",
-    "2. [ ] 👀 抓不到（GraphQL: Could not resolve） @octocat i/foo-3.md — owner/foo#3",
-    "3. [x] 👀 已看完 @dev 🧠🔖💤 i/55.md — All three badges",
-    "4. [ ] 🔀 CI 紅 @octocat 💤 →修CI +1.2k/-340 i/56.md — Action, size and badge",
-    "5. [ ] 👀 待 review（手寫旁註） @octocat +86/-12 i/57.md — Size without action",
-    "- [x] 🔀 merged @octocat 🧠 11-14 i/58.md — Closing date",
+    "1. [ ] 🔀 CI 紅 @octocat — Run CI on release-branch pull requests i/airflow-70724.md",
+    "2. [ ] 👀 抓不到（GraphQL: Could not resolve） @octocat — owner/foo#3 i/foo-3.md",
+    "3. [x] 👀 已看完 @dev 🧠🔖💤 — All three badges i/55.md",
+    "4. [ ] 🔀 CI 紅 @octocat 💤 →修CI +1.2k/-340 — Action, size and badge i/56.md",
+    "5. [ ] 👀 待 review（手寫旁註） @octocat +86/-12 — Size without action i/57.md",
+    "- [x] 🔀 merged @octocat 🧠 11-14 — Closing date i/58.md",
 ]
 
 
@@ -255,9 +256,9 @@ def test_t1_every_line_shape_round_trips():
 
 def test_t1_author_pending_line_round_trips():
     lines = [
-        "1. [ ] 🔀 CI 紅（作者待補） i/airflow-70724.md — No note, no author",
-        "2. [ ] 👀 抓不到（GraphQL: x；作者待補） i/foo-3.md — owner/foo#3",
-        "- [ ] 🔀 等 review（作者待補） 💤 i/13.md — Pending with badge",
+        "1. [ ] 🔀 CI 紅（作者待補） — No note, no author i/airflow-70724.md",
+        "2. [ ] 👀 抓不到（GraphQL: x；作者待補） — owner/foo#3 i/foo-3.md",
+        "- [ ] 🔀 等 review（作者待補） 💤 — Pending with badge i/13.md",
     ]
     for line in lines:
         parsed = sync.parse_board(_as_board(line))
@@ -313,10 +314,10 @@ def test_t3_real_board_shape_survives_parse_render_parse():
         "# Work Board — o/r\n"
         "> 最後刷新：2026-08-19 ｜ 🎯 2 ｜ ⏳ 1 ｜ ✅ 0\n\n"
         "## 🎯 下一件（2）\n"
-        "1. [ ] 🔀 CI 紅 @octocat i/other-11.md — First invented title\n"
-        "2. [ ] 👀 待 review @octocat 💤 i/12.md — Second invented title\n\n"
+        "1. [ ] 🔀 CI 紅 @octocat — First invented title i/other-11.md\n"
+        "2. [ ] 👀 待 review @octocat 💤 — Second invented title i/12.md\n\n"
         "## ⏳ 等別人（1）\n"
-        "- [ ] 🔀 等 review @octocat i/13.md — Third invented title\n\n"
+        "- [ ] 🔀 等 review @octocat — Third invented title i/13.md\n\n"
         "## ✅ 最近結案（0）\n"
     )
     first = sync.parse_board(text)
@@ -344,27 +345,27 @@ def _line_args(**over):
 
 def test_render_line_writes_author_pending_note_when_no_note():
     line = refresh.render_line(**_line_args())
-    assert line == "- [ ] 👀 待 review（作者待補） i/1.md — t"
+    assert line == "- [ ] 👀 待 review（作者待補） — t i/1.md"
 
 
 def test_render_line_merges_author_pending_into_existing_note():
     line = refresh.render_line(**_line_args(note="（手寫旁註）"))
-    assert line == "- [ ] 👀 待 review（手寫旁註；作者待補） i/1.md — t"
+    assert line == "- [ ] 👀 待 review（手寫旁註；作者待補） — t i/1.md"
     assert line.count("（") == 1
 
 
 def test_render_line_treats_author_pending_lookalike_as_plain_note():
     line = refresh.render_line(**_line_args(note="（作者待補中）"))
-    assert line == "- [ ] 👀 待 review（作者待補中；作者待補） i/1.md — t"
+    assert line == "- [ ] 👀 待 review（作者待補中；作者待補） — t i/1.md"
 
 
 def test_render_line_drops_pending_marker_once_author_is_known():
     only = refresh.render_line(**_line_args(note="（作者待補）", author="octocat"))
-    assert only == "- [ ] 👀 待 review @octocat i/1.md — t"
+    assert only == "- [ ] 👀 待 review @octocat — t i/1.md"
     merged = refresh.render_line(
         **_line_args(note="（手寫旁註；作者待補）", author="octocat")
     )
-    assert merged == "- [ ] 👀 待 review（手寫旁註） @octocat i/1.md — t"
+    assert merged == "- [ ] 👀 待 review（手寫旁註） @octocat — t i/1.md"
 
 
 def test_overflow_never_prints_bare_at():
@@ -593,7 +594,7 @@ def test_render_line_places_action_size_and_date_between_badges_and_detail():
     line = refresh.render_line(
         **_fields(badges=["🧠"], action="審", size="+1.2k/-340", ended="11-14")
     )
-    assert line == "1. [ ] 👀 待 review @octocat 🧠 →審 +1.2k/-340 11-14 i/1.md — t"
+    assert line == "1. [ ] 👀 待 review @octocat 🧠 →審 +1.2k/-340 11-14 — t i/1.md"
 
 
 def test_render_line_drops_action_when_prefix_over_budget():
@@ -629,8 +630,8 @@ def test_render_line_keeps_size_and_title_when_over_budget():
     )
     head, _, tail = line.partition(" — ")
     assert "→" not in head and "+1/-1" in head
-    assert tail == " ".join(title.split())
-    assert board_state_width(head) > refresh.LINE_BUDGET  # best effort, not a hard cap
+    assert tail == " ".join(title.split()) + " i/1.md"
+    assert board_state_width(head + " i/1.md") > refresh.LINE_BUDGET  # best effort
 
 
 def test_line_without_new_fields_still_parses():
@@ -645,7 +646,7 @@ def test_line_without_new_fields_still_parses():
         (None, None, None)
     ] * 2
     assert (
-        _render(parsed["lines"][0]) == "1. [ ] 🔀 CI 紅 @octocat 💤 i/9.md — Old shape"
+        _render(parsed["lines"][0]) == "1. [ ] 🔀 CI 紅 @octocat 💤 — Old shape i/9.md"
     )
 
 
@@ -679,9 +680,9 @@ def test_action_rows_show_action_and_size_and_done_rows_the_closing_date(tmp_pat
     gh.prs[3] = pr_meta(3, author="me", state="MERGED", mergedAt="2026-09-28T08:00:00Z")
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     sections = section_rows(tmp_path)
-    assert sections["🎯"][0].endswith("→修CI +10/-2 i/2.md — PR 2")
-    assert sections["👀"][0].endswith("待 review @carol +1.2k/-340 i/1.md — PR 1")
-    assert sections["✅"][0].endswith("merged @me 09-28 i/3.md — PR 3")
+    assert sections["🎯"][0].endswith("→修CI +10/-2 — PR 2 i/2.md")
+    assert sections["👀"][0].endswith("待 review @carol +1.2k/-340 — PR 1 i/1.md")
+    assert sections["✅"][0].endswith("merged @me 09-28 — PR 3 i/3.md")
     # the full facts stay in the detail file
     assert "- 規模：Δ+1210/-340" in (tmp_path / ".maigo/i/1.md").read_text()
     again = board_lines(tmp_path)
@@ -1925,7 +1926,7 @@ def test_unposted_row_shows_verdict_and_old_duplicate_note_retires(tmp_path, gh)
     _verdict_board(tmp_path, gh, legacy)
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     assert _line_1(tmp_path) == (
-        "1. [ ] 👀 待送出 @carol NEEDS_CHANGES +68/-1 i/1.md — PR 1"
+        "1. [ ] 👀 待送出 @carol NEEDS_CHANGES +68/-1 — PR 1 i/1.md"
     )
     assert sync.parse_board((tmp_path / ".maigo/board.md").read_text())["errors"] == []
     detail = (tmp_path / ".maigo/i/1.md").read_text()
@@ -1979,7 +1980,7 @@ def test_review_row_without_report_shows_neither_result_nor_action(tmp_path, gh)
     legacy = "1. [ ] 👀 待 review @carol →審 +68/-1 i/1.md — Title 1"
     _verdict_board(tmp_path, gh, legacy, verdict=None)
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
-    assert _line_1(tmp_path) == "1. [ ] 👀 待 review @carol +68/-1 i/1.md — PR 1"
+    assert _line_1(tmp_path) == "1. [ ] 👀 待 review @carol +68/-1 — PR 1 i/1.md"
     assert "本地 review 結果" not in (tmp_path / ".maigo/i/1.md").read_text()
 
 
@@ -2007,17 +2008,149 @@ def test_own_pr_new_comment_shows_approval_and_ci_red_keeps_action(tmp_path, gh)
     assert "→修CI" in second
 
 
-def test_excluded_legacy_action_line_is_kept_byte_for_byte():
+def test_excluded_legacy_action_line_keeps_its_fields_but_moves_the_path_last():
+    # was "kept byte for byte"; the path-last grammar rewrites the old shape once
     line = "1. [ ] 👀 待送出 @a →送出 +68/-1 i/2120.md — t"
     parsed = sync.parse_board(_as_board(line))["lines"][0]
-    assert _render(parsed) == line
+    assert _render(parsed) == "1. [ ] 👀 待送出 @a →送出 +68/-1 — t i/2120.md"
+
+
+# --- path-last grammar: `… — [<title> ]<detail>` -----------------------------
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        (
+            dict(
+                number=1,
+                type="👀",
+                status="待送出",
+                author="marcusalstrom",
+                badges=["💤"],
+                result="NEEDS_CHANGES",
+                size="+68/-1",
+                detail="i/1261.md",
+                title="fix(bump)!: only add version files",
+            ),
+            "1. [ ] 👀 待送出 @marcusalstrom 💤 NEEDS_CHANGES +68/-1 — fix(bump)!: only add version files i/1261.md",
+        ),
+        (
+            dict(
+                number=2,
+                checked=True,
+                type="👀",
+                status="↩︎ 回你的球",
+                author="contributor",
+                result="上次 APPROVE_WITH_NITS",
+                size="+1.2k/-340",
+                detail="i/9301.md",
+                title="Avoid duplicate GitHub requests",
+            ),
+            "2. [x] 👀 ↩︎ 回你的球 @contributor 上次 APPROVE_WITH_NITS +1.2k/-340 — Avoid duplicate GitHub requests i/9301.md",
+        ),
+        (
+            dict(
+                number=3,
+                type="🔀",
+                status="有新 comment",
+                author="Lee-W",
+                result="已核准",
+                size="+12/-3",
+                detail="i/9202.md",
+                title="Document plugin installation flow",
+            ),
+            "3. [ ] 🔀 有新 comment @Lee-W 已核准 +12/-3 — Document plugin installation flow i/9202.md",
+        ),
+    ],
+)
+def test_render_line_puts_the_path_last_for_the_three_documented_examples(
+    fields, expected
+):
+    assert refresh.render_line(**_fields(**fields)) == expected
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "",
+        "標題。",
+        "標題！？",
+        "done 🎉",
+        "bump i/9.md",
+        "a — b",
+        "多\n行\t標題  x",
+        "　全形空白　",
+    ],
+)
+@pytest.mark.parametrize(
+    "extra",
+    [
+        dict(),
+        dict(number=None, status="等 review", type="🔀"),
+        dict(ended="11-14", number=None, checked=True, status="merged", type="🔀"),
+        dict(action="審", size="+1/-1"),
+        dict(result="NEEDS_CHANGES", size="+1/-1", badges=["🧠", "💤"]),
+    ],
+)
+def test_render_line_invariants_path_is_last_token_after_one_ascii_space(title, extra):
+    detail = "i/1261.md"
+    line = refresh.render_line(**_fields(detail=detail, title=title, **extra))
+    assert line.endswith(detail)
+    assert line[-len(detail) - 1] == " " and line[-len(detail) - 2] != " "
+    assert line == line.rstrip() and "\n" not in line
+    parsed = sync.parse_board(_as_board(line))
+    assert parsed["errors"] == [] and parsed["lines"][0]["detail"] == detail
+    assert parsed["lines"][0]["title"] == " ".join(title.split())
+
+
+def test_render_line_empty_title_leaves_just_the_path_after_the_dash():
+    assert refresh.render_line(**_fields(title="")).endswith("@octocat — i/1.md")
+
+
+def test_render_line_over_budget_row_still_ends_with_the_path():
+    line = refresh.render_line(
+        **_fields(
+            note="（手寫的很長很長很長很長很長很長很長很長很長很長很長很長的旁註）",
+            action="審",
+            size="+1/-1",
+        )
+    )
+    assert line.endswith(" — t i/1.md")
+
+
+def test_old_shape_board_refreshes_to_new_shape_and_is_a_fixed_point(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            focus=[
+                row(1, extra="（手寫旁註）", author="carol"),
+                row(2, status="↩︎ 回你的球", author="carol"),
+            ],
+            wait=[row(3, icon="🔀", status="等 review", author="me", numbered=False)],
+        ),
+    )
+    for n in (1, 2, 3):
+        put_detail(tmp_path, n)
+    gh.prs[1] = pr_meta(1, author="carol")
+    gh.prs[2] = pr_meta(2, author="carol")
+    gh.prs[3] = pr_meta(3, author="me")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    first = (tmp_path / ".maigo/board.md").read_text()
+    item_lines = [ln for ln in first.splitlines() if "[ ]" in ln or "[x]" in ln]
+    assert len(item_lines) == 3
+    assert all(re.search(r" — PR \d i/\d\.md$", ln) for ln in item_lines)
+    assert any("（手寫旁註）" in ln for ln in item_lines)
+    assert sync.parse_board(first)["errors"] == []
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert (tmp_path / ".maigo/board.md").read_text() == first
 
 
 def test_render_line_puts_result_before_size_and_drops_size_first_when_over_budget():
     line = refresh.render_line(
         **_fields(status="待送出", author="a", result="NEEDS_CHANGES", size="+68/-1")
     )
-    assert line == "1. [ ] 👀 待送出 @a NEEDS_CHANGES +68/-1 i/1.md — t"
+    assert line == "1. [ ] 👀 待送出 @a NEEDS_CHANGES +68/-1 — t i/1.md"
     wide = _fields(
         status="待送出", author="a" * 22, badges=["💤"], result="上次 APPROVE_WITH_NITS",
         size="+1.2k/-340",

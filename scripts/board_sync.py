@@ -106,8 +106,18 @@ _BODY_RE = re.compile(
     r"(?:(?P<size>\+\d+(?:\.\d)?k?/-\d+(?:\.\d)?k?)\s*)?"
     r"(?:(?P<ended>\d{2}-\d{2})\s*)?"
     r"(?P<detail>i/\S+?\.md)?"
-    r"\s*—\s?(?P<title>.*)$"
+    r"\s*—\s?(?P<tail>.*)$"
 )
+# Two line shapes read back as the same fields (see SKILL.md §1「行文法」):
+#   new  `… — [<title> ]<detail>`  detail is the LAST whitespace-separated token, so `$` then
+#        `gf` lands on it; the title may itself end in `i/9.md` (only the last token counts).
+#   old  `… <detail> — <title>`    detail sits before the first `—`; `_BODY_RE` captures it.
+# The old shape is told apart by "does the head (before the first `—`) already hold a detail".
+# Accepted ambiguity: an old-shape line whose head has no detail and whose title ends in a
+# path-looking token (`… — fix i/9.md`, a hand-broken line) reads as new shape with that token
+# as the detail; `_resolve_lines` then fails loudly because the file does not exist.
+_GLUED_TAIL_RE = re.compile(r"\Si/\S+?\.md\s*$")  # 路徑黏在前一個字後面（缺半形空白）
+_TAIL_RE = re.compile(r"^(?:(?P<title>.*?)\s+)?(?P<detail>i/\S+?\.md)\s*$")
 AUTHOR_PENDING = "作者待補"
 
 
@@ -122,6 +132,18 @@ def note_has_author_pending(note: str | None) -> bool:
 
 
 _DETAIL_ANYWHERE_RE = re.compile(r"i/\S+?\.md")
+_DETAIL_LAST_RE = re.compile(r"(?:^|\s)(i/\S+?\.md)\s*$")
+
+
+def _bad_line_detail(raw: str) -> str | None:
+    """Detail path of a malformed line: the last token when it is one (new shape), else the first."""
+    last = _DETAIL_LAST_RE.search(raw)
+    if last:
+        return last[1]
+    found = _DETAIL_ANYWHERE_RE.search(raw)
+    return found[0] if found else None
+
+
 _LINK_RE = re.compile(r"^- 連結：(\S+)", re.MULTILINE)
 _LEGACY_PR_RE = re.compile(r"^\*\*PR:\*\*\s*<?(\S+?)>?(?=\s|$)", re.MULTILINE)
 # `## 🎯 下一件` 是舊版（三區時代）標題，只當讀取別名；寫出一律用 `## 🎯 我的下一件`。
@@ -195,13 +217,13 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
             continue
         match = _ITEM_RE.match(raw)
         if not match:
-            found = _DETAIL_ANYWHERE_RE.search(raw)
+            found = _bad_line_detail(raw)
             if found:  # a mangled item line must not look like a dd
                 errors.append(
                     f"board.md:{line_no}: 格式壞掉（無法解析的項目行）：{raw}"
                 )
                 unparsed.append(
-                    {"line_no": line_no, "raw": raw, "detail": found[0], "type": None}
+                    {"line_no": line_no, "raw": raw, "detail": found, "type": None}
                 )
             continue
         rest = match["rest"]
@@ -225,8 +247,21 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
         parsed = _BODY_RE.match(body) if problem is None and body is not None else None
         if problem is None and parsed is None:
             problem = "缺 `— ` 分隔符或欄位格式壞掉"
-        if problem is None and not parsed["detail"]:  # type: ignore[index]
-            problem = "缺細節檔路徑"
+        detail = title = None
+        if parsed is not None and problem is None:
+            if parsed["detail"]:
+                detail, title = parsed["detail"], parsed["tail"]
+            else:
+                tail = _TAIL_RE.match(parsed["tail"])
+                if tail:
+                    detail, title = tail["detail"], tail["title"] or ""
+        if problem is None and not detail:
+            glued = parsed is not None and _GLUED_TAIL_RE.search(parsed["tail"])
+            problem = (
+                "細節檔路徑前需要半形空白（路徑黏在前一個字後面）"
+                if glued
+                else "缺細節檔路徑"
+            )
         if problem is None and not parsed["author"]:  # type: ignore[index]
             if note_has_author_pending(parsed["note"]):  # type: ignore[index]
                 warnings.append(f"board.md:{line_no}: {AUTHOR_PENDING}：{raw}")
@@ -236,12 +271,11 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
                 problem = "缺 @作者"
         if problem is not None or parsed is None:
             errors.append(f"board.md:{line_no}: {problem}：{raw}")
-            found = _DETAIL_ANYWHERE_RE.search(raw)
             unparsed.append(
                 {
                     "line_no": line_no,
                     "raw": raw,
-                    "detail": found[0] if found else None,
+                    "detail": _bad_line_detail(raw),
                     "type": item_type,
                 }
             )
@@ -261,8 +295,8 @@ def parse_board(text: str, *, allow_missing_author: bool = False) -> dict:
                 "result": parsed["result"],
                 "size": parsed["size"],
                 "ended": parsed["ended"],
-                "detail": parsed["detail"],
-                "title": parsed["title"].strip(),
+                "detail": detail,
+                "title": (title or "").strip(),
                 "raw": raw,
             }
         )

@@ -342,6 +342,113 @@ class TestParseBoard:
         assert parsed["legacy"] is False and parsed["errors"] == []
         assert parsed["lines"][0]["section"] == "🎯"
 
+    # --- 行尾路徑（新形）與舊形並存 ------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("line", "title", "detail"),
+        [
+            (
+                "1. [ ] 👀 待送出 @marcusalstrom 💤 NEEDS_CHANGES +68/-1 — fix(bump)!: only add version files i/1261.md",
+                "fix(bump)!: only add version files",
+                "i/1261.md",
+            ),
+            (
+                "2. [x] 👀 ↩︎ 回你的球 @contributor 上次 APPROVE_WITH_NITS +1.2k/-340 — Avoid duplicate GitHub requests i/9301.md",
+                "Avoid duplicate GitHub requests",
+                "i/9301.md",
+            ),
+            (
+                "3. [ ] 🔀 有新 comment @Lee-W 已核准 +12/-3 — Document plugin installation flow i/9202.md",
+                "Document plugin installation flow",
+                "i/9202.md",
+            ),
+            ("4. [ ] 👀 待送出 @a — i/1.md", "", "i/1.md"),
+            ("5. [ ] 👀 待送出 @a — a — b i/1.md", "a — b", "i/1.md"),
+            (
+                "6. [ ] 👀 待送出 @a — bump i/9.md i/1261.md",
+                "bump i/9.md",
+                "i/1261.md",
+            ),
+            ("7. [ ] 👀 待送出 @a — 完成。 i/2.md", "完成。", "i/2.md"),
+            ("8. [ ] 👀 待送出 @a — 🎉 i/2.md", "🎉", "i/2.md"),
+        ],
+    )
+    def test_new_shape_reads_title_and_last_token_detail(self, line, title, detail):
+        parsed = sync.parse_board("## 🎯 我的下一件\n" + line + "\n")
+        assert parsed["errors"] == []
+        assert parsed["lines"][0]["title"] == title
+        assert parsed["lines"][0]["detail"] == detail
+
+    def test_old_and_new_shapes_mix_in_one_board(self):
+        parsed = sync.parse_board(
+            "## 🎯 我的下一件\n"
+            "1. [ ] 👀 待送出 @a i/1.md — old title\n"
+            "2. [ ] 👀 待送出 @a — new title i/2.md\n"
+        )
+        assert parsed["errors"] == []
+        assert [(x["title"], x["detail"]) for x in parsed["lines"]] == [
+            ("old title", "i/1.md"),
+            ("new title", "i/2.md"),
+        ]
+
+    def test_old_shape_with_path_in_title_keeps_old_reading(self):
+        line = sync.parse_board(
+            "## 🎯 我的下一件\n1. [ ] 👀 待送出 @a i/1.md — see i/9.md\n"
+        )["lines"][0]
+        assert (line["detail"], line["title"]) == ("i/1.md", "see i/9.md")
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "1. [ ] 👀 待送出 @a — only a title",
+            "1. [ ] 👀 待送出 @a — title i/1.md extra",
+            "1. [ ] 👀 待送出 @a — title `i/1.md`",
+        ],
+    )
+    def test_new_shape_without_trailing_path_is_an_error(self, bad):
+        parsed = sync.parse_board("## 🎯 我的下一件\n" + bad + "\n")
+        assert len(parsed["errors"]) == 1 and "缺細節檔路徑" in parsed["errors"][0]
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "1. [ ] 👀 待送出 @a — 修正（測試）i/1.md",
+            "1. [ ] 👀 待送出 @a — fix:i/1.md",
+        ],
+    )
+    def test_path_glued_to_the_previous_character_says_a_space_is_needed(self, bad):
+        parsed = sync.parse_board("## 🎯 我的下一件\n" + bad + "\n")
+        assert len(parsed["errors"]) == 1
+        assert (
+            "半形空白" in parsed["errors"][0]
+            and "缺細節檔路徑" not in parsed["errors"][0]
+        )
+
+    def test_trailing_whitespace_after_the_path_is_tolerated(self):
+        parsed = sync.parse_board(
+            "## 🎯 我的下一件\n1. [ ] 👀 待送出 @a — t i/1.md  \n"
+        )
+        assert parsed["errors"] == [] and parsed["lines"][0]["detail"] == "i/1.md"
+
+    def test_hand_broken_old_line_reads_as_new_and_fails_the_resolve(self, tmp_path):
+        # known ambiguity: head without detail + title ending in a path-looking token
+        (tmp_path / ".maigo").mkdir()
+        parsed = sync.parse_board(
+            "## 🎯 我的下一件\n1. [ ] 👀 待送出 @a — fix i/notes.md\n"
+        )
+        assert parsed["lines"][0]["detail"] == "i/notes.md"
+        errors = sync._resolve_lines(parsed, tmp_path / ".maigo", REPO)
+        assert len(errors) == 1 and "i/notes.md" in errors[0]
+        # numeric same-repo paths keep `detail_url`'s fallback, so `fix i/9.md` is NOT caught
+        numeric = sync.parse_board(
+            "## 🎯 我的下一件\n1. [ ] 👀 待送出 @a — fix i/9.md\n"
+        )
+        assert sync._resolve_lines(numeric, tmp_path / ".maigo", REPO) == []
+
+    def test_malformed_line_keeps_the_trailing_path_as_its_detail(self):
+        parsed = sync.parse_board("## 🎯 我的下一件\n1 [ ] broken — t i/7.md\n")
+        assert parsed["unparsed"][0]["detail"] == "i/7.md"
+
     def test_subheading_under_new_section_is_legacy(self):
         assert sync.parse_board("## 👀 待我 review\n### 已 review\n")["legacy"] is True
         assert sync.parse_board("## 🎯 我的下一件\n### x\n")["legacy"] is True
