@@ -316,6 +316,18 @@ orchestrator 印出候選清單（每筆一句「為什麼值得記 + 建議 typ
 使用者勾選的每一筆，**依序各跑一輪 [`/maigo:remember`](https://github.com/Lee-W/maigo/blob/main/commands/remember.md) 步驟 5+6** 寫入
 （type 預填 `project`——這是能被 Soyo 當 review item 4 的唯一可行 type；name/body 由 comment
 提煉，使用者可在 remember 步驟 5 改）。**每筆獨立——某筆在 remember 步驟 5 取消只跳過該筆、繼續往下一筆，不中止其餘**。
+寫入時另帶兩個 optional frontmatter 欄位（定義見
+[`docs/reference/memory.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/memory.md)）：
+`category`（取自
+[`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
+的 key，orchestrator 依該 comment 判定）與 `seen_in`（本次 PR，`<owner/repo>#<n>`）。
+reviewer 與作者的人名不寫進記憶，只留 PR 號與類別。
+
+**寫入前先比對既有同 `category` 的 `type: project` 條目**：判定是同一教訓時，改為在該條目的
+`seen_in` 追加本次 PR（已含此 PR 就不重複追加），不新建；判定不是同一教訓才走新建。比對結果
+與「追加到 `<slug>`」或「新建」的建議一併攤在 remember 步驟 5 的確認裡，**使用者可改判**
+（追加改新建，或新建改追加）。
+
 寫入路徑、rollback、同 slug 處理全交給 remember 既有規格，**不在此另寫一份**。
 
 **crystallize 提示（不自動執行）：** 若某筆候選明顯是「反覆出現、夠結構化」（這次 PR 多筆同主題，

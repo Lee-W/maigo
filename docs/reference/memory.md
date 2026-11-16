@@ -46,6 +46,8 @@ name: <人類可讀標題，不必跟檔名相同>
 description: <一句話，給 reader agent 判斷相關性用>
 type: user | feedback | project | reference
 triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
+category: <taxonomy key>          # optional；只有 type: project 適用
+seen_in: [<owner/repo>#<n>, ...]  # optional；只有 type: project 適用
 ---
 ```
 
@@ -55,6 +57,8 @@ triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
 | `description` | 一句話摘要；reader 用這句話決定要不要讀全文 |
 | `type` | 見下方 Types 說明 |
 | `triggers` | optional；skill name list；只 `type: project` 適用 |
+| `category` | optional；reviewer 指出的問題類別，值取自 [reviewer-comment-taxonomy](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md) 的 key；只 `type: project` 適用 |
+| `seen_in` | optional；這條教訓出現過的 PR，格式 `<owner/repo>#<n>`，扁平 list；只 `type: project` 適用 |
 
 > **Frontmatter 必須是扁平結構**：不支援巢狀鍵（如 `metadata.type`）。所有欄位直接放在 `---` 最上層；巢狀結構會被 parser 讀不到，`validate_memory.py` 回報 "missing field"。
 
@@ -62,6 +66,12 @@ triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
 逐一嘗試讀 `skills/<name>/SKILL.md`——存在就附加為 base 9 項 checklist 之後的 item 10+；
 不存在 → log「triggered skill `<name>` 找不到，忽略」，不 crash，繼續後續 entry。
 其他 type（`user` / `feedback` / `reference`）的 `triggers` 欄位無聲忽略。
+
+**`category` 與 `seen_in`**：兩者都是 optional，舊條目不需遷移；沒有這兩個欄位的條目照舊運作。
+同一教訓在另一個 PR 再次出現時，**在原條目的 `seen_in` 追加**新的 PR 號，不新建條目；`seen_in`
+有兩個以上不同 PR，是 [`/maigo:crystallize`](https://github.com/Lee-W/maigo/blob/main/commands/crystallize.md)
+判斷反覆性的強訊號。PR 號屬公開資訊；reviewer 與作者的人名不寫進條目。
+`validate_memory.py` 只檢查必填欄位，這兩個欄位不會被它拒收。
 
 ## Types 解釋 + 範例
 

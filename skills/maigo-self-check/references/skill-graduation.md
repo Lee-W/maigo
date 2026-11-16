@@ -19,7 +19,9 @@ Read this file when executing the corresponding crystallize step.
 - **有明確 consumer**——某個 command / agent 載入它時會真的用到
   （能講出「這條畢業後該掛在哪個 command / agent 的哪一步」）
 - **反覆性 signal**——描述含「以後都 / 每次 / 慣例 / 一律」，
-  或多筆記憶指向同一主題、可合併成一個 skill 段落
+  或多筆記憶指向同一主題、可合併成一個 skill 段落；
+  帶 `seen_in` 的條目另以次數計：**`seen_in` 有兩個以上不同 PR 視為強反覆性訊號**
+  （欄位定義見 [`docs/reference/memory.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/memory.md)）
 
 **額外強訊號**：entry 自己標註了畢業意圖（如 `**How to apply**` 寫了
 「未來可寫進 `<script>` / 降級此記憶」）——這類直接列為高優先候選。
@@ -38,6 +40,14 @@ Read this file when executing the corresponding crystallize step.
   | 語言通用慣例（不綁特定 repo，例如 pytest／mock／import 規則） | 對應語言層 skill（目前：`python-aware`）的本體或 `references/`；沒有對應語言層 → 留在記憶層，不要塞進 repo-aware skill |
   | 專案限定知識（如 Airflow 案例）；判斷句：規則換到另一個同語言 repo 仍然成立 → 不是專案限定，改走上一列 | 對應 repo-aware skill（如 `airflow-aware`）的本體或其 `references/`，**不進通用 skill** |
   | 自成一群的新慣例 | 先評估能否掛進相近既有 skill 的 `references/`；真的無處可掛才 `新建 skill <name>`（給建議 name + 一句 description + 預定 owner / consumer） |
+
+  **帶 `category` 的條目**：預設目的地是
+  [reviewer-comment-taxonomy](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
+  中該類「對應規則」所在的檔，再依上表的落點判斷細化：語言通用 → `python-aware`；repo 限定 →
+  該 repo-aware skill 的 `references/`；跨語言 → strict-review 的 `references/`（例：
+  `pre-pr-sweeps.md`）。對應規則為「無」時，提議在 strict-review 的 `references/` 新增段落。
+  隱私檢查與公開性檢查照常執行；PR 號屬公開資訊，私人細節仍依閘門處理；reviewer 與作者的
+  人名不寫進記憶、skill 或 reference 的內容，只留 PR 號與類別。
 
   **併進優先**：落點預設先試「併進既有 skill / references」，新建 standalone skill 是
   last resort——避免 skill 增殖、控 context 成本。連「自成一群的新慣例」也先問能否掛進

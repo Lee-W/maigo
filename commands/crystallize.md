@@ -65,7 +65,7 @@ Fallback：記憶目錄 / index 不存在或為空 → 印「記憶層是空的�
 ### 2. 挑畢業候選（criteria）
 
 對每筆 entry 套一組準則，**全中才是候選**：形狀是 convention / workflow / 規則（非一次性事實）、
-有明確 consumer、有反覆性 signal；額外強訊號與排除規則見
+有明確 consumer、有反覆性 signal（帶 `seen_in` 的條目有兩個以上不同 PR 即為強訊號）；額外強訊號與排除規則見
 `skills/maigo-self-check/references/skill-graduation.md`「Step 2 — 挑畢業候選：criteria 細節」。
 
 掃完印一段 `## 畢業候選`，列出 N 個候選 + 每個的一句畢業理由。候選為 0 → 跳到步驟 7 的空結算。
@@ -91,7 +91,7 @@ Fallback：記憶目錄 / index 不存在或為空 → 印「記憶層是空的�
 
 - **來源**：記憶條目 `<slug>`（引用其 description / body）
 - **畢業理由**：命中哪些 criteria
-- **目的地**（先過落點決策表——條目形狀對應的落點、併進優先原則、~150 行尺寸預算，見
+- **目的地**（先過落點決策表——條目形狀對應的落點、帶 `category` 條目的預設落點、併進優先原則、~150 行尺寸預算，見
   `skills/maigo-self-check/references/skill-graduation.md`「Step 4 — 目的地決策表」）
 - **來源記憶處置**：`退役（刪 entry + 移除 index 行）` 或
   `留一行降級指針指向 skill`
