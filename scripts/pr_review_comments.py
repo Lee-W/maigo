@@ -36,7 +36,10 @@ from typing import Any
 GhRunner = Callable[[list[str]], str]
 
 _GH_TIMEOUT_SECONDS = 60
-_PR_URL_RE = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)/?$")
+_PR_URL_RE = re.compile(
+    r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/(\d+)/?$"
+)
+_DOT_SEGMENTS = {".", ".."}
 _BOT_SUFFIX = "[bot]"
 
 
@@ -50,7 +53,10 @@ def parse_pr_url(url: str) -> tuple[str, str, int]:
         raise PrCommentsError(
             f"不是 PR URL（https://github.com/<owner>/<repo>/pull/<n>）: {url}"
         )
-    return match.group(1), match.group(2), int(match.group(3))
+    owner, repo = match.group(1), match.group(2)
+    if owner in _DOT_SEGMENTS or repo in _DOT_SEGMENTS:
+        raise PrCommentsError(f"owner／repo 不可是路徑片段: {url}")
+    return owner, repo, int(match.group(3))
 
 
 def run_gh(args: list[str]) -> str:
@@ -80,7 +86,10 @@ def _decode_pages(text: str) -> list[Any]:
         if text[index].isspace():
             index += 1
             continue
-        value, index = decoder.raw_decode(text, index)
+        try:
+            value, index = decoder.raw_decode(text, index)
+        except json.JSONDecodeError as error:
+            raise PrCommentsError(f"gh 回傳的不是 JSON: {error}") from error
         if isinstance(value, list):
             items.extend(value)
         else:

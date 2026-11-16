@@ -125,11 +125,27 @@ class TestParseAndPages:
         assert prc.parse_pr_url(URL) == ("octo", "repo", 7)
 
     @pytest.mark.parametrize(
-        "bad", ["https://github.com/octo/repo/issues/7", "nope", ""]
+        "bad",
+        [
+            "https://github.com/octo/repo/issues/7",
+            "nope",
+            "",
+            "https://github.com/../repo/pull/7",
+            "https://github.com/octo/../pull/7",
+            "https://github.com/./repo/pull/7",
+            "https://github.com/octo/re?po/pull/7",
+            "https://github.com/octo/re#po/pull/7",
+            "https://github.com/octo/re po/pull/7",
+            "https://github.com/oc%2fto/repo/pull/7",
+        ],
     )
     def test_parse_rejects_non_pr_url(self, bad):
         with pytest.raises(prc.PrCommentsError):
             prc.parse_pr_url(bad)
+
+    def test_decode_non_json_raises_pr_comments_error(self):
+        with pytest.raises(prc.PrCommentsError, match="不是 JSON"):
+            prc._decode_pages("<html>rate limited</html>")
 
     def test_decode_concatenated_pages(self):
         assert prc._decode_pages('[{"a": 1}]\n[{"a": 2}, {"a": 3}]') == [
@@ -163,6 +179,7 @@ class TestReadOnly:
             assert len(args) == 3  # no -X / --method / -f / -F / --input
         paths = [args[1] for args in calls]
         assert paths[0] == "repos/octo/repo/pulls/7"
+        assert all(path.startswith("repos/octo/repo/") for path in paths)
 
     def test_default_runner_calls_gh_api_only(self, monkeypatch):
         seen: list[list[str]] = []
@@ -192,6 +209,14 @@ class TestMain:
         assert prc.main([URL]) == 0
         out = json.loads(capsys.readouterr().out)
         assert out[0]["author"] == "octocat"
+
+    def test_main_non_json_exits_1_without_traceback(self, monkeypatch, capsys):
+        def fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 0, stdout="not json", stderr="")
+
+        monkeypatch.setattr(prc.subprocess, "run", fake_run)
+        assert prc.main([URL]) == 1
+        assert "不是 JSON" in capsys.readouterr().err
 
     def test_main_bad_url_exits_1(self, capsys):
         assert prc.main(["nope"]) == 1
