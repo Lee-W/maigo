@@ -123,7 +123,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
   `有新回覆`→`重判`、`有新 comment`→`回覆`、`可合併`→`merge`、`待 review`→`審`、`待 triage`→`triage`、
   `READY`→`接手`；`抓不到`、`WIP`、`IN_PROGRESS` 不顯示。規模是 `+A/-D`，任一數字 ≥1000 時縮成一位小數加 `k`
   （`+1.2k/-340`）；issue 沒有規模、不顯示。細節檔仍是完整的 `Δ+A/-D` 與完整下一步指令。
-  這兩欄是**衍生值**：refresh 每次從狀態與 gh 資料重算，parser 讀回來只為了 round-trip（排除列、抓不到的列沿用讀到的值）。
+  這兩欄是**衍生值**：refresh 每次從狀態與 gh 資料重算，parser 讀回來只為了 round-trip（排除列沿用讀到的值；抓不到的列沿用讀到的規模，但**不顯示動作**——動作是建議你現在做什麼，抓不到時這個建議不可信，所以刷新時清掉）。
 - **✅ 區的結案日期 `MM-DD`（optional）**：放在同一個位置（badges 之後、細節檔路徑之前），讓「還會留多久」看得見；
   日期取 `mergedAt` → `closedAt` → `updatedAt`（本機時區）。⏳ 區不帶這三個欄位。
 - **行長預算**：`—` 之前的部分以顯示寬度計（East Asian Wide/Fullwidth 與 emoji 算 2 欄、組合字元與變體選擇符算 0、

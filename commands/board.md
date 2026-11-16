@@ -55,7 +55,7 @@ URL 若指到其他 repo，行內保留 `owner/repo#n` 全稱。
 搬到新 board，舊檔改名成 `.maigo/review-board.md.migrated` 留底。
 
 若 `board.md` 存在但仍是球權三分區時代的舊格式（讀到舊版 section 標題），刷新時取每行的
-checkbox / `🧠` / 狀態詞後，整檔以新的三 section 骨架重寫，不做逐行 in-place 遷移。
+checkbox / `🧠` / 狀態詞後，整檔以新骨架（四個 section）重寫，不做逐行 in-place 遷移。
 
 讀到 `作者待補` 或缺 `@` 的 warning／error 時，先跑一輪 refresh（它會從 GitHub 補回作者）再繼續。
 
@@ -90,12 +90,12 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    `--weights <file>` 指定同 rank 內加權檔、覆寫預設的 repo 層與使用者層設定，格式見
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 2. 依 exit code 分流：
-   - **exit 0** → 依輸出的 JSON（`pending_reviews`、`top`、`counts`、`warnings`、`errors`、`removed`、
-     `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`learn_pending`）做 §4。
+   - **exit 0** → 依輸出的 JSON（`pending_reviews`、`top`、`top_review`、`counts`、`warnings`、`errors`、`removed`、
+     `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`capped`、`learn_expiring`、`learn_pending`）做 §4。
    - **exit 2**（CAS 衝突：board.md 或細節檔在刷新期間被改過；除了 review.md 的 ack 標記外未寫任何檔）→ 直接重跑一次；再撞到就停下，
      告訴使用者 board 正被別的 session 寫。**不要**改用 `Write`。
    - **exit 1**（前置條件拒絕）→ 依訊息分流：舊格式或 `review-board.md` → 走下面的「手動流程 fallback」
-     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權設定檔有壞行（訊息含檔名與行號）→ 回報原文。
+     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權或載入樣板設定檔有壞行（訊息含檔名與行號）→ 回報原文。
    - **exit 3**（寫入階段失敗）→ 回報備份路徑與錯誤，不 fallback。`--json` 的 `exit_reason` 是 `write_failed`
      ＝已從備份還原；是 `post_write_failed` ＝board 已是新版、只有 ledger／snapshot 沒寫成，把輸出列出的
      未寫事件回報給使用者，說明重跑是安全的。

@@ -950,7 +950,9 @@ def test_bad_load_template_fails_with_file_and_line(
     assert not [c for c in gh.calls if c[:2] == ["gh", "pr"]]
 
 
-@pytest.mark.parametrize("branch", ["x; rm -rf ~", "$(id)", "a b", "-rf", "a/../b"])
+@pytest.mark.parametrize(
+    "branch", ["x; rm -rf ~", "$(id)", "a b", "-rf", "a/../b", "bad\n"]
+)
 def test_unsafe_branch_name_omits_load_line(tmp_path, gh, capsys, branch):
     _load_board(tmp_path, gh)
     gh.prs[2]["headRefName"] = branch
@@ -958,6 +960,27 @@ def test_unsafe_branch_name_omits_load_line(tmp_path, gh, capsys, branch):
     assert run_cli(tmp_path, "--apply", "--no-discovery", "--json") == 0
     assert _load_line(tmp_path, 2) is None
     assert any("不安全" in w for w in json.loads(capsys.readouterr().out)["warnings"])
+
+
+def test_unreachable_row_drops_the_stale_action_but_keeps_size(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(focus=[]).replace(
+            "## ⏳ 等別人",
+            "## 👀 待我 review（1）\n\n"
+            "1. [ ] 👀 待 review（x） @carol →審 +1/-1 i/1.md — Title 1\n\n## ⏳ 等別人",
+            1,
+        ),
+    )
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    gh.fail = {1}
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = section_rows(tmp_path)["👀"][0]
+    # a short hand-written note keeps the line inside the width budget, so a stale
+    # action would otherwise show
+    assert "抓不到（x）" in line and "→" not in line
+    assert "+1/-1" in line
 
 
 def test_skill_load_examples_parse():

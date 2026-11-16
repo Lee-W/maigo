@@ -68,7 +68,7 @@ LOAD_FILENAME = "board-load.txt"
 # `board-load.txt` keys and the placeholders each one may use
 LOAD_KEYS = {"pr": {"number"}, "branch": {"branch", "number"}}
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
-_SAFE_BRANCH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._/-]*$")
+_SAFE_BRANCH_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]*")  # use fullmatch
 _SAME_REPO_DETAIL_RE = re.compile(r"^i/\d+\.md$")
 NOTE_MAX = 80
 JUDGMENT_HEADING = "## 判斷"
@@ -242,7 +242,7 @@ def load_command_for(
     if row["type"] == "🔀" and "branch" in templates:
         branch = (row.get("gh_meta") or {}).get("headRefName")
         if branch:
-            if not _SAFE_BRANCH_RE.match(branch) or ".." in branch:
+            if not _SAFE_BRANCH_RE.fullmatch(branch) or ".." in branch:
                 warnings.append(f"#{number} 的 branch 名含不安全字元，略過載入指令")
                 return None
             return (
@@ -900,7 +900,7 @@ def _unreachable_row(entry: Entry, g: Gathered) -> dict:
         if row["note"] and not _is_error_note(row["note"]):
             note = row["note"]  # keep the hand-written / command-written note
         row.update(
-            error=entry.fetch["error"], status=UNREACHABLE, note=note,
+            error=entry.fetch["error"], status=UNREACHABLE, note=note, action=None,
             section=_section_of(row["type"], 0), rank=0,
             updated_at=None, mode="keep",
         )  # fmt: skip
