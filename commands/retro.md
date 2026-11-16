@@ -109,7 +109,8 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
 
 2. **歸類**：orchestrator 依
    [`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
-   逐則把 comment 歸到一個 `category` key。純提問、純讚美、無法歸類的略過。
+   逐則把 comment 歸到一個 `category` key（暫定；步驟 3 判為領域知識的，key 一律改用
+   `domain-knowledge`，覆蓋這裡的暫定歸類）。純提問、純讚美、無法歸類的略過。
 
 3. **逐則判定「現行規則該擋到它嗎」**，擇一。先分流「能不能寫成通用規則」：這類問題換到另一個
    repo 仍成立、可以寫成不分 repo 的自審規則 → 走前三種；只在特定 repo／模組／外部系統成立、
@@ -132,9 +133,9 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
    追加本次 PR（走 remember 的「追加模式」），不新建；使用者可改判。reviewer 與作者的人名與 GitHub login 不寫進記憶，只留 PR 號與類別。
 
    **領域知識的寫入**：`type: project`、`category: domain-knowledge`、帶 `seen_in`，並在
-   `/maigo:remember` 的第四題（triggered skills）預填該 repo 對應的 aware skill（例：apache/airflow →
-   `airflow-aware`），使用者可改；該 repo 沒有對應的 aware skill 就不預填，`triggers` 維持 remember
-   現行規則（空則不加欄位）。這類條目日後只畢業進該 repo 的 aware skill，見
+   `/maigo:remember` 的第四題（triggered skills）帶該 repo 對應的 aware skill 當預設值（例：apache/airflow →
+   `airflow-aware`；機制見 remember 第四題的 caller 預設值），使用者可改；該 repo 沒有對應的 aware skill
+   就不帶，`triggers` 維持 remember 現行規則（空則不加欄位）。這類條目日後只畢業進該 repo 的 aware skill，見
    [`skill-graduation`](https://github.com/Lee-W/maigo/blob/main/skills/maigo-self-check/references/skill-graduation.md)。
 
 5. 結尾 summary 在路徑 A 的 summary 之外多印三項：

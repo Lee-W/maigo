@@ -59,15 +59,18 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
      - 要不要編輯 **body**？（預設 body = 從 input 提煉的一句話 + 原 input 當補充；使用者可直接接受或提供新版）
 
    - **第四題（僅 `type: project`）**：
-     - 要 tag triggered skills 嗎？（optional，list，例：`airflow-aware`、`commitizen-aware`）。預設空，直接 Enter 略過
+     - 要 tag triggered skills 嗎？（optional，list，例：`airflow-aware`、`commitizen-aware`）。預設空，直接 Enter 略過；
+       caller 可帶建議的 triggers 當這題的預設值（例：領域知識條目帶該 repo 的 aware skill），
+       使用者可改或清空；caller 沒帶就仍預設空
      - 非空 → frontmatter 加 `triggers: [...]`；空 → 不加 `triggers` 欄位
      - 此欄位只對 `type: project` 有效；其他 type 不詢問、不寫入
 
    - **caller 帶入的欄位（不是新的詢問題）**：呼叫端（`/maigo:address-comments`、
      `/maigo:retro --pr`）可帶 `category` 與 `seen_in`（定義見
      [Memory reference](../docs/reference/memory.md)）。只在確認摘要裡列出，不另外詢問；
-     僅 `type: project` 適用，其他 type 不寫入。使用者直接下 `/maigo:remember` 時沒有 caller，
-     這兩個欄位不出現，流程不變。
+     僅 `type: project` 適用，其他 type 不寫入。caller 另可帶建議的 `triggers`，那是第四題的
+     預設值（見上），不在此列。使用者直接下 `/maigo:remember` 時沒有 caller，
+     這些都不出現，流程不變。
 
 6. 使用者確認後：
 

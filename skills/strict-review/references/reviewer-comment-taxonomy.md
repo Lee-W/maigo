@@ -9,7 +9,7 @@ should already have caught it before the PR was opened.
 Origin: a hand-classified sample of review comments on apache/airflow PRs. Counts in that
 sample are approximate (about ±3 per category) and concentrated in a few large PRs, so the
 keys are a way to count, not a measured ranking. A category with no existing rule is a gap
-in maigo; a category with a rule that still showed up means the rule was not applied in the
+in maigo (except `domain-knowledge`, which deliberately has no general rule); a category with a rule that still showed up means the rule was not applied in the
 first round only if the PR was opened through go or team after the rule landed; go reviews
 are not recorded, so that needs the user's confirmation.
 
@@ -32,7 +32,7 @@ and record each PR the same lesson appeared in under `seen_in`.
 | `pr-conflict` | The change conflicts with the base branch or with another in-flight PR touching the same text. | No existing rule. |
 | `translation` | Wording of a translated string. | No existing rule; needs a native reviewer. |
 | `perf` | A measured performance regression. | No existing rule; the reviewer ran the measurement. |
-| `domain-knowledge` | A fact true only for one repo, module or external system that the author could not have known without being told (a library's internal behaviour, a project policy, a platform constraint). | No general rule: it cannot be written as a repo-independent self-review rule. Belongs to the matching repo's aware skill (for apache/airflow, [`airflow-aware`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/SKILL.md)). |
+| `domain-knowledge` | A fact true only for one repo, module or external system that the author could not have known without being told (a library's internal behaviour, a platform constraint). Test: if the same point would still hold in a different repo, it is not this category (a stability policy is `released-compat`). | No general rule: it cannot be written as a repo-independent self-review rule. Belongs to the matching repo's aware skill (for apache/airflow, [`airflow-aware`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/SKILL.md)). |
 
 `domain-knowledge` is kept apart from the other keys on purpose. Once a reviewer has said it, the
 fact is no longer only the reviewer's, and the next change to the same code can check it first, so

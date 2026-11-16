@@ -45,7 +45,7 @@ Read this file when executing the corresponding crystallize step.
   [reviewer-comment-taxonomy](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
   中該類「對應規則」所在的檔，再依上表的落點判斷細化：語言通用 → `python-aware`；repo 限定 →
   該 repo-aware skill 的 `references/`；跨語言 → strict-review 的 `references/`（例：
-  `pre-pr-sweeps.md`）。對應規則為「無」時，提議在 strict-review 的 `references/` 新增段落。
+  `pre-pr-sweeps.md`）。對應規則為「無」時，提議在 strict-review 的 `references/` 新增段落（`domain-knowledge` 例外，見下）。
   隱私檢查與公開性檢查照常執行；PR 號屬公開資訊，私人細節仍依閘門處理；reviewer 與作者的
   人名與 GitHub login 不寫進記憶、skill 或 reference 的內容，只留 PR 號與類別。
 
