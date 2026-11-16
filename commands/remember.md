@@ -63,6 +63,12 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
      - 非空 → frontmatter 加 `triggers: [...]`；空 → 不加 `triggers` 欄位
      - 此欄位只對 `type: project` 有效；其他 type 不詢問、不寫入
 
+   - **caller 帶入的欄位（不是新的詢問題）**：呼叫端（`/maigo:address-comments`、
+     `/maigo:retro --pr`）可帶 `category` 與 `seen_in`（定義見
+     [Memory reference](../docs/reference/memory.md)）。只在確認摘要裡列出，不另外詢問；
+     僅 `type: project` 適用，其他 type 不寫入。使用者直接下 `/maigo:remember` 時沒有 caller，
+     這兩個欄位不出現，流程不變。
+
 6. 使用者確認後：
 
    a. `mkdir -p ~/.config/maigo/memory/`
@@ -87,6 +93,17 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
       triggers: [<skill-name>, ...]
       ```
 
+      若 `type: project` 且 caller 帶了 `category` / `seen_in`，與 `triggers` 並列，值原樣寫入
+      （欄位不存在就不加）：
+
+      ```markdown
+      category: <taxonomy key>
+      seen_in: [<owner/repo>#<n>, ...]
+      ```
+
+      `seen_in` 一律寫成**單行 flow list**（`[a, b]`），不用 block list——frontmatter parser
+      逐行讀、跳過縮排行，block list 會被讀成空值。
+
    c. 更新 `~/.config/maigo/memory/MEMORY.md`：
       - 若不存在 → 建立，含一行說明 + 第一個 entry
       - 若已存在 → append 一行 `- [<name>](<slug>.md) — <description>`
@@ -94,6 +111,18 @@ Orchestrator 親自執行以下步驟（不 delegate 給 Tomori 或 Anon）：
    d. 回報使用者：寫了哪兩個檔、type、name、slug
 
    e. 收場一句：`🌙 Doloris：「<name>」，願它留在該留的地方——這次，不會被遺忘。`
+
+## 追加模式（caller 指定既有 slug）
+
+caller 判定「同一教訓」並指定既有 slug 要追加 PR 時，**不走步驟 3–6b 的新建**，也不進下方
+「同 slug 已存在」的覆蓋流程：
+
+1. 確認 `~/.config/maigo/memory/<slug>.md` 存在且 `type: project`；不是就回報並中止，不寫任何檔。
+2. 在確認摘要列出「追加 `<owner/repo>#<n>` 到 `<slug>`」，經 AskUserQuestion 確認（使用者可改成新建）。
+3. 用 Edit **只改該條目 frontmatter 的 `seen_in` 一行**：不覆蓋整份、不改 body、不動
+   `MEMORY.md` 索引行。`seen_in` 已含該 PR → 不重複追加，回報「已在 `seen_in`」。條目原本沒有
+   `seen_in` → 在 frontmatter 結尾前補一行單行 flow list。
+4. 失敗（Edit 沒套上、條目不存在）→ 不留半成品，回報原因。
 
 ## 失敗 / 中斷處理（rollback 規則）
 

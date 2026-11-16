@@ -321,14 +321,14 @@ orchestrator 印出候選清單（每筆一句「為什麼值得記 + 建議 typ
 `category`（取自
 [`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
 的 key，orchestrator 依該 comment 判定）與 `seen_in`（本次 PR，`<owner/repo>#<n>`）。
-reviewer 與作者的人名不寫進記憶，只留 PR 號與類別。
+reviewer 與作者的人名與 GitHub login 不寫進記憶，只留 PR 號與類別。
 
 **寫入前先比對既有同 `category` 的 `type: project` 條目**：判定是同一教訓時，改為在該條目的
 `seen_in` 追加本次 PR（已含此 PR 就不重複追加），不新建；判定不是同一教訓才走新建。比對結果
 與「追加到 `<slug>`」或「新建」的建議一併攤在 remember 步驟 5 的確認裡，**使用者可改判**
 （追加改新建，或新建改追加）。
 
-寫入路徑、rollback、同 slug 處理全交給 remember 既有規格，**不在此另寫一份**。
+寫入路徑（含 `category`／`seen_in` 欄位與「追加模式」）、rollback、同 slug 處理全交給 remember 既有規格，**不在此另寫一份**。
 
 **crystallize 提示（不自動執行）：** 若某筆候選明顯是「反覆出現、夠結構化」（這次 PR 多筆同主題，
 或使用者表示常踩），在寫完記憶後**加一行提示**：「這條看起來會反覆出現——之後可考慮

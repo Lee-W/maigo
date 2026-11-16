@@ -111,8 +111,12 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
    [`reviewer-comment-taxonomy`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md)
    逐則把 comment 歸到一個 `category` key。純提問、純讚美、無法歸類的略過。
 
-3. **逐則判定「現行規則該擋到它嗎」**，三選一：
-   - **規則存在卻漏擋**：taxonomy 為該類列了對應規則，但 go 的第一輪沒做到 → 候選
+3. **逐則判定「現行規則該擋到它嗎」**，擇一（同一則同時符合「屬 reviewer 領域知識」與「無對應規則」時，
+   以領域知識為準，不收）：
+   - **規則存在（未確認當時是否經 go、是否在規則落地之後）**：taxonomy 為該類列了對應規則 → 候選。
+     go 的 review 不落檔，沒有資料能證明這個 PR 是經 go 開的、或開在規則落地之後，所以預設判這一種，
+     **不宣稱「漏擋」**
+   - **規則存在卻漏擋**：僅限使用者確認該 PR 是在規則存在之後、經 go／team 開出的，才從上一種升格 → 候選
    - **無對應規則**：該類在 taxonomy 標「無對應規則」→ 候選
    - **屬 reviewer 領域知識**：需要 reviewer 自己的專業或專案內部知識才知道，作者無從套用 → **不收**
 
@@ -120,14 +124,15 @@ reviewer 實際挑過什麼，不在對話裡。這條路徑讀 PR 上**別人**
    步驟 5+6 寫檔。寫入時帶 `category` 與 `seen_in`（`<owner/repo>#<n>`），並先套用
    [`/maigo:address-comments`](https://github.com/Lee-W/maigo/blob/main/commands/address-comments.md)
    步驟 7 的追加判定：已有同 `category` 且判定為同一教訓的條目，改為在其 `seen_in`
-   追加本次 PR，不新建；使用者可改判。reviewer 與作者的人名不寫進記憶，只留 PR 號與類別。
+   追加本次 PR（走 remember 的「追加模式」），不新建；使用者可改判。reviewer 與作者的人名與 GitHub login 不寫進記憶，只留 PR 號與類別。
 
 5. 結尾 summary 在路徑 A 的 summary 之外多印兩項：
    - 一行「本次各類別次數」，例：`doc-claim-drift 3、test-cannot-fail 2、edge-case 1`
-   - 「規則存在卻漏擋」清單：每筆一行，`<category>（<PR 號>）→ <該擋到它的規則>`。
-     這份清單是 pre-PR sweeps 在第一輪是否生效的量測。
+   - 「規則存在」清單：每筆一行，`<category>（<PR 號>）→ <對應規則>`；使用者確認過「規則落地後
+     經 go／team 開出」的，標為「規則存在卻漏擋」。未確認的不得算成漏擋——這份清單是 pre-PR sweeps
+     在第一輪是否生效的量測，混進未確認的會高估漏擋。
 
-   候選為 0 筆時仍印次數行；沒有任何漏擋寫「無」。
+   候選為 0 筆時仍印次數行；沒有任何一筆規則存在寫「無」。
 
 ## 中斷處理
 

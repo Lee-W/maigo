@@ -47,7 +47,7 @@ description: <一句話，給 reader agent 判斷相關性用>
 type: user | feedback | project | reference
 triggers: [<skill-name>, ...]   # optional；只有 type: project 適用
 category: <taxonomy key>          # optional；只有 type: project 適用
-seen_in: [<owner/repo>#<n>, ...]  # optional；只有 type: project 適用
+seen_in: [<owner/repo>#<n>, ...]  # optional；只有 type: project 適用；單行 flow list
 ---
 ```
 
@@ -58,7 +58,7 @@ seen_in: [<owner/repo>#<n>, ...]  # optional；只有 type: project 適用
 | `type` | 見下方 Types 說明 |
 | `triggers` | optional；skill name list；只 `type: project` 適用 |
 | `category` | optional；reviewer 指出的問題類別，值取自 [reviewer-comment-taxonomy](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/reviewer-comment-taxonomy.md) 的 key；只 `type: project` 適用 |
-| `seen_in` | optional；這條教訓出現過的 PR，格式 `<owner/repo>#<n>`，扁平 list；只 `type: project` 適用 |
+| `seen_in` | optional；這條教訓出現過的 PR，格式 `<owner/repo>#<n>`；**只用單行 flow list `[a, b]`，不用 block list**（`scripts/_frontmatter.py` 逐行讀、跳過縮排行，block list 會被讀成空值）；只 `type: project` 適用 |
 
 > **Frontmatter 必須是扁平結構**：不支援巢狀鍵（如 `metadata.type`）。所有欄位直接放在 `---` 最上層；巢狀結構會被 parser 讀不到，`validate_memory.py` 回報 "missing field"。
 
@@ -70,7 +70,7 @@ seen_in: [<owner/repo>#<n>, ...]  # optional；只有 type: project 適用
 **`category` 與 `seen_in`**：兩者都是 optional，舊條目不需遷移；沒有這兩個欄位的條目照舊運作。
 同一教訓在另一個 PR 再次出現時，**在原條目的 `seen_in` 追加**新的 PR 號，不新建條目；`seen_in`
 有兩個以上不同 PR，是 [`/maigo:crystallize`](https://github.com/Lee-W/maigo/blob/main/commands/crystallize.md)
-判斷反覆性的強訊號。PR 號屬公開資訊；reviewer 與作者的人名不寫進條目。
+判斷反覆性的強訊號。PR 號屬公開資訊；reviewer 與作者的人名與 GitHub login 不寫進條目。
 `validate_memory.py` 只檢查必填欄位，這兩個欄位不會被它拒收。
 
 ## Types 解釋 + 範例

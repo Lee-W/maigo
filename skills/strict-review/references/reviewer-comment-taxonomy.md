@@ -10,7 +10,8 @@ Origin: a hand-classified sample of review comments on apache/airflow PRs. Count
 sample are approximate (about ±3 per category) and concentrated in a few large PRs, so the
 keys are a way to count, not a measured ranking. A category with no existing rule is a gap
 in maigo; a category with a rule that still showed up means the rule was not applied in the
-first round.
+first round only if the PR was opened through go or team after the rule landed; go reviews
+are not recorded, so that needs the user's confirmation.
 
 Use a key as the `category` value of a memory entry (see
 [`docs/reference/memory.md`](https://github.com/Lee-W/maigo/blob/main/docs/reference/memory.md)),
@@ -36,5 +37,5 @@ A comment that needs the reviewer's own domain knowledge (library internals, a p
 author could not have read) fits a key above only by topic. Record it as seen, but do not
 turn it into a rule: the lesson is the reviewer's, not a convention the author can apply.
 
-Do not write reviewer or author names into a memory entry, a skill or a reference; keep the
-PR number and the category only.
+Do not write reviewer or author names or GitHub logins into a memory entry, a skill or a
+reference; keep the PR number and the category only.
