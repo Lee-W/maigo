@@ -258,7 +258,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 全部 work item 走完後，orchestrator 給一份 summary：
 
 1. **處理對照**：每條選中的 comment → 對應 work item → `done` / `blocked` + 改了哪些檔。
-2. **回覆草稿（不自動送出）**：為每條已處理的 comment 擬一段建議回覆——address-comments **不替使用者回覆、不 resolve thread、不 push**。草稿**寫成檔案**，檔案是正本，不是只印在對話裡：
+2. **回覆草稿（不自動送出）**：為每條已處理的 comment 擬回覆；不需要回覆的（照做、改完 resolve 即可，沒有提問也沒有要說明的取捨）只在草稿檔列一節、標「不必回覆」，不寫內文——address-comments **不替使用者回覆、不 resolve thread、不 push**。草稿**寫成檔案**，檔案是正本，不是只印在對話裡：
 
    - **產草稿前重抓一次 thread 狀態，已 resolve 的不列**：步驟 2 的抓取到這裡已隔了整個實作階段
      （可能數小時、數個 work item、一次 rebase），reviewer 很可能在期間按了 resolve。重跑步驟 2 的
@@ -273,10 +273,10 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
    - 檔案內容依
      `skills/github-reply-draft/references/comment-fetch-and-triage.md`「回覆草稿檔模板」：
      每則 comment 一節，寫明**在哪裡回**（inline thread / PR conversation 底部）、原始 comment 連結、
-     位置、前置條件（例如「先 push 再貼」）與 thread 狀態，其下接一個可一鍵複製的 fenced code block，內含純回覆內文。
+     位置、前置條件（例如「先 push 再貼」）與 thread 狀態，其下接一個可一鍵複製的 fenced code block，內含純回覆內文（標「不必回覆」的節除外，它沒有 block）。
      fenced block 規則依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)
      （內文若可能含三個 backtick 就用四個 backtick 外層，不加 `>` blockquote）。
-   - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設簡短、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
+   - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設一句話（約 20 個英文字）、不用稱讚或認錯開場、驗證範圍聲明不寫進回覆內文（寫在 block 外的 `備註`，並在下方對話提到）、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、預設不加 attribution footer（使用者要求才加）。「要擬稿／不必回覆」的判準見 `skills/github-reply-draft/references/draft-shape.md`。
    - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**（這行是印給終端機的 repo-root 相對路徑，不是 `gf` 的對象；
      要把回覆草稿記進細節檔 `## 筆記` 時寫檔案相對的 `../pr/<id>/reply-draft.md`〔別人的 PR 是 `../review/<id>/reply-draft.md`〕，獨立成清單項）：
 
@@ -284,11 +284,14 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
      回覆草稿：
      .maigo/pr/72049/reply-draft.md
 
-     | # | 在哪裡回 | 連結 | 前置條件 |
-     |---|----------|------|----------|
-     | C1 | inline thread（src/auth.py:42） | <url> | 先 push 再貼 |
-     | C2 | PR conversation 底部（@reviewer，引用該段） | <url> | 無 |
+     | # | 動作 | 在哪裡回 | 連結 | 前置條件 |
+     |---|------|----------|------|----------|
+     | C1 | 貼 | inline thread（src/auth.py:42） | <url> | 先 push 再貼 |
+     | C2 | 貼 | PR conversation 底部（@reviewer，引用該段） | <url> | 無 |
+     | C3 | 不必回覆 | 改完 resolve 即可（src/auth.py:77） | <url> | 無 |
      ```
+
+     表後另起一行列出所有 `備註`（未驗證的事等給使用者看的話），沒有就省略；要不要對 reviewer 說由使用者決定。
 
 3. **Commit 落地對照**：步驟 5 的 commit 政策覆寫已替每個 done work item 落地一支新 commit（獨立或 fixup!，依步驟 4 的選擇）。Finale 列出落地 commit 的 SHA + subject + body 對照表（依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 的格式），讓使用者一眼看出哪條 comment 對應哪個 commit。需要拆 / 合 / 改 wording → 使用者自行 `git commit --amend` 或 `git reset HEAD~N` + 重 stage；**orchestrator 不 push、不 force-push、不 amend、不 rebase**。
 4. **PR title/description 核對**：這裡已知 PR 存在（步驟 1 pre-flight gate 已核過），依 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md) 核對現有 title/description 是否仍符合上面落地的改動，脫鉤就草擬更新交給使用者複製貼上。
@@ -359,7 +362,7 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
 ### 收場總結重印回覆草稿的位置
 
 步驟 7、8 會跟使用者多輪互動並寫檔，步驟 6 的回覆草稿路徑因此被推出視線。全部步驟走完後，**最後一則總結要再印一次
-回覆草稿檔的路徑與步驟 6 的「在哪裡回」對照表**（不重貼回覆內文——檔案是正本），不要寫「草稿在上一則訊息」。
+回覆草稿檔的路徑與步驟 6 的「在哪裡回」對照表，以及所有 `備註`（未驗證的事不可只留在中途訊息）**（不重貼回覆內文——檔案是正本），不要寫「草稿在上一則訊息」。
 回覆草稿是這個命令唯一要使用者拿去貼的交付物，路徑與對照表不能只留在中途的訊息裡。草稿若已隔過 rebase 或新
 commit，先重驗檔案裡點名的符號與全稱陳述，過期的句子用 `Edit` 局部改（`same_topic`，不整份重寫）再印。
 

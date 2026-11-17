@@ -144,7 +144,7 @@ PR description / issue 留言、commit message、聊天回覆。
 |--------|------|------|
 | `reach for`（建議動作） | `use` | 表格欄位標題、選單型清單的動作欄也算；`the temptation to reach for it` 這種一般英文慣用不在此列 |
 | `temporal`（prose） | `time-based` | `Temporal` 是這個領域的產品名，對外文字用這個詞會讀成在指涉那個產品；命名一組跟時間有關的 mapper / window / timetable 時用「time-based」當集合名詞 |
-| `Acceptance pending your review.`（或任何「等你確認 / acceptance pending」變體） | 說完改了什麼、有什麼 trade-off 就停 | 接不接受本來就是 reviewer 的事，寫出來零資訊量；GitHub thread 側的同一規則見 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md) |
+| `Acceptance pending your review.`（或任何「等你確認 / acceptance pending」變體） | 說完改了什麼就停（trade-off 只在 reviewer 問了或改法與建議不同時才寫） | 接不接受本來就是 reviewer 的事，寫出來零資訊量；GitHub thread 側的同一規則見 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md) |
 | `You're right.` / 「你說得對」/「好問題」等奉承開場 | 直接從改了什麼開始 | 同上，交叉引用 `skills/github-reply-draft` |
 
 **豁免**：原始碼路徑與符號名照抄不改——上游確實有

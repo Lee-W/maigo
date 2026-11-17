@@ -70,7 +70,7 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 | `review` | `.maigo/review/<id>/review.md` | orchestrator（`/maigo:review`） | `scripts/review_report.py`（重用 artifact_path 命名） | 同 source 只留最新完整 report；內含原作者（`--author`）、最後 review 時間、reviewed commit 與本地已看完標記；metadata 的 `verdict` 會顯示在 board 的 👀 行尾 |
 | `review-draft` | `.maigo/review/<id>/draft.md` | orchestrator（`/maigo:review` §4.5） | 同上 | 待貼上 GitHub 的 review body 草稿；`board_state.py` 的 `待送出` next_action 在這個檔存在時給 `gh pr review --body-file` 指令，不存在時改提示先起草 |
 | `pr-comments` | `.maigo/review/<id>/pr-comments.md` | orchestrator（`/maigo:address-comments`） | 同上 | PR 既有 review comment 的抓取與分類結果 |
-| `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部）、連結與前置條件；對話只印路徑與對照表 |
+| `reply-draft` | `.maigo/review/<id>/reply-draft.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:address-comments` §6） | 同上 | 每則回覆草稿的正本檔，每則標明在哪裡回（inline thread / PR conversation 底部；標「不必回覆」的節只列連結與位置）、連結與前置條件；對話只印路徑與對照表 |
 | `inline-comments` | `.maigo/review/<id>/inline-comments.md`（自己的 PR 在 `.maigo/pr/<id>/`） | orchestrator（`/maigo:review` §4.5） | `scripts/artifact_path.py`（kind `inline-comments`，`_KNOWN_KINDS`）＋ [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) 的草稿格式規則 | 待手動貼上 GitHub 的 inline comment 草稿，不送出；重審同一顆 PR 時以既有檔為底稿用 Edit 更新；隨 PR 目錄一起被 `/maigo:tidy` 封存 |
 | `triage-rubric` | `.maigo/issue/<id>/rubric.md` | 🩵 Tomori | 同上 | issue triage 的對照基準 |
 

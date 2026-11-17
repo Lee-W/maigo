@@ -1,6 +1,6 @@
 ---
 name: github-reply-draft
-description: This skill should be used when drafting reply text for GitHub PR review threads or review comments — ensuring replies are terse, reference only committed symbols, are scoped per thread, and include the required attribution footer.
+description: This skill should be used when drafting reply text for GitHub PR review threads or review comments — ensuring replies to a reviewer are terse, reference only committed symbols, are scoped per thread, and, for replies to a reviewer, carry no attribution footer unless the user asks for one.
 ---
 
 <!-- mkdocs-include-start -->
@@ -8,12 +8,65 @@ description: This skill should be used when drafting reply text for GitHub PR re
 # GitHub Reply Draft
 
 **Owner**: — (orchestrator/agent drafting GitHub replies)
-**Consumers**: `/maigo:address-comments` (per-thread replies at Finale), `/maigo:review` (reply drafts at criti gate)
+**Consumers**: `/maigo:address-comments` (per-thread replies at Finale), `/maigo:review` (reply drafts at criti gate; for its review body and inline comments only Conventions 2–5 apply)
+
+**Scope of the voice baseline**: the "Voice baseline" section and Convention 1 below govern replies to a reviewer's comments (the `reply-draft.md` that `/maigo:address-comments` writes). The review body and inline comments `/maigo:review` drafts for someone else's PR (`draft.md`, `inline-comments.md`) keep the rules in `commands/review.md` and `skills/strict-review/references/review-templates.md`; Conventions 2–5 apply to both.
 
 Delivery form: `/maigo:address-comments` writes the drafts to a `reply-draft.md` file with a
 where-to-comment hint per reply — template in
 [`references/comment-fetch-and-triage.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md)
 ("回覆草稿檔模板").
+
+## Voice baseline
+
+Replies should read like the maintainer typed them: short, concrete, no ceremony. In a comparison of agent drafts against what the maintainer actually posted, drafts were longer, opened with praise, carried verification disclaimers and a footer — and the maintainer cut all of them.
+
+- **One sentence, about 20 English words.** No closing explanation, trade-off sentence or summary sentence. Write more only when the reviewer asked *why*, or the change differs from what they suggested — and then lay it out per the layout bullet.
+- **Never open with praise or an apology.** Banned openers (and anything of the same kind): "Good catch", "You're right", "Great point", "Thanks for catching this", "Nice catch", "Good question". Start with the substance. "Yes", "Done" and "Agreed" are not banned.
+- **No verification-scope statements in the reply text.** Do not write "I did not test…", "I only checked…", "I haven't run…". If something is unverified, say so in a **note outside the code block** in the draft file (for example "備註：這則的改動沒有實跑 X"), and mention it in the Finale table or closing summary. Every reply whose change was not actually run gets such a note — the drafter does not decide case by case. Whether to tell the reviewer is the user's call. This moves the information, it does not delete it — Convention 5 (no overclaiming) and the no-"I re-ran it" narration rule still hold.
+- **Layout.** When more than one sentence is needed, put the conclusion alone on the first line, leave a blank line, then the detail. Do not write one block of text. (Each paragraph is still one unwrapped line — see the draft-file template.)
+- **A very short reply is a legitimate reply.** When all there is to say is that it changed, "Done.", "Updated." or "Fixed." is enough; do not lengthen it to look complete. Use one only when the change is already in the diff being replied against and matches what the reviewer asked for; if it differs, or is only partly done, say so per the layout bullet. When the change was not run, prefer "Done." or "Updated." over "Fixed." — "Fixed." claims the problem is gone (Convention 5) — and add the note.
+- **No footer** unless the user asks (Convention 6).
+
+**Not like this → like this** (invented examples; every "like this" follows all the rules above):
+
+1. Too long → one sentence.
+
+   > **Not:** Changed `parse_range` to reject negative bounds. The old code silently clamped them to zero, which hid caller bugs, and the new `ValueError` makes them visible earlier in the pipeline.
+   >
+   > **Like:** `parse_range` now raises `ValueError` on negative bounds instead of clamping to zero.
+
+2. Verification disclaimer → drop it from the reply, keep it as a note outside the block.
+
+   > **Not:** Renamed the flag to `--dry-run`. I only checked the CLI help output, not the shell completions.
+   >
+   > **Like:** Renamed the flag to `--dry-run`.
+   >
+   > Plus, outside the code block in the draft file: 備註：shell completion 沒有實跑。
+
+3. Praise opener → start with the substance.
+
+   > **Not:** Good catch, thanks! `load_config` now falls back to the default path.
+   >
+   > **Like:** `load_config` now falls back to the default path.
+
+4. One block of text → conclusion on its own line, blank line, detail. (Use two paragraphs only when the reviewer asked why, or the change differs from their suggestion; a plain change stays one sentence.)
+
+   > **Not:** Moved the retry loop into `_send`. The public `send()` no longer retries, so callers that wrapped it in their own retry now double up and should drop theirs.
+   >
+   > **Like:**
+   >
+   > ```text
+   > Moved the retry loop into `_send`.
+   >
+   > `send()` itself no longer retries, so callers with their own retry wrapper should drop it.
+   > ```
+
+5. Padding a trivial change → "Done."
+
+   > **Not:** I have updated the docstring so that it now describes the new default, as you suggested.
+   >
+   > **Like:** Done.
 
 ## Overview
 
@@ -27,8 +80,11 @@ This skill captures the six conventions that prevent those failures.
 
 ## Convention 1 — Default terse
 
-The opening sentence names what changed. If there is a deliberate trade-off,
-one more sentence names it and signals the user can ask for more detail.
+One sentence of about 20 words names what changed (see "Voice baseline" for
+the length, layout and banned-opener rules). No trade-off, explanation or
+summary sentence after it; a deliberate trade-off goes in the reply only when
+the reviewer asked why or the change differs from their suggestion, otherwise
+it goes in a note outside the code block for the user to decide on.
 Cut: preamble, restating the reviewer's comment, hedging phrases
 ("hopefully this addresses...", "I believe this should..."), verification
 narrative ("I re-ran the comparison and got the same result"), the process
@@ -51,8 +107,8 @@ When the reply is about a reviewer's repro case you added as a test, name the pa
 - Never close a reply with `Acceptance pending your review.` or any variant of
   "waiting for your confirmation" — whether to accept is the reviewer's call by
   definition; writing it out is zero-information filler. State what changed and stop.
-- Never open with `You're right.` or another flattering opener ("good question",
-  "great catch") — start directly with what changed.
+- Never open with a praise or apology opener — the banned list is in "Voice
+  baseline". Start directly with what changed.
 
 **Good:**
 
@@ -108,9 +164,10 @@ Distinguish between:
 - "reviewer accepted" — only confirmed when the reviewer presses Resolve
 
 A thread becoming `outdated` because of an edit is not the same as resolved;
-the reviewer has not clicked Resolve yet. State what changed and what deliberate
-trade-off was made (if any), then stop — whether to accept is the reviewer's
-call, not something the draft narrates.
+the reviewer has not clicked Resolve yet. State what changed, then stop —
+whether to accept is the reviewer's call, not something the draft narrates. A plain
+"Done." is fine: it only reports that the code changed. What is wrong is the ✅ or
+any wording that claims the reviewer is satisfied.
 
 A draft carried over from an earlier session or round is a claim about the
 diff *as it was then*. Before handing it over again, re-check every universal
@@ -121,19 +178,22 @@ the draft. Re-verify it for the new set, or narrow it to what was verified.
 
 **Good:**
 
-> Changed `_serialize_keys` to return a `frozenset` (was `list`). Trade-off:
-> callers that relied on ordering will need adjustment — flagging here in case
-> that affects your side.
+> `_serialize_keys` now returns a `frozenset` (was `list`).
 
 **Bad:**
 
 > Done ✅ — fixed as suggested.
 
-## Convention 6 — Include the attribution footer
+## Convention 6 — No attribution footer by default
 
-Every reply drafted by an agent must end with an attribution footer on its own
-paragraph, separated from the body by a blank line and a horizontal rule.
-Use the wording appropriate to whether a human reviewed the draft before posting:
+A reply draft carries no `Drafted-by` / attribution footer. In a comparison of agent
+drafts against what the maintainer posted, every draft had one and the maintainer deleted
+it every time.
+
+Add a footer only when the user asks for one (for example when a repo expects AI assistance
+to be disclosed). maigo has no per-repo setting for this and none is added: the user says so,
+and the footer goes on its own paragraph after a blank line and a horizontal rule, inside
+the code block, with this wording:
 
 - Agent draft, posted without prior human review:
 
@@ -149,8 +209,9 @@ Use the wording appropriate to whether a human reviewed the draft before posting
   Drafted-by: <Agent Name and Version>; reviewed by @<github-handle> before posting
   ```
 
-The attribution footer is in addition to any other disclosure in the PR body;
-never skip it to shorten a message.
+This convention is about replies only. The `draft.md` that `/maigo:review` writes keeps its
+own footer rule in `commands/review.md`, and PR descriptions follow
+[`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md).
 
 ## Comment fetch & triage, and pre-apply verification (references)
 
@@ -165,5 +226,5 @@ touches a line you didn't write — it may be a reviewer-directed change
 already landed via `fixup!`.
 
 Draft-shape rules (GitHub `suggestion` blocks for concrete fixes, one bullet per reviewer point,
-a draft for every listed thread, design replies that pitch differentiation) live in
+every thread listed but only those needing a reply drafted, design replies that pitch differentiation) live in
 [`references/draft-shape.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/draft-shape.md).
