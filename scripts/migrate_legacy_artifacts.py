@@ -140,6 +140,7 @@ from artifact_path import (
 from maigo_dir_catalog import Catalog, categorize, scan, split_flat_name
 from pr_context_cache import find_cache_section, parse_cached_field
 from pr_owner import OwnerUnknownError, current_login, pr_author
+from repo_list import read_repo_list
 from review_report import metadata as review_metadata
 
 _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
@@ -1103,27 +1104,6 @@ def _format_unmapped_line(repo: str, detail_path: str, line_no: int, token: str)
     return f"{repo} :: link-unchanged (no migration record) {detail_path}:{line_no} {token}"
 
 
-def _read_repo_list(path: Path) -> list[str] | None:
-    """
-    讀清單檔；檔案不存在或讀不到（權限拒絕等）一律回 `None` 讓呼叫端印
-    明確錯誤並回非 0 exit code——不能讓「路徑打錯」跟「清單裡真的沒東西」
-    看起來一樣（都是印 `(nothing to migrate)`）。
-    """
-    try:
-        if not path.is_file():
-            return None
-        raw_text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    repos = []
-    for raw in raw_text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        repos.append(line)
-    return repos
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1180,7 +1160,7 @@ def main(argv: list[str] | None = None) -> int:
         repos = args.repos
     else:
         repo_list_path = Path(args.repo_list).expanduser()
-        repos = _read_repo_list(repo_list_path)
+        repos = read_repo_list(repo_list_path)
         if repos is None:
             print(
                 f"error: --repo-list file not found or unreadable: {repo_list_path}",

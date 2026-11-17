@@ -80,7 +80,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -88,6 +87,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from board_state import github_ref
+from maigo_state import git_stdout
 
 _KNOWN_KINDS = (
     "plan",
@@ -339,22 +339,6 @@ def artifact_path_regex(kinds: Iterable[str]) -> str:
     return "(?:" + "|".join(parts) + ")"
 
 
-def _run_git(args: list[str], cwd: str | Path) -> str | None:
-    """在 `cwd` 跑 `git <args>`；失敗（非 git repo、指令不存在、逾時）一律回 `None`。"""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(cwd), *args],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip()
-
-
 def _rebase_original_branch_slug(cwd: str | Path) -> str | None:
     """
     進行中的 rebase 時，讀 rebase 記錄的原分支名，取代會在 `--continue`/
@@ -372,7 +356,7 @@ def _rebase_original_branch_slug(cwd: str | Path) -> str | None:
 
     沒有進行中的 rebase、或檔案讀不到/格式不對 → `None`，呼叫端退回短 SHA。
     """
-    git_dir = _run_git(["rev-parse", "--git-dir"], cwd)
+    git_dir = git_stdout(cwd, "rev-parse", "--git-dir")
     if not git_dir:
         return None
     git_dir_path = Path(cwd) / git_dir
@@ -418,7 +402,7 @@ def resolve_identifier(
         if ref:
             return ref
 
-    branch = _run_git(["branch", "--show-current"], cwd)
+    branch = git_stdout(cwd, "branch", "--show-current")
     if branch and topic_slug is not None and branch in DEFAULT_BRANCHES:
         if not topic_slug:
             raise ValueError(
@@ -435,7 +419,7 @@ def resolve_identifier(
     if rebase_slug:
         return rebase_slug
 
-    short_sha = _run_git(["rev-parse", "--short", "HEAD"], cwd)
+    short_sha = git_stdout(cwd, "rev-parse", "--short", "HEAD")
     if short_sha:
         return short_sha
 

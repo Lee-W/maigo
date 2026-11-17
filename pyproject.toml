@@ -35,6 +35,7 @@ module = [
   "migrate_legacy_artifacts",
   "pr_context_cache",
   "pr_owner",
+  "repo_list",
   "review_report",
 ]
 ignore_missing_imports = true

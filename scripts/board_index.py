@@ -44,6 +44,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_list import parse_repo_list  # noqa: E402
+
 _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
 _DEFAULT_OUTPUT = Path("~/.config/maigo/board-index.md").expanduser()
 
@@ -202,13 +205,7 @@ def build_index(entries: list[RepoBoardEntry], generated_at: str) -> str:
 def _read_repo_list(path: Path) -> list[str]:
     if not path.is_file():
         return []
-    repos = []
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        repos.append(line)
-    return repos
+    return parse_repo_list(path.read_text(encoding="utf-8"))
 
 
 def main(argv: list[str] | None = None) -> int:

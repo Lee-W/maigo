@@ -70,6 +70,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_list import read_repo_list  # noqa: E402
+
 JUDGMENT_HEADING = "## 判斷"  # 與 board_refresh.JUDGMENT_HEADING 同一個切點
 _DEFAULT_REPO_LIST = Path("~/.config/maigo/repos.txt").expanduser()
 
@@ -538,14 +541,6 @@ def apply_plan(plan: FilePlan) -> str | None:
     return None
 
 
-def _read_repo_list(path: Path) -> list[str] | None:
-    try:
-        lines = path.read_text().splitlines()
-    except OSError:
-        return None
-    return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
-
-
 def _show(line: str) -> str:
     return line.rstrip("\r")
 
@@ -623,7 +618,7 @@ def main(argv: list[str] | None = None) -> int:
 
     repos = args.repos
     if not repos:
-        listed = _read_repo_list(Path(args.repo_list).expanduser())
+        listed = read_repo_list(Path(args.repo_list).expanduser())
         if listed is None:
             print(
                 f"error: --repo-list file not found or unreadable: {args.repo_list}",

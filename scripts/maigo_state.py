@@ -66,7 +66,8 @@ def get_state_root() -> Path:
 state_root = get_state_root
 
 
-def _run_git(cwd: str | Path, *args: str) -> str | None:
+def git_stdout(cwd: str | Path, *args: str) -> str | None:
+    """在 `cwd` 跑 `git <args>`；失敗（非 git repo、指令不存在、逾時）一律回 `None`。"""
     try:
         result = subprocess.run(
             ["git", "-C", str(cwd), *args],
@@ -108,12 +109,12 @@ def parse_remote_identity(url: str) -> str | None:
 
 
 def get_toplevel(cwd: str | Path) -> Path | None:
-    top = _run_git(cwd, "rev-parse", "--show-toplevel")
+    top = git_stdout(cwd, "rev-parse", "--show-toplevel")
     return Path(top) if top else None
 
 
 def _get_main_worktree_name(cwd: str | Path) -> str | None:
-    common = _run_git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    common = git_stdout(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
     if common:
         path = Path(common)
         name = path.parent.name if path.name == ".git" else path.name
@@ -131,7 +132,7 @@ def resolve_identity(cwd: str | Path, *, toplevel: Path | None = None) -> str | 
     if (toplevel or get_toplevel(cwd)) is None:
         return None
     for remote in REMOTE_PRIORITY:
-        url = _run_git(cwd, "remote", "get-url", remote)
+        url = git_stdout(cwd, "remote", "get-url", remote)
         if not url:
             continue
         identity = parse_remote_identity(url)
@@ -226,7 +227,7 @@ class MigrationPlan:
 
 
 def list_worktrees(cwd: str | Path) -> list[Path]:
-    output = _run_git(cwd, "worktree", "list", "--porcelain")
+    output = git_stdout(cwd, "worktree", "list", "--porcelain")
     if not output:
         return []
     paths: list[Path] = []
