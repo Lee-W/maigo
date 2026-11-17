@@ -159,7 +159,7 @@ report 印完後，orchestrator 邀請使用者**逐條**對 must-fix / nit 表�
 起草 review 內文與 inline comment（每則 finding 一則 inline，錨點寫成 symbol 而非行號）,呼叫
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-draft --url <PR url> --repo <owner/name> --owner <owner> --topic "Review draft: <PR title>"`
 取得落檔路徑（別人的 PR 是 `.maigo/review/<id>/draft.md`，自己的是 `.maigo/pr/<id>/draft.md`），把草稿逐字寫進那個路徑，並把檔案相對的路徑（`../review/<id>/draft.md`，自己的 PR 為 `../pr/<id>/draft.md`）獨立成一個清單項寫進 board 細節檔的
-`## 筆記`（標籤放路徑後面、或路徑包反引號，不要寫成「標籤：路徑」緊貼）。只起草、不送出。
+`## 筆記`（標籤放路徑後面、或路徑包反引號，不要寫成「標籤：路徑」緊貼）。`## 筆記` 的每一行都要帶實際值——路徑放反引號（`.maigo` 內的產物用相對於該檔自己的路徑，原始碼用 repo-root 相對路徑，repo 外與 worktree 用絕對路徑），記 worktree 就寫該 worktree 的絕對路徑，不寫「見某某檔」這種只指向別處的指標行，沒有實際值可寫就不要寫那一行。只起草、不送出。
 board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-file` 送出，所以這個檔案只放
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
