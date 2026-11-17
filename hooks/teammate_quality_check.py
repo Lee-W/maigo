@@ -28,16 +28,25 @@ REVIEW_MODE_ITEMS = json.loads(
 _RETRY_LOG_BASE: Path | None = None
 _MUST_FIX_FILE_RE = re.compile(r"`([\w./-]+\.\w+)(?::\d+)?`")
 _MUST_FIX_LINE_RE = re.compile(
-    r"^\s*(?:[-*]|\d+\.)\s+(.+)$",
+    r"^\s*(?:[-*]|\d+\.|(?:#{3,6}\s+)?#\d+)\s+(.+)$",
     re.MULTILINE,
 )
 
 
 _MUST_FIX_HEADING_RE = re.compile(
-    r"##\s+(?:must[-\s]?fix|必須修)",
-    re.IGNORECASE,
+    r"^##\s+(?:must[-\s]?fix|必須修)[^\n]*\n?",
+    re.MULTILINE | re.IGNORECASE,
 )
 _NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
+_NO_MUST_FIX_RE = re.compile(
+    r"(?:none|n/?a|no\s+must[-\s]?fix(?:\s+(?:items|findings))?|"
+    r"(?:無|沒有)(?:\s*must[-\s]?fix)?)",
+    re.IGNORECASE,
+)
+
+
+def _is_no_must_fix(item: str) -> bool:
+    return _NO_MUST_FIX_RE.fullmatch(item.strip(" \t\r\n*`().。:：（）")) is not None
 
 
 def _extract_soyo_must_fix_keys(out: str) -> set[str]:
@@ -45,10 +54,12 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
     Extract must-fix keys from Soyo output.
 
     Strategy:
-    1. If a '## Must-fix' section exists, extract bullet items from that section only.
+    1. If a '## Must-fix' section exists, extract its list or #1-style items only.
     2. Otherwise, fall back to lines containing the 'must-fix' keyword.
     For each item: backtick file path (with :line stripped) is the key;
     if none, use normalized text (lowercase, whitespace collapsed, max 80 chars).
+    Explicit no-finding markers yield no keys. A non-empty section with no
+    recognizable items raises ValueError rather than resembling a clean review.
     """
     # Find ## Must-fix section
     heading_match = _MUST_FIX_HEADING_RE.search(out)
@@ -62,6 +73,8 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
             else out[section_start:]
         )
         items = _MUST_FIX_LINE_RE.findall(section_text)
+        if not items and section_text.strip() and not _is_no_must_fix(section_text):
+            raise ValueError("Must-fix 段無法解析；請用 -、1. 或 #1 列出具體 finding。")
     else:
         # Fallback: lines that mention 'must-fix' keyword
         items = [
@@ -72,6 +85,8 @@ def _extract_soyo_must_fix_keys(out: str) -> set[str]:
 
     keys: set[str] = set()
     for item in items:
+        if _is_no_must_fix(item):
+            continue
         file_match = _MUST_FIX_FILE_RE.search(item)
         if file_match:
             keys.add(file_match.group(1))
@@ -279,9 +294,14 @@ def check_soyo(out: str, *, retry_scope: RetryScope | None = None) -> None:
             )
 
         cwd = maigo_root(os.getcwd())
-        keys = _extract_soyo_must_fix_keys(out)
-        counts = _soyo_record_and_count(_soyo_log_path(cwd), keys, retry_scope)
+        try:
+            keys = _extract_soyo_must_fix_keys(out)
+        except ValueError as error:
+            emit("block", f"爽世 (Soyo) 的 {error}")
         if keys:
+            # Evidence-only NEEDS_CHANGES/BLOCKED is not an approval: only
+            # APPROVED below may write the empty record that resets a streak.
+            counts = _soyo_record_and_count(_soyo_log_path(cwd), keys, retry_scope)
             over_limit = {
                 k: c for k, c in counts.items() if k in keys and c >= SOYO_RETRY_LIMIT
             }

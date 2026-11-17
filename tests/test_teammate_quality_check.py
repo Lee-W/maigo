@@ -504,6 +504,122 @@ class TestSoyoRetryCount:
         keys = tqc._extract_soyo_must_fix_keys(out)
         assert keys == {"foo.py"}
 
+    @pytest.mark.parametrize(
+        "marker",
+        [
+            pytest.param("-", id="legacy-bullet"),
+            pytest.param("*", id="legacy-star"),
+            pytest.param("1.", id="legacy-number"),
+            pytest.param("#1", id="agent-number"),
+            pytest.param("#2", id="second-agent-number"),
+            pytest.param("### #1", id="numbered-subheading"),
+        ],
+    )
+    def test_numbered_findings_keep_file_keys(self, marker):
+        out = f"## Must-fix\n{marker} `src/app.py:10` — broken import\n"
+        assert tqc._extract_soyo_must_fix_keys(out) == {"src/app.py"}
+
+    @pytest.mark.parametrize(
+        "marker",
+        [
+            pytest.param("-", id="legacy-bullet"),
+            pytest.param("1.", id="legacy-number"),
+            pytest.param("#1", id="agent-number"),
+            pytest.param("### #1", id="numbered-subheading"),
+        ],
+    )
+    def test_numbered_findings_reach_retry_limit(self, marker, tmp_path, capsys):
+        out = (
+            MEMORY
+            + "## Verdict\nNEEDS_CHANGES\n"
+            + CHECKLIST
+            + f"## Must-fix\n{marker} `src/app.py:10` — broken import\n"
+        )
+        scope = tqc.RetryScope("run", "review")
+        results = []
+        for _ in range(2):
+            with pytest.raises(SystemExit):
+                tqc.check_soyo(out, retry_scope=scope)
+            results.append(json.loads(capsys.readouterr().out))
+        assert [result.get("decision") for result in results] == [None, "block"]
+        assert "RETRY LIMIT" in results[1]["reason"]
+        entries = [
+            json.loads(line)
+            for line in (tmp_path / "soyo-must-fix.jsonl").read_text().splitlines()
+        ]
+        assert [entry["must_fix_keys"] for entry in entries] == [
+            ["src/app.py"],
+            ["src/app.py"],
+        ]
+
+    @pytest.mark.parametrize("verdict", ["NEEDS_CHANGES", "BLOCKED"])
+    @pytest.mark.parametrize(
+        "must_fix",
+        [
+            pytest.param("## Must-fix\n", id="empty-section"),
+            pytest.param("## Must-fix\n（無）\n", id="none-chinese"),
+            pytest.param("## Must-fix\n- 無 must-fix\n", id="no-finding-bullet"),
+            pytest.param("## Must-fix\nNone\n", id="none-english"),
+            pytest.param("無 mustfix。\n", id="no-section"),
+        ],
+    )
+    def test_pending_evidence_does_not_reset_retry_streak(
+        self, verdict, must_fix, tmp_path, capsys
+    ):
+        scope = tqc.RetryScope("run", "review")
+        log = tmp_path / "soyo-must-fix.jsonl"
+        tqc._soyo_record_and_count(log, {"src/app.py"}, scope)
+        before = log.read_bytes()
+        out = (
+            MEMORY
+            + f"## Verdict\n{verdict}\n"
+            + CHECKLIST
+            + must_fix
+            + "## Evidence pending\n- test output 待補\n"
+        )
+        with pytest.raises(SystemExit):
+            tqc.check_soyo(out, retry_scope=scope)
+        assert json.loads(capsys.readouterr().out).get("decision") is None
+        assert log.read_bytes() == before
+        assert tqc._soyo_record_and_count(log, {"src/app.py"}, scope) == {
+            "src/app.py": 2
+        }
+
+    @pytest.mark.parametrize(
+        "finding",
+        [
+            pytest.param("fix the missing import in src/app.py", id="plain-prose"),
+            pytest.param("#1", id="empty-numbered-finding"),
+        ],
+    )
+    def test_unparsed_must_fix_blocks_without_recording_success(
+        self, finding, tmp_path, capsys
+    ):
+        out = MEMORY + "NEEDS_CHANGES\n" + CHECKLIST + f"## Must-fix\n{finding}\n"
+        with pytest.raises(SystemExit):
+            tqc.check_soyo(out, retry_scope=tqc.RetryScope("run", "review"))
+        result = json.loads(capsys.readouterr().out)
+        assert result["decision"] == "block"
+        assert "Must-fix" in result["reason"]
+        assert not (tmp_path / "soyo-must-fix.jsonl").exists()
+
+    @pytest.mark.parametrize("verdict", ["READY", "NEEDS_INFO", "DUP", "CLOSE"])
+    def test_triage_never_records_reviewer_retry(self, verdict, tmp_path, capsys):
+        out = (
+            MEMORY
+            + verdict
+            + "\n"
+            + CHECKLIST
+            + "## Must-fix\n#1 `src/app.py:10` — broken import\n"
+        )
+        results = []
+        for _ in range(2):
+            with pytest.raises(SystemExit):
+                tqc.check_soyo(out, retry_scope=tqc.RetryScope("run", "triage"))
+            results.append(json.loads(capsys.readouterr().out))
+        assert [result.get("decision") for result in results] == [None, None]
+        assert not (tmp_path / "soyo-must-fix.jsonl").exists()
+
     def test_extract_must_fix_keys_fallback_no_file(self):
         out = "## Must-fix\n- must-fix: rename var X to Y\n"
         keys = tqc._extract_soyo_must_fix_keys(out)
