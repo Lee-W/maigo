@@ -278,7 +278,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
      （內文若可能含三個 backtick 就用四個 backtick 外層，不加 `>` blockquote）。
    - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設一句話（約 20 個英文字）、不用稱讚或認錯開場、驗證範圍聲明不寫進回覆內文（寫在 block 外的 `備註`，並在下方對話提到）、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、預設不加 attribution footer（使用者要求才加）。「要擬稿／不必回覆」的判準見 `skills/github-reply-draft/references/draft-shape.md`。
    - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**（這行是印給終端機的 repo-root 相對路徑，不是 `gf` 的對象；
-     要把回覆草稿記進細節檔 `## 筆記` 時寫檔案相對的 `../pr/<id>/reply-draft.md`〔別人的 PR 是 `../review/<id>/reply-draft.md`〕，獨立成清單項）：
+     要把回覆草稿記進細節檔 `## 筆記` 時寫檔案相對的 `../pr/<id>/reply-draft.md`〔別人的 PR 是 `../review/<id>/reply-draft.md`〕，獨立成清單項；`## 筆記` 的每一行都要帶實際值——路徑放反引號（`.maigo` 內的產物用相對於該檔自己的路徑，原始碼用 repo-root 相對路徑，repo 外與 worktree 用絕對路徑），記 worktree 就寫該 worktree 的絕對路徑，不寫「見某某檔」這種只指向別處的指標行，沒有實際值可寫就不要寫那一行）：
 
      ```
      回覆草稿：
