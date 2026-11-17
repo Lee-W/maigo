@@ -50,7 +50,7 @@ details and recipes in `references/design-integrity.md`:
 
 ## Review judgment: when NOT to flag（索引）
 
-Thirty-one principles for calibrating whether a finding is a real must-fix
+Twenty-eight principles for calibrating whether a finding is a real must-fix
 and how much change a comment warrants; details in
 `references/review-judgment.md`:
 

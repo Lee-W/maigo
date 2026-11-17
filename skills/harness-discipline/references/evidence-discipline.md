@@ -270,7 +270,7 @@ react-hook-form 的 `reset()` 遇到 `undefined` 會 fall back 到 mount 時的
   「有沒有換一個會翻盤的觀測點」被抓到的。
 
 Related: mutation-test 作為修法驗證證據的另一半流程（暫時拆掉修法本體 → 測試須轉紅 →
-復原）在 [`skills/strict-review/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)
+復原）在 [`skills/strict-review/references/re-review-details.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/re-review-details.md)
 的「Mutation test 作為修法驗證證據」段——那條講「怎麼證明修法有守住」，這條講「canary
 全綠時怎麼判斷成因」，兩者互補但不重複。
 

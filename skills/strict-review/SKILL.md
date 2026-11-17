@@ -198,13 +198,66 @@ discipline above; do not block the PR on the author not having attached one.
 
 ## Recurring must-fix patterns / Design integrity / Review judgment
 
-**每次審查都要逐條對照這三組名單**——它們補充上面的 9 項 checklist，不是「覺得像才去查」的選讀。名單只列名稱；某一條命中、或判斷該不該 flag 時，再讀 [`references/pattern-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pattern-index.md)（每條一句判準），需要完整理由與配方才讀 [`recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)、[`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md)、[`review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)。
+**每次審查都要逐條對照下面三組名單（共 50 項）**——它們補充上面的 9 項 checklist，不是「覺得像才去查」的選讀。名單只列名稱，與 `pattern-index.md` 一一對應；某一條命中、或判斷該不該 flag 時，再讀 [`references/pattern-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pattern-index.md)（每條一句判準），需要完整理由與配方才讀 [`recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)、[`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md)、[`review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)。
 
-**Recurring must-fix patterns**：commit body 是契約；PR title／description 是契約；被 consumer `isinstance` 檢查的底線私有例外其實是 public API；新 public symbol 要在與 sibling 相同的層級 export；不要框框式區段分隔註解；concurrent PR 根本修法優先；命名（依它是什麼而非第一個 caller、private helper 帶 domain 名詞、guard／hook 成對用兩個動詞）；規則本身而非列舉程式碼導出的集合；增刪或重排呼叫的 PR 要跑斷言該函式 mock 的既有測試。
+**Recurring must-fix patterns**（11 項，每次審查逐條對照）：
 
-**Design integrity**：base layer 對所有已知下游完整；不用「experimental」當擋箭牌；fold／fixup rebase 後綠燈不可信；多型優於 caller 端 type-switch；在擁有該行為的層修；外部工具為選用且 runtime 偵測；型別配對 guard 比對宣告的屬性；對應符號對稱命名；封閉 sum-type 要結構性封閉；client／transport 邊界的版本偏差容忍；在來源端正規化部分資料。
+- Commit body is a contract
+- PR title／description is a contract
+- 被 consumer `isinstance` 檢查的底線私有例外其實是 public API
+- 新 public symbol 要在與 sibling 相同的層級 export
+- 不要框框式區段分隔註解
+- Concurrent PR 根本修法優先
+- Naming: 依它是什麼，不依第一個 caller 的用途
+- Naming: private helper 名稱帶 domain 名詞
+- Naming: guard／hook 成對用兩個動詞，不用底線
+- State the rule, don't enumerate a code-derived set（規則本身而非列舉程式碼導出的集合）
+- 增刪或重排呼叫的 PR 要跑斷言該函式 mock 的既有測試
 
-**Review judgment: when NOT to flag**：先驗 repo 設定；覆蓋缺口不升級成正確性 bug；不照單全收回歸說法；proportionality；不為 squash 前的歷史 flag；security／authz guard 用移除它證明承重；範圍宣稱要以實際 checker 輸出為據；「最小改動」不得保留已被推翻的事實；寧可讓新程式碼符合既有 checker；installed package 證據要對應被測 commit；只評最新 diff 狀態；不默默覆寫前一輪 verdict；引用的慣例要屬同一架構層。
+**Design integrity**（11 項，每次審查逐條對照）：
+
+- Base-layer completeness
+- No "experimental" hedge
+- Don't trust green after fold-fixup rebase
+- Prefer polymorphism over type-switching in the caller
+- Fix at the owning layer
+- External tools are optional and runtime-detected
+- Type-pairing guards compare declared attributes
+- Name a counterpart symmetrically
+- Close a framework-internal sum-type structurally, not visibly
+- Version-skew tolerance at the client/transport boundary
+- Normalize partial helper data at its source
+
+**Review judgment: when NOT to flag**（28 項，每次審查逐條對照）：
+
+- Verify repo config first
+- Don't escalate coverage gap to correctness bug
+- Don't adopt regression framing uncritically
+- Proportionality
+- Don't flag squash-before-merge history
+- Prove a security/authz guard is load-bearing by removing it
+- Ground scope claims in the actual checker
+- A "minimize changes" instruction never licenses keeping a disproven fact
+- Prefer conforming new code to an existing checker over extending the checker
+- Verify installed-package evidence against the commit actually under test
+- Judge only the current/latest diff state
+- Don't silently overwrite a prior round's verdict
+- Verify a cited convention belongs to the same architectural layer
+- Calibrate naming-nit persistence by visibility
+- Verify a hard-limit claim before asserting "impossible" or "breaking"
+- A reviewer's "strict / validate / enforce" wording may not match the schema
+- Don't demand a thin wrapper validate the wrapped library's own semantics
+- Rank designs by the actual cadence of their cost path
+- Verify a mechanism claim empirically
+- Trace the introducing commit before reverting a shared signature
+- Trace the reconciliation/self-heal loop fully before characterizing severity
+- Don't trust review-thread `isResolved` in either direction
+- Re-review a rewritten claim by checking the carried-over clause
+- A reviewer's diagnosis being right doesn't make their proposed wording right
+- A reviewer's stated success criterion outranks nit severity
+- When a must-fix asks for a test, derive the expected value from the contract
+- Check fallback paths before an absolute claim in a comment
+- No repo-external note names in code comments
 
 ## Claims and evidence checks (references)
 
