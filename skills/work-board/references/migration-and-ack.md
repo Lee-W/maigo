@@ -26,7 +26,7 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 [`scripts/board_sync.py ack`](https://github.com/Lee-W/maigo/blob/main/scripts/board_sync.py)
 呼叫
 [`review_report.acknowledge`](https://github.com/Lee-W/maigo/blob/main/scripts/review_report.py)
-把時間、使用者 login 寫進該 report metadata，須與目前 PR head 相同（規則見 §3a），再依 classify
+把時間、使用者 login 寫進該 report metadata，須與目前 PR head 及上次顯示的 `reviewed_at` 相符（規則見 §3a），再依 classify
 結果更新 board。它不送 GitHub review。`--reviewed` 同時加 `🔖`，後續照 §5 學習。完整流程見
 [`commands/board.md`](https://github.com/Lee-W/maigo/blob/main/commands/board.md)。
 

@@ -12,8 +12,8 @@ compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見
 
 - `dropped.jsonl`：排除紀錄，每行一個事件 `{"url","event":"drop"|"revive","reason","at"}`，
   只 append；讀取時依序 fold，最後一筆事件決定狀態。
-- `snapshot.json`：`{"version":1,"written_at","items":{<url>:{"checked","detail"}}}`，
-  上次刷新結束時 board 上有哪些項目與勾選狀態；原子寫入。
+- `snapshot.json`：`{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at"}}}`，
+  上次刷新結束時 board 上的項目、勾選與報告版本；原子寫入。舊版缺 `reviewed_at` 時須重新確認。
 - `backup/<UTC ts>/`：`refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份。
 
 另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記；`archive` 子命令
@@ -24,12 +24,15 @@ compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見
 
 ```
 python3 scripts/board_sync.py plan [--dry-run] [--max-new 50] [--no-discovery] ...
-echo '[{"url","head","change","inferred"}]' | python3 scripts/board_sync.py ack ...
+echo '[{"url","head","change","inferred","reviewed_at"}]' | python3 scripts/board_sync.py ack ...
 python3 scripts/board_sync.py drop --reason {drop,dd,aged,closed} <url...> ...
 python3 scripts/board_sync.py revive --reason manual <url...> ...
 python3 scripts/board_sync.py archive <url...> ...
-python3 scripts/board_sync.py snapshot ...
+python3 scripts/board_sync.py snapshot [--reviewed-at-file <json>] ...
 ```
+
+`snapshot --reviewed-at-file` 帶 `{<PR URL>: <報告版本|null>}`（key 以 `ref_key` 比對 👀 行；對不到的 key 在
+stderr 警告）。不帶時 snapshot 會重讀當下的 report，可能比 board 實際顯示的版本新。
 
 零 token 完整刷新（`refresh`，不需要 `--maigo-root` / `--repo` / `--you`，預設自動判斷）：
 
@@ -821,6 +824,11 @@ def plan_refresh(
         [(ref_key(item["url"]), item["checked"]) for item in lines if item["url"]],
         snapshot,
     )
+    displayed_reviews = {
+        ref_key(url): info.get("reviewed_at")
+        for url, info in (snapshot or {}).items()
+        if isinstance(info, dict)
+    }
     out_lines = []
     for line in lines:
         key = ref_key(line["url"]) if line["url"] else None
@@ -838,6 +846,7 @@ def plan_refresh(
                 "checked": line["checked"],
                 "checkbox_change": change["change"],
                 "inferred": change["inferred"],
+                "reviewed_at": displayed_reviews.get(key),
                 "excluded": key in excluded_now,
             }
         )
@@ -907,7 +916,13 @@ def ack_items(
                     if ref_key(record["source"]) == ref_key(url)
                     else url
                 )
-                if change == "unchecked":
+                if item.get("inferred") and board_state.acked_current(
+                    record, you, head
+                ):
+                    result["result"] = "already_acked"
+                elif change == "unchecked":
+                    # Removing a confirmation needs no matching report version;
+                    # `expected_reviewed_at` still guards against a swap mid-write.
                     if dry_run:
                         result["simulated_review"] = {
                             k: v
@@ -916,15 +931,24 @@ def ack_items(
                         }
                     else:
                         review_report.acknowledge(
-                            maigo_root, source, repo, head, you, True, "others"
+                            maigo_root,
+                            source,
+                            repo,
+                            head,
+                            you,
+                            True,
+                            "others",
+                            expected_reviewed_at=record["reviewed_at"],
                         )
                     result["result"] = "unacked"
+                elif item.get("reviewed_at") != record["reviewed_at"] or item.get(
+                    "inferred"
+                ):
+                    # A checked box without a report generation may belong to a
+                    # superseded report, including after cross-machine sync.
+                    result["result"] = "report_changed"
                 elif record["head_sha"] != head:
                     result["result"] = "head_changed"
-                elif item.get("inferred") and board_state.acked_current(
-                    record, you, head
-                ):
-                    result["result"] = "already_acked"
                 else:
                     if dry_run:
                         result["simulated_review"] = {
@@ -934,12 +958,22 @@ def ack_items(
                         }
                     else:
                         review_report.acknowledge(
-                            maigo_root, source, repo, head, you, owner="others"
+                            maigo_root,
+                            source,
+                            repo,
+                            head,
+                            you,
+                            owner="others",
+                            expected_reviewed_at=record["reviewed_at"],
                         )
                     result["result"] = "acked"
         except (OSError, ValueError, KeyError) as error:
             locked = "being updated" in str(error)
-            result.update(result="locked" if locked else "error", message=str(error))
+            changed = isinstance(error, review_report.ReviewChangedError)
+            result.update(
+                result="report_changed" if changed else "locked" if locked else "error",
+                message=str(error),
+            )
         results.append(result)
     return results
 
@@ -1059,20 +1093,51 @@ def write_snapshot(
     repo: str,
     now: datetime | None = None,
     checked_overrides: dict[str, bool | None] | None = None,
+    reviewed_at_overrides: dict[str, str | None] | None = None,
 ) -> dict:
     """Re-read the current board.md (not the plan-time copy) and persist it.
 
     `checked_overrides[url]` records a different `checked` (or `None` = leave the
-    URL out) so a checkbox change refresh could not process is seen again next round."""
+    URL out) so a checkbox change refresh could not process is seen again next round.
+    `reviewed_at_overrides` binds each box to the report actually rendered, even
+    if a new report was published between rendering and snapshot creation. Keys
+    are matched to board rows by `ref_key`, so URL spelling does not matter; keys
+    that match no 👀 row come back in `unmatched_reviewed_at`.
+    """
     maigo_dir = maigo_root / ".maigo"
     # Lenient: a snapshot only needs url/checked/detail, never the author.
     parsed = _read_board(maigo_root, allow_missing_author=True)
     errors = list(parsed["errors"]) + _resolve_lines(parsed, maigo_dir, repo)
-    items = {
+    items: dict[str, dict] = {
         line["url"]: {"checked": line["checked"], "detail": line["detail"]}
         for line in parsed["lines"]
         if line["url"]
     }
+    by_key: dict[tuple[str, str, int], str | None] = {}
+    for override_url, version in (reviewed_at_overrides or {}).items():
+        override_key = ref_key(override_url)
+        if override_key is not None:
+            by_key[override_key] = version
+    matched: set[tuple[str, str, int]] = set()
+    for line in parsed["lines"]:
+        url = line["url"]
+        if not url or line["type"] != "👀":
+            continue
+        if reviewed_at_overrides is not None:
+            key = ref_key(url)
+            items[url]["reviewed_at"] = by_key.get(key) if key else None
+            if key:
+                matched.add(key)
+            continue
+        try:
+            report_path = review_report.report_path(maigo_root, url, repo, "others")
+            record = review_report.metadata(report_path.read_text())
+            items[url]["reviewed_at"] = record.get("reviewed_at")
+        except FileNotFoundError:
+            items[url]["reviewed_at"] = None
+        except (OSError, ValueError) as error:
+            items[url]["reviewed_at"] = None
+            errors.append(f"{url}: 無法記錄 report 版本（{error}）")
     for override_url, value in (checked_overrides or {}).items():
         if override_url not in items:
             continue
@@ -1089,7 +1154,17 @@ def write_snapshot(
     }
     path = state_dir / SNAPSHOT_NAME
     review_report.atomic_write(path, json.dumps(payload, ensure_ascii=False, indent=2))
-    return {"path": str(path), "count": len(items), "errors": errors}
+    unmatched = sorted(
+        override_url
+        for override_url in (reviewed_at_overrides or {})
+        if ref_key(override_url) not in matched
+    )
+    return {
+        "path": str(path),
+        "count": len(items),
+        "errors": errors,
+        "unmatched_reviewed_at": unmatched,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1125,6 +1200,15 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("urls", nargs="+")
         if name == "archive":
             p.add_argument("urls", nargs="+")
+        if name == "snapshot":
+            p.add_argument(
+                "--reviewed-at-file",
+                type=Path,
+                help="JSON mapping of PR URLs to report versions actually displayed "
+                "(keys matched by canonical PR key; unmatched keys warn on stderr). "
+                "Without it the snapshot re-reads the live reports, which may be newer "
+                "than what the board shows",
+            )
     args = parser.parse_args(argv)
     if args.command == "refresh":
         if board_refresh is None:
@@ -1152,7 +1236,26 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "archive":
             result = archive_urls(root, args.urls, args.repo)
         else:
-            result = write_snapshot(root, args.repo)
+            versions = None
+            if args.reviewed_at_file is not None:
+                versions = json.loads(args.reviewed_at_file.read_text())
+                if not isinstance(versions, dict):
+                    raise ValueError("--reviewed-at-file must contain a JSON object")
+                for url, timestamp in versions.items():
+                    if ref_key(url) is None:
+                        raise ValueError("Report versions require GitHub PR URLs")
+                    if timestamp is not None:
+                        if not isinstance(timestamp, str):
+                            raise ValueError(
+                                "Report versions must be timestamps or null"
+                            )
+                        _utc(timestamp)
+            result = write_snapshot(root, args.repo, reviewed_at_overrides=versions)
+            for stray in result["unmatched_reviewed_at"]:
+                print(
+                    f"board_sync: warning: --reviewed-at-file key 對不到任何 👀 行：{stray}",
+                    file=sys.stderr,
+                )
     except (BoardLegacyError, OSError, ValueError) as error:
         print(f"board_sync: {error}", file=sys.stderr)
         return 1

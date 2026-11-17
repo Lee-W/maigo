@@ -8,8 +8,10 @@ import re
 import os
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -505,12 +507,15 @@ def test_t4_missing_judgment_line_rejects_without_writing(tmp_path, gh, capsys):
 
 
 def _checked_review_setup(tmp_path, gh):
-    write_board(tmp_path, board_text(focus=[row(1, "x")]))
+    board = write_board(tmp_path, board_text(focus=[row(1)]))
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
-    return report.publish(
+    published = report.publish(
         tmp_path, url(1), REPO, "PR 1", "## A\nx\n", HEAD, "APPROVE", owner="others"
     )
+    sync.write_snapshot(tmp_path, REPO, NOW)
+    board.write_text(board.read_text().replace("1. [ ]", "1. [x]"))
+    return published
 
 
 def test_t5_board_changed_while_fetching_exits_2_and_writes_nothing(
@@ -526,7 +531,7 @@ def test_t5_board_changed_while_fetching_exits_2_and_writes_nothing(
     assert changed == {".maigo/board.md"}  # only the simulated nvim save
     assert set(after) == set(before)
     assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
-    assert not (tmp_path / ".maigo" / "_internal").exists()
+    assert not (tmp_path / ".maigo/_internal/board/.refresh-write-lock").exists()
     assert "未寫任何檔" in capsys.readouterr().err
 
 
@@ -536,19 +541,19 @@ def test_t6_detail_changed_before_apply_exits_2_and_writes_nothing(
     write_board(tmp_path, board_text(focus=[row(1)]))
     put_detail(tmp_path, 1)
     gh.prs[1] = pr_meta(1)
-    original = refresh.apply_refresh
+    original = refresh._apply_refresh
     detail = tmp_path / ".maigo" / "i" / "1.md"
 
     def hooked(g, built):
         detail.write_text(detail.read_text().replace("<!-- 手寫區 -->", "新筆記"))
         return original(g, built)
 
-    monkeypatch.setattr(refresh, "apply_refresh", hooked)
+    monkeypatch.setattr(refresh, "_apply_refresh", hooked)
     board_before = (tmp_path / ".maigo/board.md").read_bytes()
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 2
     assert (tmp_path / ".maigo/board.md").read_bytes() == board_before
     assert "新筆記" in detail.read_text() and "PR 1" not in detail.read_text()
-    assert not (tmp_path / ".maigo" / "_internal").exists()
+    assert not any(p.is_file() for p in (tmp_path / ".maigo/_internal").rglob("*"))
 
 
 # --- T7: ordering and sections --------------------------------------------------
@@ -1379,6 +1384,7 @@ def test_t13_write_failure_restores_everything(tmp_path, gh, monkeypatch, capsys
     assert not (tmp_path / ".maigo/i/9.md").exists()
     assert ledger(tmp_path) == []
     assert not (tmp_path / ".maigo/_internal/board/snapshot.json").exists()
+    assert not (tmp_path / ".maigo/_internal/board/.refresh-write-lock").exists()
     assert "已從備份還原" in capsys.readouterr().err
 
 
@@ -1435,7 +1441,6 @@ def test_t16_preview_writes_nothing_and_prints_a_diff(tmp_path, gh, capsys):
     before = tree_hash(tmp_path)
     assert run_cli(tmp_path, "--no-discovery", "--json") == 0
     assert tree_hash(tmp_path) == before
-    assert not (tmp_path / ".maigo" / "_internal").exists()
     assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
     out = json.loads(capsys.readouterr().out)
     assert out["applied"] is False
@@ -1658,13 +1663,115 @@ def test_s3_a_check_made_during_a_failed_fetch_is_acked_on_recovery(tmp_path, gh
 
 
 def _hook_apply(monkeypatch, action):
-    original = refresh.apply_refresh
+    original = refresh._apply_refresh
 
     def hooked(g, built):
         action()
         return original(g, built)
 
-    monkeypatch.setattr(refresh, "apply_refresh", hooked)
+    monkeypatch.setattr(refresh, "_apply_refresh", hooked)
+
+
+@pytest.mark.parametrize("entrypoint", ["apply_refresh", "run_refresh"])
+def test_concurrent_refresh_rejects_before_ack_or_writes(
+    tmp_path, gh, monkeypatch, entrypoint
+):
+    board = write_board(tmp_path, board_text())
+    gh.prs.update({n: pr_meta(n) for n in (1, 2)})
+    gathered = refresh.gather(
+        tmp_path, REPO, YOU, now=NOW, add=["1"], max_new=50,
+        discovery=False, stale_days=14, jobs=1,
+    )  # fmt: skip
+    built = refresh.build(gathered, [])
+    competing = refresh.gather(
+        tmp_path, REPO, YOU, now=NOW + timedelta(seconds=1), add=["2"],
+        max_new=50, discovery=False, stale_days=14, jobs=1,
+    )  # fmt: skip
+    competing_built = refresh.build(competing, [])
+    writing, resume = Event(), Event()
+    atomic_write = report.atomic_write
+    run_acks = refresh.run_acks
+    ack_calls = []
+
+    def pause_first_board_write(path, text):
+        if path == board and not writing.is_set():
+            writing.set()
+            assert resume.wait(timeout=5), "first refresh was never released"
+        atomic_write(path, text)
+
+    def record_ack_call(*args, **kwargs):
+        ack_calls.append(True)
+        return run_acks(*args, **kwargs)
+
+    monkeypatch.setattr(report, "atomic_write", pause_first_board_write)
+    monkeypatch.setattr(refresh, "run_acks", record_ack_call)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        first = pool.submit(refresh.apply_refresh, gathered, built)
+        try:
+            assert writing.wait(timeout=5), "first refresh never reached its write"
+            with pytest.raises(refresh.RefreshError) as caught:
+                if entrypoint == "apply_refresh":
+                    refresh.apply_refresh(competing, competing_built)
+                else:
+                    refresh.run_refresh(
+                        tmp_path, REPO, YOU, apply=True, add=["2"],
+                        discovery=False, now=NOW,
+                    )  # fmt: skip
+            assert caught.value.code == 2
+            assert ack_calls == []
+        finally:
+            resume.set()
+        first.result(timeout=5)
+
+    assert "i/1.md" in board.read_text()
+    assert not (tmp_path / ".maigo/i/2.md").exists()
+    assert not (tmp_path / ".maigo/_internal/board/.refresh-write-lock").exists()
+    refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=["2"], discovery=False, now=NOW
+    )
+    assert all(f"i/{n}.md" in board.read_text() for n in (1, 2))
+
+
+def test_lock_conflict_message_names_the_holder(tmp_path):
+    with refresh.refresh_lock(tmp_path):
+        with pytest.raises(refresh.RefreshError) as caught:
+            with refresh.refresh_lock(tmp_path):
+                pass
+    assert caught.value.code == 2
+    assert f"pid {os.getpid()}" in str(caught.value)
+
+
+def test_lock_conflict_without_owner_file_keeps_the_plain_message(tmp_path):
+    lock = tmp_path / ".maigo/_internal/board/.refresh-write-lock"
+    lock.mkdir(parents=True)
+    with pytest.raises(refresh.RefreshError) as caught:
+        with refresh.refresh_lock(tmp_path):
+            pass
+    assert caught.value.code == 2 and "pid" not in str(caught.value)
+    assert lock.is_dir()
+
+
+def test_lock_directory_is_gone_after_normal_exit(tmp_path):
+    lock = tmp_path / ".maigo/_internal/board/.refresh-write-lock"
+    with refresh.refresh_lock(tmp_path):
+        assert (lock / refresh.LOCK_OWNER_NAME).is_file()
+    assert not lock.exists()
+
+
+def test_lock_release_failure_warns_and_does_not_mask_the_result(
+    tmp_path, monkeypatch, capsys
+):
+    def broken_rmdir(self):
+        raise OSError("busy")
+
+    monkeypatch.setattr(Path, "rmdir", broken_rmdir)
+    with refresh.refresh_lock(tmp_path):
+        result = "ok"
+    assert result == "ok"
+    assert "busy" in capsys.readouterr().err
+    with pytest.raises(KeyError):
+        with refresh.refresh_lock(tmp_path / "other"):
+            raise KeyError("original")
 
 
 def test_s4_cas2_message_admits_the_ack_was_written(tmp_path, gh, monkeypatch, capsys):
@@ -1677,7 +1784,129 @@ def test_s4_cas2_message_admits_the_ack_was_written(tmp_path, gh, monkeypatch, c
     assert "acknowledged_at" in report.metadata(Path(published["path"]).read_text())
     err = capsys.readouterr().err
     assert "ack" in err and "board.md" in err
-    assert not (tmp_path / ".maigo" / "_internal").exists()
+    assert not (tmp_path / ".maigo/_internal/board/.refresh-write-lock").exists()
+
+
+def test_snapshot_records_the_report_displayed_before_a_concurrent_publication(
+    tmp_path, gh, monkeypatch
+):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    old = report.publish(
+        tmp_path, url(1), REPO, "PR 1", "## A\nOld report\n", HEAD,
+        "APPROVE", owner="others",
+    )  # fmt: skip
+
+    def publish_new_report():
+        report.publish(
+            tmp_path, url(1), REPO, "PR 1", "## A\nNew report\n", HEAD,
+            "NEEDS_CHANGES", owner="others",
+        )  # fmt: skip
+
+    _hook_apply(monkeypatch, publish_new_report)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    snapshot = json.loads(
+        (tmp_path / ".maigo/_internal/board/snapshot.json").read_text()
+    )
+    assert snapshot["items"][url(1)]["reviewed_at"] == old["reviewed_at"]
+    assert (
+        report.metadata(Path(old["path"]).read_text())["reviewed_at"]
+        != old["reviewed_at"]
+    )
+
+
+def test_refresh_rejects_an_old_check_then_accepts_a_new_explicit_check(tmp_path, gh):
+    board = write_board(tmp_path, board_text(focus=[row(1, "x")]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    published = report.publish(
+        tmp_path, url(1), REPO, "PR 1", "## A\nUnread report\n", HEAD,
+        "APPROVE", owner="others",
+    )  # fmt: skip
+    result = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert [r["result"] for r in result["ack_results"]] == ["report_changed"]
+    assert any("重新勾選" in warning for warning in result["warnings"])
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+    result = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert result["ack_results"] == []
+    board.write_text(board.read_text().replace("1. [ ]", "1. [x]"))
+    result = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert [r["result"] for r in result["ack_results"]] == ["acked"]
+
+
+def test_report_replaced_during_ack_is_not_confirmed_on_the_next_refresh(
+    tmp_path, gh, monkeypatch
+):
+    published = _checked_review_setup(tmp_path, gh)
+    acknowledge = sync.review_report.acknowledge
+
+    def replace_report_before_ack(*args, **kwargs):
+        report.publish(
+            tmp_path, url(1), REPO, "PR 1", "## A\nNew unread report\n", HEAD,
+            "NEEDS_CHANGES", owner="others",
+        )  # fmt: skip
+        return acknowledge(*args, **kwargs)
+
+    monkeypatch.setattr(sync.review_report, "acknowledge", replace_report_before_ack)
+    result = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert [r["result"] for r in result["ack_results"]] == ["report_changed"]
+    assert any("重新勾選" in warning for warning in result["warnings"])
+    assert any("1. [ ]" in line and "i/1.md" in line for line in board_lines(tmp_path))
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+
+    monkeypatch.setattr(sync.review_report, "acknowledge", acknowledge)
+    result = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert result["ack_results"] == []
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+
+
+@pytest.mark.parametrize(
+    ("message", "result"),
+    [("review.md is being updated", "locked"), ("temporary write failure", "error")],
+)
+def test_failed_ack_keeps_the_old_report_version_for_its_pending_check(
+    tmp_path, gh, monkeypatch, message, result
+):
+    published = _checked_review_setup(tmp_path, gh)
+    acknowledge = sync.review_report.acknowledge
+
+    def replace_report_and_fail_ack(*args, **kwargs):
+        report.publish(
+            tmp_path, url(1), REPO, "PR 1", "## A\nNew unread report\n", HEAD,
+            "NEEDS_CHANGES", owner="others",
+        )  # fmt: skip
+        raise OSError(message)
+
+    monkeypatch.setattr(sync.review_report, "acknowledge", replace_report_and_fail_ack)
+    first = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert [r["result"] for r in first["ack_results"]] == [result]
+    assert any("1. [x]" in line and "i/1.md" in line for line in board_lines(tmp_path))
+    snapshot = json.loads(
+        (tmp_path / ".maigo/_internal/board/snapshot.json").read_text()
+    )
+    assert snapshot["items"][url(1)]["reviewed_at"] == published["reviewed_at"]
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+
+    monkeypatch.setattr(sync.review_report, "acknowledge", acknowledge)
+    second = refresh.run_refresh(
+        tmp_path, REPO, YOU, apply=True, add=[], discovery=False, now=NOW
+    )
+    assert [r["result"] for r in second["ack_results"]] == ["report_changed"]
+    assert any("1. [ ]" in line and "i/1.md" in line for line in board_lines(tmp_path))
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
 
 
 def test_s5_post_write_failure_has_its_own_exit_reason(

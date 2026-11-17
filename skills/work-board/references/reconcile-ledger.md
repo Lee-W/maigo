@@ -9,7 +9,7 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 | 檔案 | 格式 | 寫法 | 用途 |
 |---|---|---|---|
 | `dropped.jsonl` | 每行 `{"url","event":"drop"\|"revive","reason","at"}` | 單次 append 一行，只增不改 | 持久排除紀錄；以 canonical URL（`(owner, repo, number)` 小寫，`pull`/`issues` 同一項）為 key，依事件順序 fold，最後一筆決定狀態 |
-| `snapshot.json` | `{"version":1,"written_at","items":{<url>:{"checked","detail"}}}` | tempfile ＋ replace 原子寫入 | 上次刷新結束時 board 上有哪些項目與勾選狀態，用來偵測 `dd` 與勾選變化 |
+| `snapshot.json` | `{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at"}}}` | tempfile ＋ replace 原子寫入 | 上次刷新結束時 board 上的項目、勾選與實際顯示的報告版本，用來偵測 `dd` 與勾選變化 |
 | `backup/<UTC ts>/` | 與 board.md 相同的目錄結構（`board.md`、`i/*.md`） | `refresh --apply` 寫回前複製要改／刪的檔，只留最新 10 份 | 寫入失敗時還原；也是誤刪細節檔後的救援來源 |
 
 **`dd` → 排除**：`removed = (snapshot 的 URL ∪ 孤兒 i/ 檔的 URL) − board 現有行 − 已排除`，成立就
@@ -28,8 +28,8 @@ key 寫 `revive` 事件。`dd` 事件的時間記為 snapshot 的 `written_at`�
 **fail-closed**：board.md 壞掉的行（含 `i/*.md` 路徑但解析失敗）不當成 `dd`，列進 `errors`；
 snapshot 有項目但 board.md 不存在或沒有任何項目行時略過整個 `dd` 判定。
 
-**已知限制**：ack 的 `acknowledged_at` 是刷新當下，不是勾選當下；第一次跑（沒有 snapshot）時，
-已勾的 👀 行會以推斷模式補 ack。
+**已知限制**：ack 的 `acknowledged_at` 是刷新當下，不是勾選當下。缺 snapshot 或舊 snapshot
+沒有 `reviewed_at` 時，既有勾選不會替未確認的報告補 ack；刷新後須看完這版再重新勾選。
 
 **對帳 `.maigo/` 產物**（建在 `maigo_dir_catalog.scan()` 之上）：`review/<id>/review.md` 的 metadata
 `source`（GitHub PR URL，可跨 repo）、舊扁平 `review-<id>.md` 的 `**PR:**` 行、以及純數字 id 的
@@ -45,9 +45,13 @@ snapshot 有項目但 board.md 不存在或沒有任何項目行時略過整個 
 
 **`[x]` 與 ack**：snapshot 的 `checked` 與現檔比對，`[ ]→[x]` 記 `checked`、`[x]→[ ]` 記 `unchecked`；
 沒有 snapshot 或該 URL 不在 snapshot 裡時退回推斷（已勾即記 `checked`，`inferred: true`，不產生
-`unchecked`）。`checked` 且 report 存在、head 相符 → ack；`inferred` 而且同一 head 已被你 ack →
-不重打（避免把 seen_at 推過作者的新留言）；明確的 `[ ]→[x]` 一律重打；沒有 report → `no_report`；
-head 已變 → `head_changed`；`unchecked` → `acknowledge --undo`。最終 👀 checkbox ＝
+`unchecked`）。`checked` 且 report 存在、head 與 snapshot 的 `reviewed_at` 相符 → ack；
+`inferred` 而且這版已被你 ack → 不重打（避免把 seen_at 推過作者的新留言）；其他推斷、
+未知版本或已換新版 → `report_changed`，取消本次勾選並提示重新確認；沒有 report → `no_report`；
+head 已變 → `head_changed`；`unchecked` 不看報告版本（舊 snapshot 缺 `reviewed_at`、報告已換版都一樣）→ `acknowledge --undo`。
+實際 ack 在 report lock 內再次核對 `reviewed_at`，避免讀取後換版被誤確認。
+抓料或 ack 暫時失敗而保留勾選時，同時保留原報告版本；重試不能把舊勾選重新綁到新版。
+最終 👀 checkbox ＝
 `(acked_current or checked_now) and not needs_review`（`board_state.checkbox_after_refresh`）。
 👀 勾了卻沒有 report 或 head 已變：取消勾、加 `🔖`，並警告先 `/maigo:review <n>`。
 

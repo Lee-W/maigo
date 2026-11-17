@@ -5,7 +5,8 @@
 
 - 不帶 `--apply` ＝預覽：整套流程照算（含 gh 抓料），但一個檔都不寫、不建 `_internal/`、
   不 append ledger、不寫 snapshot、**不 ack**（ack 只模擬）。輸出 board.md 的 unified diff。
-- `--apply`：依序 CAS 預檢 #1 → ack → 渲染 → CAS 預檢 #2 → 備份 → 寫細節檔 → 寫 board.md →
+- `--apply`：取得 state root 的刷新鎖後，依序 CAS 預檢 #1 → ack → 渲染 → CAS 預檢 #2 →
+  備份 → 寫細節檔 → 寫 board.md →
   刪老化細節檔 → append ledger → 寫 snapshot。CAS 不一致（別人動過檔）→ exit 2，除了 ack 已寫的
   review.md 標記外不寫任何檔；寫細節檔／board 失敗 → 從備份還原、exit 3（`write_failed`）；
   board 已寫成功後 ledger／snapshot 失敗 → exit 3 但不還原（`post_write_failed`，重跑安全）。步驟與失敗語義見 `skills/work-board/SKILL.md` §3(b)。
@@ -15,7 +16,7 @@
 的 round-trip 守著。外部指令一律走 `board_sync.run`（以 module attribute 存取，
 測試只要 monkeypatch 那一個 seam）。
 
-exit code：0 成功（含無變動）／預覽；1 前置條件拒絕；2 CAS 衝突；3 寫入階段失敗。
+exit code：0 成功（含無變動）／預覽；1 前置條件拒絕；2 CAS 衝突或另一輪刷新持鎖；3 寫入階段失敗。
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ import os
 import re
 import shutil
 import sys
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -867,6 +869,7 @@ def run_acks(g: Gathered, *, dry_run: bool) -> list[dict]:
                 "head": entry.fetch["gh_meta"].get("headRefOid") or "",
                 "change": plan_line["checkbox_change"],
                 "inferred": plan_line["inferred"],
+                "reviewed_at": plan_line.get("reviewed_at"),
             }
         )
     if not items:
@@ -1216,6 +1219,10 @@ def build(
             warnings.append(
                 f"#{num} 沒有本版 report／head 已變，未標記已看完；請先 /maigo:review {num}"
             )
+        elif result["result"] == "report_changed":
+            warnings.append(
+                f"ack {result['url']}：報告已換版或尚未登記顯示版本，未標記已看完；請讀取本版後重新勾選"
+            )
         elif result["result"] in ("locked", "error"):
             warnings.append(
                 f"ack {result['url']}：{result['result']}（{result.get('message', '')}）"
@@ -1298,7 +1305,61 @@ def _prune_backups(backup_root: Path, current: Path) -> None:
             shutil.rmtree(old, ignore_errors=True)
 
 
+LOCK_OWNER_NAME = "owner"
+
+
+@contextlib.contextmanager
+def refresh_lock(root: Path) -> Iterator[None]:
+    """Keep the hash checks and every refresh side effect in one exclusive section."""
+    lock = sync._state_dir(root) / ".refresh-write-lock"
+    try:
+        lock.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise RefreshError(3, f"無法建立刷新鎖目錄，尚未寫入：{error}") from error
+    try:
+        lock.mkdir()
+    except FileExistsError as error:
+        raise RefreshError(
+            2, f"另一輪 board refresh 正在寫入{_lock_holder(lock)}；檢查 {lock} 後重跑",
+            reason="refresh_locked",
+        ) from error  # fmt: skip
+    except OSError as error:
+        raise RefreshError(3, f"無法取得刷新鎖，尚未寫入：{error}") from error
+    owner = lock / LOCK_OWNER_NAME
+    try:
+        owner.write_text(f"{os.getpid()} {datetime.now(timezone.utc).isoformat()}\n")
+    except OSError:
+        pass  # owner info is advisory; the lock itself is already held
+    try:
+        yield
+    finally:
+        try:
+            owner.unlink(missing_ok=True)
+            lock.rmdir()
+        except OSError as error:
+            # Never mask the real result (or the original exception).
+            print(
+                f"warning: 無法移除刷新鎖 {lock}，請確認後手動刪除：{error}",
+                file=sys.stderr,
+            )
+
+
+def _lock_holder(lock: Path) -> str:
+    """` (pid N, 自 <ts>)` from the lock's owner file; empty when unreadable."""
+    try:
+        pid, stamp = (lock / LOCK_OWNER_NAME).read_text().split()
+    except (OSError, ValueError):
+        return ""
+    return f"（pid {pid}，自 {stamp}）"
+
+
 def apply_refresh(g: Gathered, built: Built) -> dict:
+    """Apply a prepared refresh under the same lock as the CLI write path."""
+    with refresh_lock(g.root):
+        return _apply_refresh(g, built)
+
+
+def _apply_refresh(g: Gathered, built: Built) -> dict:
     """Steps 8-14 of the side-effect order. Returns a summary; raises RefreshError."""
     root, maigo_dir = g.root, g.root / ".maigo"
     new_board = built.board_text
@@ -1429,10 +1490,30 @@ def apply_refresh(g: Gathered, built: Built) -> dict:
         ) from error
 
     # 14. snapshot (re-reads the final board)
+    previous_reviewed_at = {
+        line["url"]: line.get("reviewed_at") for line in g.plan["lines"]
+    }
+    reviewed_at_overrides = {}
+    for rows in built.rows_by_section.values():
+        for row in rows:
+            if row["type"] != "👀":
+                continue
+            record = row.get("r", {})
+            # A pending check still belongs to the previously displayed report,
+            # even when a failed ack is followed by classifying a newer report.
+            if row["mode"] == "keep" or row["url"] in built.snapshot_overrides:
+                reviewed_at_overrides[row["url"]] = previous_reviewed_at.get(row["url"])
+            else:
+                reviewed_at_overrides[row["url"]] = (
+                    record.get("last_reviewed_at")
+                    if record.get("review_time_source") == "report"
+                    else None
+                )
     try:
         sync.write_snapshot(
-            root, g.repo, g.now, checked_overrides=built.snapshot_overrides
-        )
+            root, g.repo, g.now, checked_overrides=built.snapshot_overrides,
+            reviewed_at_overrides=reviewed_at_overrides,
+        )  # fmt: skip
     except (OSError, ValueError) as error:
         raise RefreshError(
             3, f"board 已是新版，但 snapshot 沒寫成：{error}",
@@ -1474,27 +1555,28 @@ def run_refresh(
         root, repo, you, now=now, add=add, max_new=max_new, discovery=discovery,
         stale_days=stale_days, jobs=jobs,
     )  # fmt: skip
-    if (
-        apply and _read_hash(g.board_path) != g.board_hash
-    ):  # CAS #1: before any side effect
-        raise RefreshError(2, CAS_MESSAGE.format(what="board.md"))
-    ack_results = run_acks(g, dry_run=not apply)
-    built = build(g, ack_results, rules, load_templates)
-    summary = summarize(g, built)
-    summary["applied"] = apply
-    if not apply:
-        diff = difflib.unified_diff(
-            g.board_text.splitlines(keepends=True),
-            built.board_text.splitlines(keepends=True),
-            "board.md (current)",
-            "board.md (refreshed)",
-        )
-        summary["diff"] = "".join(diff)
+    with refresh_lock(root) if apply else contextlib.nullcontext():
+        if (
+            apply and _read_hash(g.board_path) != g.board_hash
+        ):  # CAS #1: before any side effect
+            raise RefreshError(2, CAS_MESSAGE.format(what="board.md"))
+        ack_results = run_acks(g, dry_run=not apply)
+        built = build(g, ack_results, rules, load_templates)
+        summary = summarize(g, built)
+        summary["applied"] = apply
+        if not apply:
+            diff = difflib.unified_diff(
+                g.board_text.splitlines(keepends=True),
+                built.board_text.splitlines(keepends=True),
+                "board.md (current)",
+                "board.md (refreshed)",
+            )
+            summary["diff"] = "".join(diff)
+            return summary
+        outcome = _apply_refresh(g, built)
+        summary["backup"] = outcome["backup"]
+        summary["warnings"] += outcome["warnings"]
         return summary
-    outcome = apply_refresh(g, built)
-    summary["backup"] = outcome["backup"]
-    summary["warnings"] += outcome["warnings"]
-    return summary
 
 
 def summarize(g: Gathered, built: Built) -> dict:

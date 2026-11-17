@@ -1020,7 +1020,12 @@ class TestAck:
         return {"url": url(n), "head": head, "change": change, "inferred": inferred}
 
     def ack(self, root, *items):
-        return [r["result"] for r in sync.ack_items(root, REPO, YOU, list(items))]
+        payload = []
+        for item in items:
+            path = report.report_path(root, item["url"], REPO, "others")
+            current = report.metadata(path.read_text()) if path.exists() else {}
+            payload.append({"reviewed_at": current.get("reviewed_at"), **item})
+        return [r["result"] for r in sync.ack_items(root, REPO, YOU, payload)]
 
     def test_checked_with_matching_report_acks(self, tmp_path):
         path = Path(publish_report(tmp_path, 1)["path"])
@@ -1041,9 +1046,9 @@ class TestAck:
         assert self.ack(tmp_path, self.item(inferred=False)) == ["acked"]
         assert report.metadata(path.read_text())["acknowledged_at"] >= first
 
-    def test_inferred_without_prior_ack_acks(self, tmp_path):
+    def test_inferred_without_prior_ack_requires_confirmation(self, tmp_path):
         publish_report(tmp_path, 1)
-        assert self.ack(tmp_path, self.item(inferred=True)) == ["acked"]
+        assert self.ack(tmp_path, self.item(inferred=True)) == ["report_changed"]
 
     def test_no_report(self, tmp_path):
         assert self.ack(tmp_path, self.item()) == ["no_report"]
@@ -1059,6 +1064,22 @@ class TestAck:
         assert self.ack(tmp_path, self.item(change="unchecked")) == ["unacked"]
         assert "acknowledged_at" not in report.metadata(path.read_text())
 
+    @pytest.mark.parametrize("version", ["missing", "stale"])
+    def test_unchecked_undoes_the_ack_without_a_matching_version(
+        self, tmp_path, version
+    ):
+        path = Path(publish_report(tmp_path, 1)["path"])
+        self.ack(tmp_path, self.item())
+        assert "acknowledged_at" in report.metadata(path.read_text())
+        payload = {**self.item(change="unchecked")}
+        if version == "stale":
+            payload["reviewed_at"] = "2000-01-01T00:00:00+00:00"
+        [result] = sync.ack_items(tmp_path, REPO, YOU, [payload])
+        assert result["result"] == "unacked"
+        record = report.metadata(path.read_text())
+        assert "acknowledged_at" not in record
+        assert "acknowledged_by" not in record
+
     def test_busy_lock_is_reported_as_locked(self, tmp_path):
         path = Path(publish_report(tmp_path, 1)["path"])
         (path.parent / ".review-write-lock").mkdir()
@@ -1068,12 +1089,187 @@ class TestAck:
         publish_report(tmp_path, 1)
         assert self.ack(tmp_path, self.item(change=None)) == ["skipped"]
 
+    @pytest.mark.parametrize("snapshot_kind", ["missing", "legacy", "versioned"])
+    def test_old_check_does_not_ack_a_republished_report(
+        self, tmp_path, gh, snapshot_kind
+    ):
+        old = publish_report(tmp_path, 1)
+        report.acknowledge(tmp_path, url(1), REPO, HEAD, YOU, owner="others")
+        make_board(tmp_path, row(1), details=(1,))
+        if snapshot_kind != "missing":
+            sync.write_snapshot(tmp_path, REPO, NOW)
+            if snapshot_kind == "legacy":
+                snapshot_path = state_dir(tmp_path) / "snapshot.json"
+                saved = json.loads(snapshot_path.read_text())
+                saved["items"][url(1)].pop("reviewed_at", None)
+                snapshot_path.write_text(json.dumps(saved))
+        make_board(tmp_path, row(1, "x"), details=(1,))
+        fresh = report.publish(
+            tmp_path,
+            url(1),
+            REPO,
+            "PR 1",
+            "## Changed\nNew finding\n",
+            HEAD,
+            "NEEDS_CHANGES",
+            owner="others",
+        )
+        assert fresh["reviewed_at"] != old["reviewed_at"]
+        [line] = plan(tmp_path, discovery=False)["lines"]
+        [result] = sync.ack_items(
+            tmp_path,
+            REPO,
+            YOU,
+            [
+                {
+                    "url": url(1),
+                    "head": HEAD,
+                    "change": line["checkbox_change"],
+                    "inferred": line["inferred"],
+                    "reviewed_at": line.get("reviewed_at"),
+                }
+            ],
+        )
+        assert result["result"] == "report_changed"
+        assert "acknowledged_at" not in report.metadata(Path(fresh["path"]).read_text())
+
+    def test_report_replaced_during_ack_is_not_marked_read(self, tmp_path, monkeypatch):
+        published = publish_report(tmp_path, 1)
+        original = sync.review_report.acknowledge
+
+        def replace_then_ack(*args, **kwargs):
+            report.publish(
+                tmp_path,
+                url(1),
+                REPO,
+                "PR 1",
+                "## Changed\nNew finding\n",
+                HEAD,
+                "NEEDS_CHANGES",
+                owner="others",
+            )
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(sync.review_report, "acknowledge", replace_then_ack)
+        [result] = sync.ack_items(
+            tmp_path,
+            REPO,
+            YOU,
+            [{**self.item(), "reviewed_at": published["reviewed_at"]}],
+        )
+        assert result["result"] == "report_changed"
+        assert "Review changed" in result["message"]
+        assert "acknowledged_at" not in report.metadata(
+            Path(published["path"]).read_text()
+        )
+
+    def test_matching_displayed_report_can_be_acked(self, tmp_path, gh):
+        published = publish_report(tmp_path, 1)
+        make_board(tmp_path, row(1), details=(1,))
+        sync.write_snapshot(tmp_path, REPO, NOW)
+        make_board(tmp_path, row(1, "x"), details=(1,))
+        [line] = plan(tmp_path, discovery=False)["lines"]
+        assert line["reviewed_at"] == published["reviewed_at"]
+        assert self.ack(
+            tmp_path, {**self.item(), "reviewed_at": line["reviewed_at"]}
+        ) == ["acked"]
+
+    @pytest.mark.parametrize("version", [{}, {"reviewed_at": None}])
+    def test_ack_without_report_generation_is_rejected(self, tmp_path, version):
+        published = publish_report(tmp_path, 1)
+        [result] = sync.ack_items(tmp_path, REPO, YOU, [{**self.item(), **version}])
+        assert result["result"] == "report_changed"
+        assert "acknowledged_at" not in report.metadata(
+            Path(published["path"]).read_text()
+        )
+
+
+def test_snapshot_keeps_the_report_generation_actually_displayed(tmp_path):
+    first = publish_report(tmp_path, 1)
+    make_board(tmp_path, row(1), details=(1,))
+    publish_report(tmp_path, 1)
+    sync.write_snapshot(
+        tmp_path, REPO, NOW, reviewed_at_overrides={url(1): first["reviewed_at"]}
+    )
+    saved = json.loads((state_dir(tmp_path) / "snapshot.json").read_text())
+    assert saved["items"][url(1)]["reviewed_at"] == first["reviewed_at"]
+
 
 # --- CLI -----------------------------------------------------------------------
 
 
 class TestCli:
     common = ["--repo", REPO, "--you", YOU]
+
+    def test_snapshot_cli_preserves_the_displayed_generation(self, tmp_path, capsys):
+        published = publish_report(tmp_path, 1)
+        make_board(tmp_path, row(1), details=(1,))
+        publish_report(tmp_path, 1)
+        versions = tmp_path / "versions.json"
+        versions.write_text(json.dumps({url(1): published["reviewed_at"]}))
+        assert (
+            sync.main(
+                [
+                    "snapshot",
+                    "--maigo-root",
+                    str(tmp_path),
+                    *self.common,
+                    "--reviewed-at-file",
+                    str(versions),
+                ]
+            )
+            == 0
+        )
+        saved = json.loads((state_dir(tmp_path) / "snapshot.json").read_text())
+        assert saved["items"][url(1)]["reviewed_at"] == published["reviewed_at"]
+
+    @pytest.mark.parametrize(
+        "spell", [lambda u: u + "/", lambda u: u.replace(REPO, REPO.upper())]
+    )
+    def test_snapshot_cli_matches_keys_by_canonical_ref(self, tmp_path, capsys, spell):
+        published = publish_report(tmp_path, 1)
+        make_board(tmp_path, row(1), details=(1,))
+        publish_report(tmp_path, 1)
+        versions = tmp_path / "versions.json"
+        versions.write_text(json.dumps({spell(url(1)): published["reviewed_at"]}))
+        args = ["snapshot", "--maigo-root", str(tmp_path), *self.common]
+        assert sync.main([*args, "--reviewed-at-file", str(versions)]) == 0
+        saved = json.loads((state_dir(tmp_path) / "snapshot.json").read_text())
+        assert saved["items"][url(1)]["reviewed_at"] == published["reviewed_at"]
+        assert "warning" not in capsys.readouterr().err
+
+    def test_snapshot_cli_warns_on_keys_matching_no_review_row(self, tmp_path, capsys):
+        published = publish_report(tmp_path, 1)
+        make_board(tmp_path, row(1), details=(1,))
+        versions = tmp_path / "versions.json"
+        versions.write_text(
+            json.dumps({url(1): published["reviewed_at"], url(9): None})
+        )
+        args = ["snapshot", "--maigo-root", str(tmp_path), *self.common]
+        assert sync.main([*args, "--reviewed-at-file", str(versions)]) == 0
+        assert url(9) in capsys.readouterr().err
+        saved = json.loads((state_dir(tmp_path) / "snapshot.json").read_text())
+        assert saved["items"][url(1)]["reviewed_at"] == published["reviewed_at"]
+
+    @pytest.mark.parametrize("value", [[], {url(1): 3}, {url(1): "invalid"}])
+    def test_snapshot_cli_rejects_invalid_generations(self, tmp_path, value):
+        make_board(tmp_path, row(1), details=(1,))
+        versions = tmp_path / "versions.json"
+        versions.write_text(json.dumps(value))
+        assert (
+            sync.main(
+                [
+                    "snapshot",
+                    "--maigo-root",
+                    str(tmp_path),
+                    *self.common,
+                    "--reviewed-at-file",
+                    str(versions),
+                ]
+            )
+            == 1
+        )
+        assert not (state_dir(tmp_path) / "snapshot.json").exists()
 
     def test_plan_dry_run_prints_json(self, tmp_path, gh, capsys):
         make_board(tmp_path, row(1), details=(1,))
@@ -1087,9 +1283,17 @@ class TestCli:
         assert sync.main(["drop", "--reason", "aged", url(4), *root]) == 0
         assert json.loads(capsys.readouterr().out)[0]["result"] == "dropped"
         assert ledger_events(tmp_path)[0]["reason"] == "aged"
-        publish_report(tmp_path, 1)
+        published = publish_report(tmp_path, 1)
         payload = json.dumps(
-            [{"url": url(1), "head": HEAD, "change": "checked", "inferred": False}]
+            [
+                {
+                    "url": url(1),
+                    "head": HEAD,
+                    "change": "checked",
+                    "inferred": False,
+                    "reviewed_at": published["reviewed_at"],
+                }
+            ]
         )
         monkeypatch.setattr("sys.stdin", io.StringIO(payload))
         assert sync.main(["ack", *root]) == 0
@@ -1316,14 +1520,26 @@ class TestBoardTextAndTimes:
 
 
 class TestAckDryRun:
-    def item(self, change="checked"):
-        return {"url": url(1), "head": HEAD, "change": change, "inferred": False}
+    def item(self, reviewed_at, change="checked"):
+        return {
+            "url": url(1),
+            "head": HEAD,
+            "change": change,
+            "inferred": False,
+            "reviewed_at": reviewed_at,
+        }
 
     def test_dry_run_leaves_report_bytes_and_simulates_the_ack(self, tmp_path):
-        path = Path(publish_report(tmp_path, 1)["path"])
+        published = publish_report(tmp_path, 1)
+        path = Path(published["path"])
         before = path.read_bytes()
         [result] = sync.ack_items(
-            tmp_path, REPO, YOU, [self.item()], dry_run=True, now=NOW
+            tmp_path,
+            REPO,
+            YOU,
+            [self.item(published["reviewed_at"])],
+            dry_run=True,
+            now=NOW,
         )
         assert path.read_bytes() == before
         assert result["result"] == "acked"
@@ -1332,11 +1548,16 @@ class TestAckDryRun:
         assert simulated["acknowledged_at"] == NOW.isoformat()
 
     def test_dry_run_unack_simulates_removal(self, tmp_path):
-        path = Path(publish_report(tmp_path, 1)["path"])
-        sync.ack_items(tmp_path, REPO, YOU, [self.item()])
+        published = publish_report(tmp_path, 1)
+        path = Path(published["path"])
+        sync.ack_items(tmp_path, REPO, YOU, [self.item(published["reviewed_at"])])
         before = path.read_bytes()
         [result] = sync.ack_items(
-            tmp_path, REPO, YOU, [self.item("unchecked")], dry_run=True
+            tmp_path,
+            REPO,
+            YOU,
+            [self.item(published["reviewed_at"], "unchecked")],
+            dry_run=True,
         )
         assert path.read_bytes() == before
         assert result["result"] == "unacked"

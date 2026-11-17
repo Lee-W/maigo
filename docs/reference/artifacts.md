@@ -140,7 +140,8 @@ board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`�
 | 檔案 | 用途 |
 |------|------|
 | `_internal/board/dropped.jsonl` | 排除紀錄：每行一個 `drop` / `revive` 事件，只 append；`dd` 掉的項目之後不會被 discovery 補回，除非重新被指名 |
-| `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目與勾選狀態，用來偵測 `dd` 與 `[x]` 變化 |
+| `_internal/board/snapshot.json` | 上次刷新結束時 board 上的項目、勾選與報告 `reviewed_at`；勾選只確認當時顯示的報告版本 |
+| `_internal/board/.refresh-write-lock/` | 同一 state 目錄的刷新互斥鎖，持有到 ack／備份／寫回／snapshot 完成；競爭者 exit 2 |
 | `_internal/log/*` | hook 寫的機器 log（見下節「非 markdown 機器狀態檔」） |
 | `_internal/migrate-legacy-artifacts.manifest.json` | `migrate_legacy_artifacts.py --apply` 中斷時留存的搬移對應表，跑完即刪 |
 | `_internal/tidy/backup/<UTC ts>/` | `/maigo:tidy --apply` 動手前複製的備份，路徑是相對 `.maigo/` 的原路徑；還原＝複製回 `.maigo/`；不自動清，要刪由你自己決定 |

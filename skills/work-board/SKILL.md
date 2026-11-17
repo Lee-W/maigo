@@ -94,7 +94,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 ## 3. 各命令回寫合約
 
 **upsert 規則**：以 `#<n>`（含 repo 全稱時用全稱）為 key；行存在→整行替換
-（**保留原 checkbox 與 🧠 狀態**），不存在→append 到對應 section；board 檔不存在就先建骨架。
+（**保留原 checkbox 與 🧠 狀態**；publish 新報告時重置該 PR 的 checkbox），不存在→append 到對應 section；board 檔不存在就先建骨架。
 **整行替換時，對應細節檔（`.maigo/i/<slug>.md`）必須跟著整份重寫，不可只改索引行漏改
 細節檔**——索引行與細節檔是同一次寫回的兩個產物，不允許其中一個落後。
 **例外：board 還是舊格式時這條無從執行**——舊行文法把 URL / 規模 / 產物路徑都內嵌在索引行裡，
@@ -117,7 +117,10 @@ summary 說明「board 不存在（只有 `.migrated` 殘檔），本次未回�
 2. **寫入前立即重讀。** 不可拿幾輪之前讀到的內容當現況——中間可能已經有別的 session 寫過。
 3. **`Edit` 失敗 → 重讀、重算那一行、再試；不要改用 `Write` 硬寫。** 失敗是訊號不是障礙。
 
-**(b) `board_sync.py refresh --apply`（script，整檔寫回）**：以 compare-and-swap 取代 `Edit` 的樂觀鎖——
+**(b) `board_sync.py refresh --apply`（script，整檔寫回）**：先取得同一 state 目錄共用的
+`.maigo/_internal/board/.refresh-write-lock`，持有到 ack、備份、寫回與 snapshot 全部完成；
+有別的刷新持鎖時以 **exit 2** 中止、直接重跑，不覆蓋也不移除對方的鎖。程序遭強制終止留下鎖時，先確認原程序已結束才手動移除。
+鎖內以 compare-and-swap 檢查抓料期間的改動——
 讀 board.md 時記下內容雜湊，寫入前（ack 之前與實際寫檔之前各一次）重讀比對，不一致就以 **exit 2** 中止
 （每個要改／刪的細節檔同樣比對，要新建的細節檔必須仍不存在）。第一次比對在 ack 之前、什麼都沒寫；
 第二次比對在 ack 之後，所以 exit 2 時**除了 review.md 的 ack 標記外**不會寫任何檔。通過後先備份到
@@ -168,7 +171,7 @@ identity 與遷移細節見 [`.maigo/` 集中儲存](https://github.com/Lee-W/ma
 `refresh` 不帶 `--apply` 是預覽：只印 unified diff，不寫任何檔、不 ack。從 shell 跑它即是零 token 刷新，
 用法見 [`commands/board.md`](https://github.com/Lee-W/maigo/blob/main/commands/board.md)。
 
-- [`references/reconcile-ledger.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/reconcile-ledger.md)：**跑 `plan` / `ack` / `drop` / `revive` / `snapshot`、判讀排除紀錄、discovery 或 `[x]` ack 規則之前讀**。
+- [`references/reconcile-ledger.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/reconcile-ledger.md)：**跑 `plan` / `ack` / `drop` / `revive` / `snapshot`、判讀排除紀錄、discovery 或綁報告版本的 `[x]` ack 規則之前讀**。
 
 ## 4. 併入遷移與 4a 看完標記
 

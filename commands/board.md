@@ -114,7 +114,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
      [--dry-run] [--max-new 50] [--no-discovery]
    ```
 
-   輸出 JSON：`lines`（每行的 `url` / `checked` / `checkbox_change` / `inferred` / `excluded`）、
+   輸出 JSON：`lines`（每行的 `url` / `checked` / `checkbox_change` / `inferred` / `reviewed_at` / `excluded`）、
    `removed`（偵測到被 `dd` 的項目，已寫進排除紀錄）、`revived`（重新被指名而復活）、
    `additions` / `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`errors`。
    board 仍是舊版格式時 `plan` 直接失敗：先依 §1 整檔正規化再重跑。
@@ -122,15 +122,17 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    洗回 `待 review`）與每一筆 `additions` 做型別偵測並跑 `gh pr view` / `gh issue view`，
    沿用 §2 的流程。
 3. **ack**——把 `checkbox_change` 非 null 的 👀 行組成 JSON 餵給 `ack`，逐項取回結果
-   （`acked` / `already_acked` / `no_report` / `head_changed` / `unacked` / `locked` / `error`）：
+   （`acked` / `already_acked` / `no_report` / `head_changed` / `report_changed` / `unacked` / `locked` / `error`）：
 
    ```bash
-   echo '[{"url": "<url>", "head": "<full head sha>", "change": "checked", "inferred": false}]' \
+   echo '[{"url": "<url>", "head": "<full head sha>", "change": "checked", "inferred": false, "reviewed_at": "<plan reviewed_at>"}]' \
      | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py ack --maigo-root <root> --repo <owner/name> --you <login>
    ```
 
-   `change` 與 `inferred` 直接取自 `plan` 的對應行。`[ ]→[x]` 是使用者明確操作，一律重打 ack；
-   `inferred`（沒有 snapshot、由已勾推斷）且同 head 已 ack 則回 `already_acked`，不重打。
+   `change`、`inferred` 與 `reviewed_at` 直接取自 `plan` 的對應行；版本未知時傳 JSON `null`。
+   明確的 `[ ]→[x]` 只有在 report 的 head 與 `reviewed_at` 都相符時才重打 ack。
+   `inferred` 且這版已被你 ack 則回 `already_acked`；其他推斷、版本未知或已換新版時回
+   `report_changed`，取消該次勾選並提示看完新版後重新勾選。`[x]→[ ]` 的取消不需版本相符，一律撤銷 ack。讀取到實際寫入之間若換版，ack 也會拒絕。
 4. **分類**——把每項的 `type` / `gh_meta` / `prior_status`（讀自現有 board 行）/ `url`，加上
    `checked` / `checkbox_change` / `prior_badges`（該行現有 badge），餵給
    [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)：
@@ -158,8 +160,8 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
      （`needs_review`），該行自動取消勾，並在對話警告「#n 沒有本版 report／head 已變，未標記已看完；
      請先 `/maigo:review <n>`」；但 GitHub 已送出你的 review、又沒有 report 時，該行不在待看清單，
      使用者自己勾的 `[x]` 保留。
-   - **已知限制**：`acknowledged_at` 記的是刷新當下，不是勾選當下；第一次跑（沒有 snapshot）時，
-     已勾的 👀 行以推斷模式補 ack（同 head 已 ack 則不重打）。
+   - **已知限制**：`acknowledged_at` 記的是刷新當下，不是勾選當下；沒有 snapshot 或舊 snapshot
+     缺報告版本時，既有 `[x]` 不會替未確認的報告補 ack，須看完這版後重新勾選。
    - 由 artifact 對帳補進來、但分類結果是 `merged` / `closed` 的項目**不寫入 board**，改呼叫
      `board_sync.py drop --reason closed <url...>`，否則 `review/<id>/review.md` 還在時每次刷新都會補回。
    - ✅ 區老化清掉的行（別人的 PR 結案超過 3 天、自己的超過 7 天，或超出 10 行上限；待盤點未完成的行最多留到 30 天），清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
@@ -170,11 +172,13 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    - **孤兒 `i/` 檔就是 dd 訊號**：使用者在 nvim 用 `dd` 刪行後，細節檔還留著，`plan` 會把它判成 dd
      並寫進排除紀錄（剛寫好的檔有 10 分鐘寬限，列在 `pending_orphans`，本輪不判）。只有
      `excluded_detail_files`（排除項目殘留的細節檔）要列出來，**等使用者確認後才刪**，不自動刪。
-6. **快照**——全部寫回後呼叫 `snapshot`，它會重讀最終的 board 寫入 `.maigo/_internal/board/snapshot.json`
-   （下次刷新據此偵測 `dd` 與勾選變化）：
+6. **快照**——先將分類結果中實際寫進細節檔的報告版本存成 JSON object
+   `{"<PR URL>": "<last_reviewed_at>"}`（只有 `review_time_source == report` 才放時間，其餘為 `null`），
+   不要在寫 snapshot 前重讀 report 來補新版時間。key 以 `ref_key` 正規化比對（結尾斜線、大小寫、`issues`／`pull` 不影響）；對不到任何 👀 行的 key 會在 stderr 印 warning，不中止。全部寫回後呼叫 `snapshot`，重讀最終的 board 並記錄顯示版本：
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py snapshot --maigo-root <root> --repo <owner/name> --you <login>
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py snapshot --maigo-root <root> --repo <owner/name> --you <login> \
+     --reviewed-at-file <scratchpad/displayed-reviews.json>
    ```
 
 `board_sync.py drop --reason {drop,dd,aged,closed} <url...>` 單獨使用時只 append 排除紀錄。
@@ -242,10 +246,13 @@ W12 警告）；script 看不到未存檔的 buffer，只能靠這個順序。�
 
 這是使用者說「我已看完這版，不需留在待看清單」的明確操作，**等同在 nvim 勾 `[x]`**：
 `--reviewed` ＝ 把該行勾上（ack ＋ `[x]` ＋ `🔖`），`--unreviewed` ＝ 取消勾（undo ＋ `[ ]`）。
-只處理 👀 PR；兩者都走完整刷新（§3），不是只改單行，結束時寫 snapshot。做法：先把目標行的
-checkbox 改成目標狀態（`--reviewed` 改 `[x]`、`--unreviewed` 改 `[ ]`，用 `Edit`），再跑
-`refresh --apply`（取代再跑 §3 的規劃）——它依 snapshot 偵測到 `[ ]→[x]`（或 `[x]→[ ]`），經 `ack` 呼叫
-`review_report.py acknowledge --owner others`（`--unreviewed` 對應 `--undo`；👀 項目都是別人的 PR，報告固定在 `review/<id>/`），不改最後 review 時間、不送 GitHub。
+只處理 👀 PR；兩者都走完整刷新（§3），結束時寫 snapshot。先讀目標 report metadata 的
+`source`、`head_sha`、`reviewed_at`，比對目前 PR head，再呼叫
+`review_report.py acknowledge --owner others --expected-reviewed-at <剛讀到的 reviewed_at>`
+（`--cwd` / `--repo` 指向 home repo；`--source` / `--head` 取自 report metadata；
+`--you` 取 `gh api user -q .login`，不使用 PR 作者；`--unreviewed` 另加 `--undo`）。
+這是使用者對這版報告的明確確認，不依賴舊 snapshot。只有成功項才用 `Edit` 改 checkbox 並加 `🔖`，
+最後跑 `refresh --apply`；失敗時保留未確認狀態並列出原因。不改最後 review 時間、不送 GitHub。
 需要已有新版 report，且 head 必須與報告一致；舊報告先重新 review，head 已變則請先重審
 （回 `no_report` / `head_changed`，待看的行取消勾並警告）。錯誤逐項列出，不把失敗項目標成已看完。
 

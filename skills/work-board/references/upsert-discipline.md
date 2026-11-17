@@ -84,7 +84,12 @@ loud, never silently overwritten):**
   to `Write` to force it through — the failure is the mechanism working.
 
 *The refresh script* (`board_sync.py refresh --apply`) does rewrite the whole
-file, so it takes a compare-and-swap instead of `Edit`'s `old_string`: it hashes
+file. It holds `.maigo/_internal/board/.refresh-write-lock` from the first hash
+check through acknowledgement, backup, writes and snapshot creation. A competing
+refresh exits 2 without removing the other writer's lock (the message names the holder's
+pid and start time, read from the `owner` file inside the lock directory); retry after it finishes.
+A stale lock after a killed process may be removed only after confirming that
+the original writer has stopped. Inside the lock it uses compare-and-swap: it hashes
 what it read, re-checks the hash before acking and again right before writing,
 backs up to `.maigo/_internal/board/backup/`, then writes atomically (tmp +
 rename). If the board (or a detail file it is about to change) moved underneath
@@ -102,7 +107,7 @@ clobbering a concurrent update to the hand-written `## 判斷` / `## 筆記`.
 ### Machine state under `.maigo/_internal/board/`
 
 `dropped.jsonl` (the exclusion ledger) and `snapshot.json` (last refresh's board
-rows and checkbox state) are owned by `scripts/board_sync.py` and nobody else:
+rows, checkbox state and displayed report generation) are owned by `scripts/board_sync.py` and nobody else:
 the ledger is **append-only** (one line per event, never rewritten) and the
 snapshot is written **atomically** (tempfile + replace). `backup/` holds the
 copies `refresh --apply` takes before it writes. Do not `Write` or `Edit`
