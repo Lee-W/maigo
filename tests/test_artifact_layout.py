@@ -165,6 +165,11 @@ class TestScriptArtifactsAreFixedPoints:
         )
         assert layout_violations(facts + refresh.NEW_PRESERVED) == []
 
+    def test_old_preserved_area_is_normalised_on_refresh(self):
+        old = "## 判斷\n\n\n## 筆記\n\n\n<!-- 手寫區 -->\n"
+        assert layout_violations(old) != []
+        assert layout_violations(refresh.collapse_blank_runs(old)) == []
+
     def test_report_header(self, tmp_path: Path):
         url = "https://github.com/o/r/pull/7"
         result = report.publish(
