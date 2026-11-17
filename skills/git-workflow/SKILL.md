@@ -81,70 +81,13 @@ the wrong one after a `cd`.
 check baked in, not just a hash. See
 [`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#amend-target-must-be-head).
 
-### Fold polish into the unreleased introducing commit
+### Fold polish / tangled hunks / fix on the surfacing branch
 
-When the underlying feature commit on a local branch has never been
-released, fold review-driven polish — parameter renames, docstring updates,
-perf nits, additional tests — into the introducing commit via
-`git commit --amend --no-edit` (or `--amend` with an updated message; see
-[`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md))
-rather than keeping it as a follow-up commit.
+- 尚未 release 的 introducing commit：review 帶來的 polish（rename、docstring、perf nit、補測試）預設 `--amend` 進該 commit，不另開 follow-up；只有真正獨立、或 commit 已在 PR 被 review 中才另開。
+- 多條 review thread 同時重塑同一個函式／迴圈時，amend 進**最新的 tip**，不要手工重建從未存在過的中間態。偏離 split-amend 計畫時要明講。
+- 由 in-flight branch 自己引出的 lint／type／test 失敗，修在**那條 branch**，不是從 main 另切新 branch。
 
-Why: a parameter or symbol that never existed in a release doesn't need its
-rename preserved as a historical artifact — squashing means it's born with
-the right name and the rename never shows up in history. If the repo
-squash-merges on merge, the end PR result is identical either way, but
-cleaner local history helps the author's own rebase / pre-push self-review
-workflow.
-
-How to apply:
-
-- Default to "amend into the introducing commit" framing when drafting how
-  to land polish on a local feature branch.
-- Only suggest a separate commit when the polish is genuinely independent —
-  different feature scope, separate user-visible change, or the introducing
-  commit has already been published to a PR that reviewers are mid-review
-  on.
-- Don't preserve a rename as a historical artifact when the renamed symbol
-  was never released to users.
-
-### When polish hunks are tangled, amend into the tip — don't reconstruct
-
-The rule above says to amend polish into the *relevant* introducing commit.
-When the polish is per-thread localized (a rename, a docstring, one new
-test), do that — amend into the specific commit each thread targets. But
-when multiple review threads all reshape **the same function or loop
-together**, splitting the polish across commits requires hand-reconstructing
-intermediate file states for an interactive rebase — a high-error-rate
-operation that doesn't survive a later force-push cleanly.
-
-In that case, default to amending everything into the **tip** (most recent)
-of the unreleased commits, rather than reconstructing a midpoint version of
-the function that never existed in isolation.
-
-How to apply: during commit-assembly planning, inspect the actual staged
-diff before committing to a split-amend plan. If hunks for multiple threads
-collide in the same function and the intermediate state isn't naturally
-meaningful on its own, fold everything into the tip commit instead. Surface
-the deviation from a split-amend plan explicitly so the plan's author (or
-the user) can override.
-
-### A fix belongs on the branch that surfaced it, not a fresh branch off main
-
-When an in-flight branch (e.g. a CI-environment-upgrade PR) is itself what
-surfaces a new lint/type/test failure, the fix belongs **on that branch**
-(folded into the same PR), not on a fresh branch cut from the main/default
-branch.
-
-Why: CI runs against the in-flight branch. A fix sitting on a separate
-branch does nothing for the failing CI, and the failure often only exists
-*because of* that branch's own changes (e.g. an upgraded dependency
-revealing a type error that didn't exist before).
-
-How to apply: before branching off the default branch to fix something,
-check whether the failure was introduced by the currently in-flight branch.
-If yes, apply the fix there and consider folding it into the introducing
-commit (see "Fold polish into the unreleased introducing commit" above).
+[`references/commit-assembly-details.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-assembly-details.md)（理由與 How to apply 全文，決定落點時讀）
 
 ### Referencing private-layer files: path only, never content
 
@@ -161,61 +104,12 @@ precise string replacement, not a full `json.load`/`json.dump` re-serialize.
 See
 [`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#edit-a-json-field-with-precise-replacement-not-full-re-serialize).
 
-### Diff against the real merge-target baseline, not the branch tip
+### Diff baselines
 
-When quantifying a change's footprint — "what gets deleted", "is this a big
-diff", "much smaller than what" — establish the real baseline **first**:
-`git diff upstream/main..HEAD` (or the repo's actual merge target) and
-`git show upstream/main:<file>`. Don't reason against the current branch tip
-as if it were the merge target.
+- 量化改動規模（「刪掉什麼」「diff 多大」）前先確認真正的 merge-target 基準：`git diff upstream/main..HEAD`、`git show upstream/main:<file>`，不要拿 branch tip 當基準。
+- 列舉「這個 diff 新增了哪些行」（命名列舉、洩漏掃描）一律用 `git merge-base <base> HEAD` 或三點式 `git diff <base>...HEAD`，**不用兩點式**——本地 base 前進後兩點式會混進別人的 commit，產生看起來正常的假陽性。
 
-Why: it's easy to describe a change as "net-delete N lines of `symbol`"
-without checking whether `symbol` exists on the merge target at all — if the
-symbol was introduced by the branch's own unmerged feature commit, the
-"deletion" is actually reworking in-flight work, which completely changes
-the framing (an amend of the feature commit, not a deletion stacked on top —
-see "Fold polish into the unreleased introducing commit" above).
-
-How to apply: before stating diff sizes or "what gets removed", run
-`git rev-list --count upstream/main..HEAD` and check whether the code being
-"deleted" actually exists on the merge target
-(`git show upstream/main:<file> | grep <symbol>`). If the branch carries
-unmerged feature commits, the honest comparison is "reworked commit vs.
-current commit" (an amend), not "vs. the merge target". Verify empirically
-against `git show`/`git diff` output — don't assert sizing from memory of
-the working tree.
-
-### Enumerate "new lines" from a merge-base baseline, not a two-dot diff
-
-When the judgment is "which lines did *this* diff add" — naming
-enumeration, "is this symbol new in this PR", scanning for a private/secret
-token that must not leak — the baseline must be `git merge-base <base> HEAD`
-or the three-dot form `git diff <base>...HEAD`. Do not use the two-dot form
-`git diff <base>`.
-
-Why: a two-dot diff compares two commits directly. If the local `<base>` ref
-has advanced past the point this branch actually forked from (someone else
-pushed to it, or it's a shared/moving ref like `main` in a long-lived
-worktree), the two-dot diff mixes in **every commit that landed on `<base>`
-since the fork point** — changes nobody on this branch wrote. Enumerating
-"new" defs, symbols, or added lines against that diff produces false
-positives that look identical to real ones: no error, a plausible-looking
-line number, a name that reads like it could be new.
-
-How to apply: `git merge-base <base> HEAD` first, then diff from that SHA
-(`git diff <merge-base-sha>...HEAD` or equivalently the three-dot form
-against `<base>` directly) before treating any line as "added by this
-branch." This applies wherever "diff 新增行" is the judgment basis — see the
-naming-enumeration and change-site-enumeration uses of this pattern in
-[`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)
-and
-[`change-site-enumeration`](https://github.com/Lee-W/maigo/blob/main/skills/change-site-enumeration/SKILL.md).
-
-Case: a review's naming-enumeration pass ran a two-dot diff against a local
-`main` that had moved ahead; the diff pulled in an unrelated commit that
-had touched `sandbox/modal.py`, and two of that commit's pre-existing names
-got flagged as naming violations introduced by the branch under review —
-neither line was written by that branch.
+[`references/diff-baselines.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/diff-baselines.md)（理由、驗證步驟與案例，陳述 diff 規模或列舉新增行前讀）
 
 ## Pushing and opening a PR
 
@@ -237,56 +131,9 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 ## Worktree hygiene (references)
 
-Fourteen conventions for worktree lifecycle and git-attribution — worktree
-layout naming, when to open a separate worktree for a pre-existing issue,
-deferring colliding work, batch cleanup safety, squash-merge-aware "already
-merged" checks, and not over-attributing surprising git state
-(commits/rebases/wrong commit subject) to a rogue agent when it's more likely
-the user working in parallel or an unverified delegate report. Details and
-recipes in `references/worktree-hygiene.md`:
-
-- **Worktree layout** — worktrees live nested under the main worktree's own
-  `.worktrees/<topic>` (branch `<topic>`), matching the same path template a
-  personal worktree manager (e.g. worktrunk) already uses for the repo. Don't
-  open one with the harness's built-in `EnterWorktree` (it creates a locked
-  `.claude/worktrees/<name>` on branch `worktree-<name>`); use
-  `git worktree add`. Command and fix-up recipe in
-  `references/worktree-hygiene.md`.
-- **Start a task in its own worktree from the outset, not midway** — a
-  mid-task switch costs more than staying (untracked files don't follow a
-  branch switch, running agents get interrupted); correct on the *next* task.
-- **Work already finished in the shared tree, user wants it committed from a
-  worktree** — move it, don't redo it: save `git diff HEAD` as a patch (not
-  `--cached`: a failed commit hook resets the index, leaving it empty) and
-  record `shasum -a 256` of each file; `worktree_path.py` for the path, then
-  `git worktree add -b <topic> <path> <remote>/main`; in the worktree
-  `git apply --check`, apply, and commit only when the hashes match file for
-  file; then in the original tree `git restore` those files, switch back, and
-  delete the temporary branch. Untracked new files never appear in
-  `git diff HEAD` and need copying separately (inferred from git's behaviour,
-  not exercised in the session that added this entry).
-- **`ListAgents` before touching the git index** on a shared checkout — a
-  peer session can be on the same checkout/branch with zero mutual awareness,
-  and `git status` alone won't reveal it.
-- **Pre-existing fix → new worktree off upstream/main**, not folded into the
-  current feature branch (proportionality counter-case for trivial diffs).
-- **Colliding work gets deferred** — when approved work overlaps an
-  in-flight branch's files, do the non-colliding subset now and defer the
-  rest, rather than forcing everything through and creating merge conflicts.
-- **Batch cleanup**: show the exact command list before running; don't chain
-  many worktree/branch ops in one shell call (timeout risk).
-- **Squash-merge "already merged" check** needs `gh search prs`, not
-  `git branch --merged` (squash breaks ancestry).
-- **Don't over-attribute unexpected git state to a rogue agent** — verify
-  quietly (reflog, staged files) before alarming; on a delegated task, verify
-  git state (reflog/log/status) before committing on top of it.
-- **Verify the landed commit subject** with `git log --oneline -1` after every
-  commit — don't trust the tool's echoed command string.
-- **"Fix the commit message" on a tmp/mislabeled branch** means squash the
-  whole branch into one commit, not reword just the tip.
-
-Read `references/worktree-hygiene.md` when opening/cleaning up worktrees or
-when git history looks surprising after a delegated task.
+worktree 慣例（layout 放 `.worktrees/<topic>`、不用 harness 內建 `EnterWorktree`、任務一開始就在自己的 worktree、`ListAgents` 先於動 git index、已完成的工作移進 worktree 的搬法、批次清理先列指令、squash-merge 的「已合併」檢查用 `gh search prs`、不要把意外 git 狀態先歸咎於 rogue agent、commit 後用 `git log --oneline -1` 驗 subject）：
+[`references/worktree-hygiene-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene-index.md)（慣例摘要）
+；完整配方在 [`references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)，開／清 worktree 或委派後 git 歷史看起來奇怪時讀。
 
 ### Worktree automation (`--worktree` flag)
 
