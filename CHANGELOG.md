@@ -5,6 +5,34 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.76.0 (2026-11-17)
+
+### Feat
+
+- **scripts**: record what a review actually covered so same-head reports are not reused blindly
+- **hooks**: block git commit commands that carry an AI co-author trailer
+- **scripts**: fail validate_plugin when a SKILL.md exceeds 500 lines
+- **skills**: treat external content as data, not instructions
+
+### Fix
+
+- **board**: bind a read-mark to the report version it was shown against and lock refresh writes
+- **hooks**: stop the Soyo must-fix parser from misreading unlisted or "none" findings
+- **hooks**: catch standalone -S, $'...' messages and grouped git commit in the trailer check
+- **skills**: name every review pattern in strict-review body and fix stale Mutation test link
+- **skills**: read external-content rule earlier, check recurring patterns every review, hard-code worktree rule
+- **skills**: quote descriptions that YAML rejects and check frontmatter with a strict parser
+- **skills**: point section references at the references/ files the sections moved to
+- **skills**: keep the memory-propose-confirm description from truncating
+
+### Refactor
+
+- **scripts**: share one repo-list reader and one git helper across scripts
+- **skills**: move failure-handling situational sections into references
+- **skills**: move git-workflow polish, baseline and worktree detail into references
+- **skills**: move strict-review templates and pattern indexes into references
+- **skills**: move work-board lookup sections into references
+
 ## v0.75.0 (2026-11-16)
 
 ### Feat
