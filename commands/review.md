@@ -373,7 +373,7 @@ publish 新版 report 後，該 PR 的 checkbox 重設為 `[ ]`，不能把上�
   刷新 / 查看 board 用 `/maigo:board`。board 決定誰該看，review 負責看，兩者不重疊。
 - **雙語自動觸發**：repo-detect 回報 `apache/airflow` 時 orchestrator 自動加 `--bilingual`；偵測非 Airflow repo 但使用者顯式傳 `--bilingual` 也照樣執行——`--bilingual` 純粹是輸出層 flag，不會改變 agent 行為。
 - orchestrator 草擬要貼到 PR 的回覆 / comment 時，遵守 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)——放單一 fenced code block 供複製。
-- 草擬 GitHub PR review thread 回覆時，依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)——預設簡短、不引 SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、附 attribution footer。
+- 草擬 GitHub PR review thread 回覆時，依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)——預設一句話、不用稱讚或認錯開場、不引 SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、預設不加 attribution footer（僅回覆 thread，review body／inline comment 不在此列）。
 - **裁決 gate（§4.5）與 Soyo propose 的關係**：gate 把「不適用+理由」導向 Soyo 的即時 propose；
   orchestrator 自己不寫記憶、不 soften review；記憶寫入唯一路徑是 Soyo propose → confirm flow。
   gate 在單一 PR 的 report 之後；平行預設下各 PR 的 gate 集中到全部審完後問一次（逐顆模式則在下一個 PR 的 go-ahead 之前）——不與批次推進混淆。
