@@ -466,6 +466,20 @@ message 強調「這不是 test fail，是 import 錯」。
 - 在專案放 `.claude/skip-test-verification`（第一行寫原因）讓整個檢查跳過
 - 或補上最小測試套件 + 對應依賴，讓指令真的 exit 0
 
+### rebase／merge 進行中（**不** fail-open，已知缺口）
+
+hook 不檢查 git 是否處於 rebase／merge／cherry-pick 中途（`<git-dir>/rebase-merge`、`rebase-apply`、`MERGE_HEAD`、`CHERRY_PICK_HEAD`），照常跑測試。中途的 tree 必然不可測：衝突標記讓 collection 回 `SyntaxError:`（fatal marker），或 `test-command` 指到的檔案要等後面的 commit 才存在（`file or directory not found`）。每次收尾都會被擋，形成 loop。
+
+實例（2026-11-13，apache/airflow worktree）：orchestrator 把「解衝突並完成 4 個 commit 的 rebase」交給背景 subagent，自己收尾等通知；Stop hook 先因衝突標記報 `SyntaxError`、再因第 3 個 commit 才新增的 `test_sql_search.py` 報 not found，連續擋了 6 輪以上，每輪都是假紅。
+
+緩解（hook 修好之前）：
+
+- orchestrator 在背景 agent 做 rebase 期間，不要直接結束回合；改跑一個**有上限的 foreground 等待**，條件是 rebase 結束（`until [ ! -d "$(git rev-parse --git-dir)/rebase-merge" ]`，例如上限 9 分鐘），讓回合在 tree 可測之後才結束。2026-11-13 照此做之後 loop 立即停止。
+- 或在 rebase 期間暫放 `.claude/skip-test-verification`，結束後**一定要刪掉**（見上方 `claude_config_seeds` 段：這個標記是 per-worktree、無期限的）。
+- 把這類紅燈標成噪音：不寫進 `known-test-failures`，也不派人修。
+
+根本修法（未實作）：在 `verify_completion.py` 偵測到上述任一 git 中途狀態時 approve 並附註原因。這和「有 running subagent 時 skip」是同一家族的缺口。
+
 ### Fail-open 情況
 
 - 偵測不到任何專案類型（沒有 `uv.lock` / `pyproject.toml` / `package.json` / `Cargo.toml` / `go.mod`）→ approve（no-op）
