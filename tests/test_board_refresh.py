@@ -280,11 +280,17 @@ def test_t2_whole_file_round_trip_is_byte_identical():
     assert rendered == SKILL_BOARD
 
 
-SKILL_MD = Path(__file__).resolve().parent.parent / "skills" / "work-board" / "SKILL.md"
+SKILL_MD = (
+    Path(__file__).resolve().parent.parent
+    / "skills"
+    / "work-board"
+    / "references"
+    / "format-spec.md"
+)
 
 
 def test_skill_grammar_examples_parse():
-    """The example board in SKILL.md §1 parses cleanly and re-renders byte-identically."""
+    """The example board in work-board references/format-spec.md §1 parses cleanly and re-renders byte-identically."""
     text = SKILL_MD.read_text(encoding="utf-8")
     start = text.index("### Sections")
     fence = text.index("```markdown\n", start) + len("```markdown\n")
