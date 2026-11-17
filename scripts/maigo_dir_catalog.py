@@ -70,6 +70,7 @@ from artifact_path import (
     _FLAT_NAME_LOOKALIKES,
     _KNOWN_KINDS,
     _NESTED_LAYOUT,
+    _PLAN_LIKE_STEMS,
     nested_locations,
 )
 
@@ -82,12 +83,18 @@ INTERNAL_DIR = "_internal"
 # （如 "review-rubric-42.md"）。
 _KINDS_BY_LENGTH_DESC = tuple(sorted(_KNOWN_KINDS, key=len, reverse=True))
 
-# `plan` 刻意不在 `_NESTED_LAYOUT`，但 `pr/<id>/plan.md`、`issue/<id>/plan.md` 是正典
-# 巢狀產物，所以併進來；`topic/` 不納入 `scan()`（只有 `scan_tree()` 看得到）。
+# plan 同形的 kind（`plan`、`summary`）刻意不在 `_NESTED_LAYOUT`，但
+# `pr/<id>/plan.md`、`issue/<id>/plan.md`（`summary.md` 同理）是正典巢狀產物，
+# 所以併進來；`topic/` 不納入 `scan()`（只有 `scan_tree()` 看得到）。
 _TOPIC_GROUP = "topic"
 _ALL_NESTED_LOCATIONS = {
     location for kind in _NESTED_LAYOUT for location in nested_locations(kind)
-} | {location for location in nested_locations("plan") if location[0] != _TOPIC_GROUP}
+} | {
+    location
+    for kind in _PLAN_LIKE_STEMS
+    for location in nested_locations(kind)
+    if location[0] != _TOPIC_GROUP
+}
 _NESTED_GROUP_STEMS = set(_ALL_NESTED_LOCATIONS)
 _NESTED_GROUP_NAMES = sorted({group for group, _stem in _ALL_NESTED_LOCATIONS})
 _ATTEMPT_SUFFIX_RE = re.compile(r"-\d+$")

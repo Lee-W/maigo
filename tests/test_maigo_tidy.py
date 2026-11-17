@@ -330,6 +330,19 @@ def test_inline_comments_is_not_listed_as_unregistered(tmp_path):
     ] == []
 
 
+def test_summary_is_not_listed_as_unregistered_in_any_group(tmp_path):
+    maigo = make_maigo(tmp_path)
+    write(maigo / "pr" / "11" / "summary.md")
+    write(maigo / "issue" / "5" / "summary.md")
+    write(maigo / "topic" / "foo" / "summary.md")
+    actions = build(maigo)
+    assert [
+        a.path
+        for a in actions
+        if a.kind == "unregistered" and a.path.endswith("summary.md")
+    ] == []
+
+
 def test_nested_dot_maigo_is_listed_and_deleted_only_when_confirmed(tmp_path):
     maigo = make_maigo(tmp_path)
     write(maigo / ".maigo" / "session-head.json", "{}")

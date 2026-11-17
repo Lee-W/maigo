@@ -51,6 +51,7 @@ class TestIsLegacyArtifactPath:
         "path",
         [
             ".maigo/plan.md",
+            ".maigo/summary.md",
             ".maigo/review-rubric.md",
             ".maigo/pr-comments.md",
             ".maigo/triage-rubric.md",
@@ -91,6 +92,7 @@ class TestIsFlatPreNestedArtifactPath:
             "/Users/x/repo/.maigo/review-rubric-42.md",
             ".maigo/plan-main.md",
             ".maigo/plan-main-2.md",
+            ".maigo/summary-main.md",
         ],
     )
     def test_flat_pre_nested_names_are_flagged(self, path: str):
@@ -105,6 +107,9 @@ class TestIsFlatPreNestedArtifactPath:
             ".maigo/pr/42/plan.md",
             ".maigo/issue/42/plan-2.md",
             ".maigo/topic/main/plan.md",
+            ".maigo/pr/42/summary.md",
+            ".maigo/issue/42/summary-2.md",
+            ".maigo/topic/main/summary.md",
             ".maigo/pr/42/rubric.md",
             ".maigo/pr/42/reply-draft.md",
             ".maigo/review-rubric.md",
@@ -164,6 +169,39 @@ class TestLegacyArtifactPathHook:
         assert ".maigo/topic/<slug>/plan.md" in result["reason"]
         assert "migrate_legacy_artifacts.py" in result["reason"]
         _assert_script_paths_absolute_and_exist(result["reason"])
+
+    def test_top_level_identifier_named_summary_points_at_summary_command(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/summary-main.md"), monkeypatch, capsys
+            ).strip()
+        )
+        assert result["decision"] == "block"
+        for shape in (
+            ".maigo/pr/<id>/summary.md",
+            ".maigo/issue/<id>/summary.md",
+            ".maigo/topic/<slug>/summary.md",
+        ):
+            assert shape in result["reason"]
+        assert re.search(r"artifact_path\.py\"? summary-for-plan ", result["reason"])
+        assert "summary --topic" not in result["reason"]
+        assert "migrate" not in result["reason"]
+        _assert_script_paths_absolute_and_exist(result["reason"])
+
+    def test_legacy_fixed_name_summary_points_at_summary_for_plan(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ):
+        result = json.loads(
+            run_silent_hook(
+                _write_payload(".maigo/summary.md"), monkeypatch, capsys
+            ).strip()
+        )
+        assert result["decision"] == "block"
+        assert re.search(r"artifact_path\.py\"? summary-for-plan ", result["reason"])
+        assert "summary --topic" not in result["reason"]
+        assert "migrate" not in result["reason"]
 
     def test_top_level_plan_attempt_suffix_is_flagged(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

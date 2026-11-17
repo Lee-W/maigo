@@ -56,6 +56,7 @@ try:
         _FLAT_NAME_LOOKALIKES,
         _KNOWN_KINDS,
         _NESTED_LAYOUT,
+        _PLAN_LIKE_STEMS,
         nested_locations,
     )
 except Exception:
@@ -66,6 +67,7 @@ except Exception:
     # is fixed, instead of taking down every Write/Edit in every repo.
     _KNOWN_KINDS = ()
     _NESTED_LAYOUT = {}
+    _PLAN_LIKE_STEMS = {}
     _FLAT_NAME_LOOKALIKES = ()
 
     def nested_locations(kind: str) -> list[tuple[str, str]]:
@@ -126,7 +128,24 @@ def is_flat_pre_nested_artifact_path(file_path: str) -> str | None:
     return match.group(2)
 
 
+def _summary_command_hint() -> str:
+    # summary 的路徑由本次 plan 路徑推導，不重新解析（見 teammate-flow「Run summary」）。
+    return (
+        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" summary-for-plan '
+        '"<本次 plan 路徑>"\n'
+        "取得同目錄、同編號的 summary 路徑（`path:` 那行），寫到那裡。\n"
+    )
+
+
 def _block_reason(kind: str, file_path: str) -> str:
+    if kind == "summary":
+        return (
+            f"`{file_path}` 是 `.maigo/` 底下舊固定檔名的 `{kind}` 產物，"
+            "只可讀、不可當寫入目標。\n"
+            "改用：\n"
+            f"{_summary_command_hint()}"
+            "見 skills/teammate-flow/SKILL.md「Run summary」。"
+        )
     return (
         f"`{file_path}` 是 `.maigo/` 底下舊固定檔名的 `{kind}` 產物，"
         "只可讀、不可當寫入目標（跨 13 個裝了 maigo 的 repo 實測，這套舊寫法的"
@@ -139,24 +158,37 @@ def _block_reason(kind: str, file_path: str) -> str:
     )
 
 
-def _flat_plan_block_reason(file_path: str) -> str:
-    return (
-        f"`{file_path}` 是頂層 `plan-<id>.md`——這個形狀已淘汰，plan 改收進 "
-        "`.maigo/pr/<id>/plan.md`（PR URL）、`.maigo/issue/<id>/plan.md`"
-        "（issue URL）或 `.maigo/topic/<slug>/plan.md`（其餘）。\n"
-        "改用：\n"
-        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" plan --topic "<H1 主題>" '
-        "[--url <url> --repo <owner/name>] [--slug <topic-slug>]\n"
-        "取得巢狀新路徑（`path:` 那行），寫到那裡（在 main 等預設分支上要給 `--slug`）；"
-        f"既有的頂層 plan 可用 `{_SCRIPTS_DIR / 'migrate_legacy_artifacts.py'}` "
+def _flat_plan_block_reason(kind: str, file_path: str) -> str:
+    stem = _PLAN_LIKE_STEMS[kind]
+    if kind == "summary":
+        return (
+            f"`{file_path}` 是頂層 `{stem}-<id>.md`——這個形狀已淘汰，{kind} 改收進 "
+            f"`.maigo/pr/<id>/{stem}.md`（PR URL）、`.maigo/issue/<id>/{stem}.md`"
+            f"（issue URL）或 `.maigo/topic/<slug>/{stem}.md`（其餘）。\n"
+            "改用：\n"
+            f"{_summary_command_hint()}"
+            "見 skills/teammate-flow/SKILL.md「Run summary」。"
+        )
+    migrate_hint = (
+        f"；既有的頂層 plan 可用 `{_SCRIPTS_DIR / 'migrate_legacy_artifacts.py'}` "
         "搬進 `topic/<id>/`，不必手動搬。\n"
+    )
+    return (
+        f"`{file_path}` 是頂層 `{stem}-<id>.md`——這個形狀已淘汰，{kind} 改收進 "
+        f"`.maigo/pr/<id>/{stem}.md`（PR URL）、`.maigo/issue/<id>/{stem}.md`"
+        f"（issue URL）或 `.maigo/topic/<slug>/{stem}.md`（其餘）。\n"
+        "改用：\n"
+        f'  python3 "{_SCRIPTS_DIR / "artifact_path.py"}" {kind} --topic "<H1 主題>" '
+        "[--url <url> --repo <owner/name>] [--slug <topic-slug>]\n"
+        "取得巢狀新路徑（`path:` 那行），寫到那裡（在 main 等預設分支上要給 `--slug`）"
+        f"{migrate_hint}"
         "見 skills/harness-discipline/references/artifact-ownership.md 規則 4。"
     )
 
 
 def _flat_pre_nested_block_reason(kind: str, file_path: str) -> str:
-    if kind == "plan":
-        return _flat_plan_block_reason(file_path)
+    if kind in _PLAN_LIKE_STEMS:
+        return _flat_plan_block_reason(kind, file_path)
     return (
         f"`{file_path}` 是巢狀佈局採用前的分目錄前扁平 `{kind}` 產物，"
         "只可讀、不可當寫入目標——新路徑收進 `.maigo/review/<id>/`（別人的 PR）、"

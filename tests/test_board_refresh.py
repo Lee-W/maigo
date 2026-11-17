@@ -542,6 +542,17 @@ def test_sort_related_files_orders_groups_then_known_kinds_then_attempts_then_th
     ]  # fmt: skip
 
 
+def test_sort_related_files_lists_summary_after_plan_and_before_rubric():
+    shuffled = [
+        "pr/9/notes.md", "pr/9/review.md", "pr/9/summary-2.md", "pr/9/rubric.md",
+        "pr/9/summary.md", "pr/9/plan-2.md", "pr/9/plan.md",
+    ]  # fmt: skip
+    assert refresh.sort_related_files(shuffled) == [
+        "pr/9/plan.md", "pr/9/plan-2.md", "pr/9/summary.md", "pr/9/summary-2.md",
+        "pr/9/rubric.md", "pr/9/review.md", "pr/9/notes.md",
+    ]  # fmt: skip
+
+
 def test_sort_related_files_puts_the_unnumbered_file_before_its_first_attempt():
     shuffled = [
         "review/5/rubric-10.md", "review/5/rubric-2.md", "review/5/rubric-1.md",
