@@ -3,7 +3,7 @@
 Loaded on demand by [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) —
 full mechanics for the multi-PR batch path: how Raana sorts and prints the queue, the
 per-PR status pre-processing table (merged / closed / draft), the default
-run-them-all-in-parallel flow, and the opt-in one-at-a-time gate. Read this file when `/maigo:review` receives more than one target.
+run-them-all-in-parallel flow, and the opt-in one-at-a-time gate. Read this file for a multi-target review, review-coverage reuse, or verification-checkout setup.
 
 ---
 
@@ -11,10 +11,13 @@ run-them-all-in-parallel flow, and the opt-in one-at-a-time gate. Read this file
 
 ## 樂奈先抓 metadata 排隊
 
-第一輪 🐱 樂奈以 parallel 方式抓**每個 PR** 的 lightweight metadata（不抓 diff）：
+第一輪 🐱 樂奈先以輸入的完整 URL 取得 canonical PR URL，從該 URL 保留每顆的
+`<target-repo>`（`owner/repo`）與 `<N>`；之後所有 `gh` 查詢用 canonical URL，或同時帶
+`<N> --repo <target-repo>`，不可只留下編號。home repo 只決定 board 與產物位置。
+以 parallel 方式抓**每個 PR** 的 lightweight metadata（不抓 diff）：
 
 ```bash
-gh pr view <N> --repo <repo> --json number,title,additions,deletions,state,isDraft,mergedAt,reviewDecision
+gh pr view <canonical-PR-url> --json number,title,additions,deletions,state,isDraft,mergedAt,reviewDecision
 ```
 
 排序規則：
@@ -55,17 +58,28 @@ merged / closed 的 PR **不需要** review report——只在 queue 表標 skip
 本檔適用的批次模式下，下列選擇直接套用，使用者另有指示才改（單顆審查的流程在 `strict-review` 本體，不受影響）：
 
 - **draft PR 預設跳過**，不逐顆問。
-- **已有舊報告的 PR：head 沒變就跳過，head 變了才審增量。** 先對每顆跑 `gh pr view <n> --json headRefOid`，與舊 review.md 記錄的 `head_sha` 比對；相同就不重審，只在批次總表帶一行（例如「無新 commit，只多了 bot 通知／別人的 approve」）。head 有變時審增量——即使看起來只是 rebase，也用 patch-id 確認 PR 自己的 commit 有沒有動。這與下方「審之前先查 PR state」並存：先查 state（merged／closed 直接 skipped），再比 head。
+- **已有舊報告的 PR：同 head 且 coverage 足夠才跳過。** 先查 state（merged／closed 直接 skipped），再取 `gh pr view <canonical-PR-url> --json headRefOid`。執行下方 coverage CLI；只有 `reusable: true` 才在批次總表帶一行並略過。舊報告沒有 coverage、先前只做 design-preview／compliance-only、checklist 不足或必要驗證未 `passed`，都不因 head 相同而跳過；沿用已完成部分，只補缺少的項目或驗證。head 有變時審增量——即使看起來只是 rebase，也用 patch-id 確認 PR 自己的 commit 有沒有動。
 - **模型調度用相對降檔**（對齊 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md) 的精神）：探索、規劃、審查三個角色在批次時可比單顆審查降一檔（基準＝單顆審查的調度）；驗證角色可再降一檔，因為它只做機械性的實跑與 read-back。單顆 PR 或高風險 PR 不適用。
 
 Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠大於收益；使用者在一次 46 顆的批次前如此選擇。head 沒變就跳過則是使用者明確推翻「全部重審」的舊預設（「沒有改動就不用重審」）；以此為準。
+
+coverage 判斷由共同 publisher 讀取結構 metadata，必要 checklist 來自 `hooks/review_modes.json`：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" check-coverage \
+  --cwd <home-repo-root> --repo <home-owner/name> --source <canonical-PR-url> \
+  --owner <mine-or-others> --head <current-full-head-sha> --mode <requested-mode>
+```
+
+CLI exit 0 表示成功判斷，**不是可以跳過**；必須讀 `reusable`。exit 非零時視為不能復用，先處理錯誤。
+`reason` 與 `missing_checklist_items` 說明還缺什麼；不從正文的「APPROVE」反推曾查過全部項目。
 
 ## 預設：平行審完全部、統一 publish、board 放最前
 
 多 PR 參數的預設流程（不必使用者另外交代）：
 
-1. **先排隊、再一次 fetch**：樂奈 metadata 排好 queue、前置處理表過完後，orchestrator
-   **一次**把所有要審的 PR head fetch 成具名本機 ref（`+pull/<N>/head:refs/review/pr-<N>-latest`，
+1. **先排隊、按 target repo 各自 fetch**：樂奈 metadata 排好 queue、前置處理表過完後，orchestrator
+   在各 target checkout **一次**把該 repo 要審的 PR head fetch 成具名本機 ref（`+pull/<N>/head:refs/review/<owner>/<repo>/pr-<N>-latest`，
    不用 `FETCH_HEAD`，fetch 後對 `headRefOid`——細節見下方「大批平行 spawn」一節的 fetch 規則）。
    各 agent 不各自 fetch，避免搶 fetch 與讀到別顆的 head。
 2. **平行審**：🟡 爽世唯讀，並行度不受下面這條上限；🟣 立希每顆各自一個**獨立 worktree**（Airflow
@@ -117,7 +131,7 @@ review 報告寫得多完整都不算交付——**貼上 GitHub 才算**。apac
 - **一顆審完就貼**，不要累積成批等「一起送」。
 - **先貼粗版再補**：must-fix ＋ 一句證據就夠，nit 可後續補留言。完美措辭的邊際價值遠低於
   時效。
-- **審之前先查 PR state**：`gh pr view <n> --json state,mergedAt,headRefOid`。避免審
+- **審之前先查 PR state**：`gh pr view <canonical-PR-url> --json state,mergedAt,headRefOid`。避免審
   已 merged 的 PR，也避免審過期的 head。
 - 若同一 PR 上已有其他人提出同樣的點，**改成接話而非重述**，否則就是 reviewer noise。
 
@@ -149,19 +163,19 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   `~/airflow`）；根因與其他症狀見
   [`airflow-aware` 的「Every worktree shares one sqlite test DB」一節](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)。
 
-- 立希的驗證 worktree **一律用獨立後綴路徑**（`.worktrees/review-<N>-verify`），交辦文寫明該路徑，
+- 立希的驗證 worktree **一律用獨立後綴路徑**（`.worktrees/review-<owner>-<repo>-<N>-verify`），交辦文寫明該路徑，
   不沿用也不移除既有的 `.worktrees/review-<N>`——重審時它常是舊輪次留下、停在舊 head 的 worktree，
   不是這次建的。`git worktree add` 回 `already exists`，或既有 worktree 的 HEAD 與 `headRefOid` 不符，
   立希應停手回報而非自行刪除；收尾只 `git worktree remove` 自己建的那個。
   （實例：5 顆重審批次中，一隻立希在 `review-76575` 撞到停在上一輪 head 的舊 worktree，
   整輪驗證停擺，換成 `-verify` 路徑重派才跑通。）
 
-- 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到具名 ref**（例如
-  `git fetch <remote> +pull/<N>/head:refs/review/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
+- 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到含 target repo 的具名 ref**（例如
+  `git -C <target-root> fetch <matching-remote> +pull/<N>/head:refs/review/<owner>/<repo>/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
   「不要用 `FETCH_HEAD`」。**refspec 開頭要有 `+`**：重審時早先 session 留下的同名 ref 已存在，
   沒有 `+` 會被 `! [rejected] (non-fast-forward)` 拒絕、ref 靜默留在舊 head，後面的 worktree 與
   所有派工就對著舊 head 審（實例：重審時 `review-pr-<N>` 仍指著舊 head，PR 實際 head 早已前進）。fetch 後一律拿 `git rev-parse <ref>` 與
-  `gh pr view <N> --json headRefOid` 比對，不一致就停下重抓。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
+  `gh pr view <canonical-PR-url> --json headRefOid` 比對，不一致就停下重抓。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
   讀到的可能是別隻 agent 的 PR。實例（2026-10-01）：一隻探索 agent 拿 `git diff main FETCH_HEAD`
   看到另一顆 PR 的 snowflake 改動，就誤判成「main 在 session 中途被 fast-forward」；查 `git reflog`
   才確認 main 根本沒動。
@@ -169,39 +183,48 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
 ## 立希的驗證 worktree（單 PR 與批次共用）
 
 立希跑 test / lint / type check 一律在獨立的 detached worktree 裡，**不切換使用者目前的 branch**——
-PR 入口與 branch 入口都一樣，不用 `gh pr checkout`、不用 `git checkout`。下面只是把上面已寫的規則
-（`-verify` 後綴路徑、具名 ref fetch、HEAD 對 `headRefOid`、只清自己建的）落成指令順序，沒有新規則。
+PR 入口與 branch 入口都一樣，不用 `gh pr checkout`、不用 `git checkout`。
+PR URL 的 target repo 決定讀碼與驗證 checkout，入口的 home repo 決定產物與 board；兩者不能混用。
 下列指令由 orchestrator 執行，立希只拿到建好的絕對路徑。
 
-1. **主 worktree 根目錄與前置檢查**：`root` 取 `git worktree list --porcelain` 的第一筆 `worktree` 路徑；
+1. **確認 target checkout 與前置檢查**：先記下入口 `home-root`；從 canonical URL 取得 `<owner>/<repo>`，
+   查 `git remote -v`，核對 remote URL 的 repo 身分（HTTPS／SSH 形式都以 owner/repo 比對）。
+   有對應 target 的 remote 才能用這個 checkout，不能因為 remote 叫 `upstream` 就當作目標。
+   沒有相符 remote 時，使用已確認的 target repo checkout；尚無 checkout 就 clone
+   `https://github.com/<owner>/<repo>.git` 到 `<scratchpad>/review-checkouts/<owner>/<repo>`。
+   **不把其他 repo 的 PR objects fetch 進 home repo**。clone 失敗要回報驗證 unavailable，不退回 home remote。
+   `root` 取 target checkout 執行 `git worktree list --porcelain` 的第一筆 `worktree` 路徑；
    `git -C "$root" check-ignore -q .worktrees/probe` 必須通過，不通過就停下請使用者處理
    （見 [`worktree-automation`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-automation.md)
-   的 1a 節）；並先查剩餘磁碟（每個約 2GB+，Airflow 這類大 repo 尤其要看）。
+   的 1a 節）；只有本輪新 clone 的 scratch checkout，可直接把 `.worktrees/` 加到它自己的
+   `.git/info/exclude` 後重查，不改既有 checkout 的排除規則。並先查剩餘磁碟
+   （每個約 2GB+，Airflow 這類大 repo 尤其要看）。branch／range 入口的 target 就是入口 checkout。
 2. **取得目標 commit**：
-   - PR 入口：orchestrator 自己 `git fetch <remote> +pull/<N>/head:refs/review/pr-<N>-latest`
-     （`<remote>` 與 [`/maigo:go`](https://github.com/Lee-W/maigo/blob/main/commands/go.md) 一致：
-     `git remote get-url upstream` 成功就用 `upstream`，否則用 `origin`），
-     再讓 `git rev-parse refs/review/pr-<N>-latest` 與 `gh pr view <N> --json headRefOid` 比對，
+   - PR 入口：orchestrator 自己 `git -C <target-root> fetch <matching-remote> +pull/<N>/head:refs/review/<owner>/<repo>/pr-<N>-latest`，
+     `<matching-remote>` 必須是上一步已核對 target identity 的 remote。
+     再讓 `git -C <target-root> rev-parse refs/review/<owner>/<repo>/pr-<N>-latest`
+     與 `gh pr view <canonical-PR-url> --json headRefOid` 比對，
      不一致就停下重抓。
-   - branch 入口：`git rev-parse <branch>` 取 SHA，確認它是使用者要審的那個 tip。
-3. **算路徑**：`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" --topic "review-<N>-verify" --cwd "$root"`，
+   - branch／range 入口：`git -C <target-root> rev-parse <reviewed-tip>` 取 SHA，確認它是使用者要審的那個 tip。
+3. **算路徑**：`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_path.py" --topic "review-<owner>-<repo>-<N>-verify" --cwd "$root"`，
    取輸出的 `path:`；輸出的 `branch:` 忽略（detached 不用 branch）。branch 入口把 `<N>` 換成 branch 名。
-4. **建立**：`git worktree add --detach <path> <ref 或 SHA>`。回 `already exists`，或建好後
+   本地無 GitHub repo identity 時以 `local-<checkout-name>` 取代 `<owner>-<repo>`。
+4. **建立**：`git -C <target-root> worktree add --detach <path> <ref 或 SHA>`。回 `already exists`，或建好後
    `git -C <path> rev-parse HEAD` 與目標不符，就停手回報——不刪、不沿用既有的 `review-<N>`。
-5. **交辦立希**：只對立希寫該 worktree 的絕對路徑為 cwd；🐱 樂奈、🟡 爽世仍讀主 checkout，
-   用 `git show <sha>:<file>` 或 diff，不讀工作樹。
+5. **交辦立希**：只對立希寫該 worktree 的絕對路徑為 cwd；🐱 樂奈、🟡 爽世讀 target checkout，
+   用 `git -C <target-root> show <sha>:<file>` 或 diff，不讀 home 工作樹。
 6. **產物**：新 worktree 沒有 `.maigo`（symlink 由 SessionStart 的 `ensure_link` 建，
    `git worktree add` 不會產生它）。review 產物（rubric、review、草稿、board）一律由 orchestrator
-   從主 checkout 的 `.maigo` 寫；立希的 log 與 PoC 放 scratchpad 的絕對路徑；
+   從 `home-root` 的 `.maigo` 寫；立希的 log 與 PoC 放 scratchpad 的絕對路徑；
    不得在驗證 worktree 內建立實體 `.maigo/`。
 7. **收尾**：只處理本次自己建的那一個路徑，逐條列出指令後再執行，不鏈一大串；`refs/review/*` 不刪。
-   - `git worktree remove <本次自己建的絕對路徑>`。
+   - `git -C <target-root> worktree remove <本次自己建的絕對路徑>`。
    - 立希跑完測試後 worktree 常有 untracked 或 modified 檔，git 會回
      `fatal: '<path>' contains modified or untracked files, use --force to delete it`。
      這時先 `git -C <path> status --short` 確認內容只是驗證產物（測試快取、build 輸出、log），
-     再對**同一個路徑**執行 `git worktree remove --force <path>`；內容不像驗證產物就不要強制，照下一條回報。
+     再對**同一個路徑**執行 `git -C <target-root> worktree remove --force <path>`；內容不像驗證產物就不要強制，照下一條回報。
    - 仍移除失敗，或流程中途中斷（session 結束、立希失敗、停手）：不刪其他任何東西，
-     在最終報告列出殘留的 worktree 路徑與 `refs/review/pr-<N>-latest`，讓使用者決定。
+     在最終報告列出 target checkout、殘留 worktree 路徑與 `refs/review/<owner>/<repo>/pr-<N>-latest`，讓使用者決定。
 
 ## 持久 Work Board（跨 session 追蹤）
 

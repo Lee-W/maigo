@@ -573,3 +573,287 @@ def test_maigo_symlink_outside_state_root_is_refused(tmp_path):
     with pytest.raises(ValueError, match="escapes"):
         publish(repo)
     assert list(outside.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("old_mode", "items", "verification", "requested_mode", "current_head", "reason"),
+    [
+        pytest.param(
+            "design-preview",
+            [1, 4],
+            "skipped",
+            "full",
+            HEAD,
+            "checklist_incomplete",
+            id="preview-to-full",
+        ),
+        pytest.param(
+            "design-preview",
+            [1, 4],
+            "passed",
+            "full",
+            HEAD,
+            "checklist_incomplete",
+            id="preview-with-extra-validation",
+        ),
+        pytest.param(
+            "design-preview",
+            [1, 4],
+            "skipped",
+            "design-preview",
+            HEAD,
+            "covered",
+            id="preview-covered",
+        ),
+        pytest.param(
+            "full",
+            list(range(1, 10)),
+            "passed",
+            "compliance-only",
+            HEAD,
+            "covered",
+            id="full-covers-compliance",
+        ),
+        pytest.param(
+            "compliance-only",
+            [4, 5, 6, 7, 8],
+            "passed",
+            "full",
+            HEAD,
+            "checklist_incomplete",
+            id="compliance-to-full",
+        ),
+        pytest.param(
+            "full",
+            [1, 4],
+            "passed",
+            "full",
+            HEAD,
+            "checklist_incomplete",
+            id="partial-full",
+        ),
+        pytest.param(
+            "full",
+            list(range(1, 10)),
+            "passed",
+            "full",
+            "b" * 40,
+            "head_changed",
+            id="new-head",
+        ),
+        *[
+            pytest.param(
+                "full",
+                list(range(1, 10)),
+                status,
+                "full",
+                HEAD,
+                "covered" if status == "passed" else "verification_incomplete",
+                id=f"verification-{status}",
+            )
+            for status in report.VERIFICATION_STATUSES
+        ],
+    ],
+)
+def test_coverage_reuse_requires_requested_checklist_and_verification(
+    tmp_path, old_mode, items, verification, requested_mode, current_head, reason
+):
+    result = publish(
+        tmp_path, mode=old_mode, checklist_items=items, verification=verification
+    )
+    record = report.metadata(Path(result["path"]).read_text())
+
+    coverage = report.check_coverage(record, URL, current_head, requested_mode)
+
+    assert coverage["reason"] == reason
+    assert coverage["reusable"] is (reason == "covered")
+
+
+@pytest.mark.parametrize(
+    "legacy", [False, True], ids=["metadata-without-coverage", "unmanaged-legacy"]
+)
+def test_old_publish_call_and_legacy_report_cannot_claim_full_coverage(
+    tmp_path, legacy
+):
+    record = (
+        {} if legacy else report.metadata(Path(publish(tmp_path)["path"]).read_text())
+    )
+
+    assert report.check_coverage(record, URL, HEAD, "full") == {
+        "reusable": False,
+        "reason": "report_missing_or_legacy" if legacy else "coverage_unknown",
+        "missing_checklist_items": list(range(1, 10)),
+    }
+
+
+def test_coverage_reuse_rejects_other_source(tmp_path):
+    record = publish(
+        tmp_path, mode="full", checklist_items=list(range(1, 10)), verification="passed"
+    )
+
+    assert (
+        report.check_coverage(record, URL + "0", HEAD, "full")["reason"]
+        == "source_changed"
+    )
+
+
+@pytest.mark.parametrize(
+    "coverage",
+    [
+        pytest.param({"mode": "full"}, id="missing-items-and-verification"),
+        pytest.param(
+            {"mode": "unknown", "checklist_items": [], "verification": "passed"},
+            id="unknown-mode",
+        ),
+        pytest.param(
+            {"mode": "full", "checklist_items": [1, 1], "verification": "passed"},
+            id="duplicate-items",
+        ),
+        pytest.param(
+            {"mode": "full", "checklist_items": [True], "verification": "passed"},
+            id="boolean-item",
+        ),
+        pytest.param(
+            {
+                "mode": "design-preview",
+                "checklist_items": [1, 2, 4],
+                "verification": "skipped",
+            },
+            id="outside-mode",
+        ),
+        pytest.param(
+            {"mode": "full", "checklist_items": [1], "verification": "green"},
+            id="unknown-verification",
+        ),
+    ],
+)
+def test_invalid_publish_coverage_does_not_write(tmp_path, coverage):
+    with pytest.raises(ValueError):
+        publish(tmp_path, **coverage)
+    assert not (tmp_path / ".maigo").exists()
+
+
+def test_coverage_uses_shared_mode_mapping_instead_of_a_copied_subset(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "hooks/review_modes.json").write_text(json.dumps({"full": [1, 4]}))
+    monkeypatch.setattr(report, "__file__", str(tmp_path / "scripts/review_report.py"))
+    record = {
+        "source": URL,
+        "head_sha": HEAD,
+        "mode": "full",
+        "checklist_items": [1, 4],
+        "verification": "passed",
+    }
+
+    assert report.check_coverage(record, URL, HEAD, "full")["reusable"] is True
+
+
+@pytest.mark.parametrize("undo", [False, True], ids=["acknowledge", "undo"])
+def test_acknowledge_rejects_republished_same_head_inside_lock(tmp_path, undo):
+    old = publish(tmp_path)
+    current = publish(tmp_path)
+    path = Path(current["path"])
+    previous = path.read_text()
+
+    with pytest.raises(report.ReviewChangedError, match="Review changed;"):
+        report.acknowledge(
+            tmp_path,
+            URL,
+            "owner/project",
+            HEAD,
+            "reviewer",
+            undo=undo,
+            owner="others",
+            expected_reviewed_at=old["reviewed_at"],
+        )
+
+    assert path.read_text() == previous
+
+
+def test_acknowledge_accepts_expected_report_version(tmp_path):
+    current = publish(tmp_path)
+
+    result = report.acknowledge(
+        tmp_path,
+        URL,
+        "owner/project",
+        HEAD,
+        "reviewer",
+        owner="others",
+        expected_reviewed_at=current["reviewed_at"],
+    )
+
+    assert result["acknowledged_by"] == "reviewer"
+
+
+def test_cli_publish_and_check_coverage_are_explicit_and_read_only(tmp_path, capsys):
+    body = tmp_path / "body.md"
+    body.write_text(BODY)
+    common = [
+        "--cwd",
+        str(tmp_path),
+        "--source",
+        URL,
+        "--repo",
+        "owner/project",
+        "--owner",
+        "others",
+        "--head",
+        HEAD,
+    ]
+    assert (
+        report.main(
+            [
+                "publish",
+                *common,
+                "--title",
+                "Preview",
+                "--body-file",
+                str(body),
+                "--verdict",
+                "APPROVE",
+                "--mode",
+                "design-preview",
+                "--checklist-items",
+                "1",
+                "4",
+                "--verification",
+                "skipped",
+            ]
+        )
+        == 0
+    )
+    published = json.loads(capsys.readouterr().out)
+    path = Path(published["path"])
+    previous = path.read_text()
+
+    assert report.main(["check-coverage", *common, "--mode", "full"]) == 0
+    assert json.loads(capsys.readouterr().out)["reusable"] is False
+    assert path.read_text() == previous
+
+
+def test_cli_check_coverage_missing_report_does_not_create_state(tmp_path, capsys):
+    assert (
+        report.main(
+            [
+                "check-coverage",
+                "--cwd",
+                str(tmp_path),
+                "--source",
+                URL,
+                "--repo",
+                "owner/project",
+                "--owner",
+                "others",
+                "--head",
+                HEAD,
+                "--mode",
+                "full",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["reusable"] is False
+    assert not (tmp_path / ".maigo").exists()

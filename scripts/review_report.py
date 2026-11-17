@@ -25,6 +25,75 @@ from maigo_state import check_maigo_link_trusted  # noqa: E402
 
 _METADATA = re.compile(r"^<!-- maigo-review: (.+) -->$", re.MULTILINE)
 VERDICTS = ("APPROVE", "APPROVE_WITH_NITS", "NEEDS_CHANGES", "BLOCKED")
+VERIFICATION_STATUSES = ("passed", "failed", "unavailable", "skipped", "known_failures")
+
+
+class ReviewChangedError(ValueError):
+    """The report was republished after the caller observed it."""
+
+
+def required_checklist(mode: str) -> list[int]:
+    """Read the shared checklist mapping instead of copying review-mode subsets."""
+    modes = json.loads(
+        (
+            Path(__file__).resolve().parent.parent / "hooks" / "review_modes.json"
+        ).read_text()
+    )
+    if mode not in modes:
+        raise ValueError(f"Unknown review mode: {mode}")
+    return modes[mode]
+
+
+def validate_coverage(record: dict) -> None:
+    """Coverage is optional for old callers, but must be explicit and complete."""
+    keys = ("mode", "checklist_items", "verification")
+    if not any(key in record for key in keys):
+        return
+    if not all(key in record for key in keys):
+        raise ValueError(
+            "Review coverage requires mode, checklist_items and verification"
+        )
+    mode = record["mode"]
+    if not isinstance(mode, str):
+        raise ValueError("Review mode must be a string")
+    required = required_checklist(mode)
+    items = record["checklist_items"]
+    if (
+        not isinstance(items, list)
+        or any(type(item) is not int or item not in required for item in items)
+        or len(items) != len(set(items))
+    ):
+        raise ValueError(
+            "checklist_items must be distinct item numbers from the review mode"
+        )
+    if record["verification"] not in VERIFICATION_STATUSES:
+        raise ValueError("Unknown review verification status")
+
+
+def check_coverage(record: dict, source: str, head_sha: str, mode: str) -> dict:
+    """Reuse only coverage of the requested source, head and required review stages."""
+    required = required_checklist(mode)
+    validate_coverage(record)
+    reason = None
+    missing = sorted(set(required) - set(record.get("checklist_items", [])))
+    if not record:
+        reason = "report_missing_or_legacy"
+    elif record.get("source") != source:
+        reason = "source_changed"
+    elif record.get("head_sha") != head_sha:
+        reason = "head_changed"
+    elif not all(key in record for key in ("mode", "checklist_items", "verification")):
+        reason = "coverage_unknown"
+    else:
+        if missing:
+            reason = "checklist_incomplete"
+        elif mode != "design-preview" and record["verification"] != "passed":
+            reason = "verification_incomplete"
+    return {
+        "reusable": reason is None,
+        "reason": reason or "covered",
+        "missing_checklist_items": missing,
+    }
 
 
 def metadata(text: str) -> dict:
@@ -42,6 +111,7 @@ def metadata(text: str) -> dict:
         raise ValueError("Review metadata requires source, head_sha and reviewed_at")
     if value.get("verdict") not in VERDICTS:
         raise ValueError("Unknown review verdict")
+    validate_coverage(value)
     if "author" in value and not (
         isinstance(value["author"], str) and value["author"].strip()
     ):
@@ -209,6 +279,9 @@ def publish(
     verdict: str,
     author: str | None = None,
     owner: str | None = None,
+    mode: str | None = None,
+    checklist_items: list[int] | None = None,
+    verification: str | None = None,
 ) -> dict:
     owner = resolve_owner(source, owner)
     path = report_path(root, source, home_repo, owner)
@@ -219,6 +292,13 @@ def publish(
         "verdict": verdict,
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
     }
+    coverage = {
+        "mode": mode,
+        "checklist_items": checklist_items,
+        "verification": verification,
+    }
+    record.update({key: value for key, value in coverage.items() if value is not None})
+    validate_coverage(record)
     if author is not None:
         if not author.strip():
             raise ValueError("Review author must be a non-empty string")
@@ -281,6 +361,7 @@ def acknowledge(
     you: str,
     undo: bool = False,
     owner: str | None = None,
+    expected_reviewed_at: str | None = None,
 ) -> dict:
     path = report_path(root, source, home_repo, owner)
     with report_lock(path):
@@ -289,6 +370,13 @@ def acknowledge(
         if not record or record.get("source") != source:
             raise ValueError(
                 "Publish a timestamped review for this PR before marking it read"
+            )
+        if (
+            expected_reviewed_at is not None
+            and record["reviewed_at"] != expected_reviewed_at
+        ):
+            raise ReviewChangedError(
+                "Review changed; reread this version before marking it read"
             )
         if not undo and record.get("head_sha") != head_sha:
             raise ValueError(
@@ -318,7 +406,7 @@ def acknowledge(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("publish", "acknowledge"))
+    parser.add_argument("action", choices=("publish", "acknowledge", "check-coverage"))
     parser.add_argument("--cwd", type=Path, default=Path.cwd())
     parser.add_argument("--repo", default="")
     parser.add_argument(
@@ -336,6 +424,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--you")
     parser.add_argument("--undo", action="store_true")
     parser.add_argument(
+        "--mode", help="Actual publish mode or requested check-coverage mode"
+    )
+    parser.add_argument(
+        "--checklist-items", type=int, nargs="*", help="Items actually reviewed"
+    )
+    parser.add_argument("--verification", choices=VERIFICATION_STATUSES)
+    parser.add_argument("--expected-reviewed-at", help="Report version to acknowledge")
+    parser.add_argument(
         "--owner",
         choices=("mine", "others"),
         help="PR author is you (mine → pr/) or someone else (others → review/); "
@@ -346,6 +442,14 @@ def main(argv: list[str] | None = None) -> int:
         if not re.fullmatch(r"[0-9a-fA-F]{40,64}", args.head):
             raise ValueError("--head must be a full commit hash")
         source = args.source.rstrip("/")
+        if args.expected_reviewed_at is not None and args.action != "acknowledge":
+            raise ValueError("--expected-reviewed-at is only valid with acknowledge")
+        if args.action != "publish" and (
+            args.checklist_items is not None or args.verification is not None
+        ):
+            raise ValueError(
+                "--checklist-items and --verification are only valid with publish"
+            )
         if args.action == "publish":
             if not args.title or not args.body_file or not args.verdict or args.undo:
                 raise ValueError("publish requires --title, --body-file and --verdict")
@@ -359,8 +463,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.verdict,
                 args.author,
                 args.owner,
+                args.mode,
+                args.checklist_items,
+                args.verification,
             )
-        else:
+        elif args.action == "acknowledge":
+            if args.mode is not None:
+                raise ValueError("--mode is not valid with acknowledge")
             if args.author is not None:
                 raise ValueError("--author is only valid with publish")
             if not args.you:
@@ -373,7 +482,17 @@ def main(argv: list[str] | None = None) -> int:
                 args.you,
                 args.undo,
                 args.owner,
+                args.expected_reviewed_at,
             )
+        else:
+            if not args.mode:
+                raise ValueError("check-coverage requires --mode")
+            path = report_path(args.cwd.resolve(), source, args.repo, args.owner)
+            record = metadata(path.read_text()) if path.exists() else {}
+            result = {
+                "path": str(path),
+                **check_coverage(record, source, args.head, args.mode),
+            }
     except (OSError, ValueError) as error:
         print(f"review_report: {error}", file=sys.stderr)
         return 1

@@ -2,7 +2,7 @@
 
 Loaded on demand by [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) —
 full semantics for `--mode` / `--bilingual`: the mode-to-checklist-subset table, how the
-orchestrator threads mode into the rubric and into Soyo / Taki prompts, and the bilingual
+orchestrator threads mode into the rubric, coverage metadata and Soyo / Taki prompts, and the bilingual
 output trigger + Taiwanese Mandarin prose rules. Read this file when parsing `--mode=*` /
 `--bilingual` or deciding whether to skip the Taki stage.
 
@@ -30,6 +30,8 @@ Orchestrator 在啟動 Soyo / Taki 前先解析 `--mode` 與 `--bilingual`：
 - 🟡 Soyo 收到 prompt 時被明確告知 checklist subset，依共用 mode 資料保留完整 9 項，使用 `## Checklist (mode=<name>)`；不在 subset 的項標 `[—]` 且逐項附 `skipped by mode=<name>`。
 - mode = `design-preview` → 不啟動 Taki stage；最終報告 Verification 段註記「Skipped (mode=design-preview)」
 - mode = `compliance-only` → 正常啟動 Taki stage（與 full mode 相同）
+- publish 時顯式傳 `--mode`、`--checklist-items` 與 `--verification`，只記實際查過的項目及實際驗證結果；`design-preview` 未跑驗證填 `skipped`。必要項目仍由 `hooks/review_modes.json` 讀取，不另維護副本。
+- 同 head 的舊報告不代表完整審查：批次略過前執行 `review_report.py check-coverage --mode <requested-mode>`，只有來源、head、必要項目與驗證都覆蓋此次要求才復用；`full`／`compliance-only` 必須已有 `passed`，`design-preview` 不要求驗證。舊報告缺 coverage 時保守視為未知，不能補填 `full` 來省略審查。完整 CLI 見 [batch-queue](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)。
 - `--bilingual` 旗標**或** repo-detect 回報 `apache/airflow` → orchestrator 在最終 report 前面加一段 Taiwanese Mandarin 快結（見「## 雙語輸出」）；不影響 Soyo / Taki 行為
 
 ## 雙語輸出

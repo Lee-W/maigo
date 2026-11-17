@@ -167,6 +167,11 @@ hook 與執行角色都以它為準；下表是用途摘要。輸出 `## Checkli
 每個略過的 code-review 項目都附 `skipped by mode=<name>`，同份報告不可混用模式。
 純測試變更用 `test-only`；沒有指定時用 `full`。`triage` 是 issue 分類檢查，非 code review。
 
+持久報告記錄實際 mode、已查項目與驗證結果；同 head 只有 coverage 足夠才可復用，見
+[review-modes](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-modes.md)。
+單 PR 與批次的驗證先核對 canonical target repo、使用該 repo 的 checkout；批次 coverage CLI、
+fetch/ref/worktree 與 home 產物分工見 [batch-queue](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)。
+
 | Context | Adaptation |
 |---------|-----------|
 | Internal code (you own it) | Give specific改法 with exact code |
