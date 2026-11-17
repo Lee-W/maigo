@@ -490,6 +490,11 @@ per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問�
 **例外：board 還是舊格式時這條無從執行**——舊行文法把 URL / 規模 / 產物路徑都內嵌在索引行裡，
 `.maigo/i/` 整個目錄不存在。此時只更新索引行，不要為單一項目憑空生一份細節檔（那會讓同一份
 board 一半有細節檔一半沒有）；細節檔由 `/maigo:board` 在整檔正規化時一次建齊，見 §2 向下相容段。
+**例外：`board.md` 不存在、但同目錄有 `board.md.migrated`（或 `review-board.md.migrated`）時，
+不建骨架、也不靜默略過**——只有搬遷殘檔、沒有現役 board，可能是使用者已停用 board，也可能是搬遷後
+還沒重建，收尾 upsert 分不出是哪一種；憑空建骨架會讓一份只有單一項目的 board 冒出來。改在收尾
+summary 說明「board 不存在（只有 `.migrated` 殘檔），本次未回寫」，並建議跑 `/maigo:board` 重建。
+（2026-11-13 apache/airflow #71072：address-comments 步驟 8 撞到此情境。）
 
 **併發寫回（board 是跨 session 共用的單一檔，不帶任務識別碼，所以要靠寫法自保）**。
 共同目的：別人動過就吵，不安靜覆蓋。寫入者有兩種：
