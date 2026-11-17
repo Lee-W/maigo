@@ -21,15 +21,15 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 .maigo/
 ├── board.md                    Work Board 索引（人讀）
 ├── i/<slug>.md                 Work Board 細節檔（人讀）
-├── pr/<id>/                    自己的 PR：plan.md、rubric.md、review.md、reply-draft.md …
+├── pr/<id>/                    自己的 PR：plan.md、summary.md、rubric.md、review.md、reply-draft.md …
 ├── review/<id>/                別人的 PR：review.md、rubric.md、draft.md、pr-comments.md …
-├── issue/<id>/                 issue：plan.md、rubric.md
-├── topic/<slug>/               沒有 PR / issue 的任務：plan[-n].md
+├── issue/<id>/                 issue：plan.md、summary.md、rubric.md
+├── topic/<slug>/               沒有 PR / issue 的任務：plan[-n].md、summary[-n].md
 ├── _archive/<原相對路徑>        已結案項目，鏡射上面的相對路徑（review/、pr/、i/ 由 /maigo:board 與 /maigo:tidy 封存；issue/、topic/ 由 /maigo:tidy 封存）
 └── _internal/                  只給機器讀：board/、log/、tidy/backup/
 ```
 
-- `plan` 的 group 依 URL 決定：PR URL → `pr/`、issue URL → `issue/`，其餘 → `topic/`。
+- `plan` 與 `summary` 的 group 依 URL 決定（`summary` 與它所總結的 plan 同目錄）：PR URL → `pr/`、issue URL → `issue/`，其餘 → `topic/`。
   在預設分支（`main` / `master` / `develop` / `trunk`）上，識別碼不用分支名，用
   `--slug`（優先）或 `--topic` 的 H1 slug；兩者都推不出來就報錯，不退回短 SHA。
 - 同一個 group 目錄收同一顆 PR / issue / topic 的所有產物；conflict 的第 2 個 attempt
@@ -45,11 +45,12 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 `status: conflict`，呼叫端必須先問使用者再決定要不要用建議的候選路徑（從第 2 個 attempt 起第一個未被其他主題占用者；也可能指到 H1 相同的既有檔，status 仍是 conflict），
 不擅自覆寫。兩種形狀都是巢狀：
 
-### `plan`（巢狀，`<group>/<id>/plan.md`，group 依 URL 分 `pr` / `issue` / `topic`）
+### `plan` / `summary`（巢狀，`<group>/<id>/<stem>.md`，group 依 URL 分 `pr` / `issue` / `topic`）
 
 | 種類 | 檔名規則 | 誰寫的 | 正典來源 | 生命週期 |
 |------|----------|--------|----------|----------|
 | `plan` | `.maigo/pr/<id>/plan.md`（PR URL）／`.maigo/issue/<id>/plan.md`（issue URL）／`.maigo/topic/<slug>/plan.md`（其餘；預設分支用 `--slug`） | 🩵 Tomori | `scripts/artifact_path.py` + [artifact-ownership](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) | 單次任務的實作計畫，任務結束後仍留存供追溯 |
+| `summary` | 與該任務的 `plan.md` 同目錄：`.maigo/pr/<id>/summary.md`／`.maigo/issue/<id>/summary.md`／`.maigo/topic/<slug>/summary.md`（由本次 plan 路徑經 `artifact_path.py summary-for-plan` 推導：`plan-<n>.md` → `summary-<n>.md`） | orchestrator（`/maigo:go`、`/maigo:team` 收尾） | `scripts/artifact_path.py`（`summary-for-plan`；kind `summary` 為退路）＋ [`run-summary-template.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md) | 單次任務的收尾報告：為什麼做、做了什麼、怎麼做，含三張純文字圖；任務結束後仍留存供追溯，隨 PR／issue／topic 目錄一起被 `/maigo:tidy` 封存 |
 
 ### `review` / `pr` / `issue`（巢狀，`<group>/<id>/<stem>.md`）——按 PR/issue 分資料夾
 

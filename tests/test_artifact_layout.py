@@ -8,6 +8,7 @@ blank line after a closing code fence.
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import Path
 
 from scripts import board_refresh as refresh
@@ -225,3 +226,96 @@ class TestScriptArtifactsAreFixedPoints:
             }
         )
         assert layout_violations(section) == []
+
+
+_TEMPLATE = (
+    Path(__file__).resolve().parent.parent
+    / "skills"
+    / "teammate-flow"
+    / "references"
+    / "run-summary-template.md"
+)
+
+
+def _template_markdown_blocks() -> list[str]:
+    text = _TEMPLATE.read_text(encoding="utf-8")
+    return re.findall(r"^````markdown\n(.*?)^````\n", text, re.S | re.M)
+
+
+def _display_width(line: str) -> int:
+    return sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in line)
+
+
+class TestRunSummaryTemplate:
+    def test_template_has_a_skeleton_and_a_filled_example(self):
+        assert len(_template_markdown_blocks()) == 2
+
+    def test_skeleton_and_example_are_fixed_points(self):
+        for block in _template_markdown_blocks():
+            assert layout_violations(block) == []
+
+    def test_skeleton_and_example_have_the_required_sections_in_order(self):
+        for block in _template_markdown_blocks():
+            headings = [line for line in block.splitlines() if line.startswith("## ")]
+            assert headings == [
+                "## 為什麼做",
+                "## 做了什麼",
+                "## 怎麼做",
+                "## 驗證",
+                "## 沒處理的",
+            ]
+
+    def test_skeleton_and_example_have_three_text_diagrams(self):
+        for block in _template_markdown_blocks():
+            assert len(re.findall(r"^```text\n(.*?)^```\n", block, re.S | re.M)) == 3
+            assert "```" not in re.sub(
+                r"^```text\n.*?^```\n", "", block, flags=re.S | re.M
+            )
+
+    def test_skeleton_and_example_open_with_the_four_header_fields_in_order(self):
+        for block in _template_markdown_blocks():
+            lines = block.splitlines()
+            assert lines[0].startswith("# ")
+            assert lines[1] == ""
+            fields = [re.match(r"- \*\*(.+?)\*\*：", line) for line in lines[2:6]]
+            assert [m.group(1) if m else None for m in fields] == [
+                "日期",
+                "結果",
+                "計畫",
+                "commit",
+            ]
+            assert lines[6] == ""
+
+    def test_skeleton_plan_field_is_a_placeholder_not_a_hard_coded_file(self):
+        skeleton = _template_markdown_blocks()[0]
+        assert "- **計畫**：`<本次實際的 plan 檔名>`" in skeleton.splitlines()
+
+    def test_example_agent_names_outside_diagrams_carry_the_emoji_prefix(self):
+        example = _template_markdown_blocks()[1]
+        prose = re.sub(r"^```text\n.*?^```\n", "", example, flags=re.S | re.M)
+        prefixes = {
+            "樂奈": "🐱",
+            "燈": "🩵",
+            "愛音": "🎀",
+            "爽世": "🟡",
+            "立希": "🟣",
+        }
+        mentioned = 0
+        for name, emoji in prefixes.items():
+            mentioned += prose.count(name)
+            assert prose.count(name) == prose.count(f"{emoji} {name}"), name
+        assert mentioned > 0
+
+    def test_example_diagrams_follow_the_text_diagram_rules(self):
+        example = _template_markdown_blocks()[1]
+        diagrams = re.findall(r"^```text\n(.*?)^```\n", example, re.S | re.M)
+        assert len(diagrams) == 3
+        for diagram in diagrams:
+            for line in diagram.splitlines():
+                assert line.isascii(), line
+                assert line == line.rstrip(), line
+                assert _display_width(line) <= 80, line
+
+    def test_example_has_no_markdown_table(self):
+        example = _template_markdown_blocks()[1]
+        assert not [line for line in example.splitlines() if line.startswith("|")]

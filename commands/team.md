@@ -55,7 +55,7 @@ Orchestrator 守則（旁白、不自實作、不跳關、commit message draft�
 
 | 爽世 | 立希 | 處理 |
 |------|------|------|
-| APPROVED | PASS | 完成。給使用者 summary |
+| APPROVED | PASS | 完成。收尾寫 `summary.md`（teammate-flow 的「Run summary」），再給使用者 summary |
 | APPROVED | FAIL | 回到 🎀 愛音修 failure；受審內容有變就重跑 🟡 爽世 + 🟣 立希，僅環境恢復且內容未變時可沿用 review |
 | NEEDS_CHANGES / BLOCKED | PASS | 回到愛音修 must-fix，**修完要重跑 Soyo + Taki**（不能假設 test 還會綠） |
 | NEEDS_CHANGES / BLOCKED | FAIL | 回到愛音兩邊一起修，重跑 Soyo + Taki |

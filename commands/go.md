@@ -30,6 +30,9 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 收尾時若當前 branch 尚無 PR，會在 final summary 附上可整段複製的 PR title 與 description 草稿
 （不開 PR、不 push），見 teammate-flow 的「Commit message draft + 落地」段。
 
+收尾還會由 orchestrator 寫一份 `summary.md`（為什麼做、做了什麼、怎麼做，含純文字圖）到 plan 所在的
+`.maigo/` 目錄，並在 final summary 附上路徑，見 teammate-flow 的「Run summary」段。
+
 ## `--worktree`（opt-in，預設不開）
 
 帶這個旗標時，在 🐱 樂奈開始之前，orchestrator 親自跑：
