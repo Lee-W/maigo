@@ -25,6 +25,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 - **開場**：`model-dispatch`（解析 `--model-profile`）、`narration`／`orchestrator-voice`（旁白與對話，各命令本來就會載入）
 - **審查階段（🟡 爽世）**：`strict-review`；批次審查才讀 `strict-review/references/review-batch-queue.md`
 - **收尾階段（🟣 立希全綠之後，見下方「Commit message draft + 落地」）**：`commit-message`、`pr-sync-check`、`github-title-description`（含 `draft-bundle`）——**只在走到該步驟時才讀**
+- **寫 run summary 時（PR 草稿／`pr-sync-check` 之後，見下方「Run summary」）**：[`references/run-summary-template.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md) 與 `vim-friendly-artifacts`
 - **`git-workflow` 例外，流程前段就會用到**：開／清 worktree、交辦會跑 git 的 agent（含 stage、amend 範圍與 cwd 規則）、或要動 git index 前確認沒有 agent 在跑時，**那一刻就讀**，不等到收尾
 - **出事才讀**：`failure-handling`（爽世 BLOCKED、立希紅、subagent 中斷時）、`memory-propose-confirm`（🟡 爽世或 🎀 愛音的輸出含 Memory propose 區塊時）
 
@@ -158,7 +159,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 - 每個 agent 完成後依上面的交棒規則給一至兩句摘要，保留角色聲音與事實；必要的決策或缺口可展開
 - 不要跳關。即使任務看起來很小，每一步都要走（此條管**執行階段**；命令設計階段選精實形狀的例外見
   [`harness-discipline` 的 delegation-sizing](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md)）
-- 完成後給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題。Claude Code
+- 完成後先寫 run summary（見下方「Run summary」），再給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題，並附上 summary 檔的路徑。Claude Code
   的 Stop hook 會自行附上一行 token usage；orchestrator 不讀 usage log、不把統計塞回 prompt
 - **呼叫端命令帶了 worktree cwd 時**（`/maigo:go` / `/maigo:take-issue` 的
   `--worktree`，見
@@ -238,6 +239,33 @@ Design rationale、Known limitations 與 Test Plan，見
 已有 PR 時不產草稿，順序改為：commit → `pr-sync-check`。依
 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
 核對當前 branch 已開 PR 的 title/description 是否仍符合現在的實際改動；沒有對應 PR 就走上一段的草稿，不算失敗。
+
+### Run summary（收尾報告）
+
+`/maigo:go` 與 `/maigo:team` 的收尾，在 commit 落地、PR 草稿或 `pr-sync-check` 之後、對話的 final summary 之前，由 orchestrator 寫一份 `summary.md`，用文字與純文字圖說明為什麼做、做了什麼、怎麼做。`/maigo:quick`、`/maigo:take-issue`、`/maigo:address-comments`、`/maigo:review` 的收尾不變。
+
+**步驟**：
+
+1. 取路徑：summary 一律與**本次實際寫出的 plan** 同目錄、同編號——不要另外呼叫 `artifact_path.py summary --topic ...` 重新解析（同目錄已有別的 plan、預設分支沒帶 `--slug`、或 cwd 不同時會落到別處）。本次 plan 的路徑就是流程第 2 步 orchestrator 以 `artifact_path.py plan` 取得、交給 🩵 燈寫入的那個 `path:`（plan 衝突、使用者改用 `plan-2.md` 時是改用後的路徑）。執行 `python3 "<maigo-root>/scripts/artifact_path.py" summary-for-plan "<本次 plan 路徑>"`，輸出的 `path:` 即 summary 路徑（`plan.md` → `summary.md`、`plan-<n>.md` → `summary-<n>.md`）；同一次 run 重寫同一份 summary 是覆寫，屬正常。
+   沒有 plan 路徑可用的退路（go／team 理論上不會發生）：才呼叫 `artifact_path.py summary --topic "<任務標題>"`，必須用與取 plan 時相同的 cwd 與整組參數（`--slug`／`--url`／`--repo`），取得 `path:` 後核對目錄，且「計畫」欄寫「無」；歸屬結果依 [`artifact-ownership`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/artifact-ownership.md) 處理。
+2. 依 [`references/run-summary-template.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md) 的骨架落筆：開頭欄位、`## 為什麼做`、`## 做了什麼`、`## 怎麼做`、`## 驗證`、`## 沒處理的`，其中三張純文字圖的畫法依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md) 的「純文字圖」。
+3. 在 final summary 附上 summary 檔的路徑（`.maigo/…` 開頭，給使用者看的清單，不是 `gf` 對象）。
+
+**為什麼由 orchestrator 自己寫，不委派**：使用者的原始需求、🐱 樂奈的探索、🟡 爽世每一輪的 verdict 與輪數、🟣 立希的實跑結果，多半只存在對話裡、沒有落檔；只有 orchestrator 手上有全貌。委派出去就得把這些原料再轉述一次，轉述的過程正是失真的來源。可靠的磁碟來源只有 plan 檔與 git，其餘靠 orchestrator 在收尾時從對話彙整，所以動筆前先重讀 plan 與 `git log`／`--stat`，不憑記憶。
+
+**何時寫**（單一規則）：本次 run 有任何檔案被改動（已 commit 或未 commit 都算），**且** run 即將結束（完成，或使用者決定結束）才寫；沒有任何檔案被改動就不寫。
+
+- 不寫：plan 確認階段取消、plan 確認後動工前取消、🎀 愛音在任何改動前就失敗（都沒有檔案被改）。
+- 先不寫：停在 retry 上限、等使用者介入時（見 [`failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md) 的「無限迴圈防護」，那是「停下，請使用者介入」，run 還沒結束）。使用者選擇繼續，就等真正結束再寫；選擇結束，才寫，「結果」依下一條判定。
+- 「結果」欄三個值互斥。前提：run 只會因為「完成」或「使用者決定結束」而結束（停在 retry 上限是等使用者決定，不算結束），所以只用「本次 run 有沒有 commit 落地」當分界：
+  - **完成**：plan 的步驟全部做完、🟡 爽世 APPROVED、🟣 立希全綠、commit 已落地——四項全部成立。
+  - **部分完成**：不符合「完成」，但本次 run 至少有一顆 commit 落地。
+  - **中止**：不符合「完成」，且本次 run 沒有任何 commit 落地（改動只留在工作樹）。
+- 結果不是「完成」時，「沒處理的」一節必須逐條寫出「完成」的四項裡哪幾項沒達成，以及使用者為什麼決定結束。
+
+**寫作規則**：只寫實際發生的事，數字必須來自本次實跑；失敗、跳過、沒驗證的如實寫；不以人名或 login 指稱任何人。細則在範本開頭。
+
+這一步沒有 hook 擋：收尾閘門管不到 orchestrator，Codex 端也沒有 hooks，所以只靠這份 skill 的明確步驟。漏寫只是少一份報告，不影響程式碼，屬於品質下降，不擋整個 turn。
 
 ### `/maigo:go` vs `/maigo:team` — 選哪個
 

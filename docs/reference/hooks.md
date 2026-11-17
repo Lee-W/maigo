@@ -184,7 +184,7 @@ PreToolUse 的 `approve` 等於跳過權限系統。這個 hook 沒有資格代�
 
 匹配 `Write` / `Edit` 兩種工具。擋下寫入 `.maigo/` 底下兩種舊形狀的產物：
 
-1. **舊固定檔名**（`plan.md` / `review-rubric.md` / `review.md` / `review-draft.md` /
+1. **舊固定檔名**（`plan.md` / `summary.md` / `review-rubric.md` / `review.md` / `review-draft.md` /
    `triage-rubric.md` / `pr-comments.md` / `reply-draft.md` / `inline-comments.md`；
    即 `_KNOWN_KINDS` 每個 kind 的 `<kind>.md`）
 2. **巢狀 kind 的分目錄前扁平檔**（`review-rubric-42.md` 這類，`kind` 是

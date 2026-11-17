@@ -1,16 +1,17 @@
 # Harness Discipline — Artifact Ownership
 
 Loaded on demand by [`skills/harness-discipline/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) —
-`.maigo/` 底下 agent 寫的 markdown 產物（`plan` / `review` / `review-rubric` /
+`.maigo/` 底下 agent 寫的 markdown 產物（`plan` / `summary` / `review` / `review-rubric` /
 `review-draft` / `triage-rubric` / `pr-comments` / `reply-draft` 這類）曾經被兩個並行
 session 靜默覆寫過，因為它們共用同一個固定檔名，語意上卻該有各自一份；後續
 又改成按 PR/issue 分資料夾，PR 類產物再依 PR 作者分流：別人的 PR 在
 `.maigo/review/<id>/{review,rubric,draft,pr-comments,reply-draft}.md`，自己的 PR 在
 `.maigo/pr/<id>/` 同名檔，issue 在 `.maigo/issue/<id>/rubric.md`；作者判斷用
 [`scripts/pr_owner.py`](https://github.com/Lee-W/maigo/blob/main/scripts/pr_owner.py)
-取得後以 `--owner mine|others` 傳給 `artifact_path.py`；`plan` 不依作者分流，改依 URL 分三組：
+取得後以 `--owner mine|others` 傳給 `artifact_path.py`；`plan` 與 `summary`（`/maigo:go`／`/maigo:team` 的收尾報告）不依作者分流，改依 URL 分三組：
 `.maigo/pr/<id>/plan.md`（PR URL）、`.maigo/issue/<id>/plan.md`（issue URL）、
-`.maigo/topic/<slug>/plan.md`（其餘）。預設分支（`main` / `master` / `develop` /
+`.maigo/topic/<slug>/plan.md`（其餘），`summary.md` 與同一次 run 的 plan 在同一個目錄（路徑由 plan 路徑推導，見
+[`teammate-flow`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/SKILL.md) 的「Run summary」）。預設分支（`main` / `master` / `develop` /
 `trunk`）上識別碼不用分支名，改傳 `--slug`（優先）或由 `--topic` 的 H1 推導；
 兩者都推不出 slug 就報錯。頂層 `.maigo/plan-<id>.md` 已淘汰。
 Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要幫它取
@@ -22,7 +23,7 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
 
 ## 規則（四條，全部程式碼強制，不是靠你記得檢查）
 
-1. **每份這類 markdown 必須以能識別主題的 H1 開頭**（例：`# Plan: <task>`、
+1. **每份這類 markdown 必須以能識別主題的 H1 開頭**（例：`# Plan: <task>`、`# <任務標題>`（summary）、
    `# Review rubric: <PR title>`、`# Review: <PR title / branch / range>`、
    `# Triage rubric: <issue title> (#<N>)`、`# PR comments: <PR title> (#<number>)`、
    `# Reply drafts: <PR title> (#<number>)`）。

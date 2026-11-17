@@ -1,6 +1,6 @@
 # 在編輯器裡讀 Work Board 與 `.maigo` 產物
 
-Maigo 把 plan、review 報告、草稿與 Work Board 都寫成 `.maigo/` 底下的 markdown 檔，
+Maigo 把 plan、run summary、review 報告、草稿與 Work Board 都寫成 `.maigo/` 底下的 markdown 檔，
 你用編輯器直接開來讀、來改。這份文件說明怎麼進去、怎麼在檔案之間跳轉、哪些地方可以手改，
 以及哪些事做不到。讀完約 5 分鐘。
 
@@ -51,6 +51,7 @@ nvim .maigo/board.md
 
 - **board → 細節檔**：移到該行，按 `$` 讓游標落在行尾的路徑上，再按 `gf`。看完用 `<C-o>` 回到 board 原本的位置。
 - **細節檔 → 報告、草稿**：事實區的 `相關檔案` 清單列出該項目的所有產物，游標停在路徑上按 `gf`（檔名含空白或括號的檔會列出，但 `gf` 跳不過去，改用 `:e`）。路徑是相對於該細節檔自己的位置（例如 `../review/4822/review.md`）。
+- **plan → 同資料夾的 summary**：`/maigo:go` 與 `/maigo:team` 收尾會在 plan 旁邊寫一份 `summary.md`（`plan-2.md` 對應 `summary-2.md`），用文字與純文字圖說明為什麼做、做了什麼、怎麼做。plan 本身不會連到它，從 plan 開著的 buffer 用 `:e %:h/summary.md`（`plan-2.md` 就換成 `summary-2.md`）開；summary 檔頭的「計畫」欄反過來指回 plan，游標停在檔名上按 `gf`。細節檔的 `相關檔案` 清單只列 `pr/`、`issue/`、`review/` 底下的檔，`topic/` 底下的 summary 不會出現在那裡，直接開 plan 旁邊的檔。
 - **報告 → 同資料夾的 rubric 等**（rubric 是審查用的檢查清單）：同樣 `gf`，同目錄的檔案只寫檔名（例如 `rubric.md`）。
 - **開 GitHub**：外部網址寫成 `<URL>`，游標在上面按 `gx`。細節檔的 `連結` 那一行就是這樣寫的。
 - **在 board 裡找東西**：四個區標題與狀態詞都是純文字，`/待送出`、`/等別人`、`/4822` 直接命中；`gO` 在 filetype plugin 開啟時會列出標題大綱。

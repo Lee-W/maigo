@@ -22,6 +22,7 @@ Maigo 提供十六個命令，所有命令的 source-of-truth 是 `commands/*.md
 | 4 | Anon | 按 plan 實作 |
 | 5 | Soyo | review（依 `strict-review` skill） |
 | 6 | Taki | 跑 test / lint / type check |
+| 7 | Orchestrator | 收尾：commit 落地、PR 草稿或 `pr-sync-check`，再寫 `summary.md`（為什麼做、做了什麼、怎麼做，含純文字圖；與 plan 同目錄）並在 final summary 附路徑 |
 
 **失敗處理：** 任何 stage 卡關 → 回 Anon 修正。同條 must-fix / failure 連續 **2** 次卡關才停下——詳見 [`skills/failure-handling`](../skills/failure-handling.md)。
 
@@ -48,7 +49,7 @@ Maigo 提供十六個命令，所有命令的 source-of-truth 是 `commands/*.md
 
 | Soyo | Taki | 處理 |
 |------|------|------|
-| APPROVED | PASS | 完成 |
+| APPROVED | PASS | 完成（收尾寫 `summary.md`） |
 | APPROVED | FAIL | 回 🎀 Anon 修 failure；受審內容有變就重跑 🟡 Soyo + 🟣 Taki，僅環境恢復且內容未變時可沿用 review |
 | NEEDS_CHANGES / BLOCKED | PASS | 回 Anon 修 must-fix，修完**重跑 Soyo + Taki** |
 | NEEDS_CHANGES / BLOCKED | FAIL | 兩邊一起修，重跑 |

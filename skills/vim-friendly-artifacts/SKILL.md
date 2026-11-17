@@ -1,6 +1,6 @@
 ---
 name: vim-friendly-artifacts
-description: This skill should be used whenever writing, templating or generating any human-read artifact under `.maigo/` (plan, review report, rubric, draft, pr-comments, reply draft, board.md and i/ detail files). It is the single source for the layout that makes them read and edit well in plain Neovim.
+description: This skill should be used whenever writing, templating or generating any human-read artifact under `.maigo/` (plan, run summary, review report, rubric, draft, pr-comments, reply draft, board.md and i/ detail files). It is the single source for the layout that makes them read and edit well in plain Neovim.
 ---
 
 <!-- mkdocs-include-start -->
@@ -12,6 +12,7 @@ description: This skill should be used whenever writing, templating or generatin
 **Consumers**:
 
 - [`agents/Tomori`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md)（plan、triage rubric）
+- [`teammate-flow` 的 run summary 範本](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md)（summary）
 - [`/maigo:review`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)（review 報告、review draft）
 - [`strict-review` 輸出模板](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)（review rubric、報告骨架）
 - [`github-reply-draft` 模板](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md)（pr-comments、reply-draft）
@@ -28,6 +29,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 - `plan`：[`agents/Tomori.md`](https://github.com/Lee-W/maigo/blob/main/agents/Tomori.md) 的輸出格式段
 - `triage-rubric`：同檔的 triage-issue 模式段
+- `summary`：[`run-summary-template.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md)，`/maigo:go`、`/maigo:team` 收尾由 orchestrator 寫；含三張純文字圖，畫法見下方「純文字圖」
 - `review-rubric`：[`review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md) 的 rubric 骨架，檔頭夾著 `scripts/pr_context_cache.py` 產生的 cache 區塊
 - `review`：`scripts/review_report.py` 的 `render_report` 產生檔頭，正文骨架在 `review-templates.md`
 - `review-draft`：[`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) §4.5，整份會被 `gh pr review --body-file` 送上 GitHub
@@ -38,7 +40,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 本規範只約束**新寫入**的檔案。`.maigo/` 被 gitignore、多為一次性產物，既有檔案不回溯改寫；review 報告與 rubric 的 cache 區塊、細節檔事實區會在下次發佈或刷新時自然換成新格式。讀回端（`board_sync`、`review_report`、`pr_context_cache`、`migrate_legacy_artifacts`）同時接受裸 URL 與 `<URL>`；筆記裡舊的路徑寫法（相對 `.maigo/` 或 repo-root 相對）不會被 refresh 或其他命令改寫，新舊混用可接受；要整理時用 `scripts/rewrite_note_paths.py`（預設乾跑、印出改前改後整行，確認後才 `--apply`，見路徑規則第 6 條）。
 
-**保證的界線**：下列由 script 寫出、有測試鎖住——`board.md`、`i/<slug>.md` 的事實區與新建骨架（刷新時保留區只被壓掉 code fence 外的連續空行與純空白行（後接縮排 code block 的空行不動），其餘逐字保留）、`review.md` 檔頭、`rubric.md` 的 cache 區塊結構（欄位行、fence、marker 前後的空行）。cache 區塊裡 title、body、CI 狀態與 review thread／review／comment 的內容是 GitHub 原文逐字帶入，版面不保證（多行 body 會讓 formatter 在清單前補空行）。其餘（plan、rubric 骨架、`review.md` 正文、`draft.md`、`inline-comments.md`、`pr-comments.md`、`reply-draft.md`）只靠範本約束，沒有機器擋，模型落筆時可能漂移；`scripts/review_report.py` 的 `publish` 不對正文做正規化，維持逐字寫入。
+**保證的界線**：下列由 script 寫出、有測試鎖住——`board.md`、`i/<slug>.md` 的事實區與新建骨架（刷新時保留區只被壓掉 code fence 外的連續空行與純空白行（後接縮排 code block 的空行不動），其餘逐字保留）、`review.md` 檔頭、`rubric.md` 的 cache 區塊結構（欄位行、fence、marker 前後的空行）。cache 區塊裡 title、body、CI 狀態與 review thread／review／comment 的內容是 GitHub 原文逐字帶入，版面不保證（多行 body 會讓 formatter 在清單前補空行）。其餘（plan、`summary.md`、rubric 骨架、`review.md` 正文、`draft.md`、`inline-comments.md`、`pr-comments.md`、`reply-draft.md`）只靠範本約束，沒有機器擋，模型落筆時可能漂移；`scripts/review_report.py` 的 `publish` 不對正文做正規化，維持逐字寫入。
 
 ## 「預設可用」的前提
 
@@ -60,6 +62,19 @@ description: This skill should be used whenever writing, templating or generatin
 6. **標題與清單前後各留一個空行，不留連續空行，closing fence 與緊接的 marker 之間留一個空行。** 理由：這是通用 markdown formatter 的 fixed point；版面已經是這個形狀，存檔就不會被改寫、diff 也不會出現只有空行的雜訊。鍵值檔頭行仍以空行隔開。
 
 規則 1、2 的本文在 [`copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)，這裡只補 nvim 側的理由，見下方「與 copyable-deliverable 的關係」。
+
+## 純文字圖
+
+產物裡需要畫圖（流程、因果、前後對照）時，用純文字圖（review 報告的 mermaid 圖是既有例外，見版面規則 1）。理由：nvim 不渲染圖，圖必須在原始檔裡就讀得懂，而且存檔後不會被 formatter 動。
+
+- **一律放在 fenced code block 內，語言標 `text`。** 理由：fence 內容是 formatter 的不動點（rumdl 0.2.16 實測：fence 內的連續空行、行尾空白、非 ASCII 字元都不被改寫），圖不會因存檔而變形。
+- **結構線只用 ASCII：`+ - | > < v ^`。** 不用 box-drawing 字元與 emoji。理由：box-drawing 在 Unicode 屬 East Asian Ambiguous，寬度可能因終端與字型而異（本 repo 未實測），emoji 同樣寬度不一；ASCII 在任何等寬字型下都是一格。
+- **中文可以當標籤，但不可依賴中文字右邊的對齊。** 理由：中文字在等寬字型佔兩格，同一行中文字後面的字元位置會與純 ASCII 的行對不齊。要對齊的圖，標籤用 ASCII；中文標籤放行尾，或獨立成一行。
+- **單行寬度以 80 個顯示寬度為上限**（ASCII 算 1、中文字算 2）。理由：超過會在一般視窗被 wrap 折斷，圖就爛了；規則 1 的「不手動斷行」只管散文，不管 fence 內的圖。
+- **fence 內不留行尾空白。**
+- 圖只畫實際發生的事，不為了版面好看補節點；數字（輪數、測試數）要與正文一致。
+
+不加機器檢查：圖畫得不好只是品質下降，由範本與審查約束。
 
 ## HTML 規則與 marker 白名單
 

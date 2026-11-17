@@ -18,7 +18,8 @@ flowchart TD
     Soyo --> Join{合流: 爽世 x 立希}
     Taki --> Join
     Join -- APPROVED + PASS --> Commit[Orchestrator<br/>落地 commit]
-    Commit --> Done([完成: summary])
+    Commit --> Summary[Orchestrator<br/>寫 summary.md]
+    Summary --> Done([完成: summary])
     Join -- APPROVED + FAIL --> AnonFixTest[Anon 修 test]
     Join -- BLOCKED + PASS --> AnonFixMust[Anon 修 must-fix]
     Join -- BLOCKED + FAIL --> AnonFixBoth[Anon 兩邊一起修]
