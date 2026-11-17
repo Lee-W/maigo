@@ -1,6 +1,6 @@
 ---
 name: commitizen-aware
-description: This skill should be used when working in the `commitizen-tools/commitizen` repository as a contributor (not as a downstream `[tool.commitizen]` user). It surfaces the conventions from the repo's own AGENTS.md — uv + poe tasks, conventional commits enforced by commitizen itself, ruff/mypy linting, pytest, and PR guidelines — so any task (review, quick-fix, refactor) in commitizen follows them.
+description: This skill should be used when working in the `commitizen-tools/commitizen` repository as a contributor (not as a downstream `[tool.commitizen]` user). It surfaces the repo's own AGENTS.md conventions — uv + poe, conventional commits, ruff/mypy, pytest, PR guidelines — for any task there.
 ---
 
 <!-- mkdocs-include-start -->

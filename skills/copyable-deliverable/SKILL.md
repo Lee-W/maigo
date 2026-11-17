@@ -1,6 +1,6 @@
 ---
 name: copyable-deliverable
-description: This skill should be used whenever a maigo command produces a deliverable destined to be pasted elsewhere (a PR/issue comment, a reply draft, a commit message, a gh command draft). It mandates wrapping that content in a single fenced code block so the user gets raw, one-click-copyable markdown instead of a rendered-only version, and keeps the content itself paste-friendly (no markdown tables, no hard-wrapped prose).
+description: This skill should be used whenever a maigo command produces a deliverable destined to be pasted elsewhere (a PR/issue comment, reply draft, commit message, gh command draft). It mandates wrapping it in a single fenced code block, paste-friendly (no markdown tables, no hard-wrapped prose).
 ---
 
 <!-- mkdocs-include-start -->

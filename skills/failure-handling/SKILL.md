@@ -1,6 +1,6 @@
 ---
 name: failure-handling
-description: This skill should be used when handling failures in go-class command flows — Soyo blocking with NEEDS_CHANGES / BLOCKED, Taki test failures, subagent infrastructure overload / unavailability (e.g. 529), mid-task usage/session-limit interruption of a running subagent, and infinite-loop protection for repeated same must-fix or same test ID. Applies to /maigo:go, /maigo:quick, /maigo:team, and /maigo:address-comments step 5.
+description: This skill should be used when handling failures in go-class command flows — Soyo NEEDS_CHANGES / BLOCKED, Taki test failures, subagent overload (529) or mid-task limit interruption — and infinite-loop protection on repeated same must-fix or test ID. Used by go, quick, team, address-comments.
 ---
 
 <!-- mkdocs-include-start -->

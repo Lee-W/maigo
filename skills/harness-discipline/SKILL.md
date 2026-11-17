@@ -1,6 +1,6 @@
 ---
 name: harness-discipline
-description: This skill should be used when the maigo orchestrator, running in the Claude Code harness, decides whether to delegate work to a subagent instead of doing it on the main thread, needs to keep a long task's acceptance criteria from drifting after context compaction, or needs to keep verification independent from whoever produced the work. Scope note: 只在 Claude Code harness 下才適用——這裡的 orchestrator context 會被計費、可能被壓縮、且可 spawn subagent 分攤負載；沒有 subagent 能力的 harness 不適用此 skill。
+description: This skill should be used when the maigo orchestrator, in the Claude Code harness, decides whether to delegate to a subagent, must keep a long task's acceptance criteria from drifting after context compaction, or must keep verification independent from the producer. Claude Code harness only.
 ---
 
 <!-- mkdocs-include-start -->

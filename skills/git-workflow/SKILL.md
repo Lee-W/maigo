@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: This skill should be used when assembling git commits — deciding what to stage, how to scope a bash/agent command's working directory, whether to amend an unreleased commit or stack a new one, and how to size a diff against the correct baseline. Applies to the commit-assembly step of /maigo:go, /maigo:quick, /maigo:team, and /maigo:address-comments, and to the orchestrator generally.
+description: This skill should be used when assembling git commits — what to stage, how to scope a command's working directory, whether to amend an unreleased commit or stack a new one, and how to size a diff against the right baseline. Applies to the commit-assembly step of go, quick, team and address-comments.
 ---
 
 <!-- mkdocs-include-start -->

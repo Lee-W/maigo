@@ -1,6 +1,6 @@
 ---
 name: python-aware
-description: This skill should be used when writing, testing, or reviewing Python code — in any repository. It is the Python language layer: toolchain habits, coding rules, and pytest/mock conventions that hold regardless of the repo. Repo-aware skills such as airflow-aware and commitizen-aware compose it; strict-review reads it when a diff contains Python.
+description: This skill should be used when writing, testing, or reviewing Python code in any repository. It is the Python language layer: toolchain habits, coding rules, and pytest/mock conventions. Repo-aware skills compose it; strict-review reads it when a diff contains Python.
 ---
 
 <!-- mkdocs-include-start -->

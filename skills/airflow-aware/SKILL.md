@@ -1,6 +1,6 @@
 ---
 name: airflow-aware
-description: This skill should be used when working in the apache/airflow repository as a contributor (not as a Dag author). It surfaces the conventions Airflow's own AGENTS.md enforces — naming, Breeze/uv environment, Ruff/Mypy style, coding rules, pytest patterns, PR hygiene — so any task (review, quick-fix, refactor) in airflow follows them.
+description: This skill should be used when working in the apache/airflow repository as a contributor (not as a Dag author). It surfaces Airflow's own AGENTS.md conventions — naming, Breeze/uv, Ruff/Mypy, coding rules, pytest patterns, PR hygiene — for any review, quick-fix or refactor there.
 ---
 
 <!-- mkdocs-include-start -->

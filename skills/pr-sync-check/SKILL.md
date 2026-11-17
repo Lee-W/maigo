@@ -1,6 +1,6 @@
 ---
 name: pr-sync-check
-description: This skill should be used after a change is complete — at the wrap-up of /maigo:quick, /maigo:go, /maigo:team, or /maigo:address-comments — when the current branch may already have an open GitHub PR, to check whether the PR's title/description still accurately reflects the actual diff and draft an update if it has drifted. It never runs `gh pr edit` on the user's behalf.
+description: This skill should be used at the wrap-up of /maigo:quick, go, team or address-comments, when the current branch may already have an open GitHub PR, to check whether its title/description still matches the actual diff and draft an update if drifted. It never runs `gh pr edit`.
 ---
 
 <!-- mkdocs-include-start -->

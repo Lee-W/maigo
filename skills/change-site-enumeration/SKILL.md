@@ -1,6 +1,6 @@
 ---
 name: change-site-enumeration
-description: This skill should be used when about to declare "N sites need changing", "the scope is closed", or "this is already fully shared" — before writing a plan that lists change sites, before implementing against a plan's site list, before reviewing a diff for lingering per-section branches, or before an orchestrator reports a scope/size number to the user.
+description: This skill should be used when about to declare "N sites need changing", "the scope is closed", or "this is already fully shared" — before writing a plan that lists change sites, implementing one, reviewing a diff for lingering per-section branches, or reporting a scope/size number to the user.
 ---
 
 <!-- mkdocs-include-start -->

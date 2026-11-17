@@ -1,6 +1,6 @@
 ---
 name: strict-triage
-description: This skill should be used when triaging an inbound GitHub issue from a maintainer perspective — applying a 9-item checklist to decide a verdict (READY / NEEDS_INFO / DUP / CLOSE), surfacing classification disagreements with existing labels, and producing a draft response plus gh command suggestions. Parallel to strict-review but for issues, not code.
+description: This skill should be used when triaging an inbound GitHub issue from a maintainer perspective — a 9-item checklist deciding a verdict (READY / NEEDS_INFO / DUP / CLOSE), surfacing label disagreements, and drafting a response plus gh command suggestions. Parallel to strict-review, for issues.
 ---
 
 <!-- mkdocs-include-start -->

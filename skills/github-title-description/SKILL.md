@@ -1,6 +1,6 @@
 ---
 name: github-title-description
-description: This skill should be used when drafting or rewriting a GitHub PR title and/or description. It produces a user-impact title (not conventional-commits formatted) and a Why / What / Test Plan body with optional Breaking changes / Related issues sections. Use both for fresh drafts from branch commits/diff (e.g., /maigo:describe-pr flow) and for ad-hoc rewrites of an existing PR body without re-fetching git context.
+description: This skill should be used when drafting or rewriting a GitHub PR title and/or description. It produces a user-impact title (not conventional-commits) and a Why / What / Test Plan body. Use for fresh drafts from branch commits/diff (/maigo:describe-pr) and for ad-hoc rewrites of an existing PR body.
 ---
 
 <!-- mkdocs-include-start -->

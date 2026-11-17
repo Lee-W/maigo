@@ -1,6 +1,6 @@
 ---
 name: vim-friendly-artifacts
-description: This skill should be used whenever writing, templating or generating any human-read artifact under `.maigo/` (plan, review report, review rubric, review draft, pr-comments, reply draft, triage rubric, board.md and its i/ detail files). It is the single source for the layout those files follow so they read and edit well in plain Neovim with no plugin - one paragraph per line, no tables, no HTML outside a marker whitelist, blank lines around headings and lists, file-relative links between `.maigo/` artifacts, external URLs written as `<URL>` autolinks.
+description: This skill should be used whenever writing, templating or generating any human-read artifact under `.maigo/` (plan, review report, rubric, draft, pr-comments, reply draft, board.md and i/ detail files). It is the single source for the layout that makes them read and edit well in plain Neovim.
 ---
 
 <!-- mkdocs-include-start -->

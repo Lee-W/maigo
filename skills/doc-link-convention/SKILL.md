@@ -1,6 +1,6 @@
 ---
 name: doc-link-convention
-description: This skill should be used when writing or reviewing cross-file links inside Maigo source files (`agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`). It enforces that cross-source links use absolute GitHub URLs — relative links break `mkdocs build --strict` because these files are dual-context (raw GitHub view + include-markdown shim into `docs/`).
+description: This skill should be used when writing or reviewing cross-file links inside Maigo source files (`agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`). Cross-source links must be absolute GitHub URLs — relative links break `mkdocs build --strict` because these files are dual-context.
 ---
 
 <!-- mkdocs-include-start -->

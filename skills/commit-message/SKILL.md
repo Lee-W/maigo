@@ -1,6 +1,6 @@
 ---
 name: commit-message
-description: This skill should be used when drafting a git commit message (new commit, `git commit --amend`, or a squash/rewrite message) from staged or proposed changes. It produces a user-impact subject and a concise body listing changed behaviour and breaking-change / newsfragment / related-PR pointers, deliberately avoiding motivation paragraphs (which belong in the PR description, not the commit log).
+description: This skill should be used when drafting a git commit message (new commit, `git commit --amend`, or squash/rewrite message) from staged or proposed changes. It produces a user-impact subject and a concise body listing changed behaviour and breaking-change / newsfragment / related-PR pointers.
 ---
 
 <!-- mkdocs-include-start -->

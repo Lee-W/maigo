@@ -1,6 +1,6 @@
 ---
 name: command-router
-description: Codex pseudo-command router for Maigo. Use when the user sends or discusses any `/maigo:*` or `maigo:*` command, including go, team, quick, review, board, remember, memory, retro, crystallize, describe-pr, address-comments, triage-issue, take-issue, doctor, or repo-audit; also use when the user asks why Maigo commands do not behave like native Codex slash commands.
+description: Codex pseudo-command router for Maigo. Use when the user sends or discusses any `/maigo:*` or `maigo:*` command (go, team, quick, review, board, remember, retro, doctor, etc.), or asks why Maigo commands do not behave like native Codex slash commands.
 ---
 
 <!-- mkdocs-include-start -->

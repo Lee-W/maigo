@@ -1,6 +1,6 @@
 ---
 name: work-board
-description: This skill should be used when reading, writing, or migrating `.maigo/board.md` — the single cross-session Work Board that tracks issues to triage, your own PRs, and PRs you're reviewing, ranked into a single priority ladder (🎯 我的下一件 / 👀 待我 review / ⏳ 等別人 / ✅ 最近結案). Covers the line grammar, possession-判定 tables per item type, the upsert contract each writing command follows, the review-board.md migration path, and the checkbox → `--learn` memory gate.
+description: This skill should be used when reading, writing, or migrating `.maigo/board.md` — the cross-session Work Board of issues to triage, your own PRs and PRs you review, ranked into 🎯 我的下一件 / 👀 待我 review / ⏳ 等別人 / ✅ 最近結案. Covers line grammar, upsert contract, migration and the `--learn` gate.
 ---
 
 <!-- mkdocs-include-start -->
