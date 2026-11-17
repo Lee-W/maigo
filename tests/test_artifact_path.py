@@ -181,6 +181,7 @@ class TestNaming:
     def test_known_stems_follow_known_kinds_order_without_duplicates(self):
         assert ap.known_stems() == (
             "plan",
+            "summary",
             "rubric",
             "review",
             "draft",
@@ -202,6 +203,29 @@ class TestNaming:
         assert ap.artifact_path("plan", "7", attempt=3, group="pr") == (
             ".maigo/pr/7/plan-3.md"
         )
+
+    @pytest.mark.parametrize(
+        ("group", "attempt", "expected"),
+        [
+            ("topic", 1, ".maigo/topic/7/summary.md"),
+            ("pr", 1, ".maigo/pr/7/summary.md"),
+            ("issue", 1, ".maigo/issue/7/summary.md"),
+            ("pr", 3, ".maigo/pr/7/summary-3.md"),
+        ],
+    )
+    def test_summary_is_plan_shaped(self, group, attempt, expected):
+        assert "summary" not in ap._NESTED_LAYOUT
+        assert ap.artifact_path("summary", "7", attempt, group=group) == expected
+        assert ap.nested_locations("summary") == [
+            ("pr", "summary"),
+            ("issue", "summary"),
+            ("topic", "summary"),
+        ]
+
+    def test_summary_defaults_to_topic_and_rejects_unknown_group(self):
+        assert ap.artifact_path("summary", "7") == ".maigo/topic/7/summary.md"
+        with pytest.raises(ValueError, match="group"):
+            ap.artifact_path("summary", "7", group="review")
 
     def test_plan_group_from_pr_url_issue_url_and_none(self):
         assert ap.plan_group("https://github.com/o/r/pull/9", "o/r") == "pr"
@@ -228,6 +252,57 @@ class TestNaming:
 # ---------------------------------------------------------------------------
 # flat_path() — 分目錄前的扁平形，只供讀取退路與遷移
 # ---------------------------------------------------------------------------
+
+
+class TestSummaryForPlan:
+    @pytest.mark.parametrize(
+        ("plan_path", "expected"),
+        [
+            (".maigo/topic/feat-x/plan.md", ".maigo/topic/feat-x/summary.md"),
+            (".maigo/topic/feat-x/plan-2.md", ".maigo/topic/feat-x/summary-2.md"),
+            (".maigo/topic/feat-x/plan-10.md", ".maigo/topic/feat-x/summary-10.md"),
+            (".maigo/topic/feat-x/plan-1.md", ".maigo/topic/feat-x/summary-1.md"),
+            (".maigo/pr/9/plan.md", ".maigo/pr/9/summary.md"),
+            (".maigo/issue/5/plan-3.md", ".maigo/issue/5/summary-3.md"),
+            (".maigo/pr/r-9/plan-2.md", ".maigo/pr/r-9/summary-2.md"),
+            (
+                "/abs/repo/.maigo/topic/t/plan-2.md",
+                "/abs/repo/.maigo/topic/t/summary-2.md",
+            ),
+            ("plan.md", "summary.md"),
+        ],
+    )
+    def test_swaps_the_stem_and_keeps_directory_and_suffix(self, plan_path, expected):
+        assert ap.summary_path_for_plan(plan_path) == expected
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            ".maigo/topic/t/summary.md",
+            ".maigo/topic/t/rubric.md",
+            ".maigo/topic/t/plan-.md",
+            ".maigo/topic/t/plan-x.md",
+            ".maigo/topic/t/plan-0.md",
+            ".maigo/topic/t/plan-01.md",
+            ".maigo/topic/t/plan-00.md",
+            ".maigo/topic/t/plan-2.txt",
+            ".maigo/topic/t/myplan.md",
+            ".maigo/topic/t/",
+        ],
+    )
+    def test_rejects_non_plan_file_names(self, bad):
+        with pytest.raises(ValueError, match="not a plan file name"):
+            ap.summary_path_for_plan(bad)
+
+    def test_cli_prints_the_path_for_plan_2(self, capsys):
+        assert ap.main(["summary-for-plan", ".maigo/topic/feat-x/plan-2.md"]) == 0
+        assert capsys.readouterr().out == "path: .maigo/topic/feat-x/summary-2.md\n"
+
+    def test_cli_rejects_a_non_plan_file_with_exit_code_2(self, capsys):
+        with pytest.raises(SystemExit) as excinfo:
+            ap.main(["summary-for-plan", ".maigo/topic/feat-x/summary.md"])
+        assert excinfo.value.code == 2
+        assert "not a plan file name" in capsys.readouterr().err
 
 
 class TestFlatPath:
@@ -453,6 +528,64 @@ class TestResolveIdentifierChain:
             == 0
         )
         assert "path: .maigo/topic/x/plan.md" in capsys.readouterr().out
+
+    def test_cli_summary_on_main_lands_next_to_plan(self, tmp_path: Path, capsys):
+        _init_git_repo(tmp_path)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+        common = ["--slug", "Example Topic", "--cwd", str(tmp_path)]
+        assert ap.main(["plan", "--topic", "Plan: Example topic", *common]) == 0
+        plan_out = capsys.readouterr().out.splitlines()
+        assert ap.main(["summary", "--topic", "Example topic", *common]) == 0
+        assert capsys.readouterr().out.splitlines() == [
+            "status: new",
+            "path: .maigo/topic/example-topic/summary.md",
+        ]
+        assert plan_out[1] == "path: .maigo/topic/example-topic/plan.md"
+
+    @pytest.mark.parametrize(
+        ("url", "repo", "expected"),
+        [
+            ("https://github.com/o/r/pull/9", "o/r", ".maigo/pr/9/summary.md"),
+            ("https://github.com/o/r/issues/5", "o/r", ".maigo/issue/5/summary.md"),
+            ("https://github.com/o/r/pull/9", "x/y", ".maigo/pr/r-9/summary.md"),
+        ],
+    )
+    def test_cli_summary_follows_url_group_and_cross_repo_ident(
+        self, tmp_path: Path, capsys, url, repo, expected
+    ):
+        args = ["--topic", "Task", "--url", url, "--repo", repo, "--cwd", str(tmp_path)]
+        assert ap.main(["summary", *args]) == 0
+        assert capsys.readouterr().out.splitlines() == [
+            "status: new",
+            f"path: {expected}",
+        ]
+        assert ap.main(["plan", *args]) == 0
+        plan_path = capsys.readouterr().out.splitlines()[1].removeprefix("path: ")
+        assert Path(plan_path).parent == Path(expected).parent
+
+    def test_cli_summary_attempt_follows_conflict_suggestion(
+        self, tmp_path: Path, capsys
+    ):
+        existing = tmp_path / ".maigo" / "pr" / "9" / "summary.md"
+        existing.parent.mkdir(parents=True)
+        existing.write_text("# Another task\n")
+        args = [
+            "--topic",
+            "Task",
+            "--url",
+            "https://github.com/o/r/pull/9",
+            "--repo",
+            "o/r",
+            "--cwd",
+            str(tmp_path),
+        ]
+        assert ap.main(["summary", *args]) == 3
+        assert "suggest: .maigo/pr/9/summary-2.md" in capsys.readouterr().out
+
+    def test_cli_slug_is_rejected_for_other_kinds(self, tmp_path: Path):
+        with pytest.raises(SystemExit) as excinfo:
+            ap.main(["review-rubric", "--topic", "T", "--slug", "x"])
+        assert excinfo.value.code == 2
 
     def test_cli_plan_with_pr_url_writes_pr_path(self, tmp_path: Path, capsys):
         assert (

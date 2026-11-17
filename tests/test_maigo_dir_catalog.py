@@ -132,6 +132,12 @@ class TestCategorize:
         assert sorted(catalog.nested) == sorted(names)
         assert catalog.unregistered == []
 
+    def test_pr_and_issue_summary_are_nested(self):
+        names = ["pr/7/summary.md", "pr/7/summary-2.md", "issue/5/summary.md"]
+        catalog = mdc.categorize(names)
+        assert sorted(catalog.nested) == sorted(names)
+        assert catalog.unregistered == []
+
     def test_topic_plan_is_not_a_scan_category(self):
         catalog = mdc.categorize(["topic/foo/plan.md"])
         assert catalog.nested == []
@@ -348,9 +354,12 @@ class TestScanTree:
         maigo_dir = tmp_path / ".maigo"
         _write(maigo_dir / "topic" / "my-topic" / "plan.md")
         _write(maigo_dir / "topic" / "my-topic" / "plan-2.md")
+        _write(maigo_dir / "topic" / "my-topic" / "summary.md")
         _write(maigo_dir / "topic" / "my-topic" / "rubric.md")
         _write(maigo_dir / "pr" / "9" / "plan.md")
+        _write(maigo_dir / "pr" / "9" / "summary.md")
         _write(maigo_dir / "issue" / "3" / "plan.md")
+        _write(maigo_dir / "issue" / "3" / "summary.md")
         _write(maigo_dir / "review" / "5" / "rubric.md")
         _write(maigo_dir / "_archive" / "review" / "42" / "review.md")
         _write(maigo_dir / "_archive" / "i" / "42.md")
@@ -359,10 +368,13 @@ class TestScanTree:
 
         assert tree["nested"] == [
             "issue/3/plan.md",
+            "issue/3/summary.md",
             "pr/9/plan.md",
+            "pr/9/summary.md",
             "review/5/rubric.md",
             "topic/my-topic/plan-2.md",
             "topic/my-topic/plan.md",
+            "topic/my-topic/summary.md",
         ]
         # `rubric.md` is not a topic stem, so it is not a registered artifact there
         assert tree["unregistered"] == ["topic/my-topic/rubric.md"]

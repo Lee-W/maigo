@@ -22,6 +22,10 @@ pr-comments 收進同一個目錄，不再散成頂層扁平檔。
      預設分支（`main` / `master` / `develop` / `trunk`）上 `<id>` 不用分支名，
      改用 `--slug` 或 `--topic` H1 推導的 slug。頂層 `.maigo/plan-<id>.md` 已
      淘汰，只供讀取退路與遷移。
+   - `summary`（`/maigo:go` 收尾報告）：與 `plan` 同形，`.maigo/<group>/<id>/summary[-<attempt>].md`，
+     group 與 `<id>` 解析規則和 `plan` 完全相同；用與取 `plan` 路徑相同的 `--slug` /
+     `--url` / `--repo` 呼叫，就會落在同一個目錄。更可靠的是直接由本次 plan 路徑推導：
+     `artifact_path.py summary-for-plan <plan 路徑>`（`summary_path_for_plan()`）。
    `<id>` 走四級來源鏈（`resolve_identifier()`），每一級都必須是事後可重新
    推導的——不是只要唯一就好。
 2. **(c) 歸屬檢查**：`resolve_for_write()` 是唯一對外入口，`topic`
@@ -56,6 +60,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" plan \
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" review-rubric \
     --topic "Review rubric: <PR 標題>" --url <PR url> --repo owner/name \
     --owner mine|others
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/artifact_path.py" summary-for-plan \
+    <plan 路徑>   # 同目錄、同編號的 summary 路徑，印 `path:` 一行
 ```
 
 會分流的 kind 帶 `--url` 卻沒給 `--owner` → exit 2（先跑 `scripts/pr_owner.py`）；
@@ -91,6 +97,7 @@ from maigo_state import git_stdout
 
 _KNOWN_KINDS = (
     "plan",
+    "summary",
     "review-rubric",
     "review",
     "review-draft",
@@ -101,8 +108,8 @@ _KNOWN_KINDS = (
 )
 
 # kind → (group 目錄, 檔名 stem)：巢狀佈局 `.maigo/<group>/<id>/<stem>.md`。
-# key 是 `_KNOWN_KINDS` 的子集，恰好不含 "plan"——plan 的 group 由 URL 決定，
-# 走下面的 `_PLAN_GROUPS` / `plan_group()`，見 `artifact_path()`。
+# key 是 `_KNOWN_KINDS` 的子集，恰好不含 plan 同形的 kind（`_PLAN_LIKE_STEMS`）——
+# 它們的 group 由 URL 決定，走下面的 `_PLAN_GROUPS` / `plan_group()`，見 `artifact_path()`。
 _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "review": ("review", "review"),
     "review-rubric": ("review", "rubric"),
@@ -113,11 +120,12 @@ _NESTED_LAYOUT: dict[str, tuple[str, str]] = {
     "triage-rubric": ("issue", "rubric"),
 }
 
-# plan 的 group 目錄：`.maigo/<group>/<id>/plan[-n].md`，stem 固定是 `plan`。
-# 刻意不放進 `_NESTED_LAYOUT`（那張表的 group 是 kind 的固有屬性，plan 的 group
-# 取決於 URL）也不放進 `_OWNER_SPLIT_KINDS`（plan 不依作者分流）。
+# plan 同形的 kind：`.maigo/<group>/<id>/<stem>[-n].md`，group 目錄由 URL 決定，
+# kind → stem。`summary`（收尾報告）與它所總結的 plan 同目錄，所以走同一套解析。
+# 刻意不放進 `_NESTED_LAYOUT`（那張表的 group 是 kind 的固有屬性，這些 kind 的 group
+# 取決於 URL）也不放進 `_OWNER_SPLIT_KINDS`（不依作者分流）。
 _PLAN_GROUPS = ("pr", "issue", "topic")
-_PLAN_STEM = "plan"
+_PLAN_LIKE_STEMS: dict[str, str] = {"plan": "plan", "summary": "summary"}
 
 # 這些分支不代表任何 topic：在上面開的 plan 會全部撞成同一個識別碼（`main`）。
 DEFAULT_BRANCHES = frozenset({"main", "master", "develop", "trunk"})
@@ -219,20 +227,38 @@ def known_stems() -> tuple[str, ...]:
     """
     stems: list[str] = []
     for kind in _KNOWN_KINDS:
-        stem = _PLAN_STEM if kind == "plan" else _NESTED_LAYOUT[kind][1]
+        stem = _PLAN_LIKE_STEMS.get(kind) or _NESTED_LAYOUT[kind][1]
         if stem not in stems:
             stems.append(stem)
     return tuple(stems)
 
 
+# attempt 從 2 起跳（`artifact_path()`），但舊 state 可能有 `plan-1.md`；不接受前導零。
+_PLAN_FILE_RE = re.compile(r"^plan(-[1-9]\d*)?\.md$")
+
+
+def summary_path_for_plan(plan_path: str) -> str:
+    """
+    由本次寫出的 plan 路徑推導 summary 路徑：同目錄，檔名 `plan.md` → `summary.md`、
+    `plan-<n>.md` → `summary-<n>.md`（後綴原樣保留）。檔名不是這兩種形狀就
+    `ValueError`。純函式，不碰檔案系統。
+    """
+    directory, sep, name = plan_path.rpartition("/")
+    if not _PLAN_FILE_RE.match(name):
+        raise ValueError(
+            f"not a plan file name: {name!r}; expected plan.md or plan-<n>.md"
+        )
+    return f"{directory}{sep}summary{name[len('plan') :]}"
+
+
 def nested_locations(kind: str) -> list[tuple[str, str]]:
     """
     *kind* 所有可能的 `(group, stem)`：會分流的 kind 回 `pr` 與 `review` 兩組，
-    `plan` 回 `pr` / `issue` / `topic` 三組，其餘巢狀 kind 回一組，未知 kind 回
-    空 list。純函式。
+    plan 同形的 kind（`plan`、`summary`）回 `pr` / `issue` / `topic` 三組，其餘巢狀
+    kind 回一組，未知 kind 回空 list。純函式。
     """
-    if kind == "plan":
-        return [(group, _PLAN_STEM) for group in _PLAN_GROUPS]
+    if kind in _PLAN_LIKE_STEMS:
+        return [(group, _PLAN_LIKE_STEMS[kind]) for group in _PLAN_GROUPS]
     if kind not in _NESTED_LAYOUT:
         return []
     _group, stem = _NESTED_LAYOUT[kind]
@@ -267,8 +293,8 @@ def artifact_path(
     """
     正典路徑：`.maigo/<group>/<id>/<stem>[-<attempt>].md`。純函式。
 
-    `plan` 的 group 由呼叫端用 `plan_group()` 算出後以 `group` 傳入（`pr` /
-    `issue` / `topic`，沒給就是 `topic`）；其他 kind 的 group 是固有屬性，給了
+    plan 同形的 kind（`plan`、`summary`）的 group 由呼叫端用 `plan_group()` 算出後以
+    `group` 傳入（`pr` / `issue` / `topic`，沒給就是 `topic`）；其他 kind 的 group 是固有屬性，給了
     `group` 就 `ValueError`。
 
     會分流的 kind 必須給 `owner`（`mine` → `pr/`、`others` → `review/`），沒給
@@ -290,13 +316,13 @@ def artifact_path(
         raise ValueError(f"attempt must be >= 1: {attempt!r}")
     _check_owner(kind, owner)
     suffix = "" if attempt == 1 else f"-{attempt}"
-    if kind == "plan":
+    if kind in _PLAN_LIKE_STEMS:
         plan_dir = group if group is not None else "topic"
         if plan_dir not in _PLAN_GROUPS:
             raise ValueError(
                 f"unknown plan group: {plan_dir!r}; must be one of {_PLAN_GROUPS}"
             )
-        return f".maigo/{plan_dir}/{identifier}/{_PLAN_STEM}{suffix}.md"
+        return f".maigo/{plan_dir}/{identifier}/{_PLAN_LIKE_STEMS[kind]}{suffix}.md"
     if group is not None:
         raise ValueError(f"kind {kind!r} has a fixed group; do not pass group")
     nested_group, stem = _NESTED_LAYOUT[kind]
@@ -419,7 +445,7 @@ def resolve_identifier(
     if branch and topic_slug is not None and branch in DEFAULT_BRANCHES:
         if not topic_slug:
             raise ValueError(
-                f"on default branch {branch!r} a plan needs a topic slug, but the "
+                f"on default branch {branch!r} a plan/summary needs a topic slug, but the "
                 "topic yields an empty one; pass --slug"
             )
         return topic_slug
@@ -527,7 +553,8 @@ def resolve_for_write(
     會分流的 kind：有 `url` 就必須給 `owner`（沒給 `ValueError`）；沒有 `url`
     （本地 branch / range）沒給 `owner` 時算自己的（`mine`）。
 
-    `plan`：group 由 `url` 決定（`plan_group()`）；在預設分支上識別碼用 `slug`
+    plan 同形的 kind（`plan`、`summary`）：group 由 `url` 決定（`plan_group()`）；
+    在預設分支上識別碼用 `slug`
     （優先）或 `topic` 的 H1 slug，兩者都空就 `ValueError`。
     """
     if kind in _OWNER_SPLIT_KINDS and owner is None:
@@ -537,9 +564,9 @@ def resolve_for_write(
                 "(resolve it with scripts/pr_owner.py)"
             )
         owner = "mine"
-    group = plan_group(url, home_repo) if kind == "plan" else None
+    group = plan_group(url, home_repo) if kind in _PLAN_LIKE_STEMS else None
     topic_slug = None
-    if kind == "plan":
+    if kind in _PLAN_LIKE_STEMS:
         topic_slug = slug if slug is not None else (topic_slug_from_h1(topic) or "")
     identifier = resolve_identifier(
         cwd, url=url, home_repo=home_repo, topic_slug=topic_slug
@@ -602,7 +629,25 @@ def resolve_for_write(
     )
 
 
+def _summary_for_plan_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="artifact_path.py summary-for-plan",
+        description="由 plan 路徑推導同目錄的 summary 路徑（plan.md → summary.md、"
+        "plan-<n>.md → summary-<n>.md），印 `path:` 一行。",
+    )
+    parser.add_argument("plan_path", help="本次實際寫出的 plan 檔路徑")
+    args = parser.parse_args(argv)
+    try:
+        print(f"path: {summary_path_for_plan(args.plan_path)}")
+    except ValueError as exc:
+        parser.error(str(exc))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    effective = sys.argv[1:] if argv is None else argv
+    if effective and effective[0] == "summary-for-plan":
+        return _summary_for_plan_main(effective[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("kind", choices=_KNOWN_KINDS)
     parser.add_argument("--topic", required=True, help="打算寫進檔案第一行的 H1 主題")
@@ -616,7 +661,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--slug",
         default=None,
-        help="plan 專用：預設分支上的識別碼（優先於 --topic 的 H1 slug；"
+        help="plan／summary 專用：預設分支上的識別碼（優先於 --topic 的 H1 slug；"
         "純中文主題在 main 上必須給）",
     )
     parser.add_argument(
@@ -636,8 +681,10 @@ def main(argv: list[str] | None = None) -> int:
             "run scripts/pr_owner.py --url <url> to resolve it"
         )
 
-    if args.slug is not None and args.kind != "plan":
-        parser.error(f"--slug only applies to kind 'plan', not {args.kind!r}")
+    if args.slug is not None and args.kind not in _PLAN_LIKE_STEMS:
+        parser.error(
+            f"--slug only applies to kinds {tuple(_PLAN_LIKE_STEMS)}, not {args.kind!r}"
+        )
     slug = None
     if args.slug is not None:
         slug = slugify(args.slug)
