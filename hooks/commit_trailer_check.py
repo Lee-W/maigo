@@ -13,6 +13,8 @@ turn → hook），這支 hook 把它降成機器擋。
   `git [全域選項] commit ...` 的 segment（含 `git -C <dir> commit`、`--amend`）。
 - 訊息來源只取指令字面上看得到的：`-m` / `--message` / `--trailer` 的值，以及掛在
   該 segment 上的 heredoc 內文（含 `-m "$(cat <<'EOF' ... EOF)"` 這種寫在引號內的形狀）。
+- `$'...'`（ANSI-C 引號）內的 `\\n` 視為換行；一般引號內的字面 `\\n` 不處理（git 不解讀）。
+- segment 開頭的 `(`、`{`、`then`、`do` 等群組／流程關鍵字會被略過再找 `git`。
 - `-F <file>` 這類訊息不在指令字面上的情況不讀檔，放行。
 - trailer 判準是「某一行以 `Co-Authored-By:` 開頭」（不分大小寫）：真正的 trailer 一定
   獨佔一行；散文裡提到這個字樣（例如討論這條規則的 commit）不算。
@@ -53,14 +55,43 @@ _GIT_OPTS_WITH_VALUE = {
     "--namespace",
     "--exec-path",
 }
-# git commit 短選項裡會吃值的字母（`m` 另外處理）。
-_COMMIT_SHORT_WITH_VALUE = set("FCctS")
+# git commit 短選項裡「值在下一個 token」的字母（`m` 另外處理），依 `git commit -h`：
+# -F -C -c -t -U。`-S[<keyid>]`、`-u[<mode>]` 的值只能黏著寫，獨立的 `-S` 不吃下一個
+# token，所以不在此集合。長選項不需要清單：`--file x` 之類的值是非 `-` 開頭的 token，
+# 會被當成位置參數略過，只有 `--message` / `--trailer` 需要取值。
+_COMMIT_SHORT_WITH_VALUE = set("FCctU")
+# 群組／流程控制語法造成 `git` 前面多出來的 token（只在 segment 開頭才略過）。
+_LEADING_KEYWORDS = {"(", "{", "!", "then", "do", "else", "elif", "if", "while", "time"}
+_ANSI_C_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", "'": "'", '"': '"'}
 
 
 class _Segment:
     def __init__(self) -> None:
         self.text: list[str] = []
         self.heredocs: list[str] = []
+
+
+def _ansi_c(command: str, start: int) -> tuple[str, int] | None:
+    """Decode a `$'...'` string at `start`; return (single-quoted literal, last index).
+
+    Only n, t, r, backslash, single and double quote escapes are decoded; others stay literal.
+    Returns None when unterminated.
+    """
+    out: list[str] = []
+    i = start + 2
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if ch == "\\" and i + 1 < n:
+            nxt = command[i + 1]
+            out.append(_ANSI_C_ESCAPES.get(nxt, ch + nxt))
+            i += 2
+        elif ch == "'":
+            return "'" + "".join(out).replace("'", "'\\''") + "'", i
+        else:
+            out.append(ch)
+            i += 1
+    return None
 
 
 def _split_segments(command: str) -> list[_Segment]:
@@ -83,6 +114,11 @@ def _split_segments(command: str) -> list[_Segment]:
                 cur.text.append(command[i])
             elif ch == '"':
                 quote = None
+        elif (
+            ch == "$" and command.startswith("$'", i) and (ansi := _ansi_c(command, i))
+        ):
+            cur.text.append(ansi[0])
+            i = ansi[1]
         elif ch in "'\"":
             quote = ch
             cur.text.append(ch)
@@ -123,6 +159,14 @@ def _split_segments(command: str) -> list[_Segment]:
 def _commit_args(tokens: list[str]) -> list[str] | None:
     """If tokens are `git [opts] commit ...`, return the args after `commit`."""
     i = 0
+    while i < len(tokens):
+        stripped = tokens[i].lstrip("({")
+        if tokens[i] in _LEADING_KEYWORDS:
+            i += 1
+        elif stripped and stripped != tokens[i]:  # `(git` / `{git` glued form
+            tokens = [*tokens[:i], stripped, *tokens[i + 1 :]]
+        else:
+            break
     while i < len(tokens) and (
         _ENV_ASSIGN_RE.match(tokens[i]) or tokens[i] in ("command", "env")
     ):

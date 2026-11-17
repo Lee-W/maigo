@@ -237,6 +237,9 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
   串在其他指令之後的情況。
 - 訊息來源只取指令字面上看得到的：`-m` / `--message` / `--trailer` 的值，以及掛在
   該 segment 上的 heredoc 內文（含 `-m "$(cat <<'EOF' ... EOF)"`）。
+- `$'...'`（ANSI-C 引號）內的 `\n` 視為換行；一般單、雙引號裡的字面 `\n` 不當換行
+  （git 也不解讀）。segment 開頭的 `(`、`{`、`then`、`do` 等群組／流程關鍵字會先略過
+  再找 `git`。`-S` 只接受黏著的 keyid（`-Skeyid`），獨立的 `-S` 不吃下一個參數。
 - 「某一行以 `Co-Authored-By:` 開頭」（不分大小寫）才算 trailer；散文裡提到這個字樣
   不擋。
 - `-F <file>`（訊息不在指令字面上）不讀檔，放行；`git log --grep Co-Authored-By`、
@@ -254,6 +257,17 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 
 - input 不是有效 JSON、`tool_name` 不是 `Bash`、`tool_input.command` 不是非空字串 → 靜默放行
 - segment 的引號不平衡等 shell 解析失敗 → 該 segment 放行
+
+### 已知不擋的情況
+
+以下都是刻意 fail-open：要支援就得真的執行或完整解析 shell，換來的是誤擋風險，
+而誤擋會讓所有 session 無法 commit。
+
+- 訊息來自變數（`-m "$MSG"`）或命令替換（`-m "$(printf ...)"`），內容不在指令字面上。
+  例外是 `$(cat <<'EOF' ... EOF)` 這種 heredoc 內文寫在指令裡的形狀，會擋。
+- `-F <檔案>`、`-F <(...)`（process substitution），以及先把訊息 heredoc 寫進檔案、再 `-F` 讀回。
+- `sh -c '...'`、`bash -c "..."` 內層的 `git commit`：外層指令不是 `git`，不會往字串內遞迴。
+- 其他沒列入略過清單的 shell 結構（例如 `case` 分支、函式本體、`$(git commit ...)` 開頭的命令替換）。
 
 ### Timeout
 
