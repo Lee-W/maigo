@@ -283,6 +283,26 @@ def check_skill_frontmatter() -> CheckResult:
     return r
 
 
+SKILL_MAX_LINES = 500
+
+
+def check_skill_size() -> CheckResult:
+    """SKILL.md body is loaded in full on every use; long lookup material belongs in references/."""
+    r = CheckResult(f"skills/*/SKILL.md ≤ {SKILL_MAX_LINES} 行")
+    skills_dir = ROOT / "skills"
+    if not skills_dir.is_dir():
+        r.note("skills/ 目錄不存在")
+        return r
+    for skill_file in sorted(skills_dir.glob("*/SKILL.md")):
+        lines = len(skill_file.read_text(encoding="utf-8").splitlines())
+        if lines > SKILL_MAX_LINES:
+            r.fail(
+                f"{skill_file.relative_to(ROOT)}: {lines} 行超過 {SKILL_MAX_LINES} 行上限，"
+                "把查閱型內容搬到同一個 skill 的 references/ 並在本體留「什麼時候讀」的指標"
+            )
+    return r
+
+
 def check_hook_scripts() -> CheckResult:
     r = CheckResult("hooks.json 指向的 script 存在 + 語法正確 + 可執行")
     hooks_json = ROOT / "hooks" / "hooks.json"
@@ -777,6 +797,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_command_frontmatter,
     check_command_persona_quotes,
     check_skill_frontmatter,
+    check_skill_size,
     check_hook_scripts,
     check_pre_commit_config,
     check_skill_crossrefs,

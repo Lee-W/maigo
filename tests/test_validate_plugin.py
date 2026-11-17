@@ -584,6 +584,36 @@ class TestCheckHooksSchema:
 # ---------------------------------------------------------------------------
 
 
+class TestCheckSkillSize:
+    def _write(self, tmp_path: Path, lines: int) -> None:
+        skill_file = make_skill(tmp_path, "big")
+        skill_file.write_text("\n".join(["x"] * lines) + "\n", encoding="utf-8")
+
+    def test_at_limit_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        self._write(tmp_path, validate_plugin.SKILL_MAX_LINES)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        assert validate_plugin.check_skill_size().passed
+
+    def test_over_limit_fails_and_points_to_references(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(tmp_path, validate_plugin.SKILL_MAX_LINES + 1)
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_skill_size()
+        assert not result.passed
+        assert any("references/" in e and "big" in e for e in result.errors)
+
+    def test_references_files_are_not_counted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._write(tmp_path, 10)
+        ref = tmp_path / "skills" / "big" / "references" / "long.md"
+        ref.parent.mkdir()
+        ref.write_text("y\n" * 2000, encoding="utf-8")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        assert validate_plugin.check_skill_size().passed
+
+
 class TestCheckSkillCrossrefs:
     def test_missing_skill_reference_fails(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
