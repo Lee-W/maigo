@@ -131,6 +131,8 @@ stopping there: report the branch/compare URL and ask if a PR should be opened.
 
 ## Worktree hygiene (references)
 
+**硬規則：不要用 harness 內建的 `EnterWorktree`；一律用 `git worktree add -b <topic> <root>/.worktrees/<topic> <remote>/main` 建在 `<root>/.worktrees/<topic>`，branch 名不帶 `worktree-` 前綴。**內建工具預設建在 `.claude/worktrees/` 並加前綴與鎖定，與本專案慣例不符。
+
 worktree 慣例（layout 放 `.worktrees/<topic>`、不用 harness 內建 `EnterWorktree`、任務一開始就在自己的 worktree、`ListAgents` 先於動 git index、已完成的工作移進 worktree 的搬法、批次清理先列指令、squash-merge 的「已合併」檢查用 `gh search prs`、不要把意外 git 狀態先歸咎於 rogue agent、commit 後用 `git log --oneline -1` 驗 subject）：
 [`references/worktree-hygiene-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene-index.md)（慣例摘要）
 ；完整配方在 [`references/worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)，開／清 worktree 或委派後 git 歷史看起來奇怪時讀。

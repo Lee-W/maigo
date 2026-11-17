@@ -198,10 +198,13 @@ discipline above; do not block the PR on the author not having attached one.
 
 ## Recurring must-fix patterns / Design integrity / Review judgment
 
-三組慣見模式與判斷原則（commit body 與 PR description 是契約、公開符號 export、命名原則、base-layer 完整性、fix at the owning layer、不要把覆蓋缺口升級成正確性 bug、先驗證 repo 設定再 flag、proportionality 等）的索引在：
-[`references/pattern-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pattern-index.md)（判斷某 finding 屬於哪類模式、或該不該 flag 時讀）
+**每次審查都要逐條對照這三組名單**——它們補充上面的 9 項 checklist，不是「覺得像才去查」的選讀。名單只列名稱；某一條命中、或判斷該不該 flag 時，再讀 [`references/pattern-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pattern-index.md)（每條一句判準），需要完整理由與配方才讀 [`recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)、[`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md)、[`review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)。
 
-完整理由與配方：[`references/recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)、[`references/design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md)、[`references/review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)（判斷何時**不** flag、改動要多大時務必讀）。
+**Recurring must-fix patterns**：commit body 是契約；PR title／description 是契約；被 consumer `isinstance` 檢查的底線私有例外其實是 public API；新 public symbol 要在與 sibling 相同的層級 export；不要框框式區段分隔註解；concurrent PR 根本修法優先；命名（依它是什麼而非第一個 caller、private helper 帶 domain 名詞、guard／hook 成對用兩個動詞）；規則本身而非列舉程式碼導出的集合；增刪或重排呼叫的 PR 要跑斷言該函式 mock 的既有測試。
+
+**Design integrity**：base layer 對所有已知下游完整；不用「experimental」當擋箭牌；fold／fixup rebase 後綠燈不可信；多型優於 caller 端 type-switch；在擁有該行為的層修；外部工具為選用且 runtime 偵測；型別配對 guard 比對宣告的屬性；對應符號對稱命名；封閉 sum-type 要結構性封閉；client／transport 邊界的版本偏差容忍；在來源端正規化部分資料。
+
+**Review judgment: when NOT to flag**：先驗 repo 設定；覆蓋缺口不升級成正確性 bug；不照單全收回歸說法；proportionality；不為 squash 前的歷史 flag；security／authz guard 用移除它證明承重；範圍宣稱要以實際 checker 輸出為據；「最小改動」不得保留已被推翻的事實；寧可讓新程式碼符合既有 checker；installed package 證據要對應被測 commit；只評最新 diff 狀態；不默默覆寫前一輪 verdict；引用的慣例要屬同一架構層。
 
 ## Claims and evidence checks (references)
 

@@ -24,7 +24,8 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 
 - **開場**：`model-dispatch`（解析 `--model-profile`）、`narration`／`orchestrator-voice`（旁白與對話，各命令本來就會載入）
 - **審查階段（🟡 爽世）**：`strict-review`；批次審查才讀 `strict-review/references/review-batch-queue.md`
-- **收尾階段（🟣 立希全綠之後，見下方「Commit message draft + 落地」）**：`commit-message`、`git-workflow`、`pr-sync-check`、`github-title-description`（含 `draft-bundle`）——**只在走到該步驟時才讀**
+- **收尾階段（🟣 立希全綠之後，見下方「Commit message draft + 落地」）**：`commit-message`、`pr-sync-check`、`github-title-description`（含 `draft-bundle`）——**只在走到該步驟時才讀**
+- **`git-workflow` 例外，流程前段就會用到**：開／清 worktree、交辦會跑 git 的 agent（含 stage、amend 範圍與 cwd 規則）、或要動 git index 前確認沒有 agent 在跑時，**那一刻就讀**，不等到收尾
 - **出事才讀**：`failure-handling`（爽世 BLOCKED、立希紅、subagent 中斷時）、`memory-propose-confirm`（🟡 爽世或 🎀 愛音的輸出含 Memory propose 區塊時）
 
 ## 共通流程（Sequential 段）
@@ -195,7 +196,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 
 ### Commit message draft + 落地
 
-**讀取時機：本節用到的 `commit-message`、`git-workflow`、`pr-sync-check`、`github-title-description` 四個 skill 到這一步才讀，之前的階段不需要載入。**
+**讀取時機：本節用到的 `commit-message`、`pr-sync-check`、`github-title-description` 三個 skill 到這一步才讀，之前的階段不需要載入；`git-workflow` 若流程前段因開／清 worktree、交辦 git 操作或動 git index 已讀過，這裡不必重讀，否則到這一步一定要讀。**
 
 Taki 全綠（或 `/maigo:team` 合流 APPROVED + PASS）後，若還有未 commit 的本次變更，
 依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。
