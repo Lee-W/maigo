@@ -108,7 +108,7 @@ _BODY_RE = re.compile(
     r"(?P<detail>i/\S+?\.md)?"
     r"\s*—\s?(?P<tail>.*)$"
 )
-# Two line shapes read back as the same fields (see SKILL.md §1「行文法」):
+# Two line shapes read back as the same fields (see work-board references/format-spec.md §1「行文法」):
 #   new  `… — [<title> ]<detail>`  detail is the LAST whitespace-separated token, so `$` then
 #        `gf` lands on it; the title may itself end in `i/9.md` (only the last token counts).
 #   old  `… <detail> — <title>`    detail sits before the first `—`; `_BODY_RE` captures it.

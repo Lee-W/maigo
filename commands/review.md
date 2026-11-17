@@ -325,7 +325,7 @@ GitHub PR review 每跑完一顆並輸出 report 後，依
   新 head 或作者新留言會回 👀 `↩︎ 回你的球`。
 - 上面 publisher 回傳的 `path`（即
   `.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md` 產物的實際路徑）寫進對應細節檔（`.maigo/i/<slug>.md`，見
-  [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
+  [`skills/work-board/references/format-spec.md` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)）
   的 `## 筆記` 區，一行路徑連結（獨立成清單項 `- ../review/9301/review.md`，或標籤後接反引號路徑；不要寫成緊貼中文冒號的 `報告：../review/…`。檔案相對，自己的 PR 為 `../pr/9301/review.md`；規則與理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）——
   不再寫進索引行
 

@@ -32,7 +32,7 @@ description: This skill should be used whenever writing, templating or generatin
 - `review`：`scripts/review_report.py` 的 `render_report` 產生檔頭，正文骨架在 `review-templates.md`
 - `review-draft`：[`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md) §4.5，整份會被 `gh pr review --body-file` 送上 GitHub
 - `pr-comments`、`reply-draft`：[`comment-fetch-and-triage.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/comment-fetch-and-triage.md) 的兩個模板
-- `board.md`、`i/<slug>.md`：[`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) §1、§1a，nvim 操作見 §6
+- `board.md`、`i/<slug>.md`：[`skills/work-board/references/format-spec.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md) §1、§1a，nvim 操作見 [`nvim-usage.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/nvim-usage.md)（§6）
 
 不在範圍：`.maigo/_internal/` 與所有 jsonl／json 機器狀態檔，它們只給程式讀。
 

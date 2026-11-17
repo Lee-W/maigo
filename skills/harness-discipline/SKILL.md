@@ -113,7 +113,7 @@ prek 局部 hook、grep read-back、diff 範圍確認就夠，不必為此再燒
 **與 `failure-handling` 的 529 代打不是同一件事**：那條講的是 review subagent 因基礎設施
 過載反覆啟動失敗時，orchestrator 主線代打當 fallback（見
 [`failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)
-「Subagent 過載 / 不可用」段），且明示違反分工守則、嚴格度不打折。這裡講的是**預設路由**——
+「Subagent 過載、被切斷與假 failed」段），且明示違反分工守則、嚴格度不打折。這裡講的是**預設路由**——
 審自己 branch 本來就該 inline，不是過載才退而求其次的代打。
 
 ## Scope discipline

@@ -123,7 +123,7 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 |------|----------|--------|----------|----------|
 | Work Board 索引 | `.maigo/board.md` | orchestrator（`/maigo:board` / `/maigo:review`） | `scripts/board_state.py` + [work-board skill](../skills/work-board.md) | 跨 session 常駐，不隨單次任務結束而收檔 |
 | Work Board 細節檔 | `.maigo/i/<slug>.md` | 同上 | 同上 | 跟著對應 issue/PR 的追蹤狀態走；沒有索引行引用的孤兒細節檔視為 `dd`（使用者刪了那一行），見 [work-board skill](../skills/work-board.md) §3a |
-| 已結案封存 | `.maigo/_archive/review/<id>/`、`.maigo/_archive/pr/<id>/`、`.maigo/_archive/i/<id>.md` | orchestrator（`board_sync.py archive`） | `scripts/board_sync.py` + [work-board skill](../skills/work-board.md) §3「細節檔生命週期」 | merged／closed／老化項目的 review／pr 目錄與細節檔從 `review/`、`pr/`、`i/` 搬來這裡留存；不覆蓋既有封存，不被 board 對帳讀取 |
+| 已結案封存 | `.maigo/_archive/review/<id>/`、`.maigo/_archive/pr/<id>/`、`.maigo/_archive/i/<id>.md` | orchestrator（`board_sync.py archive`） | `scripts/board_sync.py` + [work-board skill](../skills/work-board.md) §3 與 [`detail-lifecycle-and-location.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/detail-lifecycle-and-location.md)「細節檔生命週期」 | merged／closed／老化項目的 review／pr 目錄與細節檔從 `review/`、`pr/`、`i/` 搬來這裡留存；不覆蓋既有封存，不被 board 對帳讀取 |
 
 board 這條線是全 repo 最佳實踐——code 定正典（`board_state.py`）、skill 鏡射
 人讀版本（`work-board`）、test 守一致（`tests/test_board_state.py`），三方鎖住，

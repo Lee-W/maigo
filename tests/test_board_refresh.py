@@ -996,7 +996,10 @@ def test_skill_load_examples_parse():
     start = text.index("# 載到本機的指令樣板（範例）")
     fence = text.rindex("```text\n", 0, start) + len("```text\n")
     example = text[fence : text.index("```", fence)]  # fence is indented in the list
-    assert set(refresh.parse_load_templates(example, "SKILL.md")) == {"pr", "branch"}
+    assert set(refresh.parse_load_templates(example, "format-spec.md")) == {
+        "pr",
+        "branch",
+    }
 
 
 # --- board-weights: same-rank boost ---------------------------------------------

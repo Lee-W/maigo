@@ -166,7 +166,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    - **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
      `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
      `## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格見
-     [`skills/work-board` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)。
+     [`skills/work-board/references/format-spec.md` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)。
    - **孤兒 `i/` 檔就是 dd 訊號**：使用者在 nvim 用 `dd` 刪行後，細節檔還留著，`plan` 會把它判成 dd
      並寫進排除紀錄（剛寫好的檔有 10 分鐘寬限，列在 `pending_orphans`，本輪不判）。只有
      `excluded_detail_files`（排除項目殘留的細節檔）要列出來，**等使用者確認後才刪**，不自動刪。
@@ -281,7 +281,7 @@ orchestrator 逐項抓使用者在 GitHub 的實際處理方式，蒸餾 0-3 條
 留痕區。保留原 checkbox 與 `🧠` 狀態；**並呼叫 `board_sync.py drop --reason drop <url...>`
 寫入排除紀錄**，之後的 discovery 與 artifact 對帳都不再補回，刷新也不會把 `已放棄` 洗回 `待 review`
 （該行 `excluded: true`）。對應細節檔不動，等老化清除時跟索引行一起刪
-（見 [`skills/work-board` §3 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
+（見 [`skills/work-board/references/detail-lifecycle-and-location.md` 細節檔生命週期](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/detail-lifecycle-and-location.md)）。
 
 ### 8. `--cross-repo`
 

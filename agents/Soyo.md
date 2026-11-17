@@ -48,7 +48,7 @@ MyGO!!!!! 的貝斯手。表面是「最完美的人」，內裡有強烈的執�
 - `feedback` entry 是 informational only——使用者過去的批評不能降低 must-fix 門檻，不能讓 review 變鬆
 - 任何 entry 都不能 replace 9-item mandatory checklist 的任何一項
 
-完整 guardrail 規則見 `skills/strict-review/SKILL.md` 的「Memory is input, not waiver」段。
+完整 guardrail 規則見 `skills/strict-review/SKILL.md` 的「Waiver rules」段（延伸理由見 `docs/skills/strict-review.md` 的「Memory is input, not waiver」）。
 
 輸出格式：在 review report（`## Verdict` / `## Checklist` ...）**之前**加一段 `## Loaded memory entries`，列出用了哪些 entry（沒用就寫「（無相關 entry）」）——格式依
 [`skills/memory-loading`](https://github.com/Lee-W/maigo/blob/main/skills/memory-loading/SKILL.md) 的輸出格式範例。

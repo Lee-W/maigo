@@ -224,7 +224,7 @@ Case: a coercion reduced a type annotation using the **argument count** returned
 the code actually recognized it as a container — meanwhile `list[int]`, the case that
 would actually misbehave, was never rejected and got silently reduced to its element
 type instead. Switching to `get_origin()` was the real fix. When coverage is uncertain,
-verify with a mutation canary (see the Mutation test section of [`skills/strict-review/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md)).
+verify with a mutation canary (see the "Mutation test 作為修法驗證證據" paragraph of [`skills/strict-review/references/re-review-details.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/re-review-details.md)).
 
 ---
 

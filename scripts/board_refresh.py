@@ -11,7 +11,7 @@
   board 已寫成功後 ledger／snapshot 失敗 → exit 3 但不還原（`post_write_failed`，重跑安全）。步驟與失敗語義見 `skills/work-board/SKILL.md` §3(b)。
 
 渲染器（`render_line` / `render_board` / `render_detail_facts` / `split_detail`）是
-`skills/work-board/SKILL.md` §1 / §1a 文法的程式鏡像，由 `tests/test_board_refresh.py`
+`skills/work-board/references/format-spec.md` §1 / §1a 文法的程式鏡像，由 `tests/test_board_refresh.py`
 的 round-trip 守著。外部指令一律走 `board_sync.run`（以 module attribute 存取，
 測試只要 monkeypatch 那一個 seam）。
 
@@ -313,7 +313,7 @@ def render_line(
     ended: str | None = None,
     result: str | None = None,
 ) -> str:
-    """One board line per SKILL.md §1「行文法」: `… — [<title> ]<detail>`.
+    """One board line per work-board references/format-spec.md §1「行文法」: `… — [<title> ]<detail>`.
 
     The detail path is the last token of the line (one ASCII space before it, nothing after
     it), so `$` then `gf` lands on it. `action` / `size` (🎯/👀 rows) and `ended` (✅ rows)
@@ -376,7 +376,7 @@ def render_row(row: dict, number: int | None, section: str) -> str:
 
 
 def count_learn_pending(rows: list[dict]) -> int:
-    """Rows that are (`[x]` or `🔖`) and have no `🧠` (SKILL.md §1, §5)."""
+    """Rows that are (`[x]` or `🔖`) and have no `🧠` (work-board references/format-spec.md §1, learning-gate.md §5)."""
     return sum(
         1
         for row in rows
@@ -391,7 +391,7 @@ def render_board(
     rows_by_section: dict[str, list[dict]],
     learn_pending_count: int,
 ) -> str:
-    """Whole board.md per SKILL.md §1「Sections」; 🎯 and 👀 are each numbered from 1."""
+    """Whole board.md per work-board references/format-spec.md §1「Sections」; 🎯 and 👀 are each numbered from 1."""
     counts = {s: len(rows_by_section.get(s, [])) for s in SECTIONS}
     header = (
         f"> 最後刷新：{refreshed_at_local} ｜ 🎯 {counts['🎯']} ｜ 👀 {counts['👀']} ｜ "
@@ -510,7 +510,7 @@ def render_detail_facts(
     load_command: str | None = None,
     result: str | None = None,
 ) -> str:
-    """The fact section (everything before `## 判斷`), SKILL.md §1a; ends with a blank line."""
+    """The fact section (everything before `## 判斷`), work-board references/format-spec.md §1a; ends with a blank line."""
     lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
     is_pr = type != "🐛"
     if is_pr and additions is not None and deletions is not None:

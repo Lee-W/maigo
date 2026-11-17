@@ -65,8 +65,8 @@ was missing from the CI test-path list, so CI never ran it. Another PR drew the 
 reads the table and the repo's test-path configuration, and does not mutate anything.
 - Run the mutation per test (or with `-v`) and record a small baseline → post-mutation
   table; the recipe and the restore discipline (backup, byte-compare, shared working tree
-  rules) are in the Mutation test section of
-  [`strict-review/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md).
+  rules) are in the "Mutation test 作為修法驗證證據" paragraph of
+  [`strict-review/references/re-review-details.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/re-review-details.md).
 - Any test still green under mutation gets a one-line reason: it guards something else, or
   it guards nothing and is removed or fixed.
 - For CI collection, find where the repo lists its test paths and check the new file is

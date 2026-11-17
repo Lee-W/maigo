@@ -21,7 +21,7 @@ def _classify(item_type, gh_meta, prior_status):
 
 
 # ---------------------------------------------------------------------------
-# 🐛 issue — table rows from skills/work-board/SKILL.md §2
+# 🐛 issue — table rows from skills/work-board/references/classification.md (§2)
 # ---------------------------------------------------------------------------
 
 
