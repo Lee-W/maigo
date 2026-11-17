@@ -132,50 +132,11 @@ will come back next round.
 
 ## Output format
 
-```markdown
-## Verdict
-APPROVED | NEEDS_CHANGES | BLOCKED
+輸出依序為 `## Verdict`（`APPROVED | NEEDS_CHANGES | BLOCKED`）、`## 前置驗證`、`## Checklist`（9 項逐項 `[x]`／`[ ]` 附缺漏說明）、`## Must-fix`（每項 `file:line` ＋ 問題 ＋ **改法** ＋ **為什麼**）、`## Nit`、`## Evidence pending`、`## What's good`，推翻燈的判斷時加 `## Facts corrected from rubric`。
+完整骨架：
+[`references/output-format.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/output-format.md)（寫最終輸出前讀）
 
-## 前置驗證
-- `gh pr diff` — 範圍 +A/-B，N 檔（自己核，非轉述）
-- 讀 `path:line` 原始碼 — 確認 <rubric 某判斷> 屬實 / 推翻
-- timeline 查 linked issue — <有 / 無>
-
-## Checklist
-- [x] acceptance match
-- [ ] evidence per function — 缺：function_X 沒 output
-- [x] edge case coverage
-- [ ] convention conformance — 缺：import 排序跟 auth.py:1-10 不一致
-- [x] no unsafe pattern
-- [x] no unexplained magic
-- [x] no TODO evasion
-- [x] no defensive bloat
-- [x] no completeness theatre
-
-## Must-fix
-- `file.py:42` — <problem>
-  → **改法：** <concrete change>
-  → **為什麼：** <reason / risk>
-
-## Nit (suggest, don't block)
-- `other.py:10` — <small thing> + <suggestion>
-
-## Evidence pending
-- `function_X` 執行 output
-- edge case `empty input` 的 test 結果
-
-## What's good
-- <短列，不灌水>
-
-## Facts corrected from rubric（推翻燈的判斷時才寫，否則省略）
-- <rubric 的哪條 Decision / acceptance> — 實查 `path:line` 後推翻，因為 <證據>
-```
-
-`/maigo:review` 的持久報告另依
-[`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)
-產生共用檔頭、最後 review 時間與 reviewed commit；只保留同 source 最新完整報告。
-本地「已看完」與 GitHub 已送出分開記錄，不改變審查 verdict。
-
+`/maigo:review` 的持久報告另依 [`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md) 產生共用檔頭、最後 review 時間與 reviewed commit。
 
 ## Re-review (when implementer comes back)
 
@@ -185,50 +146,11 @@ Walk through the previous round's must-fix and evidence-pending **one by one**.
 - "我改了類似的地方" / "順便修了別的" doesn't clear a must-fix
 - New problems found in this round still count — being "round 3" is not a reason to relax
 - When briefing the reviewer for a re-review, ask for the whole changed passage to be checked sentence by sentence and **every** finding listed in one pass. A reviewer who only re-checks the sentence just fixed surfaces one new unsupported claim per round, and a doc fix can drag on for three or four rounds.
+- Mutation／canary 證據是修正輪 evidence 的必要項：暫時拆掉修法本體，對應測試必須轉紅，復原後轉綠，並逐測試點名哪個斷言轉紅；fixture 的 patch 若指向舊 callable，把 stub 改成 `raise AssertionError` 紅的支數必須 > 0。
+- 已審過的 PR 出現新 commit 或新 maintainer review → 對照已存報告做 delta re-review，不從頭審。
 
-When new commits or a new maintainer review arrive on a PR **already
-reviewed before**, do a delta re-review against the stored report rather
-than reviewing from scratch — the two-step ancestor+date check, the
-rebase-range pitfall, and `isResolved` reliability (see below) are in
-`references/review-modes.md` and `references/review-judgment.md`.
-
-When the whole review (or a delta re-review) is handed to a single subagent —
-minimum delegation clauses, text hand-back instead of a report file, which
-claims the orchestrator re-checks, stacked PRs whose upstream already merged —
-see `references/review-agent-handoff.md`.
-
-**Mutation test 作為修法驗證證據**：光看「新增的斷言轉綠」不夠——測試可能本來就不會失敗，
-或斷言弱到修法被拆掉也不會紅（安慰劑測試）。要求：暫時拆掉修法本體 → 對應測試必須轉紅
-（證明測試真的在守這條修法）→ 復原修法 → 測試轉綠。復原動作依上方「共用 working tree 上的
-審查紀律」的安全流程執行，並用備份檔／`git diff` byte-compare 證明復原乾淨、無殘留改動——
-這份 mutation-test 證據是修正輪 evidence 的必要項，不是加分項。（第一輪新行為測試的 mutation 表另見下方「Pre-PR sweeps」段，有自己的適用範圍。）
-
-**Canary 回報要點名哪個斷言轉紅，不是只看檔案級 exit code**——同一個 bug 常補了不只一支
-測試，跑 canary 只記「這個測試檔轉紅」會蓋掉「其中只有一支真的有鑑別力」這件事：兩條
-code path 可能在某個測試餵的 input 上收斂到同一個值，這種測試無法區分修法與 bug，看起來
-像覆蓋、實際是裝飾。要求：逐測試（或 `-v`/`--tb=line`）跑 canary，記一張 baseline→
-post-mutation 的小表；對每一支在 mutation 下仍是綠的測試，追問「為什麼」並講清楚它守的是
-別的東西還是什麼都沒守住；跑之前先預測預期的紅/綠分布，一支「本該綠卻紅」或「本該紅卻綠」
-本身就是資訊。命中一次後，回覆裡順手給一個兩條 path 真的會分岔的 input，讓下一輪能直接
-驗證鑑別力，而不是重新摸索。review 意見一次點出「缺少什麼」與「有沒有被真的 pin 住」兩層
-要求時，修完要對每一層各做一次**型態不同**的 mutation（拿掉整段程式碼 vs 把邏輯換成寫死
-常數／固定值），不能用同一次 mutation 的結果覆蓋兩層——呼叫端的預設值可能與斷言值巧合相同
-（例如寫死 `1` 剛好等於預設 `1`），必須改用非預設值才能讓兩條路徑分岔。
-
-**重構搬動守門邏輯時，canary 要打在新位置，不是這次 diff 動過的行。** 某個 default／
-守門判斷若同一輪被搬進另一個函式，canary 打在舊位置只會讓不相關的斷言變紅——看起來像
-驗過了，但被證明的性質其實還是沒被測到。判準：canary 的落點由「被證明的性質現在住在
-哪一行」決定，不是由「這次 diff 改了哪些行」決定。對同一個守門點打兩種變異（換值、拿掉
-保護）能分別證明「接住的值是什麼」與「缺值會不會被接住」兩件不同的事，兩者紅的支數落差
-本身就是覆蓋率的證據。
-
-**Fixture liveness：production 改呼叫另一個 callable 時，patch 舊 callable 的 fixture
-會靜默死掉，測試仍全綠。** 測試綠只證明斷言成立，不證明斷言仍由測試控制的那條路徑
-產生——fixture 死掉之後，那些測試在測真實實作，不是在測宣稱要測的 dispatch。要求：把
-受影響 fixture 的 stub 改成無條件 `raise AssertionError`，重跑該 fixture 服務的整批
-測試，**紅的支數必須 > 0**；0 支紅代表這個 patch 已經是死碼、測試對它零控制。修好
-（讓 patch 指向真正被呼叫的 callable）之後再跑一次同一個 canary，確認這次真的轉紅。
-classmethod 與 instance method 是不同的 callable，patch 一個攔不到另一個即使同名。
+細節（delta re-review 兩步檢查、mutation／canary 的完整要求、fixture liveness、單一 subagent 複審的交辦條款）：
+[`references/re-review-details.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/re-review-details.md)（複審時讀）
 
 ## Adapting per context
 
@@ -267,50 +189,12 @@ someone else's PR and in the other modes, list it under `## Evidence pending` (o
 direction) and, if the repo's tooling allows it, run the mutation yourself under the working-tree
 discipline above; do not block the PR on the author not having attached one.
 
-## Recurring must-fix patterns
+## Recurring must-fix patterns / Design integrity / Review judgment
 
-Cross-cutting patterns that surface frequently; treat as supplements to the 9-item checklist.
-Full rationale and recipes in `references/recurring-patterns.md` — read it when a pattern applies.
+三組慣見模式與判斷原則（commit body 與 PR description 是契約、公開符號 export、命名原則、base-layer 完整性、fix at the owning layer、不要把覆蓋缺口升級成正確性 bug、先驗證 repo 設定再 flag、proportionality 等）的索引在：
+[`references/pattern-index.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pattern-index.md)（判斷某 finding 屬於哪類模式、或該不該 flag 時讀）
 
-- **Commit body is a contract** — behavioral claims in the commit body must match the diff;
-  mismatch is must-fix (implement the promise or rewrite the body). Details: `references/recurring-patterns.md`.
-- **PR title/description is a contract** — behavioural/scope claims in the PR title or
-  description must match the actual diff; mismatch is must-fix or nit depending on whether it
-  would mislead reviewer judgment. Details: `references/recurring-patterns.md`.
-- **Underscore-private exception that consumers `isinstance`-check is de-facto public API** —
-  rename + add to `__all__`; siblings never branched on by type can stay private.
-  Details + Airflow case studies: `references/recurring-patterns.md` and
-  `skills/airflow-aware/references/review-checks.md`.
-- **New public symbol must export at the same surface as its siblings** — a new
-  Enum/class/type consumed by a user-facing kwarg must be reachable from the same
-  top-level import as the sibling class that uses it; missing `__all__` / lazy-import
-  entries is must-fix, not nit. Details: `references/recurring-patterns.md`.
-- **不要框框式區段分隔註解** — `# ----` / `# --- 區段名 ---` 全刪含 label，靠函式邊界與空行分段。
-- **Concurrent PR 根本修法優先** — 有 SDK 層根本修法時肯定當前解但明確指向根本修法，說明 supersede 關係。
-  Details: `references/recurring-patterns.md`.
-- **Naming: by what it is, not its first caller's use case** — a name coupled to one caller's context misleads and blocks reuse; generalize it.
-- **Naming: private helper name carries the domain noun** — behavioral qualifiers ("once", "dedup") go in the docstring, not the name.
-- **Naming: guard-then-hook pairs use two distinct verbs, not an underscore** — check for an existing same-file pairing convention before naming; collapsing to `x`/`_x` when the file's other pairs use two verbs reads as confusing, not idiomatic. Details: `references/recurring-patterns.md`.
-- **State the rule, don't enumerate a code-derived set** — a comment/docstring listing "all the other X" goes stale as the set grows; require the rule itself. Hitting the same incomplete-enumeration defect a second round is a signal to change approach, not add the N+1th member.
-  Details: `references/recurring-patterns.md`.
-- **A PR that adds, removes or reorders calls inside a function: run the existing tests that assert on that function's mocks** — not only the tests the PR touched. Details: `references/recurring-patterns.md`.
-
-## Design integrity checks (references)
-
-Cross-cutting patterns that surface on framework/base API work and rebase workflows;
-details and recipes in `references/design-integrity.md`:
-
-- **Base-layer completeness** — base must be complete for all known downstreams before release; defer = must-fix.
-- **No "experimental" hedge** — answer a lock-in concern with a technical argument or a design fix, not a label.
-- **Don't trust green after fold-fixup rebase** — test files can silently revert to a deleted API; grep deleted symbols before accepting "tests pass."
-- **Prefer polymorphism over type-switching in the caller** — an `isinstance` chain or type-flag branch in the caller is a signal to push behavior onto a base-class method instead; don't extend the switch with a new flag.
-- **Fix at the owning layer** — a defect in behavior owned by an upstream module/library gets an upstream option or callback, not a downstream workaround; details in `references/design-integrity.md` Part L.
-- **External tools are optional and runtime-detected** — detect the binary, don't add a hard dependency; fallback must not leave the user with neither path; extension of Part E.
-- **Type-pairing guards compare declared attributes** — never use "is this method overridden" as a proxy; one `is not` comparison on a declared attribute of both sides (Part M).
-- **Name a counterpart symmetrically** — `upstream_x` / `downstream_x`, not `upstream_x` / `fine_x`; sibling classes share the vocabulary (Part N).
-- **Close a framework-internal sum-type structurally, not visibly** — an encoder-level allowlist, not `ABC` / "do not subclass" text (Part O).
-- **Version-skew tolerance at the client/transport boundary** — not by relaxing generated models or raising the dependency floor (Part P).
-- **Normalize partial helper data at its source** — a variant of the owning-layer rule in Part L.
+完整理由與配方：[`references/recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md)、[`references/design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md)、[`references/review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)（判斷何時**不** flag、改動要多大時務必讀）。
 
 ## Claims and evidence checks (references)
 
@@ -322,43 +206,6 @@ re-sync after behaviour changes; details in
 ## Frontend device checks (references)
 
 UI / CSS / client interaction diffs: a bug reproducible only on a real device, or only outside Chrome, is a distinct class of failure (`100vh`, WebKit external `<use>`, Firefox / touch acceptance); see `references/frontend-device-checks.md`.
-
-## Review judgment: when NOT to flag (references)
-
-Thirty-one principles for calibrating whether a finding is a real must-fix
-and how much change a comment warrants; details in
-`references/review-judgment.md`:
-
-- **Verify repo config first** — grep linter config + sibling files before flagging a PEP / textbook rule.
-- **Don't escalate coverage gap to correctness bug** — verify reachability + not-by-design (and blast radius — a removed guard isn't automatically must-fix) before calling it a bug.
-- **Don't adopt regression framing uncritically** — verify the claim against HEAD; reply-only may be correct.
-- **Proportionality** — COMMENTED nit does not justify a cross-hierarchy refactor; do the minimum proportionate change.
-- **Don't flag squash-before-merge history** — pre-merge commit count / fixups vanish on merge; flag content violations, not history shape.
-- **Prove a security/authz guard is load-bearing by removing it** — delete the guard, run the security test, confirm the flip, then restore.
-- **Ground scope claims in the actual checker** — run the linter/hook and quote its output; never extrapolate a count from a raw grep.
-- **A "minimize changes" instruction never licenses keeping a disproven fact** — fix the wrong token, keep the rest minimal.
-- **Prefer conforming new code to an existing checker over extending the checker** — a local annotation fix beats a cross-cutting change to checker logic.
-- **Verify installed-package evidence against the commit actually under test** — confirm the `.venv` matches the commit's lockfile and Python-version marker before citing package source.
-- **Judge only the current/latest diff state** — commit history and prior review rounds are irrelevant to the verdict.
-- **Don't silently overwrite a prior round's verdict** — a stricter new verdict needs discriminating evidence; surface conflicts to the user instead.
-- **Verify a cited convention belongs to the same architectural layer** — a same-codebase precedent from a different layer is a category error, not support.
-- **Calibrate naming-nit persistence by visibility** — one round then drop for private names; public API naming drift is worth pushing on. Exception: when the nit enforces a repo-documented naming convention (e.g. Airflow AGENTS.md's action-verb-prefix rule), private names don't get the one-round-then-drop treatment — the convention's own counter-examples are often private.
-- **Verify a hard-limit claim before asserting "impossible" or "breaking"** — check release status and actual tool capability before foreclosing an option.
-- **A reviewer's "strict / validate / enforce" wording may not match the schema** — check the underlying data model and sibling commands before implementing literally.
-- **Don't demand a thin wrapper validate the wrapped library's own semantics** — and don't flag an eager-to-lazy init refactor as breaking without a concrete consumer signal.
-- **Rank designs by the actual cadence of their cost path** — verify trigger frequency in code, not by feel; verify assumed costs too.
-- **Verify a mechanism claim empirically** — write a small isolated repro before publishing a "why this works/breaks" explanation.
-- **Trace the introducing commit before reverting a shared signature** — a type error at a changed signature's use site is usually an incomplete rollout, not a wrong change.
-- **Trace the reconciliation/self-heal loop fully before characterizing a bug's severity** — a mismatch that self-corrects within one cleanup cycle is not the same severity as one that repeats forever; find the actual consumer/cleanup loop before writing the severity language.
-- **Don't trust review-thread `isResolved` in either direction** — a resolved thread can be an empty self-resolve, an open thread can already be fixed; read the thread then verify against code before drawing either conclusion.
-- **Re-review a rewritten claim by checking the carried-over clause, not the one you rewrote** — the clause reused verbatim from the flagged sentence gets no fresh scrutiny and is just as likely to still be wrong.
-- **A reviewer's diagnosis being right doesn't make their proposed wording right** — verify the defect and the reviewer's replacement separately; rebuild the replacement from source before adopting it.
-- **A reviewer's stated success criterion outranks nit severity** — a finding pointing at an unmet criterion the reviewer explicitly stated ("byte-identical", "no behaviour change") is must-fix even if the practical impact looks small.
-- **When a must-fix asks for a test, derive the expected value from the contract, not the current output** — read the docstring/docs/changelog for what the behavior *should* be; if the contract and the implementation disagree, flag the disagreement itself as a finding instead of pinning current output as the test's expected value.
-- **Check fallback paths before an absolute claim in a comment** — "never / can ever reach" gets refuted by a `TypeError` or env-var fallback on the call chain; trace it before writing or approving the claim. Details: `references/recurring-patterns.md`.
-- **No repo-external note names in code comments** — a docstring or comment cites only facts verifiable in the repo and what breaks; a reference to an assistant memory entry reads as invented. Details: `references/recurring-patterns.md`.
-
-Read `references/review-judgment.md` when deciding whether to flag and how large to make the change.
 
 ## What this skill does NOT cover
 
