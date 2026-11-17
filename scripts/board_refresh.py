@@ -30,17 +30,18 @@ import os
 import re
 import shutil
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 if __package__:
-    from . import board_state, maigo_state, review_report
+    from . import artifact_path, board_state, maigo_state, review_report
     from . import board_sync as sync
 else:  # run as a script: scripts/ is on sys.path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import artifact_path  # type: ignore[no-redef]  # noqa: E402
     import board_state  # type: ignore[no-redef]  # noqa: E402
     import maigo_state  # type: ignore[no-redef]  # noqa: E402
     import board_sync as sync  # type: ignore[no-redef]  # noqa: E402
@@ -570,8 +571,14 @@ def render_detail_facts(
     acknowledged_at: str | None,
     load_command: str | None = None,
     result: str | None = None,
+    related_files: Sequence[str] = (),
 ) -> str:
-    """The fact section (everything before `## 判斷`), work-board references/format-spec.md §1a; ends with a blank line."""
+    """The fact section (everything before `## 判斷`), work-board references/format-spec.md §1a; ends with a blank line.
+
+    `related_files` are paths relative to `.maigo/` in the order to print (see
+    `sort_related_files`); each becomes a backticked, detail-file-relative sub-item of
+    `- 相關檔案：`, and the field is left out when there are none.
+    """
     lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
     is_pr = type != "🐛"
     if is_pr and additions is not None and deletions is not None:
@@ -594,7 +601,80 @@ def render_detail_facts(
             lines.append("- 最後 review：尚未 review")
     if acknowledged_at:
         lines.append(f"- 已看完：{acknowledged_at}")
+    if related_files:
+        lines.append("- 相關檔案：")
+        lines.extend(f"  - `../{rel}`" for rel in related_files)
     return "\n".join(lines) + "\n\n"
+
+
+# --- related artifact files ---------------------------------------------------------
+
+RELATED_GROUPS = ("review", "pr", "issue")  # scan and print order; never `topic/`
+_KNOWN_STEMS = artifact_path.known_stems()
+
+
+def sort_related_files(rels: Sequence[str]) -> list[str]:
+    """Order `<group>/<ident>/<file>` paths: group, then known kinds (by `_KNOWN_KINDS`
+    order, the unnumbered file before `-1`, then attempts ascending), then every other
+    file by path."""
+
+    def key(rel: str) -> tuple:
+        group, _, rest = rel.split("/", 2)
+        for index, stem in enumerate(_KNOWN_STEMS):
+            match = re.fullmatch(re.escape(stem) + r"(?:-(\d+))?\.md", rest)
+            if match:
+                attempt = int(match[1] or 1)
+                return (
+                    RELATED_GROUPS.index(group),
+                    0,
+                    index,
+                    attempt,
+                    match[1] is not None,
+                    rel,
+                )
+        return (RELATED_GROUPS.index(group), 1, 0, 0, False, rel)
+
+    return sorted(rels, key=key)
+
+
+def is_listable_name(name: str) -> bool:
+    """Whether a file or directory name can appear in the related-files list: not hidden,
+    not an in-flight temp file (`*.tmp`, `*~`), no backtick or
+    line break (cannot sit in a one-line code span), and valid UTF-8 (a surrogate-escaped
+    name from a non-UTF-8 filesystem cannot be written out)."""
+    if name.startswith(".") or name.endswith((".tmp", "~")):
+        return False
+    if any(c in name for c in "`\r\n"):
+        return False
+    try:
+        name.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def scan_related_files(maigo_dir: Path, ident: str) -> list[str]:
+    """Regular files under `<group>/<ident>/` for each of `RELATED_GROUPS`, as
+    `<group>/<ident>/<path>`, sorted. A missing directory is just no files; names that
+    `is_listable_name` rejects are left out, and an entry that cannot be inspected
+    (OSError) is skipped without affecting the others."""
+    found: list[str] = []
+    for group in RELATED_GROUPS:
+        top = maigo_dir / group / ident
+        for dirpath, dirnames, filenames in os.walk(top):
+            dirnames[:] = [d for d in dirnames if is_listable_name(d)]
+            for name in filenames:
+                if not is_listable_name(name):
+                    continue
+                full = os.path.join(dirpath, name)
+                try:
+                    if not os.path.isfile(full):
+                        continue
+                    rel = Path(full).relative_to(maigo_dir)
+                except (OSError, ValueError):
+                    continue
+                found.append(rel.as_posix())
+    return sort_related_files(found)
 
 
 def format_local(now: datetime) -> str:
@@ -1185,17 +1265,21 @@ def build(
 
     load_warnings: list[str] = []
     detail_writes: list[dict] = []
+    maigo_dir = g.root / ".maigo"
     for row in all_rows:
         if row["mode"] == "keep":
             continue
         rel = row["detail"]
         old = g.details.get(rel)
+        ident = board_state.github_ref(row["url"], g.repo)
+        related = scan_related_files(maigo_dir, ident) if ident else []
         if row["mode"] == "new-unreachable":
             facts = render_detail_facts(
                 type=row["type"], status=UNREACHABLE, title=row["title"],
                 url=row["url"], additions=None, deletions=None, author=None,
                 next_action=None, number=None, last_reviewed_at=None,
                 review_time_source=None, acknowledged_at=None,
+                related_files=related,
             )  # fmt: skip
         else:
             r, meta = row["r"], row["gh_meta"]
@@ -1213,6 +1297,7 @@ def build(
                     row, load_templates or {}, load_warnings
                 ),
                 result=row.get("result") if row["type"] == "👀" else None,
+                related_files=related,
             )  # fmt: skip
         if old is None:
             preserved = NEW_PRESERVED

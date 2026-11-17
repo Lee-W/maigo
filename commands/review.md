@@ -308,7 +308,7 @@ source 衝突或檔案正在被另一個 session 寫入 → 明確失敗，保�
 合約。多 PR 每顆分別 publish；roll-up 留在本輪對話，不覆蓋任何單顆 PR 的 report。
 
 若 `removed` 含細節檔筆記中引用的舊報告，立即重讀該細節檔，用 Edit **只替換那個路徑**
-成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`；寫進筆記時用檔案相對的 `../review/<id>/review.md` 或 `../pr/<id>/review.md`，路徑獨立成清單項或包反引號），保留其餘手寫內容。最後回覆附最新報告連結、最後 review
+成最新的 publisher 回傳 `path`（`.maigo/review/<id>/review.md` 或 `.maigo/pr/<id>/review.md`；寫進筆記時用檔案相對的 `../review/<id>/review.md` 或 `../pr/<id>/review.md`，路徑獨立成清單項或包反引號），保留其餘手寫內容。同一路徑也會出現在事實區的 `相關檔案` 清單：Edit 的 `old_string` 要包含 `## 筆記` 標題或相鄰的筆記行等上下文，使它在檔內只命中一次；動手前先確認命中數為一，不可用 `replace_all`；事實區清單由下次刷新重寫，不要手改。最後回覆附最新報告連結、最後 review
 時間，以及 `/maigo:board --reviewed <n>`（或直接在 board 勾 `[x]`）和 `/maigo:board --reviews`，讓使用者知道下一步。
 
 ## Work Board 回寫

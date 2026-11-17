@@ -524,6 +524,308 @@ def test_detail_facts_degradation_rules():
     assert old.endswith("\n\n")
 
 
+def test_sort_related_files_orders_groups_then_known_kinds_then_attempts_then_the_rest():
+    shuffled = [
+        "issue/5/notes.txt", "pr/5/review.md", "review/5/rubric-2.md", "review/5/zz.md",
+        "review/5/sub/a.md", "review/5/review.md", "review/5/draft.md", "pr/5/plan.md",
+        "review/5/rubric-10.md", "review/5/rubric.md", "review/5/inline-comments.md",
+        "review/5/pr-comments-2.md", "review/5/pr-comments.md", "pr/5/a.txt",
+        "review/5/reply-draft.md", "review/5/aaa.md",
+    ]  # fmt: skip
+    assert refresh.sort_related_files(shuffled) == [
+        "review/5/rubric.md", "review/5/rubric-2.md", "review/5/rubric-10.md",
+        "review/5/review.md", "review/5/draft.md", "review/5/pr-comments.md",
+        "review/5/pr-comments-2.md", "review/5/reply-draft.md",
+        "review/5/inline-comments.md", "review/5/aaa.md", "review/5/sub/a.md",
+        "review/5/zz.md", "pr/5/plan.md", "pr/5/review.md", "pr/5/a.txt",
+        "issue/5/notes.txt",
+    ]  # fmt: skip
+
+
+def test_sort_related_files_puts_the_unnumbered_file_before_its_first_attempt():
+    shuffled = [
+        "review/5/rubric-10.md", "review/5/rubric-2.md", "review/5/rubric-1.md",
+        "review/5/rubric.md",
+    ]  # fmt: skip
+    assert refresh.sort_related_files(shuffled) == [
+        "review/5/rubric.md", "review/5/rubric-1.md", "review/5/rubric-2.md",
+        "review/5/rubric-10.md",
+    ]  # fmt: skip
+
+
+def test_detail_facts_list_related_files_as_backticked_file_relative_sub_items():
+    base = dict(
+        title="T", url=url(5), additions=3, deletions=1, author="carol",
+        next_action=None, number=5, last_reviewed_at=None,
+        review_time_source=None, acknowledged_at=None,
+    )  # fmt: skip
+    facts = refresh.render_detail_facts(
+        type="👀", status="待 review",
+        related_files=["review/5/review.md", "pr/5/a.txt"], **base,
+    )  # fmt: skip
+    assert facts.endswith(
+        "- 最後 review：尚未 review\n"
+        "- 相關檔案：\n"
+        "  - `../review/5/review.md`\n"
+        "  - `../pr/5/a.txt`\n\n"
+    )
+    plain = refresh.render_detail_facts(type="👀", status="待 review", **base)
+    assert "相關檔案" not in plain
+
+
+def test_scan_related_files_reads_three_groups_recursively_and_nothing_else(tmp_path):
+    maigo = tmp_path / ".maigo"
+    for rel in (
+        "review/5/review.md", "review/5/notes/deep.txt", "review/5/.DS_Store",
+        "pr/5/plan.md", "issue/5/rubric.md", "topic/5/plan.md",
+        "_archive/review/5/review.md", "review/50/review.md", "review/other-5/review.md",
+    ):  # fmt: skip
+        (maigo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (maigo / rel).write_text("x\n")
+    assert refresh.scan_related_files(maigo, "5") == [
+        "review/5/review.md",
+        "review/5/notes/deep.txt",
+        "pr/5/plan.md",
+        "issue/5/rubric.md",
+    ]
+    assert refresh.scan_related_files(maigo, "other-5") == ["review/other-5/review.md"]
+    assert refresh.scan_related_files(maigo, "404") == []
+    assert refresh.scan_related_files(tmp_path / "missing", "5") == []
+
+
+def _touch_all(maigo: Path, rels: list[str]) -> None:
+    for rel in rels:
+        (maigo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (maigo / rel).write_text("x\n")
+
+
+def test_scan_related_files_skips_names_a_one_line_code_span_cannot_carry(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(
+        maigo,
+        ["review/5/a`b.md", "review/5/a\nb.md", "review/5/a\rb.md", "review/5/ok.md"],
+    )
+    assert refresh.scan_related_files(maigo, "5") == ["review/5/ok.md"]
+
+
+def test_scan_related_files_skips_in_flight_temp_files(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(
+        maigo,
+        [
+            "review/5/x.md.tmp", "review/5/notes.md~",
+            "review/5/.tmp-abcdefgh", "review/5/tmp.md", "review/5/ok.md",
+        ],
+    )  # fmt: skip
+    assert refresh.scan_related_files(maigo, "5") == [
+        "review/5/ok.md",
+        "review/5/tmp.md",
+    ]
+
+
+def test_scan_related_files_lists_hand_placed_files_that_only_look_like_temp_names(
+    tmp_path,
+):
+    maigo = tmp_path / ".maigo"
+    _touch_all(maigo, ["review/5/tmpnotes123", "review/5/tmpab12cd34"])
+    assert refresh.scan_related_files(maigo, "5") == [
+        "review/5/tmpab12cd34",
+        "review/5/tmpnotes123",
+    ]
+
+
+def test_scan_related_files_skips_the_whole_subtree_of_an_unlistable_directory(
+    tmp_path,
+):
+    maigo = tmp_path / ".maigo"
+    _touch_all(
+        maigo,
+        [
+            "review/5/dir~/a.md", "review/5/dir.tmp/a.md", "review/5/.hid/a.md",
+            "review/5/d`r/a.md", "review/5/ok/a.md",
+        ],
+    )  # fmt: skip
+    assert refresh.scan_related_files(maigo, "5") == ["review/5/ok/a.md"]
+
+
+def test_scan_related_files_does_not_descend_into_directory_symlinks(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(maigo, ["review/5/real.md"])
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    (target / "o.md").write_text("x\n")
+    (maigo / "review/5/linkdir").symlink_to(target, target_is_directory=True)
+    assert refresh.scan_related_files(maigo, "5") == ["review/5/real.md"]
+
+
+def test_atomic_write_stages_through_a_dot_prefixed_temp_file_next_to_the_target(
+    tmp_path, monkeypatch
+):
+    seen = []
+    real_replace = Path.replace
+
+    def spy(self, target):
+        seen.append((self.parent, self.name))
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", spy)
+    report.atomic_write(tmp_path / "out.md", "hi\n")
+    assert [parent for parent, _ in seen] == [tmp_path]
+    assert seen[0][1].startswith(".tmp-")
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["out.md"]
+
+
+def test_scan_related_files_lists_names_with_spaces_and_parentheses(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(maigo, ["review/5/my file (1).md", "review/5/中文 檔.md"])
+    assert refresh.scan_related_files(maigo, "5") == [
+        "review/5/my file (1).md",
+        "review/5/中文 檔.md",
+    ]
+
+
+def test_scan_related_files_lists_file_symlinks_and_skips_dangling_ones(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(maigo, ["review/5/real.md"])
+    outside = tmp_path / "outside.md"
+    outside.write_text("x\n")
+    (maigo / "review/5/link.md").symlink_to(outside)
+    (maigo / "review/5/dangling.md").symlink_to(tmp_path / "gone.md")
+    assert refresh.scan_related_files(maigo, "5") == [
+        "review/5/link.md",
+        "review/5/real.md",
+    ]
+
+
+def test_is_listable_name_rejects_a_surrogate_escaped_non_utf8_name():
+    assert refresh.is_listable_name("ok.md")
+    assert not refresh.is_listable_name("bad\udcff.md")
+
+
+def test_scan_related_files_skips_non_utf8_names_so_facts_still_write(
+    tmp_path, monkeypatch
+):
+    maigo = tmp_path / ".maigo"
+    top = maigo / "review" / "5"
+    top.mkdir(parents=True)
+    (top / "ok.md").write_text("x\n")
+    walked = [
+        (str(top), ["bad\udcffdir"], ["bad\udcff.md", "ok.md"]),
+        (str(top / "bad\udcffdir"), [], ["inside.md"]),
+    ]
+    real_walk = os.walk
+    monkeypatch.setattr(
+        os, "walk", lambda path: iter(walked) if path == top else real_walk(path)
+    )
+    found = refresh.scan_related_files(maigo, "5")
+    assert found == ["review/5/ok.md"]
+    facts = refresh.render_detail_facts(
+        type="👀", status="待 review", title="T", url=url(5), additions=1,
+        deletions=1, author="carol", next_action=None, number=5,
+        last_reviewed_at=None, review_time_source=None, acknowledged_at=None,
+        related_files=found,
+    )  # fmt: skip
+    report.atomic_write(tmp_path / "detail.md", facts)
+    assert (tmp_path / "detail.md").read_text(encoding="utf-8") == facts
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores file modes"
+)
+def test_scan_related_files_survives_an_unreadable_subdirectory(tmp_path):
+    maigo = tmp_path / ".maigo"
+    _touch_all(maigo, ["review/5/ok.md", "review/5/locked/x.md"])
+    locked = maigo / "review/5/locked"
+    locked.chmod(0o444)
+    try:
+        assert refresh.scan_related_files(maigo, "5") == ["review/5/ok.md"]
+    finally:
+        locked.chmod(0o755)
+
+
+def _related_lines(path: Path) -> list[str]:
+    facts, _ = refresh.split_detail(path.read_text())
+    return [ln for ln in facts.splitlines() if ln.startswith("  - ")]
+
+
+def _put_artifact(root: Path, rel: str) -> None:
+    path = root / ".maigo" / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("x\n")
+
+
+def test_refresh_lists_related_files_and_keeps_judgment_and_notes_byte_for_byte(
+    tmp_path, gh
+):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1, judgment="修還是換路？", notes="- `../review/1/draft.md`")
+    for rel in ("review/1/rubric.md", "review/1/review.md", "pr/1/plan.md"):
+        _put_artifact(tmp_path, rel)
+    gh.prs[1] = pr_meta(1)
+    detail = tmp_path / ".maigo/i/1.md"
+    _, preserved_before = refresh.split_detail(detail.read_text())
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _related_lines(detail) == [
+        "  - `../review/1/rubric.md`",
+        "  - `../review/1/review.md`",
+        "  - `../pr/1/plan.md`",
+    ]
+    facts, preserved = refresh.split_detail(detail.read_text())
+    assert "\n- 相關檔案：\n  - `../review/1/rubric.md`\n" in facts
+    assert preserved.encode() == preserved_before.encode()
+
+
+def test_refresh_without_artifacts_writes_no_related_field(tmp_path, gh):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "相關檔案" not in (tmp_path / ".maigo/i/1.md").read_text()
+
+
+def test_refresh_updates_the_list_when_artifacts_change_and_is_stable_otherwise(
+    tmp_path, gh
+):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1)
+    _put_artifact(tmp_path, "review/1/review.md")
+    gh.prs[1] = pr_meta(1)
+    detail = tmp_path / ".maigo/i/1.md"
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    first = detail.read_bytes()
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert detail.read_bytes() == first
+    _put_artifact(tmp_path, "review/1/inline-comments.md")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _related_lines(detail) == [
+        "  - `../review/1/review.md`",
+        "  - `../review/1/inline-comments.md`",
+    ]
+    (tmp_path / ".maigo/review/1/inline-comments.md").unlink()
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert detail.read_bytes() == first
+
+
+def test_refresh_cross_repo_item_lists_only_its_own_repo_prefixed_directories(
+    tmp_path, gh
+):
+    cross = "https://github.com/o/other/pull/9"
+    put_detail(tmp_path, 9, text=detail_text(9).replace(url(9), cross))
+    (tmp_path / ".maigo/i/9.md").rename(tmp_path / ".maigo/i/other-9.md")
+    write_board(
+        tmp_path,
+        board_text(focus=[row(9).replace("i/9.md", "i/other-9.md")]),
+    )
+    for rel in ("review/other-9/review.md", "review/9/review.md", "pr/other-9/plan.md"):
+        _put_artifact(tmp_path, rel)
+    gh.prs[9] = pr_meta(9)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _related_lines(tmp_path / ".maigo/i/other-9.md") == [
+        "  - `../review/other-9/review.md`",
+        "  - `../pr/other-9/plan.md`",
+    ]
+
+
 def test_fetch_item_type_comes_from_the_author_unless_kept(gh):
     gh.prs[1] = pr_meta(1, author="ME")
     gh.prs[2] = pr_meta(2, author="carol")

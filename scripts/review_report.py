@@ -206,7 +206,11 @@ def report_lock(path: Path):
 
 def atomic_write(path: Path, text: str) -> None:
     with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=".tmp-",
+        delete=False,
     ) as stream:
         temporary = Path(stream.name)
         try:

@@ -46,6 +46,7 @@ description: This skill should be used when reading, writing, or migrating `.mai
 （判斷句寫進 `## 判斷`、`## 筆記` 留空）。這條硬規則適用於**所有**寫回路徑——`/maigo:board`
 的 refresh 以及五個 delegate 命令（review / triage-issue / take-issue / describe-pr /
 address-comments）各自的 upsert，沒有例外可以整份覆蓋掉細節檔清掉使用者手寫的 `## 筆記`。
+改 `## 筆記` 裡的路徑時，同一路徑也會出現在事實區的 `相關檔案` 清單：Edit 的 `old_string` 要包含 `## 筆記` 標題或相鄰的筆記行等上下文，使它在檔內只命中一次；動手前先確認命中數為一，不可用 `replace_all`；事實區清單由下次刷新重寫，不要手改。
 
 ### 舊格式與整檔重寫（硬規則）
 
