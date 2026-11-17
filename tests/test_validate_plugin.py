@@ -584,6 +584,37 @@ class TestCheckHooksSchema:
 # ---------------------------------------------------------------------------
 
 
+class TestCheckFrontmatterStrictYaml:
+    def _skill(self, tmp_path: Path, description_line: str) -> None:
+        skill_file = make_skill(tmp_path, "demo")
+        skill_file.write_text(
+            f"---\nname: demo\n{description_line}\n---\n\nbody\n", encoding="utf-8"
+        )
+
+    def test_quoted_colon_space_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._skill(tmp_path, 'description: "Use when: a thing happens."')
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        assert validate_plugin.check_frontmatter_strict_yaml().passed
+
+    def test_unquoted_colon_space_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._skill(tmp_path, "description: Use when: a thing happens.")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        result = validate_plugin.check_frontmatter_strict_yaml()
+        assert not result.passed
+        assert any("demo" in e and "YAML" in e for e in result.errors)
+
+    def test_non_string_description_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._skill(tmp_path, "description: [a, b]")
+        monkeypatch.setattr(validate_plugin, "ROOT", tmp_path)
+        assert not validate_plugin.check_frontmatter_strict_yaml().passed
+
+
 class TestCheckSkillSize:
     def _write(self, tmp_path: Path, lines: int) -> None:
         skill_file = make_skill(tmp_path, "big")

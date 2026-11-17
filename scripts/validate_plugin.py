@@ -283,6 +283,44 @@ def check_skill_frontmatter() -> CheckResult:
     return r
 
 
+def check_frontmatter_strict_yaml() -> CheckResult:
+    """Frontmatter must parse under a strict YAML parser, with a string description.
+
+    `parse_frontmatter` is a line splitter and accepts values (an unquoted
+    `: ` inside a description, say) that a real YAML parser rejects; hosts that
+    parse strictly would then drop the skill. PyYAML arrives transitively via the
+    dev group (pre-commit); without it the check is skipped with a note.
+    """
+    r = CheckResult("frontmatter strict YAML")
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        r.note("PyYAML 不可用，略過 strict YAML 檢查（uv run 環境下應可用）")
+        return r
+    files = [
+        *sorted((ROOT / "agents").glob("*.md")),
+        *sorted((ROOT / "commands").glob("*.md")),
+        *sorted((ROOT / "skills").glob("*/SKILL.md")),
+    ]
+    for path in files:
+        rel = path.relative_to(ROOT)
+        text = path.read_text(encoding="utf-8")
+        end = text.find("\n---\n", 4) if text.startswith("---\n") else -1
+        if end == -1:
+            continue  # missing/malformed frontmatter is flagged by the checks above
+        try:
+            data = yaml.safe_load(text[4:end])
+        except yaml.YAMLError as exc:
+            msg = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+            r.fail(f"{rel}: frontmatter 不是合法 YAML（{msg}）；含 `: ` 的值請加引號")
+            continue
+        if not isinstance(data, dict):
+            r.fail(f"{rel}: frontmatter 解析後不是 mapping")
+        elif "description" in data and not isinstance(data["description"], str):
+            r.fail(f"{rel}: description 解析後不是字串")
+    return r
+
+
 SKILL_MAX_LINES = 500
 
 
@@ -797,6 +835,7 @@ CHECKS: list[Callable[[], CheckResult]] = [
     check_command_frontmatter,
     check_command_persona_quotes,
     check_skill_frontmatter,
+    check_frontmatter_strict_yaml,
     check_skill_size,
     check_hook_scripts,
     check_pre_commit_config,
