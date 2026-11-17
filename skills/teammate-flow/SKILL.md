@@ -18,6 +18,15 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 有 `--worktree` 時先將 profile 路徑解析為入口 cwd 下的絕對路徑，再建立 worktree。
 五個角色可使用相同模型；沒有 subagents 時在主線依序執行，保留交棒與驗證要求。
 
+## 連結的 skill 什麼時候讀
+
+本檔連到的 skill 不要在流程開頭一次全讀，依階段到了才開：
+
+- **開場**：`model-dispatch`（解析 `--model-profile`）、`narration`／`orchestrator-voice`（旁白與對話，各命令本來就會載入）
+- **審查階段（🟡 爽世）**：`strict-review`；批次審查才讀 `strict-review/references/review-batch-queue.md`
+- **收尾階段（🟣 立希全綠之後，見下方「Commit message draft + 落地」）**：`commit-message`、`git-workflow`、`pr-sync-check`、`github-title-description`（含 `draft-bundle`）——**只在走到該步驟時才讀**
+- **出事才讀**：`failure-handling`（爽世 BLOCKED、立希紅、subagent 中斷時）、`memory-propose-confirm`（🟡 爽世或 🎀 愛音的輸出含 Memory propose 區塊時）
+
 ## 共通流程（Sequential 段）
 
 以下四步在 `/maigo:go` 和 `/maigo:team` 都必須照順序走：
@@ -186,6 +195,8 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 
 ### Commit message draft + 落地
 
+**讀取時機：本節用到的 `commit-message`、`git-workflow`、`pr-sync-check`、`github-title-description` 四個 skill 到這一步才讀，之前的階段不需要載入。**
+
 Taki 全綠（或 `/maigo:team` 合流 APPROVED + PASS）後，若還有未 commit 的本次變更，
 依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。
 
@@ -272,11 +283,11 @@ worktree（或最多 2–3 個併發、有速率限制），先確認硬碟還�
 
 ## 失敗處理
 
-詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。
+**發生失敗時才讀**，詳見 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)。
 
 ## Memory propose confirm flow
 
-偵測（含 fence tracking）與 6 步 confirm flow 依
+**輸出含 Memory propose 區塊時才讀**；偵測（含 fence tracking）與 6 步 confirm flow 依
 [`skills/memory-propose-confirm`](https://github.com/Lee-W/maigo/blob/main/skills/memory-propose-confirm/SKILL.md) 處理。
 Confirm flow 完成後繼續主線流程——不改變各 command 的步驟結構。
 
