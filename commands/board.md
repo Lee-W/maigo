@@ -167,7 +167,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    - ✅ 區老化清掉的行（別人的 PR 結案超過 3 天、自己的超過 7 天，或超出 10 行上限；待盤點未完成的行最多留到 30 天），清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
    - **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
      `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
-     `## 判斷` 與 `## 筆記` 原樣保留；細節檔不存在才整份新建。格式規格見
+     `## 判斷` 與 `## 筆記` 依 work-board 硬規則保留（唯一例外見 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）；細節檔不存在才整份新建。格式規格見
      [`skills/work-board/references/format-spec.md` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)。
    - **孤兒 `i/` 檔就是 dd 訊號**：使用者在 nvim 用 `dd` 刪行後，細節檔還留著，`plan` 會把它判成 dd
      並寫進排除紀錄（剛寫好的檔有 10 分鐘寬限，列在 `pending_orphans`，本輪不判）。只有
@@ -323,7 +323,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maig
   **整行替換時對應細節檔（`.maigo/i/<slug>.md`）必須跟著同步更新，不可只改索引行漏改細節檔**
   ——兩者是同一次寫回的兩個產物。同步更新＝只重寫事實區，`## 判斷` 與 `## 筆記`
   依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)
-  的硬規則原樣保留，沒有例外。
+  的硬規則保留（唯一的空行整理例外見該 skill 同段）。
 - **`--learn` 必須確認**：候選知識要經 `memory-propose-confirm`，不可靜默寫入 memory。
 - **`refresh --apply` 是唯一會整檔寫 board 的寫入者**，靠 CAS 防覆蓋；`plan` / `ack` / `drop` /
   `revive` / `snapshot` 不寫 `board.md` / `i/*.md`。Claude 自己仍只用 `Edit`，`Write` 只用在建立骨架；

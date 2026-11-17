@@ -40,7 +40,9 @@ description: This skill should be used when reading, writing, or migrating `.mai
 - [`references/format-spec.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)：**寫、改、解析任何一行 board 或細節檔之前讀**（行文法的程式鏡像在 `scripts/board_refresh.py` 的 `render_line` / `render_board`，改文法時兩邊一起改）。
 
 **硬規則：refresh 或任何寫回只重寫 `## 判斷` 之前的事實區（標題行 ＋ metadata），
-`## 判斷` 與 `## 筆記` 兩段一律原樣保留，絕不覆蓋。** 細節檔不存在時才整份新建
+`## 判斷` 與 `## 筆記` 兩段一律原樣保留，絕不覆蓋。**
+唯一例外：`board_refresh.py` 刷新時把這兩段裡 code fence 外的連續空行壓成一行、只含空白的行改成空行（空行後接縮排 4 格以上或 tab 的行時整段不動，免得改到縮排 code block），讓檔案維持 formatter 不動點；其餘位元組不動。
+細節檔不存在時才整份新建
 （判斷句寫進 `## 判斷`、`## 筆記` 留空）。這條硬規則適用於**所有**寫回路徑——`/maigo:board`
 的 refresh 以及五個 delegate 命令（review / triage-issue / take-issue / describe-pr /
 address-comments）各自的 upsert，沒有例外可以整份覆蓋掉細節檔清掉使用者手寫的 `## 筆記`。

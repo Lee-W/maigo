@@ -76,6 +76,7 @@ _SAFE_BRANCH_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]*")  # use fullmatch
 _SAME_REPO_DETAIL_RE = re.compile(r"^i/\d+\.md$")
 NOTE_MAX = 80
 JUDGMENT_HEADING = "## 判斷"
+_FENCE_LINE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 NEW_PRESERVED = "## 判斷\n\n## 筆記\n\n<!-- 手寫區 -->\n"
 UNREACHABLE = "抓不到"
 ERROR_NOTE_PREFIX = "（gh 失敗："
@@ -493,6 +494,64 @@ def split_detail(text: str) -> tuple[str, str]:
             return facts, text[offset:]
         offset += len(line) + 1
     raise ValueError(f"細節檔缺少 `{JUDGMENT_HEADING}` 行")
+
+
+def collapse_blank_runs(text: str) -> str:
+    """Squeeze runs of blank lines outside code fences to one plain blank line.
+
+    A formatter (MD012, MD009) rewrites consecutive blank lines and trailing whitespace,
+    so a preserved area written by an older template would be re-edited on every save.
+    Outside code fences a whitespace-only line becomes an empty line (a CRLF file keeps
+    its `\\r`) and only the first of each run is kept; a run at the end of the text is
+    dropped, leaving the single final newline. Fenced code and every other byte stay put.
+    A run followed by a line indented 4+ spaces or a tab is left untouched (it may be an
+    indented code block, which a formatter does not rewrite). A fence opens on any
+    indentation and closes only on a same-character fence at least as long with nothing
+    but whitespace after it, so an unclosed or odd fence errs towards
+    leaving blank lines alone.
+    """
+    ends_with_newline = text.endswith("\n")
+    lines = text.split("\n")
+    if ends_with_newline:
+        lines.pop()
+    out: list[str] = []
+    fence: str | None = None
+    pending_blank = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        marker = _FENCE_LINE.match(line)
+        if marker:
+            if fence is None:
+                fence = marker[1]
+            elif (
+                marker[1][0] == fence[0]
+                and len(marker[1]) >= len(fence)
+                and not marker[2].strip()
+            ):
+                fence = None
+        if fence is None and not marker and not line.strip():
+            j = i
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and lines[j].startswith(("    ", "\t")):
+                out.extend(
+                    lines[i:j]
+                )  # may be an indented code block: leave the run alone
+                pending_blank = False
+            else:
+                out.append("\r" if line.endswith("\r") else "")
+                pending_blank = True
+            i = j
+            continue
+        pending_blank = False
+        out.append(line)
+        i += 1
+    if ends_with_newline:
+        if pending_blank and len(out) > 1:
+            out.pop()
+        out.append("")
+    return "\n".join(out)
 
 
 def render_detail_facts(
@@ -1160,6 +1219,7 @@ def build(
         else:
             try:
                 _, preserved = split_detail(old.decode("utf-8"))
+                preserved = collapse_blank_runs(preserved)
             except ValueError as error:
                 raise RefreshError(1, f"{rel}：{error}") from error
         new_text = facts + preserved

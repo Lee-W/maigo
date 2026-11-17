@@ -405,6 +405,100 @@ def test_split_detail_keeps_everything_from_the_judgment_line_verbatim():
         refresh.split_detail("# head\n\n## 筆記\n")
 
 
+OLD_TEMPLATE = "## 判斷\n\n\n## 筆記\n\n\n<!-- 手寫區 -->\n"
+
+
+def test_collapse_blank_runs_squeezes_old_double_blank_lines():
+    assert refresh.collapse_blank_runs(OLD_TEMPLATE) == refresh.NEW_PRESERVED
+
+
+def test_collapse_blank_runs_keeps_fenced_blank_lines_and_handwriting():
+    text = "## 判斷\n\n- 一\n  \n\n[連結](x)\n\n```\na\n\n\nb\n```\n\n~~~\nc\n\n\n~~~\n"
+    want = "## 判斷\n\n- 一\n\n[連結](x)\n\n```\na\n\n\nb\n```\n\n~~~\nc\n\n\n~~~\n"
+    assert refresh.collapse_blank_runs(text) == want
+
+
+def test_collapse_blank_runs_is_identity_on_normal_content():
+    for text in (
+        refresh.NEW_PRESERVED,
+        "## 判斷\r\nx\r\n\n## 筆記\n\n- a\n",
+        "no newline",
+    ):
+        assert refresh.collapse_blank_runs(text) == text
+
+
+def test_collapse_blank_runs_drops_a_trailing_blank_run():
+    assert refresh.collapse_blank_runs("a\n\n\n") == "a\n"
+
+
+WHITESPACE_CASES = [
+    ("a\n  \n", "a\n"),
+    ("a\n\t\n", "a\n"),
+    ("a\n  \n\n\nb\n", "a\n\nb\n"),
+    ("a\n   \n\t\n  \nb\n", "a\n\nb\n"),
+    ("a\r\n  \r\n", "a\r\n"),
+    ("a\r\n\t\r\n", "a\r\n"),
+    ("a\r\n  \r\n\r\n\r\nb\r\n", "a\r\n\r\nb\r\n"),
+    ("a\r\n   \r\n\t\r\n  \r\nb\r\n", "a\r\n\r\nb\r\n"),
+    (
+        "- a\n\n    ```\n    x\n\n\n    y\n    ```\n",
+        "- a\n\n    ```\n    x\n\n\n    y\n    ```\n",
+    ),
+    ("```\nx\n```py\n\n\ny\n```\n", "```\nx\n```py\n\n\ny\n```\n"),
+    ("~~~\nx\n~~~ notclose\n\n\ny\n~~~\n", "~~~\nx\n~~~ notclose\n\n\ny\n~~~\n"),
+    ("````\nx\n```\n\n\ny\n````\n\n\nz\n", "````\nx\n```\n\n\ny\n````\n\nz\n"),
+    ("```\nx\n```  \n\n\ny\n", "```\nx\n```  \n\ny\n"),
+    ("p\n\n    x\n\n\n    y\n", "p\n\n    x\n\n\n    y\n"),
+    ("p\n\n\tx\n\n\n\ty\n", "p\n\n\tx\n\n\n\ty\n"),
+    ("p\n\n\n    x\n", "p\n\n\n    x\n"),
+    (
+        "## 判斷\n\n    x\n\n\n    y\n\n## 筆記\n",
+        "## 判斷\n\n    x\n\n\n    y\n\n## 筆記\n",
+    ),
+]
+
+
+@pytest.mark.parametrize(("text", "want"), WHITESPACE_CASES)
+def test_collapse_blank_runs_whitespace_fences_and_crlf(text, want):
+    got = refresh.collapse_blank_runs(text)
+    assert got == want
+    assert refresh.collapse_blank_runs(got) == got
+
+
+def test_refresh_rewrites_old_double_blank_preserved_area(tmp_path, gh):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1, judgment="keep\n\n\nme", notes="note")
+    gh.prs[1] = pr_meta(1)
+    path = tmp_path / ".maigo/i/1.md"
+    path.write_text(path.read_text().replace("## 筆記", "\n## 筆記", 1))
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    after = path.read_text()
+    assert "\n\n\n" not in after and "keep\n\nme" in after
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert path.read_text() == after
+
+
+def test_refresh_normalises_whitespace_only_lines_and_trailing_blank_lines(
+    tmp_path, gh
+):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1, judgment="keep", notes="note")
+    gh.prs[1] = pr_meta(1)
+    path = tmp_path / ".maigo/i/1.md"
+    path.write_text(
+        path.read_text().replace("keep", "keep\n  \n\t\n\nnext", 1).rstrip("\n")
+        + "\n  \n\n"
+    )
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    after = path.read_text()
+    _, preserved = refresh.split_detail(after)
+    assert "keep\n\nnext" in preserved
+    assert preserved.endswith("note\n")
+    assert "  \n" not in preserved and "\t\n" not in preserved
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert path.read_text() == after
+
+
 def test_detail_facts_degradation_rules():
     base = dict(
         title="T", url=url(5), additions=3, deletions=1, author="carol",
@@ -446,7 +540,7 @@ def test_fetch_item_type_comes_from_the_author_unless_kept(gh):
 
 def test_t4_judgment_and_notes_survive_byte_for_byte(tmp_path, gh):
     write_board(tmp_path, board_text(focus=[row(1)]))
-    notes = "多行\n\n<!-- 保留 -->\r\n- 一\n- 二\n"
+    notes = "多行\n\n<!-- 保留 -->\r\n- 一\n- 二"
     put_detail(tmp_path, 1, judgment="修還是換路？\n第二行", notes=notes)
     gh.prs[1] = pr_meta(1)
     before = (tmp_path / ".maigo/i/1.md").read_bytes()
