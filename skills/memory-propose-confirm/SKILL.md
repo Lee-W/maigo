@@ -1,6 +1,6 @@
 ---
 name: memory-propose-confirm
-description: This skill should be used by the maigo orchestrator whenever a Soyo or Anon output contains a ## Memory propose section. Handles the confirm flow, fence-tracking rules for detecting the section, no-answer handling, and parallel-mode timing adjustments. Applies to /maigo:go, /maigo:quick, /maigo:team, /maigo:review.
+description: This skill should be used by the maigo orchestrator whenever a Soyo or Anon output contains a "Memory propose" section. Handles the confirm flow, fence-tracking rules for detecting the section, no-answer handling, and parallel-mode timing adjustments. Applies to /maigo:go, /maigo:quick, /maigo:team, /maigo:review.
 ---
 
 <!-- mkdocs-include-start -->
