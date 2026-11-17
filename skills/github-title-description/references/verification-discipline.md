@@ -51,6 +51,27 @@ specific `path:line`, not a general impression.
 
 ---
 
+## A PR that adds user-visible output needs a use case and a real run in its description
+
+When the PR adds output a user will see — metrics, log lines, CLI output, exported
+data — the description carries two things: who the output is for and in what
+situation they use it (the use case), and evidence of what it actually looks like
+(a screenshot, a short recording, or output pasted from a real run). Code and unit
+tests alone don't show a reviewer what is being sent out.
+
+Seen: apache/airflow #77084 (opt-in usage metrics on a set of LLM operators). The
+reviewer's first comment asked for the use case and a screenshot or demo of the
+exported metrics; the review continued after the author added the description and
+a screenshot of the output received by a local StatsD listener.
+
+How to apply: before opening such a PR, run the feature once and paste the output
+into the description, with the use case beside it. Note anything that makes the
+output differ from what the code suggests (for example a name prefix that comes
+from configuration, or a client that does not display tags). When reviewing
+someone else's PR of this kind, ask for these first if the description has none
+(that review-side step is an extension of what the reviewer in #77084 did; the
+reviewer there only asked).
+
 ## Re-sync the description after a design pivot
 
 A PR description doesn't update itself when new commits land. If review swaps out the

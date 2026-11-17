@@ -633,6 +633,29 @@ Before writing or approving a claim about stability, release state, CI or suppor
 
 Examples (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while three toolsets had no `tool_prefix`; another said "shipped in 0.10.0" while the tag showed the class in an earlier release; a plan promised "the changelog records the latest tested version" when no CI job tracked that.
 
+## Example outputs and measurements in docs come from a real run
+
+Source: apache/airflow #76799 (four review comments on one provider docs page,
+plus a fifth caught while fixing them).
+
+- **Paste a real run verbatim.** An example output (tool return values,
+  query results) is captured by running the code — for common.ai, a
+  `FunctionModel` driving the toolset against a breeze database needs no LLM
+  key — and pasted as printed. Don't hand-write it or reorder it. The code
+  block in the docs and the code that was run must be the same text, and every
+  parameter the prose mentions must appear in that block, otherwise a reader
+  who copies it won't see the same result.
+- **A measurement sentence says what was measured and on what** ("one query
+  was issued" — on which database, on which major version of which library).
+  Anything not actually run is stated as "read from the source", not as
+  measured.
+- **Don't pin a third-party package's minor or patch version** in prose; it
+  is stale at the next release. Name the major version, or the behaviour.
+- **SQL and hook-API calls in an example need a source** — a line you can point
+  to in the code, or a run that exercised them. A column name or method that
+  merely looks right (a MySQL catalog column, in the case above) is the
+  typical miss.
+
 ## "When to use X vs Y" comparison docs
 
 A comparison doc needs why (X's core value proposition), when (bullets mapped to concrete operator/API names with doc

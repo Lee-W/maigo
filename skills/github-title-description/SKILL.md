@@ -231,6 +231,8 @@ reference docs go stale silently; use `gh pr view`, `git show HEAD:<path>`, or
 `gh pr diff <n>` to confirm. Details and a per-claim-type recipe in
 `references/verification-discipline.md`.
 
+A PR that adds user-visible output (metrics, log lines, CLI output) states its use case and attaches a screenshot or real-run output in the description — same reference, "A PR that adds user-visible output needs a use case and a real run".
+
 ## Tracking issue body: short prose, not a template
 
 When drafting a tracking / follow-up issue body (e.g. for deferred work

@@ -194,6 +194,29 @@ pytest <file> -q` (take the floor from the version the file's own
 reads green while everything skipped proves nothing. The same `--with` must
 go into `.claude/test-command` (no `&&`; the hook has no shell).
 
+### A new common.ai test file that needs an agent framework must be listed in `run_agent_framework_tests.sh`
+
+Scope gate: applies only when the diff adds or moves a test under
+`providers/common/ai` that needs an agent framework (`openai-agents`,
+`strands-agents`, `google-adk`, `llama-index`).
+
+These frameworks are not provider dependencies, so the generic provider test
+job skips such a file at its `importorskip` and CI stays green. Only the paths
+in the `TEST_PATHS` array of `scripts/in_container/run_agent_framework_tests.sh`
+run in the job that installs the framework. A test file missing from that
+array has never run, and nothing says so.
+
+How to apply: check the file is covered. As of 2026-11-17 on `upstream/main`,
+`TEST_PATHS` lists the `tests/unit/common/ai/tools` **directory** (a new file
+there is covered automatically) but lists files under `durable/`, `hooks/`
+and `operators/` **one by one** (a new file there needs its own line added in
+the same PR). Re-read the array rather than trusting this snapshot. Then open
+the PR's agent framework job log and confirm its collected count includes the
+new file. To run it locally, add the framework for that run only with
+`uv run --frozen --project providers/common/ai --with '<pkg><constraint>' python -m pytest <file>`,
+taking the constraint from what the file's `importorskip` and the provider's
+extras expect.
+
 ## 3. Local-machine false reds
 
 These are environment states that make real, unmodified code look broken.

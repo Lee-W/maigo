@@ -149,3 +149,15 @@ description's "stable query usage" was therefore over-claimed.
 
 **How to check.** For each patched name in the test, ask whether it runs per item in production
 and issues queries; if so the "constant" claim is unproven for that path.
+
+## 10. A PR that "supports package X's new version": check the lock file before trusting CI
+
+**Rule.** When reviewing a fix or compatibility PR for a new release of a third-party package, read the PR head's lock file (`uv.lock` or equivalent) for the version it pins. If that is not the version the PR targets, a green CI proves only that the old version still works, not that the fix works. Put "CI did not exercise the target version" under the report's unverified items and ask the author to bump the lock or paste output from a real run on the target version; still check the fix itself against the package source separately.
+
+**Why.** Case (apache/airflow #77108, a fix for a str-enum write under a newer MySQL client): the lock pinned the previous release, every MySQL job was green, and none of them ran the target version.
+
+## 11. A comment's claim about third-party API behaviour needs a documentation source
+
+**Rule.** A comment or docstring that says what a third-party parameter controls, or whether a call blocks, must be backed by that API's official documentation; ask for the link, or check it yourself. A defensive "do X, then poll/retry anyway" loop must be explainable in one sentence as protection against a specific situation; if the author can't say which, remove it.
+
+**Why.** Case (apache/airflow #75369): a comment tied a keep-alive parameter to blocking behaviour, they are unrelated, and the whole polling loop built on that belief was deleted.
