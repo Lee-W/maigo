@@ -224,6 +224,41 @@ regex 要求 `<kind>.md`（stem 整個等於某個 kind）；第二種要求 `<k
 
 5 秒上限。純 regex，毫秒級完成。
 
+## PreToolUse — `hooks/commit_trailer_check.py`
+
+匹配 `Bash` 工具。擋下帶 `Co-Authored-By:` trailer 的 `git commit`——這條規則原本只寫在
+[commit-message](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)
+的 Trailers 段（prompt 層），已被違反多次，所以改用程式碼兜底。
+
+判準刻意保守（寧可少擋、不可誤擋，誤擋會讓所有載入此 plugin 的 session 無法 commit）：
+
+- 把指令切成 segment（`;` `&&` `||` `|` `&`、換行；引號內不切），只看
+  `git [全域選項] commit ...` 的 segment，含 `git -C <dir> commit`、`--amend`、
+  串在其他指令之後的情況。
+- 訊息來源只取指令字面上看得到的：`-m` / `--message` / `--trailer` 的值，以及掛在
+  該 segment 上的 heredoc 內文（含 `-m "$(cat <<'EOF' ... EOF)"`）。
+- 「某一行以 `Co-Authored-By:` 開頭」（不分大小寫）才算 trailer；散文裡提到這個字樣
+  不擋。
+- `-F <file>`（訊息不在指令字面上）不讀檔，放行；`git log --grep Co-Authored-By`、
+  `grep`、`echo` 等非 `git commit` 指令放行。
+
+命中時 block，訊息說明本 plugin 的 commit 慣例不加 AI 共同作者 trailer、請移除後重下。
+放行一律靜默 `exit 0`，理由同上面兩支 PreToolUse hook。
+
+### 逃生口
+
+在 hook payload 的 `cwd` 底下建 `.claude/skip-commit-trailer-check`，第一行非空非註解
+視為原因；檔案存在且有原因就整個跳過檢查。形狀與 `.claude/skip-test-verification` 相同。
+
+### Fail-open 情況
+
+- input 不是有效 JSON、`tool_name` 不是 `Bash`、`tool_input.command` 不是非空字串 → 靜默放行
+- segment 的引號不平衡等 shell 解析失敗 → 該 segment 放行
+
+### Timeout
+
+5 秒上限。純字串解析，毫秒級完成。
+
 ## PostToolUse／SubagentStop — `hooks/token_usage.py`
 
 兩條路徑都寫入目前 repo 根目錄的 `.maigo/_internal/log/token-usage.jsonl`，不重新送內容給模型、不跑 tokenizer，也不自行估算：
@@ -513,6 +548,10 @@ python3 -c "import json,sys; print(json.dumps({'cwd':'/path/to/project'}))" \
 # 模擬 Write 到舊固定檔名（應該 block）
 python3 -c "import json; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'.maigo/plan.md'}}))" \
   | python3 hooks/legacy_artifact_path_check.py
+
+# 模擬帶 trailer 的 git commit（應該 block）
+python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git commit -m \"x\\n\\nCo-Authored-By: Bot <b@x.io>\"'}}))" \
+  | python3 hooks/commit_trailer_check.py
 
 # 模擬 foreground Agent usage metadata
 python3 -c "import json; print(json.dumps({'hook_event_name':'PostToolUse','tool_name':'Agent','session_id':'demo','cwd':'/path/to/project','tool_input':{'subagent_type':'maigo:Soyo'},'tool_response':{'status':'completed','agentId':'agent-1','resolvedModel':'claude-sonnet','usage':{'input_tokens':100,'output_tokens':20}}}))" \
