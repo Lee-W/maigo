@@ -83,6 +83,7 @@ PR title / description 是 reviewer 對這次變更的第一印象。常見的�
 - `## What` ≤ 1 段 + 1 個 code example（僅限 core API 改動這種需要秀 signature/呼叫方式的情況）——不要寫成逐檔案條列。
 - `## Test Plan` 維持條列、一行一個 bullet，描述測到什麼，**不要**貼 test 檔內容進去。至多 3 條：跑了什麼指令、結論是什麼；有實跑證據時寫出命令與結論，做過 mutation 驗證就加一句摘要（拿掉哪裡、哪支測試轉紅）；逐項的筆數、計數與驗證過程留在 review thread，不進 description。
 - PR 涵蓋多個主題時，`## What` 改用條列，**至多 4–5 條、每條一句**；同一類的小修併成一條（「修了 pre-commit 安裝與 livereload 兩個 dev task」），不要一個修正一條、每條三句。
+- **大 PR 不豁免**：新功能、上千行 diff、有安全考量時也一樣套上面的上限——`## What` 不開粗體子標題分區；實作細節（逐項安全措施、metric/log 欄位、截斷上限）與已知限制只用一句指向 PR 帶的 guide / docs，不在 description 重講。（實例：一份新 adapter 的初稿因逐項展開被使用者評「有點太長」，砍到約 1/3 才合格。）
 - 未驗證的事項併成 `## Test Plan` 最後**一條** bullet（`Not checked: A, and B.`），只留 reviewer 需要自己確認的；不另開小節、不逐項解釋為什麼沒驗。🟣 Taki 回報的未驗項目**只**進這一條，不重複寫進 `## Known limitations`。
 - **整份 description 以一個螢幕內讀完為準**（約 25 行以內，不含 template 自帶的 checklist）。寫超過就刪，不要靠排版擠——太長的 description 沒有人會讀完。
 - **例外：出現 `## Design rationale` 或 `## Known limitations` 時，放寬到約 40 行**，且兩段各有上限（Design rationale ≤3 句、Known limitations ≤5 條且每條一句）。放寬只為這兩段，不是讓 Why / What / Test Plan 變長；沒有這兩段就維持約 25 行。
