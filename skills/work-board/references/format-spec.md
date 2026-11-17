@@ -169,6 +169,9 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 - 本地 review 結果：<與 board 行相同的結果字串>
 - 最後 review：<ISO 8601 時間，含時區>
 - 已看完：<ISO 8601 時間，含時區；尚未確認時省略>
+- 相關檔案：
+  - `../review/<ident>/review.md`
+  - `../pr/<ident>/plan.md`
 
 ## 判斷
 
@@ -200,9 +203,10 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
 - **下一步**：`next_action` 為 `null` 時省略整行——狀態沒有對應下一步，見
   [`scripts/board_state.py`](https://github.com/Lee-W/maigo/blob/main/scripts/board_state.py)
   的 `_STATUS_META`（`WIP` / `IN_PROGRESS` / P8 / P9 / P0 這類狀態）。
+- **相關檔案**：刷新時掃 state 目錄的 `review/<ident>/`、`pr/<ident>/`、`issue/<ident>/`（`<ident>` 與細節檔名同一個識別碼，同 repo 為 `<n>`、跨 repo 為 `<repo>-<n>`，由 `board_state.github_ref()` 算出），把底下所有一般檔列成事實區最後一個欄位的巢狀清單，每項是包反引號、相對於細節檔自己位置的路徑（`../review/<ident>/review.md`），所以在 nvim 裡游標停在路徑上按 `gf` 就能開，**但檔名含空白或括號的檔仍會列出、`gf` 無法直接跳**（用 `:e` 或自己選取路徑）。清單只在刷新時更新，檔案增減要等下一次刷新才反映；沒有被這次刷新重新產生的列（沿用舊內容的 `keep` 列，例如抓取失敗的項目）不會更新。順序：先依目錄（`review`、`pr`、`issue`），目錄內先依 [`scripts/artifact_path.py`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py) 的 `_KNOWN_KINDS` 對應的檔名順序（`plan`、`rubric`、`review`、`draft`、`pr-comments`、`reply-draft`、`inline-comments`；同名的無後綴檔排在 `-<attempt>` 之前，`-<attempt>` 由小到大，例如 `rubric.md`、`rubric-1.md`、`rubric-2.md`、`rubric-10.md`），其餘檔（含子目錄內的檔）依路徑字典序。沒有任何產物時整個欄位省略；不列的有：`topic/`、`_archive/`、`_internal/`、隱藏檔與隱藏目錄（名稱以 `.` 開頭）、名稱含反引號或換行（CR／LF）的檔（無法放進單行 code span）、名稱不是合法 UTF-8 的檔、寫入中的暫存檔（`.tmp` 或 `~` 結尾），以及掃描時讀不到的檔或目錄；目錄的名稱同樣套用這些條件（隱藏、`.tmp`／`~` 結尾、含反引號或換行、非 UTF-8），符合的目錄整個子樹都不列。這個清單是機器維護的事實，不要手改；自己的筆記與手寫連結寫在 `## 筆記`。
 - **舊 `📄 <產物路徑>`**（`review/<n>/review.md` / triage 筆記等本地產物）：改寫進 `## 筆記`
   區裡的一行路徑連結（檔案相對、獨立成清單項或包反引號，例：`- ../review/9301/review.md`，自己的 PR 為 `../pr/9301/review.md`；不要寫成緊貼中文冒號的 `報告：../review/…`；
-  細節檔在 `.maigo/i/` 底下，理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)），不佔事實區欄位。
+  細節檔在 `.maigo/i/` 底下，理由見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）。這是手寫區的連結，refresh 不替它寫；產物的完整清單由事實區的 `相關檔案` 欄提供，筆記裡的連結只用來補充說明，重複列出可接受。
   既有筆記裡的舊寫法（`.maigo/review/…`、`review/…`、緊貼中文標點的路徑）refresh 與命令不會改寫，新舊混用可接受；要整理時跑 `scripts/rewrite_note_paths.py`（預設乾跑，見 §6）。
 - **資料缺失時的降級**（與上面三條「刻意省略」不同）：某欄位該有值但當下拿不到
   （例：遷移進來的 👀 項目沒有 `Δ+A/-D`，因為舊格式本來就沒記），就**只寫拿得到的部分**

@@ -178,6 +178,17 @@ class TestNaming:
         rubric_path = Path(ap.artifact_path("review-rubric", "58543", owner="others"))
         assert review_path.parent == rubric_path.parent == Path(".maigo/review/58543")
 
+    def test_known_stems_follow_known_kinds_order_without_duplicates(self):
+        assert ap.known_stems() == (
+            "plan",
+            "rubric",
+            "review",
+            "draft",
+            "pr-comments",
+            "reply-draft",
+            "inline-comments",
+        )
+
     def test_plan_nests_under_pr_issue_topic_groups(self):
         assert set(ap._NESTED_LAYOUT).issubset(set(ap._KNOWN_KINDS))
         # plan's group depends on the URL, so it is not a fixed `(group, stem)` row

@@ -165,6 +165,25 @@ class TestScriptArtifactsAreFixedPoints:
         )
         assert layout_violations(facts + refresh.NEW_PRESERVED) == []
 
+    def test_new_detail_file_with_related_files(self):
+        facts = refresh.render_detail_facts(
+            type="👀",
+            status="待 review",
+            title="Some PR",
+            url="https://github.com/o/r/pull/1",
+            additions=3,
+            deletions=1,
+            author="carol",
+            next_action="run `x`",
+            number=1,
+            last_reviewed_at=None,
+            review_time_source=None,
+            acknowledged_at=None,
+            related_files=["review/1/review.md", "pr/1/plan.md"],
+        )
+        assert "  - `../review/1/review.md`\n" in facts
+        assert layout_violations(facts + refresh.NEW_PRESERVED) == []
+
     def test_old_preserved_area_is_normalised_on_refresh(self):
         old = "## 判斷\n\n\n## 筆記\n\n\n<!-- 手寫區 -->\n"
         assert layout_violations(old) != []

@@ -212,6 +212,19 @@ def plan_group(url: str | None, home_repo: str = "") -> str:
     return "topic"
 
 
+def known_stems() -> tuple[str, ...]:
+    """
+    `_KNOWN_KINDS` 對應的檔名 stem（不含 `-<attempt>` 與 `.md`），依 `_KNOWN_KINDS`
+    順序、同名只留第一次出現（`review-rubric` 與 `triage-rubric` 共用 `rubric`）。純函式。
+    """
+    stems: list[str] = []
+    for kind in _KNOWN_KINDS:
+        stem = _PLAN_STEM if kind == "plan" else _NESTED_LAYOUT[kind][1]
+        if stem not in stems:
+            stems.append(stem)
+    return tuple(stems)
+
+
 def nested_locations(kind: str) -> list[tuple[str, str]]:
     """
     *kind* 所有可能的 `(group, stem)`：會分流的 kind 回 `pr` 與 `review` 兩組，
