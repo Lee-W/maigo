@@ -12,7 +12,8 @@ flowchart TD
     Taki --> TakiVerdict{全綠?}
     TakiVerdict -- FAIL --> Anon
     TakiVerdict -- PASS --> Commit[Orchestrator<br/>落地 commit]
-    Commit --> Summary[Orchestrator<br/>寫 summary.md]
+    Commit --> Shots[Orchestrator<br/>可見變更才截圖]
+    Shots --> Summary[Orchestrator<br/>寫 summary.md]
     Summary --> Done([完成: summary])
 
     classDef raana fill:#6EEB83,stroke:#333,color:#000
