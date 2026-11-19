@@ -17,7 +17,12 @@ When delivering new tests, self-check two things before calling it done:
   docstring that disappears once the tests are merged.
 - **Repeated setup/cleanup across tests** → extract to a fixture. Look for the repo's
   existing shared helper first (e.g. a shared DB-cleanup helper)
-  rather than writing a fresh `session.execute(delete(...))` per test.
+  rather than writing a fresh `session.execute(delete(...))` per test. When the repeated
+  piece is the same constructor line, make it a **function-scope** fixture, not a
+  module-level variable (a module-level instance is shared by every test that uses it).
+  Leave a call that takes different arguments, and a test that builds several instances,
+  as it is. Before moving a constructor into a fixture, check that it does not depend on
+  state the test body sets up itself (cwd, environment variables, patches).
 
 Don't force tests into the same parametrize when any of these three signals is present —
 the judgment call isn't "how many lines would this save" but "does the reader have to

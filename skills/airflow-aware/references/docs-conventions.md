@@ -633,6 +633,23 @@ Before writing or approving a claim about stability, release state, CI or suppor
 
 Examples (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while three toolsets had no `tool_prefix`; another said "shipped in 0.10.0" while the tag showed the class in an earlier release; a plan promised "the changelog records the latest tested version" when no CI job tracked that.
 
+## Provider docs that name a third-party class: check it against the provider's declared floor, with per-tag evidence
+
+Scope: the diff adds or edits provider docs or an example that names a class, function or parameter of a third-party
+package (for example telling users to distinguish two error kinds by exception class).
+
+A provider declares a minimum version of each third-party package in its `pyproject.toml`, and that floor is usually far
+older than what the development environment has installed. A symbol that exists in the local install can be missing, or
+be a different class, at the floor.
+
+1. Compare every named third-party symbol with the declared floor. If it only exists above the floor, the doc must say
+   from which version it is available and what the user gets on older versions. One case: a page told users to tell two
+   error kinds apart with a rule keyed on distinct exception classes, but at the declared floor both kinds were the same
+   class, so the documented rule could not separate them.
+2. Prove the version with release tags, not with memory or the locally installed version: read the package source at two
+   adjacent tags (one without the symbol, one with it) and cite both.
+3. If you cannot check the tags, write the claim as unverified rather than picking a version.
+
 ## "When to use X vs Y" comparison docs
 
 A comparison doc needs why (X's core value proposition), when (bullets mapped to concrete operator/API names with doc

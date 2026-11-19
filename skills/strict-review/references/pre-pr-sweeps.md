@@ -72,6 +72,22 @@ reads the table and the repo's test-path configuration, and does not mutate anyt
 - For CI collection, find where the repo lists its test paths and check the new file is
   covered by it.
 - No new behaviour test in the diff: write "none".
+- Before running anything, name the **most likely wrong implementation** each test is meant to reject (loop order
+  swapped, a condition inverted or always true, a type check standing in for a value check, a missing value treated as
+  a match), and say why the assertion fails under it. A test that passes only shows the current code satisfies it, not
+  that it tells the right code from a plausible wrong one. The mutation run above and the per-side recipe in
+  [`python-aware/references/test-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/test-conventions.md)
+  ("Parity tests need a one-sided mutation") already cover how to run it; the points below are what they do not.
+- A parametrized test: for every id, confirm the object it builds really is the scenario the id names and reaches the
+  branch the id claims (a "mixed" case whose members were all built the same way takes a different branch and passes
+  by coincidence).
+- Every deliberate either/or in the design (strict or lenient, do or do not) needs one piece of test data that tells the
+  two choices apart, including the "do not" half (a rule that excludes a field only under some condition needs a case
+  where it must not be excluded; a pairwise comparison where a missing value equals only a missing value needs a pair
+  with a value on one side only). List that data at planning time.
+- Pin assertions to the behaviour's output (a return value, an argument passed on, a call count), not only to a type.
+- Cleanup paths count: when a `finally` branches on a flag (raise if cleanup fails, or only log so the original failure
+  wins), each branch needs a test in which the cleanup action really fails, and inverting the condition turns both red.
 
 ## (c) Behaviour that has already been released
 
@@ -124,6 +140,12 @@ unrelated to the subject, is moved out or justified in the PR description.
 inflates the review unit. Case (apache/airflow #76015): a reviewer pointed out that five
 new tests already passed against the base branch and covered paths the PR did not change,
 and asked whether they belonged in it.
+
+The same rule governs a requested style fix (an inline import, a name, a duplicate): when asked to fix a pattern, change
+only the files this PR adds or modifies. Other files with the identical pattern, even the one it was copied from, are
+left alone and mentioned in the report in one sentence. It holds inside a single file too: change only the lines this
+branch added, and leave same-kind lines that already exist on the target branch. Tell them apart with
+`git diff <target>...HEAD` (three dots: changes since the merge base); a line not in that diff is not yours to touch.
 
 **How to check.** Executed by 🎀 Anon, because it needs a worktree and 🟡 Soyo is read-only.
 - Run each new test against the base branch in a detached worktree (never a checkout in the

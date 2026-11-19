@@ -112,13 +112,13 @@ Its "Contents" list enumerates 10.1–10.38 plus the unnumbered release-tag chec
 
 | Reference | Read when |
 |---|---|
-| `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, Dag authoring |
-| `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle |
-| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds; attribution; relock pin-back to the documented version; docs screenshot procedure |
-| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests |
+| `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, Dag authoring, example-Dag imports that need an extra of their own |
+| `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle, embedded-server logging reset |
+| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds (incl. baseline-worktree rule); same-process Sphinx test leaks; attribution; relock pin-back to the documented version; docs screenshot procedure |
+| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims and before a doc's "on Airflow X and later" claim. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests |
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
 | `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity, provider public-surface compatibility |
-| `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs, docs examples |
+| `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs (incl. third-party class vs declared version floor), docs examples |
 | `references/test-cases.md` | Writing or reviewing Airflow tests: Airflow instances and Airflow-specific facts behind the python-aware test-conventions rules (read alongside the rule) |
 | `references/ui-conventions.md` | `airflow-core/src/airflow/ui` changes; zh-TW translation rules |
 | `references/naming.md` | The naming hook fires, or editing a historical archival file |

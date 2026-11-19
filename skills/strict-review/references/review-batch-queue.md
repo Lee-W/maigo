@@ -36,7 +36,7 @@ gh pr view <canonical-PR-url> --json number,title,additions,deletions,state,isDr
 | 3 | #Z | … | +A/-B | ⚠️ CHANGES_REQUESTED |
 | — | #W | … | — | ⏭️ skipped (merged) |
 
-共 N 顆，平行開跑（排序只決定 roll-up 與 board 的呈現順序）。
+共 N 顆，平行開跑（排序只決定 roll-up 的呈現順序；board 順序以加權檔為準）。
 ```
 
 使用者送多 PR 進來就已經授權整批啟動——**不需要**任何 go-ahead，PR 與 PR 之間也不停。
@@ -58,7 +58,7 @@ merged / closed 的 PR **不需要** review report——只在 queue 表標 skip
 本檔適用的批次模式下，下列選擇直接套用，使用者另有指示才改（單顆審查的流程在 `strict-review` 本體，不受影響）：
 
 - **draft PR 預設跳過**，不逐顆問。
-- **已有舊報告的 PR：同 head 且 coverage 足夠才跳過。** 先查 state（merged／closed 直接 skipped），再取 `gh pr view <canonical-PR-url> --json headRefOid`。執行下方 coverage CLI；只有 `reusable: true` 才在批次總表帶一行並略過。舊報告沒有 coverage、先前只做 design-preview／compliance-only、checklist 不足或必要驗證未 `passed`，都不因 head 相同而跳過；沿用已完成部分，只補缺少的項目或驗證。head 有變時審增量——即使看起來只是 rebase，也用 patch-id 確認 PR 自己的 commit 有沒有動。
+- **已有舊報告的 PR：同 head 且 coverage 足夠才跳過。** 先查 state（merged／closed 直接 skipped），再取 `gh pr view <canonical-PR-url> --json headRefOid`。執行下方 coverage CLI；只有 `reusable: true` 才在批次總表帶一行並略過。舊報告沒有 coverage、先前只做 design-preview／compliance-only、checklist 不足或必要驗證未 `passed`，都不因 head 相同而跳過；沿用已完成部分，只補缺少的項目或驗證（草稿還沒送出時，先走下方「同 head 重送：先對帳，不整顆重審」）。head 有變時審增量——即使看起來只是 rebase，也用 patch-id 確認 PR 自己的 commit 有沒有動。
 - **模型調度用相對降檔**（對齊 [`skills/model-dispatch`](https://github.com/Lee-W/maigo/blob/main/skills/model-dispatch/SKILL.md) 的精神）：探索、規劃、審查三個角色在批次時可比單顆審查降一檔（基準＝單顆審查的調度）；驗證角色可再降一檔，因為它只做機械性的實跑與 read-back。單顆 PR 或高風險 PR 不適用。
 
 Why：數十顆規模下，每顆都問一次或都用最高檔位，成本遠大於收益；使用者在一次 46 顆的批次前如此選擇。head 沒變就跳過則是使用者明確推翻「全部重審」的舊預設（「沒有改動就不用重審」）；以此為準。
@@ -74,7 +74,34 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review_report.py" check-coverage \
 CLI exit 0 表示成功判斷，**不是可以跳過**；必須讀 `reusable`。exit 非零時視為不能復用，先處理錯誤。
 `reason` 與 `missing_checklist_items` 說明還缺什麼；不從正文的「APPROVE」反推曾查過全部項目。
 
-## 預設：平行審完全部、統一 publish、board 放最前
+## 同 head 重送：先對帳，不整顆重審
+
+批次開跑前，對每顆 PR 比對 `headRefOid` 與既有 `review.md` 的 `head_sha`；相同且草稿未送出就走下面的對帳。
+
+適用：PR 的 head 與上次本地審查相同，但 `check-coverage` 回 `reusable: false`（例如舊報告沒有 coverage metadata 的
+`coverage_unknown`），且 `draft.md`／`inline-comments.md` 還沒送出。上面「已有舊報告的 PR」只說「沿用已完成部分，只補缺少的項目或驗證」，沒說草稿放了幾天之後該查什麼；這時不整顆重跑五位角色，先做一輪對帳（一隻唯讀 agent 可做完整批）：
+
+1. **舊報告完整性**：9 項 checklist 有沒有逐項結果、mode 是否標明、Verification 段實際跑了什麼、有沒有沿用更早 head 的重現。
+2. **現況**：state、`headRefOid` 是否仍等於報告的 Reviewed commit、CI 紅綠、是否已送過 review。
+3. **草稿每則 finding 對照 PR 上所有 review、conversation comment 與 inline thread**（不限報告之後），逐則判「無人提過／已有人提過／作者已回覆或承諾處理」；依留言語意判斷，不靠關鍵字。
+4. **報告之後才出現的 thread**：內容是否與草稿結論牴觸（草稿是 approve 時尤其要看）。
+
+分流：
+
+- 無牴觸且無重複 → 照送。
+- 與別人的 thread 相近 → 改寫成接話。
+- 有牴觸，或舊報告沒涵蓋的主張 → 只對那個主張做窄範圍補審（🟡 爽世讀碼；結論要當 must-fix 送出時再請 🟣 立希實跑重現）。
+- 舊報告的缺口（checklist 沒逐項列、驗證沒跑全）列給使用者決定要不要補，不自行重審。
+
+對帳後修改過的草稿一樣要送獨立查核。不因 `coverage_unknown` 直接整顆重審，也不因 head 相同直接說「可照送」。
+
+**分支：head 沒變，但上次審完後有其他 reviewer 的新 review 或留言。** 即使 coverage 可沿用也不跳過，同樣不整顆重審：派審查角色逐點查證對方的事實主張（讀碼找證據），列出與我方草稿的對照——重複、只有我方提、只有對方提；重複的改成接話或刪掉，對方抓到而我方漏的補進報告並重新判 verdict；報告寫明程式碼未重審、沿用上輪驗證。
+
+**分支：head 有變，但 PR 自己的 commit 逐一相同、只有合進 target 的 merge 有手動解衝突。** 不算 rebase-only 也不整顆重審，做法見 [`review-modes.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-modes.md) 的「Rebase whose merge hand-resolved conflicts」。
+
+Why：一批 6 顆 PR 裡有 4 顆是同 head 重送；對帳抓到一份草稿寫 approve，但兩天前另一位 reviewer 的 thread 指出一個 fallback 會重跑已完成的工具，實跑重現成立，草稿改成請求修改並在該 thread 接話；另一則 inline 與已 resolved 的舊 thread 相近，改成接續舊 thread 的 nit。四顆全部重審要多十幾隻 agent，而且不會自動去比對新 thread。另有三顆「head 沒變、有他人新意見」的 PR，對帳抓到兩個我方漏掉的點，也移除多則會變成重述的草稿。
+
+## 預設：平行審完全部、統一 publish、board 排序以加權檔為準
 
 多 PR 參數的預設流程（不必使用者另外交代）：
 
@@ -98,11 +125,12 @@ CLI exit 0 表示成功判斷，**不是可以跳過**；必須讀 `reusable`。
    怎麼處理）；草稿與 board 回寫等裁決之後一次做。例外：某顆有「使用者必須先決定才不會白做」的
    前提（例如範圍需要改審）才提前問。draft PR 預設跳過，不問。
 4. **board 單一寫手**：Work Board 由**單一** agent 以 `Edit` 回寫（不要每顆各寫一次、也不整份
-   覆寫；規則見 `skills/work-board`），這批 PR 的行放 👀 最前面。
+   覆寫；規則見 `skills/work-board`）。**排序以加權檔（`.maigo/board-weights.txt`）為準**：批次收尾不把
+   這批 PR 置頂、不手動搬行、也不為了置頂去改加權檔（手動搬的行會在下次刷新被重排）。
 5. 最後走 roll-up（見 `skills/strict-review/references/review-templates.md` 的「多 PR batch 最終 roll-up」）。
 
-Why：一次五顆 PR 照舊預設審完第一顆就停下等 go-ahead，使用者的回應是「一次看完，都寫 board，
-放到最前面」——逐顆停頓只是把等待成本丟給使用者，而且 report 版型一樣、沒有節省判斷。
+Why：一次五顆 PR 照舊預設審完第一顆就停下等 go-ahead，使用者要求一次看完、結果都寫進 board
+——逐顆停頓只是把等待成本丟給使用者，而且 report 版型一樣、沒有節省判斷。board 的先後則由加權檔決定，不因為這批剛審完而前移。
 
 ## 逐顆模式（使用者明講才用）
 

@@ -81,6 +81,7 @@ PR 類產物依作者分流（別人的 PR 在 `review/<id>/`、自己的在 `pr
   `PATH`、profile alias 讓 `cp`／`mv`／`rm`／`cd` 靜默失效、zsh 的 `$var:x` 修飾符與 BSD `sed` 不認 `\b`——這些都是指令回報成功或根本沒跑，卻沒做到
   你以為的事；其中 `uv run` 那項尤其要驗「實際在跑的那一份」，見
   [`references/shell-and-tool-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/shell-and-tool-gotchas.md)。
+  該檔另有一節規定交辦驗證 agent 時指令的形狀（一次一條單純指令、`uv run` 在 worktree 帶 `--directory`）。
 
 ### docs-only 批次的例外
 

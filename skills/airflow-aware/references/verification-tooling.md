@@ -194,6 +194,25 @@ pytest <file> -q` (take the floor from the version the file's own
 reads green while everything skipped proves nothing. The same `--with` must
 go into `.claude/test-command` (no `&&`; the hook has no shell).
 
+### A new Sphinx-app test passes alone but breaks its siblings — run all of `sphinx_exts/` in one process
+
+Scope gate: only when the diff touches `devel-common/tests/unit/sphinx_exts/` and adds a test that builds a
+`Sphinx(...)` app and calls `app.build(...)`. Skip otherwise.
+
+docutils registers nodes and directives in **process-global** state. A test that builds an app without isolating that
+registration leaks it, and the leak only turns *other* test files red, and only when they share the process. Running
+the new file alone is green, so a per-file run (or a run scoped to the changed file) proves nothing about it.
+
+How to apply: run the whole `devel-common/tests/unit/sphinx_exts/` directory in a single pytest process, and run the
+same directory on `main` as the comparison. One case (PR #74536): the new file alone was all green; in the same process
+as an existing sibling test file that file failed with `node class 'toctree' is already registered`. Counts were 33
+passed on `main`, 46 passed with the new file removed, and 52 passed after the fixture wrapped its `Sphinx(...)` and
+`app.build(...)` calls in `docutils_namespace()` (from `sphinx.util.docutils`).
+
+When reviewing, report it as a must-fix and suggest wrapping the app construction and build in `docutils_namespace()`.
+Whether CI runs these files in one process was not checked in that case — say so in the report rather than implying CI
+would catch (or miss) it.
+
 ## 3. Local-machine false reds
 
 These are environment states that make real, unmodified code look broken.
@@ -401,6 +420,24 @@ touches `sandbox/`. If `sandbox/` itself needs fixing later, treat the root
 cause as unconfirmed and read `base.py`'s path-comparison logic before
 proposing a fix.
 
+### A baseline comparison needs a fresh merge-base worktree that ran the same `--project`, nothing else
+
+The same test can pass or fail depending on which `uv run --project <P>` invocations a worktree has already seen. The
+`--project` values of one worktree share a single `.venv`, and switching project does not remove what the previous one
+installed. (Inferred mechanism — extra installed packages change test behaviour — not traced step by step.)
+
+One case (PR #75751): `task-sdk/tests/task_sdk/definitions/test_asset.py::test_uri_with_password` failed in a worktree
+that had only run `--project task-sdk`, and passed in a worktree that had also run `--project airflow-core` and
+`--project providers/common/io`, with identical asset code on both sides. A clean merge-base worktree that ran only
+`--project task-sdk` failed the same way, so it was a pre-existing environment dependence, not the PR. Using the
+"already-used" worktree as the baseline gave the opposite answer on the first comparison.
+
+How to apply: when a red is not on the known-failure list, build the baseline in a **newly created worktree at the
+merge base** and run only the `--project` values the worktree under test has run. Do not borrow another PR's worktree
+(especially one an agent is still using) as the baseline. State in the report which projects each side was synced with.
+The same rule applies when a known-failure list has gone stale and the failure counts differ from it — re-measure the
+baseline this way rather than trusting the list.
+
 ### `Run black on docs` reformats long Python inside RST code blocks, failing the first commit
 
 The `Run black on docs` prek hook rewrites Python code embedded in RST
@@ -550,7 +587,10 @@ a worktree root, not to `--project` itself.
 
 Three setup failures in sub-projects look like a regression in the PR but are the scratch environment:
 
-- `dev/registry` has no `uv.lock`, so `uv run --project dev/registry pytest …` must **not** carry `--frozen`.
+- `dev/registry` has no `uv.lock`, so `uv run --project dev/registry pytest …` must **not** carry `--frozen`. The local
+  command that works is `uv run --python 3.12 --no-project --with pytest --with packaging --with pydantic --with pyyaml
+  pytest dev/registry/tests` (one verified run: 390 passed). Tests under `dev/breeze/tests/` belong to breeze and run
+  separately.
 - `uv run --project airflow-core pytest …` fails with `ModuleNotFoundError: airflow_shared` unless
   `PYTHONPATH` lists every `shared/<dist>/src` directory (expand the glob; `PYTHONPATH` does not; the docs-build entry below makes the same point about every
   `<worktree>/shared/*/src`).

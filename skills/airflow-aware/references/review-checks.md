@@ -52,7 +52,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
 - **10.37** Before changing or unifying the output / serialization paths of a released, stable-listed `common.ai` operator, read each path's behavior in the last release tag (Request changes, scope-gated to such diffs)
 - **10.38** Deferrable path: validate hook support on the worker before deferring, and prove parity with the synchronous path through real serialization (Request changes, scope-gated to diffs that touch `deferrable`, a trigger, or `execute_complete`)
-- **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim). The author-side counterpart is sweep (c) in [`strict-review/references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)
+- **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim; includes a variant for provider docs that say "on Airflow X and later"). The author-side counterpart is sweep (c) in [`strict-review/references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
 ## Secrets masker tests: `@pytest.mark.enable_redact` + reset before use
@@ -1304,6 +1304,26 @@ no compatibility constraint. Case (#74695): `AgentOperator._dump_unregistered_mo
 #74729) was in none of the `providers-common-ai` 1.0.0, 1.0.0rc1-rc3 or 1.1.0rc1 tags; recommending
 "docs only, keep two dump paths" without checking made the shared helper look impossible until the
 user asked whether a helper was feasible.
+
+**Variant — a provider doc that states which Airflow version it applies to** (scope: the doc says "on Airflow X and
+later" or similar, and then describes core behavior). Every core behavior the page goes on to describe (what a clear
+does to stored task state, whether an API field or UI option exists, a config default) must have reached a **final
+release no later than X**. Comparing the page with core `main` only proves it matches core today, not that it holds for
+users on X. Provider and core release separately, and the provider's declared minimum Airflow version is often well
+below `main`.
+
+- Find the commit that introduced the behavior, run `git tag --contains <commit>`, and take the earliest final release
+  (leave out rc and beta). Then read the code at the X tag with `git show <tag>:<path>` or `git grep <symbol> <tag> --
+  <dir>`.
+- Also check whether the provider enables the feature on X at all (a version gate, or a compat shim that only takes
+  effect below some version), and the provider's declared minimum Airflow version, to judge whether affected users
+  exist.
+- A behavior inferred from reading and not run on that version goes in the report as a reading-based inference.
+
+Case (#76918): a page said a feature applied from Airflow 3.3, then said without a version qualifier that clearing a task
+instance drops the stored run id by default. That behavior, and the parameter that controls it, exist only from 3.4.0.
+The first round compared against core `main` and passed; the second found that a 3.3 user following the page's advice
+to clear the task instance gets the old id back from a run that already succeeded, so the work never reruns.
 
 ## DB portability and concurrency: four review checks *(narrow — when a diff touches a scheduler timer callback, a `DELETE` built from a subquery, Postgres error-code handling, or a unique-constraint get-or-create; Request changes)*
 

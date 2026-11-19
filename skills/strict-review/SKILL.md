@@ -268,7 +268,8 @@ discipline above; do not block the PR on the author not having attached one.
 
 Does the evidence support the claim? Concurrency "drained" signals, error-message advice,
 deprecation-warning migrated values, log/audit wording, docs sample output, and docs
-re-sync after behaviour changes; details in
+re-sync after behaviour changes, doc sentences that hold in only one execution mode or entry point, and the
+end-to-end reminder for third-party integrations; details in
 [`references/claims-and-evidence-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md).
 
 ## Frontend device checks (references)

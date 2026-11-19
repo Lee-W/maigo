@@ -30,9 +30,26 @@ Put the whole `try` block directly under `from __future__ import annotations`, b
 stdlib and `airflow` imports, so a missing extra fails at the very start of the module
 instead of after unrelated imports load. Put that SDK's type-only names (config / message
 types) inside the same `try` rather than splitting them into a `TYPE_CHECKING` block —
-one place to look for everything the extra provides. An example Dag that depends on the
-extra imports it at the top of the file too, not inside the task function. ruff's
-E402 and isort do not flag this ordering.
+one place to look for everything the extra provides. An example Dag whose whole point is
+that extra imports it at the top of the file too, not inside the task function (an example
+that needs an extra *beyond* the one the rest of the file relies on follows the next
+subsection instead). ruff's E402 and isort do not flag this ordering.
+
+### An example Dag keeps imports that need an extra of their own inside the task
+
+Scope: an example Dag (or any module imported at Dag-parse time) in a provider that has
+several optional extras, where the diff adds an import from a module that raises
+`AirflowOptionalProviderFeatureException` when its extra is missing.
+
+A module-level import of such a module raises at import time, so a user who installed only
+a different extra cannot even parse the Dag. Put the import inside the task function, next
+to the other optional imports that same task uses, and make the comment that explains why
+the import lives there cover it too. Check the sibling examples in the same directory first
+— they usually already do this (or wrap the module-level import in `try`). The example's
+install note must list every extra it actually needs, not only the headline one.
+
+Checking that the Dag parses with only one extra installed needs a second environment; if
+you cannot build one locally, say "not verified" in the report instead of implying it.
 
 ## Naming and constants
 

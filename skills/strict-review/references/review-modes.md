@@ -181,3 +181,19 @@ went red, and prove the fix when it is mechanical). Guards:
 **Stacked PR whose upstream already squash-merged**: `gh pr diff` and the PR's size
 include the upstream's pre-squash commits — find the real delta and report the needed
 `rebase --onto` per [`review-agent-handoff.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-agent-handoff.md).
+
+### Rebase whose merge hand-resolved conflicts: review the resolution, not the whole PR
+
+Applies when the PR's own commits are identical one-for-one (`git range-diff` shows every pair as equal) but the merge
+of the target branch into it has a hand-resolved conflict. That is not rebase-only, because the resulting patch is not
+byte-identical, and it does not warrant a full re-review either. Hand-resolving a conflict is where a rebase most easily
+slips in a behaviour change, so hand the reviewer these three things only:
+
+1. Compare each hunk of the resolution with both parents and confirm the behaviour of both sides survived.
+2. For every parameter or call the target branch added, check that each parallel path the PR itself adds (for example a
+   sync and an async variant) was wired up.
+3. Re-find the line number of every finding from the previous round at the new head, one by one; do not derive them from
+   an offset.
+
+Reuse the previous round's rubric, and state in the report which part was actually reviewed this round and which part is
+carried over. Get the combined diff of the merge with `git show --cc <merge-commit>`.

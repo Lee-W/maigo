@@ -89,3 +89,11 @@ payload.
 
 Seen: an issue title initially used the all-caps spelling and had to be corrected
 afterward with `gh issue edit`.
+
+## An end-to-end gap is told to the user in conversation, not written into the description
+
+When the change touches a third-party integration and no end-to-end run against the real service was done, do not put
+that gap into the PR title or description draft. Mention it to the user in the closing report instead. The rule and
+how to check it live in
+[`strict-review` claims and evidence checks, section 11](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md);
+this file only records the description-side half.

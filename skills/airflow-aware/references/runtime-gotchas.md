@@ -1,4 +1,4 @@
-# Airflow runtime gotchas (attrs, serialization, sessions)
+# Airflow runtime gotchas (attrs, serialization, sessions, embedded servers)
 
 Loaded on demand by `skills/airflow-aware/SKILL.md` and
 [`references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md) —
@@ -6,7 +6,8 @@ execution-time defects that pass a type checker and a casual read but fail
 against a specific SQLAlchemy version, Python version, or session lifecycle.
 Read this file when writing or reviewing code that touches attrs eq/hash
 conventions, (de)serialization field reads, or a `create_session`/scoped-session
-boundary. Python/pydantic version-skew type-system pitfalls (`Annotated`
+boundary, or that embeds a server such as uvicorn inside a process it does not own.
+Python/pydantic version-skew type-system pitfalls (`Annotated`
 constraints, nested enums, subscripted generics, `Decimal`→`int`) live in
 [`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/runtime-gotchas.md).
 
@@ -168,3 +169,25 @@ a `suggestion` block wholesale isn't safe; run it before trusting it (same
 posture as
 [`skills/harness-discipline`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md)'s
 guidance on verifying per target rather than trusting a conclusion).
+
+## An embedded `uvicorn.Config` inside a task process needs `log_config=None`
+
+Scope: the diff builds a `uvicorn.Config` (or starts another embedded server) inside a process that does not belong to
+the server — for example an in-process server a task starts to give an external agent a temporary endpoint. Skip it
+where uvicorn owns the whole process.
+
+`uvicorn.Config`'s `log_config` defaults to uvicorn's own `LOGGING_CONFIG`, and `__init__` hands it to
+`logging.config.dictConfig` immediately. A non-incremental `dictConfig` first clears and closes **every** existing
+handler in the process, including the task's own log handler. A remote log handler's `close()` uploads and marks itself
+closed, so the remote task log stops at the moment the server starts and the real upload at task end is skipped. Local
+test runs do not show it. Airflow's own uvicorn call sites pass `log_config=None` for the same reason
+(`airflow-core/src/airflow/cli/commands/api_server_command.py`, `airflow-core/src/airflow/utils/serve_logs/core.py`,
+`airflow-core/src/airflow/api_fastapi/gunicorn_app.py`).
+
+How to apply:
+
+1. Pass `log_config=None` wherever uvicorn does not own the process. `log_level` and `access_log` still work with it.
+2. Add a test that pins the `log_config` passed to `uvicorn.Config` as `None` (patch the class but let a real `Config` be
+   constructed), and check that the test's class is not skipped in CI because an external program is missing.
+3. General rule: before embedding a third-party server or framework in a process you do not own, check whether its
+   initialisation resets global state (logging, signal handlers, event-loop policy).

@@ -52,6 +52,14 @@ not write report files」。這是 harness 層的限制，**不要授權 subagen
 
 **怎麼套用**：
 
-- 預設仍照 [`SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) 回報合約「長產物寫到檔案，回傳路徑」；**被擋過一次、或同類任務已知被擋時才切換**成「不要寫檔，以文字回傳」（需要機器可讀的標題時，第一行單獨寫 `TITLE: ...`，不放 code fence）。
+- 對有寫檔工具的角色，預設仍照 [`SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/SKILL.md) 回報合約「長產物寫到檔案，回傳路徑」；**被擋過一次、或同類任務已知被擋時才切換**成「不要寫檔，以文字回傳」（需要機器可讀的標題時，第一行單獨寫 `TITLE: ...`，不放 code fence）。
 - 由 orchestrator 自己 Write 成 scratchpad 檔，再接後續發佈步驟，最後 grep 讀回確認。
 - 存檔前逐句核對組裝者加的內容：它可能自行補進交辦材料裡沒有的未驗證句子，要刪掉。
+
+**有些角色本來就沒有寫檔工具——交辦前先查，不等被擋**：
+
+- 寫回報合約前，先看該 agent 類型的工具清單有沒有 Write／Edit。本 repo 的 `agents/` 裡，🟡 爽世、🐱 樂奈只有 Read／Bash／Glob／Grep，🟣 立希只有 Bash／Read（內建的 `Explore` 同樣是唯讀角色）；🎀 愛音、🩵 燈有 Write／Edit，`general-purpose` 也有。
+- 沒有寫檔工具的角色，合約改成「直接在回覆裡給結論與 `檔案:行號`，單一引用不超過 20 行」，**不要**要求它把完整報告寫到某個檔案、回覆只給摘要。這類角色常連用導向寫檔也被禁止，完整報告只能放在回覆裡，而交辦文給下一棒指的路徑會一直不存在。
+- 例外：🟣 立希可以把測試輸出導向 scratchpad 的 log 檔，這不算寫報告；它的結論仍放在回覆裡。
+- 下一棒需要完整內容時，由 orchestrator 把回覆裡的重點落成檔案（例如 triage 檔的「調查事實」一節），spawn 下一棒之前用 `wc -l` 確認檔案存在且有內容。
+- 只有有寫檔工具的角色，才用「長產物寫到檔案，回傳路徑」的合約。

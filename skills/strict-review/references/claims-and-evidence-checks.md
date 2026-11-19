@@ -149,3 +149,44 @@ description's "stable query usage" was therefore over-claimed.
 
 **How to check.** For each patched name in the test, ask whether it runs per item in production
 and issues queries; if so the "constant" claim is unproven for that path.
+
+## 10. A doc sentence about behaviour must hold for every execution mode, entry point and default it covers
+
+**Rule.** When docs (tables above all) describe what a component does, a single sentence is often true only in one
+execution mode, through one entry point, or under one set of defaults. Before approving or writing it:
+
+1. Compare the execution modes the component has (for example an async/deferred path against the synchronous one) and
+   confirm they take the same code path. A statement read off one path is wrong on the other.
+2. Look up the defaults and settings that change the outcome (a concurrency limit's default, a cleanup-on-success
+   switch, a "cancel the previous run" flag) and check that the sentence holds under the default and under the
+   non-default values users are told to use.
+3. Where a sentence holds only in one mode, require the doc to state that scope.
+4. When the same feature has more than one entry point (an operator or decorator, versus a user calling the
+   underlying hook directly inside a plain task), find which layer actually produces the behaviour, then check that
+   every entry point goes through that layer. A sentence that holds for only some entry points must name them and say
+   what the others get instead. Case: a doc said that when every fallback in a chain fails, the task raises the
+   chain-exhausted error; only the operator path wraps the failure that way, so a plain task calling the hook
+   directly receives the underlying error and an `except` written from the doc never matches.
+5. When our code only *asks* a third party to do something (passing a flag to an external program), docs and comments
+   may say "asks" and "usually"; write what the other side does as fact only after confirming it. Case: a page stated
+   that an external tool issues calls in order, while the adapter only passed a flag, and another passage of the same
+   page said whether it takes effect was unconfirmed.
+
+**Why.** Prose written from one reading of the code passes review when the reviewer reads the same path. These misses
+were found by a second reviewer in earlier rounds (three separate PRs).
+
+**How to check.** For each behavioural sentence in the diff's docs, name the mode, entry point and default it was
+derived from, then open the other modes' and entry points' code and the settings that alter the result.
+
+## 11. A change that touches a third-party integration without an end-to-end run: remind the user, in conversation
+
+**Rule.** When an implementation, review or PR-description draft concerns an integration with an outside service,
+provider or API and no end-to-end run against the real service was done in this work, say so to the user in the closing
+report. The reminder goes to the user in conversation only; it does not go into the PR title or description draft (see
+[`github-title-description` verification discipline](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/verification-discipline.md)).
+
+**Why.** Several recent PRs of this kind were found by reviewers to have problems because they had no end-to-end
+validation.
+
+**How to check.** In the closing report, if the change is a third-party integration and no run against the real service
+was done this time, point out that gap.

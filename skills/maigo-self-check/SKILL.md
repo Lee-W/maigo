@@ -72,6 +72,15 @@ pytest 測的是 Python 行為；上述問題都在 plugin 結構層——pytest
 
 **新開獨立檔案前**先問「誰會單獨 Read 這個檔？」——答不出具體消費者就併成既有檔的一節；判準與例子見 `references/skill-graduation.md`「新開檔案前」。
 
+## repo 內容不具名
+
+寫進 maigo repo 的內容（skill、reference、command、agent、docs、測試 fixture、commit message、plan 的證據段）
+**不以人名或 GitHub login 指稱特定 reviewer 或作者**，改用不具名描述（例如「同領域 maintainer 的 PR」）；
+PR 編號可以留。
+
+交辦 🎀 愛音、🩵 燈時，把「不具名」寫成硬約束；審查與驗證時另外掃一次新增的行（人名、login、`@` 開頭的帳號），
+不只靠實作者自查。
+
 ## 兩條都必須綠才算完成
 
 任何一條紅 → 驗證未通過，不算 Taki PASS。回報實際錯誤，不跳過、不假裝綠。
