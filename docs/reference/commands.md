@@ -351,7 +351,7 @@ plan，須引用 issue 編號與 acceptance criteria → 🎀 愛音實作 → �
 
 ## `/maigo:repo-audit` — repo 自身內部健診
 
-read-only 掃描 repo 積壓狀態：已合併可刪的 branch、未關 PR、程式碼 TODO/FIXME、
+read-only 掃描 repo 積壓狀態：已合併可清的 worktree、已合併可刪的 branch、未關 PR、程式碼 TODO/FIXME、
 skill 健診（孤兒 / 重疊候選 / 指向失效）。
 Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklist，不執行任何寫入。
 🌑 Mortis 一句結算。
@@ -362,7 +362,8 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 
 | 資料源 | 指令 | 行動 |
 |--------|------|------|
-| 已合併可刪的 branch | `git branch --merged main` | 列出，不刪除 |
+| 已合併可清的 worktree | `git worktree list --porcelain` | 列出，不執行；先於 branch 處置 |
+| 已合併可刪的 branch | `git branch --merged main` | 列出，不刪除（已被 worktree 占用者由 worktree 段處理） |
 | 未關 PR | `gh pr list --state open` | 列出，不關閉（`gh` 缺則跳過） |
 | TODO / FIXME 積壓 | `grep -rn -E "TODO\|FIXME"` | 列出，不修改 |
 | Skill 健診（孤兒 / 重疊 / 指向失效） | 讀 `skills/*/SKILL.md` + grep | 列出，不合併、不刪除 |
@@ -370,7 +371,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 **與 doctor / triage-issue 的差異**：
 `/maigo:doctor` 診斷的是**環境依賴**（gh, git, python 是否可用）；
 `/maigo:triage-issue` 處理的是 **inbound GitHub issue**（maintainer 視角的 triage）；
-`/maigo:repo-audit` 關注的是 **repo 自身的積壓**（branch / PR / TODO 清理）。
+`/maigo:repo-audit` 關注的是 **repo 自身的積壓**（worktree / branch / PR / TODO 清理）。
 
 → Source: [`commands/repo-audit.md`](../commands/repo-audit.md)
 
@@ -411,7 +412,7 @@ Orchestrator 直跑（不 delegate 五人），輸出可複製的處置 checklis
 | 處理 PR 上收到的 review 意見 | `/maigo:address-comments` |
 | 批次分類 / 標記 GitHub issue | `/maigo:triage-issue` |
 | 把 triage 判定 READY 的 issue 接進實作 | `/maigo:take-issue` |
-| 定期清 repo（已合併 branch / 未關 PR / TODO 積壓 / skill 健診） | `/maigo:repo-audit` |
+| 定期清 repo（已合併 worktree / 已合併 branch / 未關 PR / TODO 積壓 / skill 健診） | `/maigo:repo-audit` |
 | 整理 `.maigo/`（舊檔遷移、已結案封存、機器日誌歸位、未登記檔） | `/maigo:tidy` |
 | 環境壞了 / 第一次裝 | `/maigo:doctor` |
 | 摸新專案 / onboarding | 直接呼叫 `Raana` |
