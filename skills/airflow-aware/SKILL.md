@@ -62,6 +62,7 @@ prek run --all-files   # prek, not pre-commit: the runner upstream specifies
 - **`session` must be keyword-only**, and the callee must not call `session.commit()`; transaction management is the caller's job.
 - Airflow-specific style (optional-extra import guard, naming, provider hooks, Dag authoring): `references/code-style.md`; general Python style (imports, validation, mypy, docstrings): `python-aware`'s `code-style.md`. attrs eq/hash, serialize/decode, scoped-session gotchas: `references/runtime-gotchas.md`. General Python rules (no `assert`, `time.monotonic()`, import placement): `python-aware`.
 - **common.ai XCom-dump tests**: a test expecting a nested / unregistered model to become a dict must carry the walker gate (`requires_typed_xcom`) — `references/test-cases.md`. Reproducing a providers Compat job on an older Airflow locally: the `breeze shell --mount-sources providers-and-tests` route breaks — `references/verification-tooling.md`, "Reproducing a providers Compat job locally".
+- **common.ai tests that need an agent framework** (diff adds/moves a test under `providers/common/ai` that `importorskip`s `openai-agents` / `strands-agents` / `google-adk` / `llama-index`): the file must be covered by `TEST_PATHS` in `scripts/in_container/run_agent_framework_tests.sh`, or CI is green without it ever running — `references/verification-tooling.md`, "A new common.ai test file that needs an agent framework".
 - A brand-new `provider.yaml` module-section *type* trips a validator check — read the "New provider.yaml module section" recipe in `references/registry-conventions.md` first.
 
 ### 6. Delivery completeness
@@ -106,7 +107,7 @@ Its "Contents" list enumerates 10.1–10.40 plus the unnumbered release-tag chec
 
 - **CLI and REST**: grep sibling commands before designing a new semantic, filter or default; name a REST endpoint after the CLI's verb. Partitioned / scheduling-range APIs take `datetime` bounds, not `date` (`references/design-integrity.md`).
 - **zh-TW locale content**: say "Taiwanese Mandarin", never "Traditional Chinese" (commit messages, PR text, docs, comments); translation details in `references/ui-conventions.md`.
-- Docs prose, status claims, user-facing snippets: `references/docs-conventions.md`. A list already owned by another section defers to it — [`recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md). UI and backport judgment: `references/ui-conventions.md`, `references/delivery.md`.
+- Docs prose, status claims, user-facing snippets (example outputs and measurements come from a real run, pasted verbatim): `references/docs-conventions.md`. A list already owned by another section defers to it — [`recurring-patterns.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/recurring-patterns.md). UI and backport judgment: `references/ui-conventions.md`, `references/delivery.md`.
 
 ## References index
 

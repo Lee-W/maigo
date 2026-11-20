@@ -306,6 +306,31 @@ module>'`.
   [`design-integrity.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/design-integrity.md#extension-the-dependency-floor)
   (Part P).
 
+## A provider's `toolsets/` directory holds only modules with a `*Toolset` class *(narrow — read when a diff adds, moves or removes a file under a provider's `toolsets/`)*
+
+Put a helper module that a toolset uses (a Protocol, a search backend, utility
+functions) under `utils/`, not `toolsets/`. Two checks pinch from both sides
+(verified against `upstream/main`, 2026-11-17):
+
+- `scripts/in_container/run_provider_yaml_files_check.py` globs every `.py`
+  under the provider's `toolsets/` and requires each one to be listed in
+  `provider.yaml`'s `toolsets` section; the only exemption is the
+  `DEPRECATED_MODULES` list. It runs as the `check-provider-yaml-valid` hook.
+- Once a module is listed, `dev/registry/extract_versions.py` falls back to a
+  **synthetic** toolset entry for a module with no class ending in `Toolset`
+  (it derives a class name from the module name), so the registry shows a toolset
+  that doesn't exist.
+
+So a module in `toolsets/` without a `*Toolset` class always breaks one of them:
+leaving it unlisted fails the hook, and listing it adds a fake registry entry.
+Moving it out of `toolsets/` — the fix in apache/airflow #76799, where deleting
+only the `provider.yaml` line made the check fail — resolves both.
+
+How to apply: `git mv` the module and its test to the mirrored path (test under
+`tests/unit/.../utils/`), update imports, `provider.yaml`, and any test table
+that enumerates the toolsets, then run `prek run check-provider-yaml-valid --files <provider.yaml>`
+(needs breeze) and confirm it exits 0.
+
 ## `provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's `get_ui_field_behaviour()` entirely (narrow — read when a diff changes connection-form UI text)
 
 **Scope note**: applies when a diff changes a connection type's user-visible

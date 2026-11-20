@@ -61,6 +61,19 @@ Rule: [`python-aware/references/test-conventions.md`](https://github.com/Lee-W/m
   Before writing or reviewing any `not in caplog`, confirm the string is the
   whole event, then run one mutation (make the log actually fire) to confirm
   the assertion turns red.
+- **`"event" in caplog` breaks the compat jobs of a provider that supports
+  older Airflow** (apache/airflow #76381): the structured assertion that
+  `AGENTS.md` prefers works in `airflow-core` and `task-sdk`, but a provider
+  is also tested against released Airflow versions (the 2.11.1 and 3.0.6
+  compat jobs). Without `airflow.sdk._shared` the `caplog` override returns
+  pytest's stock `LogCaptureFixture`, which has no `in`, so the test raises
+  `TypeError` there while the local run on `main` stays green. When writing
+  or reviewing a provider test whose code path runs on Airflow versions
+  before that override, do not accept `in caplog`: assert through a mocked
+  logger built with `spec`, or drop the log assertion when `pytest.raises`
+  already pins the behaviour. Check the compat jobs in CI before treating a
+  green local run as evidence. Does not apply to `airflow-core`, `task-sdk`,
+  or a code path that only exists on the newer versions.
 
 ---
 

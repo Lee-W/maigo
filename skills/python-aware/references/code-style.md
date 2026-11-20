@@ -35,6 +35,18 @@ A function-local import that re-imports a name the module already imports at
 top level is never allowed — it is pure duplication, with no exception case.
 Delete the local line and use the top-level name.
 
+A function-body import that stays must have a one-line comment above it saying
+why it cannot sit at the top of the file (for example "optional extra: not
+installed in every environment", or "circular import with `<module>`"). An
+unexplained inline import reads as habit, and the next reader can't tell
+whether it is safe to hoist.
+
+Do not leave an import inline because a neighbouring import in the same
+function has to be. Only the one that needs it stays: the SDK of an optional
+extra, and the adapter module that wraps it, go inline; a standard-library
+module or a required dependency imported in that same function goes to the top
+of the file.
+
 ### Annotation-only imports belong under `TYPE_CHECKING`
 
 In a module with `from __future__ import annotations`, an import used
@@ -94,6 +106,21 @@ object (`schedule = Schedule(...)`, not `schedule_def = Schedule(...)`) —
 reserve those suffixes for genuinely indirect objects (e.g. a `ScheduleRef`).
 Don't copy a `_def`-suffixed name from a neighboring test just because it's
 already there if the variable in question holds the real object.
+
+### Function names are verb phrases — private helpers and test helpers too
+
+Name a function after the action it performs: `_read_category`, not
+`_category`; `build_row`, not `row`. A bare noun reads as an attribute, not a
+callable. This holds for private helpers and for helper functions defined in
+test files. Predicates (`is_…`, `has_…`) are the one exception.
+
+Copying a sibling file's helper name is not an exemption: a noun-named
+function already in a neighbouring file is a debt, not a convention — don't copy it;
+whether to rename the sibling is a separate decision. Check your new function's name, not the surrounding
+files', and don't reproduce an existing noun-style name for consistency. Airflow's
+version of this rule is in
+[`airflow-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/code-style.md)
+("Name functions and methods with action verbs").
 
 ### Simple default values don't need a named constant
 
@@ -180,6 +207,25 @@ directly; for an already-released behaviour, go through the deprecation path des
 2. Narrow a broad `except`, but align it with the matching catch layering **upstream** so behaviour
    does not change; where upstream already warns, don't warn a second time.
 3. Class constructor parameters default to keyword-only.
+
+### A degrading `except Exception` must re-raise a lost connection first
+
+When you write an `except Exception` that turns a read failure into an empty or
+default result, decide first whether the exception can be a connection-level
+failure. A lost connection should propagate to the existing connection-error
+handling, not be treated as "no data". This matters most when the degraded result
+is cached: one transient disconnect then becomes a cached "nothing there", wrong
+for the rest of that instance's life with no signal.
+
+How to apply: inside the `except`, call the codebase's existing
+lost-connection test (for example `_is_lost_connection` in common.ai's
+`SQLToolset`) and `raise` when it is true; only otherwise log at debug level
+and return the degraded result. Add a test that a lost connection yields the
+connection error and that nothing was written to the cache. When reviewing such
+a diff, trace the call chain from the `except` to the outermost error
+translation and confirm no intermediate `except` swallows it first. Origin:
+apache/airflow #76799, where the plan said only "catch broadly" and review
+found the swallowed disconnect.
 
 ### `raise X from <expr>` silently suppresses the chain when `<expr>` is `None`
 

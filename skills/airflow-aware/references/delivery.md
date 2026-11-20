@@ -81,6 +81,18 @@ Write plain prose describing user impact instead (e.g. "Sync
 "Docs: Sync..."). If `check-no-conventional-commit-message` fails, drop
 the leading type-like prefix and retry — don't reach for `--no-verify`.
 
+## A test that is also green on `main` needs a stated reason, or its own PR
+
+Source: apache/airflow #76015 — a reviewer ran each new test against `main`'s
+source and listed the ones that passed.
+
+Before opening the PR, for each test it adds ask: "if I revert this PR's
+`src` change, does this test go red?" A test that stays green on `main` is not
+covering the change. Either give it a reason in the PR description (one sentence
+in the What section, e.g. that it pins a path the change runs through), or move
+it to a separate PR. Don't leave it unexplained: the reviewer will ask whether
+it belongs here.
+
 ## The scheduled "Upgrade important CI environment" PR is bot-regenerated
 
 That PR is produced by `.github/workflows/scheduled-upgrade-check-*.yml` (one per target branch; the

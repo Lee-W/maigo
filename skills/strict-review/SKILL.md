@@ -136,6 +136,7 @@ will come back next round.
 | "這樣比較好" | "比較好的根據？跟原本差在哪？" |
 | "已經測過了" | "貼 command + exit code。" |
 | 聲稱第三方套件行為（precedence／behavior） | "讀 `.venv/lib/pythonX.Y/site-packages/<pkg>` 的已安裝原始碼，貼關鍵函式的實際分支——不採信 docstring 或 `__init__.py` re-export。" |
+| PR 新增使用者看得到的輸出（metrics、log、CLI 輸出） | "這個輸出給誰用、什麼情境？貼實跑輸出或截圖。"——見 [`verification-discipline.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/verification-discipline.md)。 |
 
 ## Output format
 
@@ -268,8 +269,8 @@ discipline above; do not block the PR on the author not having attached one.
 
 Does the evidence support the claim? Concurrency "drained" signals, error-message advice,
 deprecation-warning migrated values, log/audit wording, docs sample output, and docs
-re-sync after behaviour changes, doc sentences that hold in only one execution mode or entry point, and the
-end-to-end reminder for third-party integrations; details in
+re-sync after behaviour changes, doc scope across execution modes and entry points, the
+end-to-end reminder for third-party integrations, lock-file version vs CI evidence, and third-party API claims in comments; details in
 [`references/claims-and-evidence-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md).
 
 ## Frontend device checks (references)

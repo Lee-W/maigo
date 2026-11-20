@@ -271,6 +271,38 @@ Two maintainer-review preferences for Airflow code (the property one from #74695
   log_path`. It drops a `None` intermediate and one inverted check. Single walrus,
   single-level condition only; don't force it onto nested or multiple walruses.
 
+## Docstrings
+
+### A docstring doesn't record a workaround or a known defect — fix it in the right layer
+
+Maintainer-review preference (apache/airflow #76015): a docstring or comment
+sentence like "X is over-counted here" or "this is inaccurate when Y" is read
+as a bug report, and the reviewer asks for the fix instead of the note. Before
+writing any such "known limitation" sentence, ask whether the defect can be
+fixed where it originates. The right layer is often a shared one rather than
+the adapter that shows the symptom (in that PR, the durable journal rather
+than the adapter above it): add the smallest new API there, use it, and delete
+the sentence. Keep a note only when the limit is genuinely unfixable (an
+external constraint), and say in it why it can't be fixed. The general form of
+this rule — raise at construction instead of documenting a structural footgun
+— is in
+[`python-aware/references/code-style.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/code-style.md).
+
+### A single-line docstring that runs long becomes a multi-line one — ruff won't flag it
+
+Maintainer-review preference (apache/airflow #76015, caught twice in one PR,
+the second time on a docstring written after the first was fixed): a one-line
+docstring near or over ~100 characters gets "too long for a single-line
+docstring". `ruff check` and `ruff format --check` do not catch it — `E501` is
+ignored in this repo's ruff config and `ruff format` does not rewrap
+docstrings, so a 120-character one-line docstring passes both — so measure
+it yourself. Convert to the multi-line
+form: opening `"""` alone on its line, a summary sentence, a blank line, then
+the explanation, every line within the 110-column limit. Check your added
+lines before pushing, for example
+`git diff -U0 | grep '^+' | awk 'length > 111'` (the extra column is the diff
+`+`).
+
 ## mypy
 
 ### Airflow note: widening a `template_fields` `Literal` to `str`

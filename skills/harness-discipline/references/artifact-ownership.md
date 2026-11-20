@@ -100,3 +100,27 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
 自己的加碼規則（同一個 PR 續跑要保留 `Status`，不得把 `done` 打回
 `pending`）——那對應的是 `status: same_topic` 的情境，是該命令特有的加碼，
 不是本頁要重複的內容。
+
+## 交辦 subagent 產出長檔案：哪些角色寫得出來
+
+交辦文要求「把完整報告寫到某路徑」之前，先確認那個 subagent 真的寫得出檔案；
+寫不出來時檔案不會出現，agent 通常只在回報末尾自述沒寫成。
+
+- **`Explore` 型 subagent 沒有 Write 工具，shell redirect 也被禁。**「完整報告寫到
+  scratchpad 檔」列進驗收條件會落空。要檔案產物的探索任務改派 `general-purpose`
+  （`model=sonnet`）；只是想省 context 的，讓 Explore inline 回報，需要時由
+  orchestrator 自己落檔。曾經同一個專案的兩次盤點與健診都踩到：第二次已經有記錄還是
+  把寫檔列為驗收條件，且同一批兩隻 Explore 一隻寫得出、一隻寫不出——**「有時寫得出來」
+  不是可以要求它寫檔的依據**。
+- **報告或草稿檔的 Write 也可能被 harness 拒絕**（觀察日期 2026-11-15：`general-purpose`
+  與 Tomori 寫報告本文到 scratchpad 時被回「請把內容放在最終回覆」；同一輪寫 rubric
+  到 `.maigo/` 底下、或用 Bash heredoc 寫 scratchpad 摘要檔則沒被拒。**這是 harness
+  當下的行為，可能隨 harness 版本改變**，行為改了就以實測為準）。對這類產物，一開始
+  就交辦成「回傳文字」合約：要求 agent 把全文放在最終回覆裡兩行獨立的起訖標記之間
+  （例：`=====BODY START=====` ／ `=====BODY END=====`；草稿與 inline 留言各用自己的
+  一組標記），由 orchestrator 從該 agent 的 task transcript（JSONL 輸出檔）用小腳本抽出，
+  再交給發佈 script，不要重打一遍文字。抽取時挑「以 `## ` 開頭」的那一則——之後只提到
+  兩個標記字樣的短訊息也會匹配。被拒的 agent 應該停下回報，不要改用 Bash 繞過；
+  交辦文保留這句。
+- 兩種情況的下一棒前置檢查相同：spawn 下一棒前對交棒檔跑 `ls`＋`wc -l`＋`head -3`，
+  確認它存在、行數合理、不是只寫指標。

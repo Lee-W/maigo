@@ -84,6 +84,25 @@ maintainer and reshaped into an `AirflowTools` adapter.
 How to apply: for a new vendor SDK, compare against the existing adapters' shape and guarantee
 list; before proposing an operator, answer "what does it give that `AgentOperator` cannot?"
 
+## A hook that delegates to a server or backend dispatches by duck typing, not by name
+
+When a hook hands work to one of several servers or backends, do not branch on
+a provider prefix or class name (`if prefix != "ollama": ... else: ...`) and
+bind the concrete classes in the branch. Instead: (1) define a
+`typing.Protocol` that lists only the methods the main flow needs, placed in
+the consuming module (the `ToolProvider` / `ManagedAgentClient` Protocols in
+common.ai are the precedent); (2) have the main flow operate only through that
+Protocol; (3) collect the name → implementation mapping in one resolver;
+(4) expose a `backend=`-style injection parameter so callers and tests can
+pass an implementation directly.
+
+Why: apache/airflow #75369 — a maintainer asked for duck typing on exactly a
+prefix check of this shape.
+
+How to apply: when reviewing or writing a hook that picks an implementation
+by string, look for the `if name == ...` / `startswith(...)` and ask whether
+the branches share a method set that a Protocol could name.
+
 ## common.ai toolset strings and released parameters
 
 - **Hints use the toolset's own tool names.** Any string a model or user sees from a common.ai

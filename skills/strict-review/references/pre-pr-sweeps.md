@@ -45,6 +45,14 @@ from the diff by reading.
 - Re-derive each doc statement from the current code, following
   [`claims-and-evidence-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md)
   section 6.
+- If the diff changes how many rows or records one operation writes (one row becomes
+  several, or the reverse), grep comments, docstrings, assert messages and log strings
+  **separately** for the singular/plural wording (for example `audit row`, `log row`),
+  and decide each hit by meaning: wording about the whole write becomes plural, wording
+  about the one row belonging to a single entity stays singular. Leave test names alone
+  (review threads anchor on them). If a log string changed, update every test assertion
+  that matches it exactly. Reviewers reliably catch these leftovers (apache/airflow
+  #71072).
 - Hand the symbol list to 🟡 Soyo in the review material; an empty list is written "none".
 
 ## (b) New tests must be able to fail
