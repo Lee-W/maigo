@@ -25,6 +25,7 @@ teammate-flow 定義了 MyGO!!!!! 五人協作的共通流程骨架——從探�
 - **開場**：`model-dispatch`（解析 `--model-profile`）、`narration`／`orchestrator-voice`（旁白與對話，各命令本來就會載入）
 - **審查階段（🟡 爽世）**：`strict-review`；批次審查才讀 `strict-review/references/review-batch-queue.md`
 - **收尾階段（🟣 立希全綠之後，見下方「Commit message draft + 落地」）**：`commit-message`、`pr-sync-check`、`github-title-description`（含 `draft-bundle`）——**只在走到該步驟時才讀**
+- **本次 diff 改變使用者看得見的輸出時（commit 落地之後、PR 草稿之前，見下方「可見變更的截圖」）**：[`references/visible-change-capture.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/visible-change-capture.md)——不適用就不讀
 - **寫 run summary 時（PR 草稿／`pr-sync-check` 之後，見下方「Run summary」）**：[`references/run-summary-template.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/run-summary-template.md) 與 `vim-friendly-artifacts`
 - **`git-workflow` 例外，流程前段就會用到**：開／清 worktree、交辦會跑 git 的 agent（含 stage、amend 範圍與 cwd 規則）、或要動 git index 前確認沒有 agent 在跑時，**那一刻就讀**，不等到收尾
 - **出事才讀**：`failure-handling`（爽世 BLOCKED、立希紅、subagent 中斷時）、`memory-propose-confirm`（🟡 爽世或 🎀 愛音的輸出含 Memory propose 區塊時）
@@ -159,7 +160,7 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 - 每個 agent 完成後依上面的交棒規則給一至兩句摘要，保留角色聲音與事實；必要的決策或缺口可展開
 - 不要跳關。即使任務看起來很小，每一步都要走（此條管**執行階段**；命令設計階段選精實形狀的例外見
   [`harness-discipline` 的 delegation-sizing](https://github.com/Lee-W/maigo/blob/main/skills/harness-discipline/references/delegation-sizing.md)）
-- 完成後先寫 run summary（見下方「Run summary」），再給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題，並附上 summary 檔的路徑。Claude Code
+- 完成後先寫 run summary（見下方「Run summary」），再給使用者一份最終 summary：改了哪些檔案、test 結果、有沒有未解問題，並附上 summary 檔的路徑；有做「可見變更的截圖」時另附一行結果。Claude Code
   的 Stop hook 會自行附上一行 token usage；orchestrator 不讀 usage log、不把統計塞回 prompt
 - **呼叫端命令帶了 worktree cwd 時**（`/maigo:go` / `/maigo:take-issue` 的
   `--worktree`，見
@@ -231,12 +232,19 @@ maigo 自己的 repo 有 `[tool.commitizen]` 所以是 CC，但這些 command �
 依 [`skills/git-workflow`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/SKILL.md)
 的 staging（不用 `git add -A`）、不 `cd`、unreleased commit 的 amend 慣例。
 
+**可見變更的截圖（條件式；`/maigo:go` 與 `/maigo:team` 共用，`/maigo:quick` 不做）**：commit 落地之後、PR 草稿或 `pr-sync-check` 之前，
+本次 diff 若改變了使用者看得見的輸出（網頁／docs 頁面的呈現，或 CLI／終端輸出），由 orchestrator 準備能直接貼進 PR 的畫面；
+純重構、只動測試、只改 skill／docs 文字內容、內部邏輯沒有可見差異時整步靜默略過；適用但做不到才印一行原因加待辦清單。終端輸出實跑前後指令，以前後對照的文字呈現；網頁畫面只在宿主有瀏覽器工具、
+且 repo 有說明怎麼啟動時由 orchestrator 擷取，圖檔放在 plan 同目錄；擷取不到就列「要截的畫面＋怎麼到達」清單由使用者手動截，
+**任何失敗只印一行原因，不中斷收尾**。結果寫進 run summary 的驗證段、PR 草稿（或 `pr-sync-check` 的更新草稿）與 final summary 一行。
+做法、圖檔命名與清單格式見 [`references/visible-change-capture.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/visible-change-capture.md)。
+
 **PR 草稿（`/maigo:go` 與 `/maigo:team` 共用這一段；`/maigo:quick` 不做）**：commit 落地之後，
 orchestrator 先依 [`pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
 步驟 1 判定當前 branch 有沒有開啟中的 PR；尚無 PR 時依
 [`draft-bundle`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/draft-bundle.md)
 抓料（base 的決定與失敗處理照該檔「收尾情境」一節：**任何失敗只略過草稿並在 summary 印一行原因，
-不中斷 final summary**），另附 plan 路徑、🟡 爽世複驗後仍未處理的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
+不中斷 final summary**），另附 plan 路徑、可見變更的截圖結果（有做才附）、🟡 爽世複驗後仍未處理的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
 describe-pr 模式產出草稿，依 [`commands/describe-pr.md`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)
 步驟 3 的格式，在 final summary 給出可整段複製的 description 與 title。素材怎麼對應到
 Design rationale、Known limitations 與 Test Plan，見
@@ -245,7 +253,7 @@ Design rationale、Known limitations 與 Test Plan，見
 
 已有 PR 時不產草稿，順序改為：commit → `pr-sync-check`。依
 [`skills/pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/skills/pr-sync-check/SKILL.md)
-核對當前 branch 已開 PR 的 title/description 是否仍符合現在的實際改動；沒有對應 PR 就走上一段的草稿，不算失敗。
+核對當前 branch 已開 PR 的 title/description 是否仍符合現在的實際改動（有做「可見變更的截圖」時，更新草稿一併標出放截圖的位置）；沒有對應 PR 就走上一段的草稿，不算失敗。
 
 ### Run summary（收尾報告）
 

@@ -33,6 +33,10 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 收尾還會由 orchestrator 寫一份 `summary.md`（為什麼做、做了什麼、怎麼做，含純文字圖）到 plan 所在的
 `.maigo/` 目錄，並在 final summary 附上路徑，見 teammate-flow 的「Run summary」段。
 
+收尾時若本次 diff 改變了使用者看得見的輸出（網頁／docs 頁面或 CLI／終端輸出），orchestrator 會在 commit 之後、PR 草稿之前
+準備截圖、前後對照的終端輸出，或擷取不到時的待截清單（純重構、只動測試、只改 skill 或 docs 的文字內容等沒有可見差異就整步略過），
+見 teammate-flow 的「Commit message draft + 落地」段。
+
 ## `--worktree`（opt-in，預設不開）
 
 帶這個旗標時，在 🐱 樂奈開始之前，orchestrator 親自跑：

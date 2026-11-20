@@ -57,6 +57,7 @@ orchestrator 自己寫，見
 
 - `<指令>`：exit <碼>，<摘要行>
 - 未驗：<項目>，原因：<原因>
+- 可見變更：<圖檔路徑、待截清單或前後對照；本次沒有可見變更就整行省略>
 
 ## 沒處理的
 
@@ -69,6 +70,11 @@ orchestrator 自己寫，見
 - **commit**：沒有 commit 就寫「未 commit」。拆成多顆時一顆一行。
 - **結果**：完成／部分完成／中止的定義只有一份，在 `teammate-flow`「Run summary」的「何時寫」（以本次 run 有沒有 commit 落地為分界）；結果不是「完成」時，「沒處理的」逐條寫出「完成」的四項裡哪幾項沒達成，以及使用者為什麼決定結束。
 - **沒處理的**只列需要取捨或會改變對外行為的項目；不需取捨、不改對外行為的低嚴重度項目（範例裡的變數命名）commit 前已補完並複驗，寫在「怎麼做」，不列在這裡。
+- **驗證**的「可見變更」行：只在本次跑了「可見變更的截圖」一步時才有，三種寫法擇一，做法見
+  [`visible-change-capture.md`](https://github.com/Lee-W/maigo/blob/main/skills/teammate-flow/references/visible-change-capture.md)。
+  圖檔：列相對於 summary 的檔名，例如 `plan-screenshot-1-export-empty-table-after.png`。
+  待截清單：每個畫面一條「畫面＋怎麼到達」。
+  前後對照：指令與前後輸出，輸出必須是實跑結果；多行輸出在實際檔案裡接在該行之後放一個 `text` fenced code block，並縮排兩格讓它屬於該清單項目，否則清單會斷掉（範本骨架內不放，因為骨架只允許三張圖的 fence）。
 - **怎麼做**的每一輪審查都要有對應條目；沒有重試就只有一條。
 - **怎麼做**的流程圖在 `/maigo:team` 審查與驗證並行時，把兩者畫在同一列（例如 `Soyo || Taki`）。
 
@@ -167,6 +173,7 @@ Raana (explore) --> Tomori (plan) --> user confirms plan
 - `uv run pytest`：exit 0，12 passed in 0.4s
 - `uv run pre-commit run --files exporter.py test_exporter.py`：exit 0，所有 hook Passed
 - 未驗：與真實匯入工具的整合，原因：測試環境沒有該工具
+- 可見變更：`export --table empty` 前 0 位元組、後 1 行表頭 `id,name`（實跑 base 與 HEAD 的輸出）
 
 ## 沒處理的
 
