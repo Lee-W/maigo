@@ -153,6 +153,14 @@ yet, default to `git checkout -b <descriptive-branch-name>` first. Use the
 repo's own commit-message convention for each per-concern commit (see
 [`commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md)).
 
+### Staging with a parallel session in the same working tree
+
+A second reason to stage by path: a parallel session may be working in the same working tree, and
+`git add -A` would sweep its uncommitted work into your commit. When a shared
+file holds both your hunks and the other session's and `git add -p` is not
+available, commit only the files that are purely yours and leave the shared
+file in the working tree rather than taking it whole.
+
 ## Repo `CLAUDE.md`/`AGENTS.md` attribution rules win over harness defaults
 
 A harness's session layer commonly carries a default instruction to append a

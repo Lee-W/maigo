@@ -42,6 +42,7 @@ inline 純文字把問題談透並給出建議與取捨，不要急著用 widget
   拿到同樣的空結果）。改用純文字重述問題與選項讓使用者回文字，尤其在逐項確認的迴圈（例如
   retro 候選、review route 確認）裡，別讓使用者看兩次同一份清單
 - **同一件事的互斥做法用 single-select**（或拆成獨立一題），別並列進同一個 multiSelect——勾選 UI 會誘導使用者把同一目標的互斥路徑都勾起來，造成矛盾組合（例：amend 加 footer vs 手動補記錄，只能擇一）。能並存的選項（feature-flag 類）才用 multiSelect。
+- **純文字一次問多件事時，每項寫成單一建議**，讓使用者回「好」「全部」能逐項對應；互斥二選一要明說預設或單獨問——見 [`references/reading-the-user.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/reading-the-user.md)「一次請使用者決定多件事」。
 - **大量逐項輸入別用 widget 逐個問**：首次匯入時有上百筆項目要分類，逐筆 AskUserQuestion（每輪上限 4 題）會變成數十輪；改產一份可編輯的草稿檔（TSV / markdown）讓使用者一次填完，再批次套用並回報失敗行。widget 只留給少量（≤4 筆）或需要使用者逐筆看過的場景。
 - **一則訊息只承載一個決策軸**。已經在問「A 還是 B」時，不要在結尾再夾「順便要不要做 X」——
   使用者會精準回答主決策（常常只回一個字母或數字），附帶問題連帶被丟掉，而你無法判斷是被否決

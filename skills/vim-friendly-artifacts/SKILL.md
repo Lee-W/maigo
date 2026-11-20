@@ -112,7 +112,7 @@ description: This skill should be used whenever writing, templating or generatin
 ## 明確不做
 
 - 不裝、不建議任何 nvim plugin，不加任何呈現層（瀏覽器頁面、TUI、mkdocs serve）
-- 不規定使用者的 nvim 設定
+- 不規定使用者的 nvim 設定；動使用者的編輯器或 shell 設定時只提通用改善，綁特定工具的設定先問再做
 - 不動機器讀的 jsonl／json 與 `_internal/` 內容
 - 不回溯改寫 `.maigo/` 既有產物
 - 不加 hook：版面不合只是品質下降、人可自決，不該擋下整個 turn；程式產出的部分由 `tests/test_artifact_layout.py`、`tests/test_board_refresh.py`、`tests/test_board_sync.py`、`tests/test_review_report.py`、`tests/test_pr_context_cache.py` 鎖住（界線見「適用範圍」的保證的界線）

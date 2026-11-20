@@ -38,6 +38,8 @@ paths: `git add <file1> <file2>`. Be especially careful after a rebase, a
 package-manager sync/install step, or after a delegated subagent ran — those
 can leave unexpected generated changes in the working tree.
 
+Parallel sessions sharing one working tree: see [`references/commit-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/commit-hygiene.md#staging-with-a-parallel-session-in-the-same-working-tree).
+
 **Treat drift as drift, not just "don't stage it" — revert it.** A
 package-manager install/codegen step (backend or frontend) can silently
 rewrite a lockfile's security-relevant sections (e.g. deleting a version
