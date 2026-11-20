@@ -92,7 +92,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 
 ## 2. 型別偵測與球權判定
 
-加 item 時先偵測型別（URL／裸編號／作者比對），`gh` 抓不到就標 `抓不到`（P0）；球權判定由 `scripts/board_state.py` 的 `classify()` 為正典，文件三張表只是鏡像。
+加 item 時先偵測型別（URL／裸編號／作者比對），`gh` 抓不到就標 `抓不到`（P0）；球權判定由 `scripts/board_state.py` 的 `classify()` 為正典，文件三張表只是鏡像。完整刷新也同步 review thread 的 resolved 狀態，細節檔顯示未解決／已解決數量；判定規則見 `references/classification.md`。
 - [`references/classification.md`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/classification.md)：**判定狀態、解讀 rank／section 落點、或寫入 `gh` 抓料欄位之前讀**。
 
 ## 3. 各命令回寫合約

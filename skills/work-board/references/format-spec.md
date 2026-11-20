@@ -320,3 +320,5 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
   → `updatedAt`。
   `/maigo:board --drop` 的落點也是這裡（狀態詞改 `已放棄`），跟其他結案行共用同一條
   老化規則，不再有獨立的 tombstone 區。
+
+完整刷新取得 PR review threads 時，細節檔事實區加 `- Review 討論：未解決 N ｜ 已解決 M`；零筆顯示 0／0，未取得資料則省略，不推測成零筆。

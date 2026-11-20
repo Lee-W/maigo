@@ -478,7 +478,27 @@ def _activity_events(gh_meta: dict) -> list[tuple[str, str]]:
         ts = comment.get("createdAt")
         if login and ts:
             events.append((login, ts))
+    threads = gh_meta.get("reviewThreads") or []
+    review_threads: dict[str, list[dict]] = {}
+    for thread in threads:
+        for comment in thread.get("comments") or []:
+            review_id = (comment.get("pullRequestReview") or {}).get("id")
+            if review_id:
+                review_threads.setdefault(review_id, []).append(thread)
+            if not thread["isResolved"]:
+                login = (comment.get("author") or {}).get("login")
+                ts = comment.get("createdAt")
+                if login and ts:
+                    events.append((login, ts))
     for review in gh_meta.get("reviews") or []:
+        linked = review_threads.get(review.get("id"))
+        if (
+            linked
+            and all(t["isResolved"] for t in linked)
+            and review.get("state") == "COMMENTED"
+            and not (review.get("body") or "").strip()
+        ):
+            continue
         login = (review.get("author") or {}).get("login")
         ts = review.get("submittedAt") or review.get("createdAt")
         if login and ts:

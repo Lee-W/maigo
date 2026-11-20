@@ -331,3 +331,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maig
 - **不寫 GitHub**：board 只讀 GitHub metadata，不回覆、不 label、不 close、不 push。
 - **開場**：🌙 Doloris 依本輪任務生成 ≤2 句，只沿用已知事實（見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)）；範例句是語感示例，不照抄。
 - **收場**：🌑 Mortis 1–2 句結算，說下一件是誰的球；沒有輪到使用者的球就直說。
+
+
+### Review thread 解決狀態
+
+完整刷新（含 `--all`）另外用 GitHub GraphQL 分頁抓完 `reviewThreads` 與 comments，以 `isResolved` 判定是否已解決；不把 outdated 當成 resolved。細節檔事實區顯示「Review 討論：未解決 N ｜ 已解決 M」。未解決 thread 的留言納入球權判定，已解決的留言不再觸發待處理；空白內文的 `COMMENTED` review 若對應的 threads 全部已解決，也不再觸發「有新 comment」。有內文的 review、正式 `CHANGES_REQUESTED`、一般 PR 留言與新 commit 仍依原規則判定。抓取失敗或不完整不當成零筆，保留舊資料並回報錯誤；不修改本地 review 報告、判斷或筆記。

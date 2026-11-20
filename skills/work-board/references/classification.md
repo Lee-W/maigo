@@ -90,3 +90,8 @@ review verdict 詞彙沿用 [`strict-review`](https://github.com/Lee-W/maigo/blo
 per-PR queue 排序 / 前置處理（merged / closed / draft 自動 skip 或問使用者）另見
 [`review-batch-queue.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-batch-queue.md)，
 那份文件管的是 **per-run 排隊**，跟本表管的**跨 session 落點**是兩件事。
+
+
+### Review thread 解決狀態
+
+完整刷新（含 `--all`）另外用 GitHub GraphQL 分頁抓完 `reviewThreads` 與 comments，以 `isResolved` 判定是否已解決；不把 outdated 當成 resolved。細節檔事實區顯示「Review 討論：未解決 N ｜ 已解決 M」。未解決 thread 的留言納入球權判定，已解決的留言不再觸發待處理；空白內文的 `COMMENTED` review 若對應的 threads 全部已解決，也不再觸發「有新 comment」。有內文的 review、正式 `CHANGES_REQUESTED`、一般 PR 留言與新 commit 仍依原規則判定。抓取失敗或不完整不當成零筆，保留舊資料並回報錯誤；不修改本地 review 報告、判斷或筆記。

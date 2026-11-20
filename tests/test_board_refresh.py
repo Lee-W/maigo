@@ -104,6 +104,32 @@ class FakeRunner:
             if number in self.fail:
                 raise RuntimeError("boom")
             return json.dumps(self.issues[number])
+        if cmd[:3] == ["gh", "api", "graphql"]:
+            number = int(
+                next(arg.split("=", 1)[1] for arg in cmd if arg.startswith("number="))
+            )
+            threads = self.prs[number].get("reviewThreads", [])
+            nodes = [
+                {
+                    **t,
+                    "comments": {
+                        "nodes": t["comments"],
+                        "commentPage": {"hasNextPage": False, "endCursor": None},
+                    },
+                }
+                for t in threads
+            ]
+            return json.dumps(
+                [
+                    {
+                        "data": {
+                            "repository": {
+                                "pullRequest": {"reviewThreads": {"nodes": nodes}}
+                            }
+                        }
+                    }
+                ]
+            )
         if cmd[:3] == ["gh", "api", "user"]:
             return YOU
         if cmd[:2] == ["gh", "api"] and cmd[2].endswith("/timeline"):
@@ -2816,3 +2842,127 @@ def test_render_line_puts_result_before_size_and_drops_size_first_when_over_budg
     assert board_state_width(cut.split(" — ")[0]) <= refresh.LINE_BUDGET + 12
     short = refresh.render_line(**{**wide, "author": "a"})
     assert "+1.2k/-340" in short
+
+
+@pytest.mark.parametrize("resolved", [False, True])
+def test_refresh_resolved_inline_review_stops_needing_a_reply(tmp_path, gh, resolved):
+    write_board(
+        tmp_path,
+        board_text(focus=(row(1, icon="🔀", status="有新 comment", author=YOU),)),
+    )
+    detail = put_detail(
+        tmp_path, 1, icon="🔀", judgment="Keep judgment", notes="Keep notes"
+    )
+    gh.prs[1] = pr_meta(
+        1,
+        author=YOU,
+        reviews=[
+            {
+                "id": "R1",
+                "state": "COMMENTED",
+                "body": "",
+                "author": {"login": "reviewer"},
+                "submittedAt": "2026-09-20T00:00:00Z",
+            }
+        ],
+        reviewThreads=[
+            {
+                "id": "T1",
+                "isResolved": resolved,
+                "comments": [
+                    {
+                        "author": {"login": "reviewer"},
+                        "createdAt": "2026-09-20T00:00:00Z",
+                        "pullRequestReview": {"id": "R1"},
+                    }
+                ],
+            }
+        ],
+    )
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    text = detail.read_text()
+    assert ("# 🔀 等 review" if resolved else "# 🔀 有新 comment") in text
+    assert (
+        f"- Review 討論：未解決 {int(not resolved)} ｜ 已解決 {int(resolved)}" in text
+    )
+    assert "Keep judgment" in text
+    assert "Keep notes" in text
+
+
+def test_review_thread_fetch_follows_both_connections(monkeypatch):
+    calls = []
+    comment = {"author": {"login": "reviewer"}, "createdAt": RECENT}
+    thread = {
+        "id": "T1",
+        "isResolved": False,
+        "comments": {
+            "nodes": [comment],
+            "commentPage": {"hasNextPage": True, "endCursor": "C1"},
+        },
+    }
+
+    def run(cmd):
+        calls.append(cmd)
+        assert "--paginate" in cmd and "--slurp" in cmd
+        if "id=T1" in cmd:
+            assert "endCursor=C1" in cmd
+            return json.dumps([{"data": {"node": {"comments": {"nodes": [comment]}}}}])
+        return json.dumps(
+            [
+                {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {"reviewThreads": {"nodes": nodes}}
+                        }
+                    }
+                }
+                for nodes in (
+                    [thread],
+                    [
+                        {
+                            **thread,
+                            "id": "T2",
+                            "comments": {
+                                "nodes": [],
+                                "commentPage": {"hasNextPage": False},
+                            },
+                        }
+                    ],
+                )
+            ]
+        )
+
+    monkeypatch.setattr(sync, "run", run)
+    assert refresh.fetch_review_threads("o", "r", "1") == [
+        {"id": "T1", "isResolved": False, "comments": [comment, comment]},
+        {"id": "T2", "isResolved": False, "comments": []},
+    ]
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param([], id="missing-pages"),
+        pytest.param([{"errors": [{"message": "forbidden"}]}], id="graphql-error"),
+        pytest.param([{"data": {"repository": None}}], id="missing-repository"),
+    ],
+)
+def test_thread_fetch_failure_keeps_the_existing_detail(
+    tmp_path, gh, monkeypatch, response
+):
+    write_board(tmp_path, board_text(focus=(row(1),)))
+    detail = put_detail(
+        tmp_path, 1, judgment="Preserve judgment", notes="Preserve notes"
+    )
+    before = detail.read_bytes()
+    gh.prs[1] = pr_meta(1)
+
+    def run(cmd):
+        if cmd[:3] == ["gh", "api", "graphql"]:
+            return json.dumps(response)
+        return gh(cmd)
+
+    monkeypatch.setattr(sync, "run", run)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert detail.read_bytes() == before

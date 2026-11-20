@@ -572,6 +572,7 @@ def render_detail_facts(
     load_command: str | None = None,
     result: str | None = None,
     related_files: Sequence[str] = (),
+    review_threads: list[dict] | None = None,
 ) -> str:
     """The fact section (everything before `## 判斷`), work-board references/format-spec.md §1a; ends with a blank line.
 
@@ -586,6 +587,10 @@ def render_detail_facts(
         lines.append(f"{size} ｜ 作者：{author}" if author else size)
     elif author:
         lines.append(f"- 作者：{author}")
+    if is_pr and review_threads is not None:
+        unresolved = sum(not t["isResolved"] for t in review_threads)
+        resolved = len(review_threads) - unresolved
+        lines.append(f"- Review 討論：未解決 {unresolved} ｜ 已解決 {resolved}")
     if next_action:
         action = next_action.replace("<n>", str(number)) if number else next_action
         lines.append(f"- 下一步：`{action}`")
@@ -692,6 +697,89 @@ def sanitize_error(message: str) -> str:
 # --- fetch ---------------------------------------------------------------------
 
 
+# GitHub's review-thread resolution lives in GraphQL, outside `gh pr view`.
+_THREAD_QUERY = """query($owner:String!,$repo:String!,$number:Int!,$endCursor:String) {
+  repository(owner:$owner,name:$repo) { pullRequest(number:$number) {
+    reviewThreads(first:100,after:$endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id isResolved comments(first:100) {
+        commentPage: pageInfo { hasNextPage endCursor }
+        nodes { author { login } createdAt pullRequestReview { id } }
+      } }
+    }
+  } }
+}"""
+_THREAD_COMMENTS_QUERY = """query($id:ID!,$endCursor:String) {
+  node(id:$id) { ... on PullRequestReviewThread {
+    comments(first:100,after:$endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { author { login } createdAt pullRequestReview { id } }
+    }
+  } }
+}"""
+
+
+def fetch_review_threads(owner: str, repo: str, number: str) -> list[dict]:
+    """Fetch every thread and comment; never classify a partial response as resolved."""
+    pages = json.loads(
+        sync.run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "--paginate",
+                "--slurp",
+                "-f",
+                f"query={_THREAD_QUERY}",
+                "-f",
+                f"owner={owner}",
+                "-f",
+                f"repo={repo}",
+                "-F",
+                f"number={number}",
+            ]
+        )
+    )
+    if not isinstance(pages, list) or not pages:
+        raise ValueError("review threads: missing response pages")
+    threads = []
+    for page in pages:
+        if page.get("errors"):
+            raise ValueError(f"review threads: {page['errors']}")
+        connection = page["data"]["repository"]["pullRequest"]["reviewThreads"]
+        for thread in connection["nodes"]:
+            if not isinstance(thread["isResolved"], bool):
+                raise ValueError("review threads: missing resolution state")
+            comments = thread["comments"]
+            nodes = list(comments["nodes"])
+            if comments["commentPage"]["hasNextPage"]:
+                extra = json.loads(
+                    sync.run(
+                        [
+                            "gh",
+                            "api",
+                            "graphql",
+                            "--paginate",
+                            "--slurp",
+                            "-f",
+                            f"query={_THREAD_COMMENTS_QUERY}",
+                            "-f",
+                            f"id={thread['id']}",
+                            "-f",
+                            f"endCursor={comments['commentPage']['endCursor']}",
+                        ]
+                    )
+                )
+                if not isinstance(extra, list) or not extra:
+                    raise ValueError("review comments: missing response pages")
+                for comment_page in extra:
+                    if comment_page.get("errors"):
+                        raise ValueError(f"review comments: {comment_page['errors']}")
+                    nodes.extend(comment_page["data"]["node"]["comments"]["nodes"])
+            threads.append({**thread, "comments": nodes})
+    return threads
+
+
 def fetch_item(
     url: str,
     type_hint: str | None,
@@ -729,6 +817,7 @@ def fetch_item(
             meta = json.loads(
                 sync.run(["gh", "pr", "view", canonical, "--json", PR_FIELDS])
             )
+            meta["reviewThreads"] = fetch_review_threads(owner, repo, number)
             login = ((meta.get("author") or {}).get("login") or "").lower()
             if keep_type:
                 item_type = type_hint or "👀"
@@ -742,8 +831,8 @@ def fetch_item(
             item_type = type_hint if keep_type and type_hint else "🐛"
     except (RuntimeError, OSError) as error:
         return {"error": sanitize_error(str(error))}
-    except ValueError as error:
-        return {"error": sanitize_error(f"gh 輸出不是合法 JSON：{error}")}
+    except (ValueError, KeyError, TypeError) as error:
+        return {"error": sanitize_error(f"gh 輸出不完整或不是合法 JSON：{error}")}
     return {"type": item_type, "gh_meta": meta, "url": canonical}
 
 
@@ -1296,6 +1385,7 @@ def build(
                 load_command=load_command_for(
                     row, load_templates or {}, load_warnings
                 ),
+                review_threads=meta.get("reviewThreads"),
                 result=row.get("result") if row["type"] == "👀" else None,
                 related_files=related,
             )  # fmt: skip

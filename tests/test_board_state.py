@@ -1706,3 +1706,64 @@ class TestIndexEntryPathLast:
             bs.ItemType.REVIEW_PR, bs.BoardStatus.PENDING_REVIEW, "i/1.md", "", ""
         )
         assert entry == "👀 待 review — i/1.md"
+
+
+@pytest.mark.parametrize(
+    "resolved,body,state,expected",
+    [
+        pytest.param(
+            True, "", "COMMENTED", bs.BoardStatus.AWAITING_REVIEW, id="resolved-inline"
+        ),
+        pytest.param(
+            False, "", "COMMENTED", bs.BoardStatus.NEW_COMMENT, id="unresolved-inline"
+        ),
+        pytest.param(
+            True,
+            "Please explain",
+            "COMMENTED",
+            bs.BoardStatus.NEW_COMMENT,
+            id="review-body",
+        ),
+        pytest.param(
+            True,
+            "",
+            "CHANGES_REQUESTED",
+            bs.BoardStatus.CHANGES_REQUESTED,
+            id="blocking-review",
+        ),
+    ],
+)
+def test_thread_resolution_does_not_clear_independent_review(
+    resolved, body, state, expected
+):
+    meta = {
+        "state": "OPEN",
+        "author": {"login": YOU},
+        "createdAt": "2026-09-01T00:00:00Z",
+        "reviewDecision": "CHANGES_REQUESTED" if state == "CHANGES_REQUESTED" else "",
+        "reviews": [
+            {
+                "id": "R1",
+                "state": state,
+                "body": body,
+                "author": {"login": "other"},
+                "submittedAt": "2026-09-02T00:00:00Z",
+            }
+        ],
+        "reviewThreads": [
+            {
+                "isResolved": resolved,
+                "comments": [
+                    {
+                        "author": {"login": "other"},
+                        "createdAt": "2026-09-02T00:00:00Z",
+                        "pullRequestReview": {"id": "R1"},
+                    }
+                ],
+            }
+        ],
+    }
+    assert (
+        _classify(bs.ItemType.OWN_PR, meta, bs.BoardStatus.NEW_COMMENT).status
+        is expected
+    )
