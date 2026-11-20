@@ -88,7 +88,7 @@ file when writing the rubric or assembling the final report.
 改動前（紅色是會壞掉的地方）：
 
 ```mermaid
-flowchart LR
+flowchart TD
     A1[<元件或檔案>] --> A2[<問題發生處>]
     classDef problem fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
     class A2 problem
@@ -97,7 +97,7 @@ flowchart LR
 改動後（綠色是這個 PR 改動或新增的地方）：
 
 ```mermaid
-flowchart LR
+flowchart TD
     B1[<元件或檔案>] --> B2[<修法>]
     classDef changed fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
     class B2 changed
@@ -145,6 +145,7 @@ PR 摘要的規則（單一 PR 與雙語版的英文 detail 都適用）：
 
 - 每項改動以行為描述，**每項附改在哪的檔案**（括號內放路徑或 `file:line`），並**每項附一句為什麼**；不寫成純檔案清單。
 - 摘要排在 Context 之前。查不到動機時，「為什麼」寫「PR 沒說明動機」，並把它列進 rubric 的「Description 沒講清楚的地方（需要 author 補答）」，不得代編。
+- Review 報告的 Mermaid flowchart 預設用 `flowchart TD`（由上往下），包含改動前後圖與其他補充流程圖，避免橫向圖過寬、渲染時整張縮小而難以閱讀。只有橫向確實更清楚、且圖寬不會迫使文字縮小時才用 `LR`；圖仍過寬時先縮短節點文字或拆圖。
 - mermaid 圖放在「為什麼」之後、條列改動之前，預設畫改動前 → 改動後的 flowchart 對照：兩個獨立的 mermaid 區塊上下排，各自前面一行小標（「改動前：」「改動後：」）；每個區塊只畫一張圖，不用 subgraph 把前後並排塞進同一張。改動前圖把會壞掉、或 PR 要修的節點用 `classDef problem fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d` 標紅；改動後圖把這個 PR 改動或新增的節點用 `classDef changed fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d` 標綠（再以 `class <節點id,...> problem|changed` 套用）；沒改動的節點不上色；小標寫明顏色的意思。節點文字標出對應檔案或元件。節點只放 PR 描述或 diff 能證實的東西，不代編流程；行為改動很小（純 rename、docs typo、依賴升級）時省略圖，並在「為什麼」後寫明省略原因。節點文字不放 HTML 標籤。
 - 增量 review 時，若 PR 本身的 patch 沒變，沿用上次這段，只補新 commit 的改動。
 - 多 PR roll-up 是對話內的一頁總結，不加摘要與圖；逐顆報告才有。

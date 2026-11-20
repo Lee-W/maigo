@@ -144,7 +144,7 @@ will come back next round.
 完整骨架：
 [`references/output-format.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/output-format.md)（寫最終輸出前讀）
 
-`/maigo:review` 的持久報告另依 [`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md) 產生共用檔頭、最後 review 時間與 reviewed commit。
+`/maigo:review` 的持久報告另依 [`review-templates`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md) 產生共用檔頭、最後 review 時間與 reviewed commit；報告的 Mermaid flowchart 預設用 `TD`，優先維持文字可讀性（例外與拆圖原則見該範本）。
 
 ## Re-review (when implementer comes back)
 
