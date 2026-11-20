@@ -424,6 +424,20 @@ push counts as reachable — a log call doesn't, no matter how prominent.
 
 ---
 
+## When a doc asks the reader to check something, say how to find it
+
+Reachability (above) asks whether the value gets out of the task; this one asks whether the reader
+can **locate** the thing. A troubleshooting section or an error message that says "check the
+file" or "inspect X" must also say where X is. For example, when the file name is a hash the
+reader cannot guess, name the log line or warning and the field that carries its path (case:
+apache/airflow #76381 — the durable journal's `path` field).
+
+How to apply: for each "check X" in a troubleshooting section or error message, ask "how does the
+reader know where X is?"; if the answer is not on the page, ask for the locating method (log field
+name, path rule, command).
+
+---
+
 ## Check `template_fields` before demoing XCom chaining into an operator argument
 
 Before writing a doc example or example Dag that feeds an upstream XCom into
@@ -630,6 +644,10 @@ Before writing or approving a claim about stability, release state, CI or suppor
 1. **Stability and Experimental markers.** Grep the feature name separately in the stability page, the feature's own page, the changelog and the PR description (one grep per spelling; check each pattern against a known hit), and align all of them in the same PR. A feature marked Experimental while the stability table still lists it as stable is the typical miss. The same applies when adding an exception to an unconditional sentence ("unchanged", "model instance"): grep each phrasing separately across docs and docstrings and mark every hit "exception added" or "not affected".
 2. **Release state** ("shipped in X", "not released before 1.0", "safe to remove before 1.0"). Check each symbol or alias with `git ls-remote --tags` and `git show <tag>:<path>`, not with memory or commit dates. Separate the module path from the package-level re-export. Put a changelog `.. note::` in a section that is not cut yet, and recheck its position after resolving a merge conflict. **Whether a version is published is decided by PyPI, not by a tag**: `curl https://pypi.org/pypi/<dist>/json` and read `releases` and each `upload_time` (e.g. `apache-airflow-providers-common-ai`). A tag proves the source exists; local tags may stop at an `rc3` while the final release is already on PyPI (#74695: tags ended at `1.0.0rc3`, `1.0.0` was already on PyPI). Don't pre-write a changelog section for an unreleased version number. A stable-listed alias or signature that has shipped is kept until the next major (see `code-style.md`, "Keep only connection-backed calls on the hook"). Write what you cannot verify as unconfirmed.
 3. **Present-tense promises about CI, support or stability.** Each one must point at an existing mechanism (a CI job, a process, a file); otherwise soften it into a non-claim. For CI wording, read the workflow and the scripts it runs rather than earlier prose or the PR description, and do not treat "canary" as "scheduled".
+4. **"Tested with" versions, and examples that follow the doc's own advice.** A tested version is a fact about the moment it was written; a later re-lock changes what CI runs.
+   - (a) When a doc says "tested with <version>" or "observed with <version>", read the version `uv.lock` resolves for that package. If they differ, write both: the version first observed, and the version the lock and CI use now. Do not rewrite the old observation as the lock's version unless it was re-verified on the new one, and do not add a sentence such as "tested locally with <version>" that cannot be verified. (For the re-lock side see `verification-tooling.md`, "A re-lock from `main`'s lock re-resolves…".)
+   - (b) For every sentence that tells users to do something ("limit the loop with the task's `execution_timeout`"), look at the examples in the same PR: if they do not do it, add it, otherwise readers who copy the example lose the protection the doc recommends.
+   - (c) After changing an example, check that the way the doc includes it (line range, or START/END markers) still points at the right lines.
 
 Examples (apache/airflow #74694, #74695): a changelog line said "like every other toolset's" while three toolsets had no `tool_prefix`; another said "shipped in 0.10.0" while the tag showed the class in an earlier release; a plan promised "the changelog records the latest tested version" when no CI job tracked that.
 
@@ -657,6 +675,22 @@ links), a mirrored "use Y instead when…" list, and a one-line rule of thumb at
 before writing the difference section — a surface feature comparison that both sides share equally hasn't found the axis yet
 (e.g. two "agent" operators don't differ by whether they have tools/MCP if both do; they differ by where the loop executes and
 who controls the tools).
+
+### A new connection type that overlaps an existing general one
+
+When a new connection type reuses an existing connection or adds a layer of capability on top
+of it (for example `pydanticai_databricks` next to the general `pydanticai`), users need to know
+how to choose. Case: apache/airflow #76797 — a single-PAT example showed something the general
+connection already did, so the page did not show what the new type adds (token refresh for OAuth,
+Azure, federation).
+
+1. Add a short passage to the guide: which situations the general type is enough for (say which
+   fields to fill in) and which need the new type.
+2. Build the example around a situation only the new type serves, not the simplest credential.
+3. In a summary table (such as common.ai's `model_providers.rst`), list both types in the same row
+   with the difference, worded like the table's existing rows of the same kind.
+4. Do not put test-status statements in the docs ("only unit-tested", "not run against a real
+   environment") — in any wording.
 
 ## Section headers name the specific things compared; no internal-component words
 

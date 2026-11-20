@@ -216,6 +216,33 @@ and keep the import out of module top level), see
 [`verification-tooling.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/verification-tooling.md)
 ("Code that branches on a 3.3-only SDK symbol …").
 
+### Third-party behaviour that differs across the declared floor
+
+The same floor logic applies to a provider's **third-party** dependencies. The
+"Low dep tests: providers / LowestDeps" CI job downgrades every dependency to
+its declared floor before running the tests, so the floor version is an
+environment CI will actually run — not a theoretical one. Case: apache/airflow
+#76797 — the job log shows it swapping `openai==3.46.0` for `openai==2.47.0`
+(the floor of the `openai` extra).
+
+1. When behaviour differs across third-party versions, read the floor from the
+   provider's `pyproject.toml` and treat that version as a guaranteed CI
+   environment.
+2. "Some transitive dependency pulls the version up, so the old one is
+   unreachable" (even when a `pyproject.toml` comment says so) is not a reason
+   to skip the old behaviour: LowestDeps installs the floor regardless.
+3. A test that asserts behaviour true only on newer versions must branch or
+   mark on the installed version, and say where the cut-over version comes from
+   (release notes, source).
+4. When a reviewer says "older versions behave differently", do one of three
+   things: handle it, raise the floor to a version where behaviour agrees, or
+   state plainly that behaviour differs at the floor. Do not answer "can't
+   happen in practice". In #76797 that answer was drafted from a comment and
+   the LowestDeps job went red after the push.
+5. When only a newer version is installed locally, check the floor version's
+   behaviour (uv cache or its source) before pushing, and expect LowestDeps to
+   exercise it.
+
 ## Validation and enforcement
 
 ### A fixed override of a base `@property` is a class attribute; "get or raise" is walrus + early return

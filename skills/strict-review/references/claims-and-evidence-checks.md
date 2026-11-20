@@ -30,6 +30,14 @@ and missing the "empty fetch" path is the typical incomplete fix.
 - Tests must simulate "everything is locked by someone else" (the fetch returns nothing
   while rows exist), assert the flag stays set and no duplicate warning/audit is emitted,
   and be mutation-checked: restore the unconditional clear and the test must go red.
+- When an audit / notification / log row changes from one per episode to one per entity
+  (Dag, task, ...), the "already written, don't write again" state must become per-entity
+  too (`bool` → `set[entity_id]`). A single global flag skips every entity that joins
+  mid-episode, and the diff and tests still look normal. Keep the reset condition as it
+  was, and keep a batch whose write failed out of the state. Case: apache/airflow #71072
+  (rows changed to per-Dag while a global bool trigger stayed). Airflow-side pointer:
+  [`review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+  (10.17, edge-trigger flags).
 
 ## 2. Error message advice must hold on every path that raises it
 

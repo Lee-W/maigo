@@ -94,6 +94,33 @@ list; before proposing an operator, answer "what does it give that `AgentOperato
   (`warnings.warn(..., AirflowProviderDeprecationWarning, stacklevel=2)`) kept until the next
   major, and make the changelog name every class (hooks included) whose default changed.
 
+## An adapter that accepts user config must not let it silently replace the adapter's own required settings
+
+When an adapter sets something itself and marks it required, and also forwards a
+user-supplied config to the external program, the external program's merge rules decide whether
+the user's value *adds to* or *replaces* the adapter's. Case: apache/airflow #76000 — the
+common.ai Codex adapter attaches its own MCP server on the process layer with
+`--config mcp_servers.<name>.*` and `required=true`, while users can also pass a thread-level
+`config`. Codex replaces a thread-level nested table wholesale, so a user's
+`{"mcp_servers": {"github": {...}}}` dropped the adapter's entry, `required=true` included; the
+thread still started, with no Airflow tools and no error. A dotted key
+(`mcp_servers.github.url`) changes only that leaf. A reviewer found it by running the real
+`codex app-server`; the original name-collision check looked only at the nested form and the
+single test covered only that form.
+
+1. List every way a user can express the same thing (nested, dotted, non-dict values) and confirm
+   none of them replaces or bypasses the adapter's required entries. The collision check must
+   cover every form.
+2. When the external program's merge rules are undocumented, run a PoC against the real program
+   before fixing the implementation, and turn the reviewer's reproduction into a regression test
+   against the real binary.
+3. Observed Codex behaviour, verified only on 0.167.0: a dotted key can address a leaf; a quoted
+   key segment is not accepted, so a server name containing `.` cannot be written as a dotted
+   key; server names may contain `:`, `@` and `/`.
+4. Before restricting the characters a user may supply, check what the external program actually
+   accepts; a stricter rule than the program's is a regression for valid configs.
+5. Never mutate the user's dict in place.
+
 ## Provider public-surface compatibility: six checks for trigger / hook / operator changes
 
 Scope: a diff that changes a provider's public trigger, hook or operator surface — signatures,

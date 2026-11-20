@@ -77,7 +77,9 @@ is deprecated since 3.2.0), so a tripwire built on
 shows. The gate itself is written up in
 [`registry-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/registry-conventions.md)
 ("`provider.yaml`'s `ui-field-behaviour`/`conn-fields` override the hook's
-`get_ui_field_behaviour()` entirely"); this entry only adds the tripwire angle.
+`get_ui_field_behaviour()` entirely"); this entry only adds the tripwire angle. That section also
+records that a repo-level check (`check_ui_field_behaviour_matches_hook`) already compares the hook
+with `provider.yaml`, so a new unit test asserting the same thing is a duplicate.
 
 ---
 

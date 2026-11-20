@@ -335,6 +335,19 @@ false claim of Ollama/vLLM support) initially edited only the docs and
 connection UI and provider registry both read `provider.yaml`, so the edited
 method was dead code and the false claim was still user-visible.
 
+**A repo-level check already compares the two — don't write a unit test for it.**
+`scripts/in_container/run_provider_yaml_files_check.py`'s
+`check_ui_field_behaviour_matches_hook` compares each hook's `get_ui_field_behaviour()`
+(hidden fields, relabeling, placeholders) with the matching `provider.yaml` section and checks for
+a missing section (symbol present on `main`, verified 2026-11-19). When adding or changing a
+connection type, don't add a test asserting "the hook's UI field behaviour equals `provider.yaml`";
+in apache/airflow #76797 a `TestUiFieldBehaviour` doing that was ruled a duplicate and removed.
+Before writing any "these two places must agree" test, look in `scripts/in_container/` and
+`scripts/ci/prek/` for an existing repo-level check. Known limit: the check is skipped, not
+failed, when the hook cannot be imported. The test-side view (a tripwire must read the source the
+runtime actually consults) is in
+[`test-cases.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/test-cases.md).
+
 ## `external-services` list membership: what counts as reachable *(narrow — read when reviewing/writing a connection-type's `external-services` field)*
 
 `providers/common/ai/provider.yaml`'s `external-services` field renders into

@@ -52,6 +52,8 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.36** `common.ai` model output pushed to XCom: route every path through the shared dump check, python-mode by default, JSON-mode only where python-mode cannot work (Request changes, scope-gated to `providers/common/ai` XCom output paths; helpers come from #74695)
 - **10.37** Before changing or unifying the output / serialization paths of a released, stable-listed `common.ai` operator, read each path's behavior in the last release tag (Request changes, scope-gated to such diffs)
 - **10.38** Deferrable path: validate hook support on the worker before deferring, and prove parity with the synchronous path through real serialization (Request changes, scope-gated to diffs that touch `deferrable`, a trigger, or `execute_complete`)
+- **10.39** A cross-provider extra that pulls in another provider's extra can collide with root `[tool.uv] conflicts` and block users from installing a conflicting extra alongside it; check the conflicts table, prefer docs or a dedicated extra over widening (Request changes, scope-gated to a diff that adds or widens a cross-provider extra)
+- **10.40** An error that retrying cannot fix (corrupt data, configuration error) should raise a skip-retry exception from the `AirflowFailException` family; transient failures stay retryable (Request changes, scope-gated to a diff that adds or changes an exception path in task execution, hook or trigger-resume code)
 - **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim; includes a variant for provider docs that say "on Airflow X and later"). The author-side counterpart is sweep (c) in [`strict-review/references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
@@ -562,6 +564,9 @@ which drops `FOR UPDATE`, so a second session cannot simulate it), assert the fl
 then mutation-check by restoring the unconditional clear on the empty branch (the test
 must go red). General rule:
 [claims and evidence checks](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/claims-and-evidence-checks.md).
+The same file's per-entity sibling rule applies when audit rows go one-per-Dag: the
+edge-trigger flag must become per-Dag too (apache/airflow #71072 — a global bool left
+Dags that joined mid-episode unlogged).
 
 ## 10.18 `providers/common/ai` hook capability additions: check three parity axes *(Request changes)*
 
@@ -1088,6 +1093,22 @@ comment (e.g. `"apache-airflow-providers-common-compat>=1.12.0",  # use next ver
     of it, and drop the comment (the `hook=` parameter of
     `get_async_connection`, added in common-compat 1.17.0, is the 2026-10-01
     example on apache/airflow #73967). How to choose that floor: see 10.33.
+- **When something the diff uses is not in any released tag (the first case above): do not
+  hand-edit the `>=` floor in the PR; only add the comment.**
+  `contributing-docs/13_airflow_dependencies_and_extras.rst` says the floor
+  must not be changed in the PR: the release manager's tooling sets it to
+  the next version at release prep. A hand-edited floor trips the
+  provider dependency bump check in
+  `dev/breeze/src/airflow_breeze/utils/selective_checks.py`
+  (`provider_dependency_bump`; the override is the "allow provider
+  dependency bump" label), so in that case asking the author to bump it by
+  hand is the wrong request. A live example of the marker on origin/main:
+  `providers/modal/pyproject.toml`.
+- **Residual risk (a note for maintainers, not a finding on the author).**
+  Possibly, if the depended-on version already has a final tag, the release
+  tooling does not substitute it automatically, so the release manager would
+  have to set that floor by hand. This is an observation, not confirmed in
+  the upstream docs; check the release tooling yourself before relying on it.
 
 Source: 2026-10-01 batch review. Reviewers called the marker "zero precedent,
 wrong" on #73967 and #73532; the second one was even a must-fix. The
@@ -1223,6 +1244,8 @@ before changing or unifying paths).
   as a dict key (the last two are the ones a top-level-only test misses; a review caught the
   dict-key case), and feed at least one result to the real `serde.serialize` instead of
   asserting on the dump alone.
+  Also add one test that runs two different operators against the same `output_type` and asserts
+  they push the same value, so a copy of the dump logic in one operator is caught.
 
 ## 10.37 Before changing or unifying output paths of a released `common.ai` operator, read each path's behavior in the last release tag *(narrow — when a diff changes the output / serialization path of a released, stable-listed `common.ai` operator, or folds its divergent paths into a shared helper; Request changes)*
 
@@ -1287,6 +1310,43 @@ the triggerer fails late and far from the cause.
   `deferrable=True`.
 - The tests must go through real serialization and compare values one by one against the
   synchronous path; a mock that replaces serialization proves nothing.
+
+## 10.39 A cross-provider extra that pulls in another provider's extra: check root `[tool.uv] conflicts` *(narrow — only when a diff adds or widens a cross-provider extra in a provider's `pyproject.toml` `[project.optional-dependencies]`; Request changes)*
+
+**Scope gate**: the diff touches a provider's `[project.optional-dependencies]` and the entry is
+`apache-airflow-providers-<other>[extra,...]` (adding the dependency, or adding an extra inside
+the brackets). For *choosing the floor* of such a dependency see 10.33; for the marker see 10.31.
+
+The root `pyproject.toml` `[tool.uv] conflicts` lists extra combinations that are mutually
+exclusive (for example common-ai's `llamaindex` and `openai`). Anyone installing
+`A[extra]` is bound to every extra written inside the brackets of `A`'s dependency on provider B,
+so they can no longer install a B extra that conflicts with it — including users who installed
+`A[extra]` only for unrelated features.
+
+1. Look up the pulled-in extra in root `[tool.uv] conflicts`; if it has a conflicting partner, flag
+   it. List which features the existing extra serves today, because those users are the ones
+   affected.
+2. A dependency needed only by a new feature belongs in that feature's docs ("also install
+   `apache-airflow-providers-B[y]`") or in a dedicated extra; do not widen an existing extra.
+3. When a dependency moves out of an extra, a test that imports the package directly must list
+   it explicitly in the provider's dev dependency group instead of relying on the transitive
+   install.
+
+Case: apache/airflow #76797 — widening `databricks[common.ai]` from `common-ai[mcp]` to
+`common-ai[mcp,openai]` made it impossible to combine with `common-ai[llamaindex]`, and also hit
+users who only used the Unity MCP toolset or an agent hook.
+
+## 10.40 An error that retrying cannot fix should use a skip-retry exception *(narrow — only when a diff adds or changes an exception path inside a task's execution, hook or trigger-resume code; Request changes)*
+
+When reviewing an error path ask: "what happens to a task with `retries=N` when it hits this?" If
+the answer is "it fails the same way every time" (corrupt stored data, a configuration error, an
+invalid argument), the code should raise an exception from the `AirflowFailException` family,
+which skips the remaining retries (example: common.ai's `DurableJournalError`). Retrying a
+deterministic failure only reruns the task N times and delays the failure signal. A transient
+failure (an interrupted I/O call, a timeout) must stay retryable; confirm it does not use the
+skip-retry exception.
+
+Source: apache/airflow #76381 (missed in one review round, caught by a second reviewer).
 
 ## Before calling a symbol "already released" or a change "breaking", check the release tags *(judgment gate — when a review comment or recommendation rests on a compatibility claim)*
 

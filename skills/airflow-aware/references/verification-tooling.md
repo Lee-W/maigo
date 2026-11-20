@@ -412,6 +412,30 @@ touch `sandbox/`, but this run was not compared against a HEAD checkout, so
 treat "pre-existing" as an inference. Judge by location and failure shape,
 not by matching a remembered number.
 
+A third measurement (2026-11-18, base `upstream/main` at `a58e0d149a`, run as
+`uv run --frozen --python 3.12 --project providers/common/ai`; its scope differs from the two
+above, so don't compare the numbers directly): running only `sandbox/test_base.py` and
+`sandbox/test_sbx.py` together gave **38 failed / 86 passed**; `test_sbx.py` alone gave
+**4 failed / 36 passed** (`TestExportFileOverride`:
+`test_streams_the_file_byte_for_byte`,
+`test_a_file_over_the_budget_reports_its_size_despite_the_notice`,
+`test_a_destination_that_fails_stops_the_copy`,
+`test_a_file_that_changed_size_while_copied_is_an_error`); the `test_base.py` failures sit in
+`TestDefaultFileOperations` and `TestDefaultExport`. The error shape is the same `SandboxError`
+(`'<macOS temp path>' does not exist in the sandbox, or is not readable`, plus the same message
+for `/dev/zero`). With those two files excluded, the whole provider's unit tests gave
+**5023 passed**. The cause is still unverified; a guess is that the sandbox's default file
+operations depend on Linux-only tools or path behaviour.
+
+When a PR to `providers/common/ai` is verified on macOS and the whole `tests/unit` has to run,
+either put these two files in the task's known-failure list and have the verifier compare the
+failure set against it, or pass `--ignore` for them and state in the report what was excluded.
+If the PR touches `sandbox/`, the list does not apply — run on Linux (breeze). The list goes
+stale as `main` moves: a red outside the list, or failure counts in these two files that differ
+from the numbers above, means re-measuring the baseline in a freshly created merge-base worktree
+(see the baseline-comparison section below), not borrowing the worktree of another PR that still
+has an agent running.
+
 How to apply: when verifying a `providers/common/ai` hook change in this
 repo, scope both `.claude/test-command` and manual verification to
 `providers/common/ai/tests/unit/common/ai/hooks` (fast — under 5s) rather
@@ -926,6 +950,11 @@ version in the docs. If they differ, either pin back with
 version. Finish with `git diff upstream/main --stat -- uv.lock`: only that package's increment
 should remain.
 
+When the versions differ and the docs are kept, write both facts (the version first observed, and
+the version the lock and CI use now); the wording rules are in
+[`docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md)
+("Status claims in provider docs").
+
 ### Every worktree shares one sqlite test DB — a `db_test` result can be someone else's noise
 
 `AIRFLOW_HOME` defaults to `~/airflow` for every worktree, so
@@ -1004,6 +1033,8 @@ delegation prompt, not just in your own head):
   `shared/*/src`, so the whole batch errors rather than fails. Add those `src` directories to
   `PYTHONPATH` in the same shell call. It doesn't hit every package, so report the original
   result and the patched-env result separately.
+  If Docker is not running and the `PYTHONPATH` patch is not enough, stop and report per the repo's `AGENTS.md`
+  instead of building a substitute environment, and say in the report which tests were not verified locally.
 - **Don't borrow another checkout's `node_modules` by symlink.** A mismatched dependency
   version there made dozens of UI test files fail to load (`tableFeatures is not a function`);
   that run is void. Install inside the worktree (see the pnpm entry above).
