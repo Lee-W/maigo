@@ -68,6 +68,7 @@ orchestrator 自己寫，見
 - **計畫**：填本次實際的 plan 檔名（`plan.md` 或 `plan-<n>.md`），同目錄、路徑相對於檔案自己，用反引號包住。plan 是 `plan-2.md` 時，這份 summary 是 `summary-2.md`，欄位填 `plan-2.md`。沒有 plan 路徑可用（退路）就寫「無」。
 - **commit**：沒有 commit 就寫「未 commit」。拆成多顆時一顆一行。
 - **結果**：完成／部分完成／中止的定義只有一份，在 `teammate-flow`「Run summary」的「何時寫」（以本次 run 有沒有 commit 落地為分界）；結果不是「完成」時，「沒處理的」逐條寫出「完成」的四項裡哪幾項沒達成，以及使用者為什麼決定結束。
+- **沒處理的**只列需要取捨或會改變對外行為的項目；不需取捨、不改對外行為的低嚴重度項目（範例裡的變數命名）commit 前已補完並複驗，寫在「怎麼做」，不列在這裡。
 - **怎麼做**的每一輪審查都要有對應條目；沒有重試就只有一條。
 - **怎麼做**的流程圖在 `/maigo:team` 審查與驗證並行時，把兩者畫在同一列（例如 `Soyo || Taki`）。
 
@@ -145,6 +146,12 @@ Raana (explore) --> Tomori (plan) --> user confirms plan
                                        Soyo round 2: APPROVED
                                              |
                                              v
+                                       Anon (fix naming nit)
+                                             |
+                                             v
+                                       Soyo re-verify: APPROVED
+                                             |
+                                             v
                                        Taki (verify): PASS
                                              |
                                              v
@@ -152,7 +159,7 @@ Raana (explore) --> Tomori (plan) --> user confirms plan
 ```
 
 - 第 1 輪審查：🟡 爽世抓到兩個 must-fix。#1 表結構為空時沒有處理，會丟例外；#2 新測試沒有覆蓋有資料的情況。🎀 愛音補上空結構的分支與兩支測試。
-- 第 2 輪審查：🟡 爽世確認兩項都已修正，結論 APPROVED，另留一個 Nit（變數命名）。
+- 第 2 輪審查：🟡 爽世確認兩項都已修正，結論 APPROVED，另留兩個 Nit（變數命名；空表匯出是否附欄位型別註解）。變數命名不需取捨也不改對外行為，🎀 愛音在 commit 前改好，🟡 爽世複驗通過。
 - 🟣 立希實跑測試與 lint，全部通過後才 commit。
 
 ## 驗證
@@ -163,6 +170,6 @@ Raana (explore) --> Tomori (plan) --> user confirms plan
 
 ## 沒處理的
 
-- 🟡 爽世的 Nit：`rows` 這個變數名稱可以更具體，沒有改，留給使用者決定。
+- 🟡 爽世的 Nit：建議空表匯出時另外附上欄位型別註解；這會改變匯出檔的對外格式，需要使用者決定，沒有改。
 - 其他輸出格式（JSON）的空表行為沒有檢查。
 ````

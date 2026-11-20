@@ -178,6 +178,8 @@ Must-fix (docs): ...
 
 **重審同一顆 PR：以既有的 `draft.md`、`inline-comments.md`、`rubric.md` 為底稿，先讀再用 `Edit` 修改，不整份 `Write`**——使用者可能手改過。仍成立的 finding 逐字保留，只更新行號、head SHA 與連結；新的 finding 附加在後；要移除的（已解）先在對話列出再移除。共用規則見 [`review-templates` 的 Draft hygiene 第 2 條](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
 
+**同一個 head、草稿還沒送、其他 reviewer 之後留了意見：只做去重，不重審。** 條件三項都要成立：PR 的 `headRefOid` 等於既有 `review.md` 的 reviewed commit、`draft.md` 還沒送出、上次 review 之後有別人的 review 或 comment。這時不重跑樂奈、燈、爽世、立希，也不重新 publish `review.md`（重發會把審查時間蓋成今天）；即使舊報告沒有 coverage metadata 也適用，因為被審的 commit 沒變。要做的是：抓對方的 inline 意見，逐則對照草稿，已被講過的整則移除、講了一部分的縮成只剩沒講到的部分，`draft.md` 內文改成附議而不重述；修改後照下面的查核流程走一輪，查核項目加上「沒有重複其他 reviewer 的點，且每個『already raised』都找得到對應的那一則」；最後刷新 board。回覆使用者時明講這一輪沒有重審程式碼、verdict 沿用上次，並列出每則草稿的處置。head 有變就不適用，走一般重審或 [delta 重審](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-modes.md)。（2026-11-19 實例：#77073 的 7 則 inline 去重後剩 5 則，查核另外抓到一句過頭的說法。）
+
 **每則 inline comment 1–3 句**：must-fix 只寫「壞在哪＋一個證據＋改法（用問句提出）」；推導過程、旁支說明（例如「這個問題 base 上其實也存在」）、行號引用與完整程式碼建議都不放——那些留在 `review.md`。nit 只寫結論。（2026-11-12 實例：#76862、#76882 兩份草稿各三段的 must-fix 被退回「太長」，砍到每則 1–3 句才收。）
 
 **錨點落在引入被批評行為的那一行**：`## <path>:<line>` 要指向 diff 裡真正引入該行為的 `+` 行，不是附近任一個有改到的行。寫進 inline comment 的行號引用與「只有 X」「沒有 Y」這類斷言，落筆前用 `git show <head>:<file>` 對照 reviewed head 逐一確認。（2026-11-12 實例：#76862 的 must-fix 錨在只多傳一個參數的 `journal.py:556`，被質疑「沒有這個改動」；內文引的 `:538` 其實是一行 log，「唯一寫入者」也漏了 `pause`。）

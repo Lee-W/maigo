@@ -199,6 +199,13 @@ Orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡�
 
 **讀取時機：本節用到的 `commit-message`、`pr-sync-check`、`github-title-description` 三個 skill 到這一步才讀，之前的階段不需要載入；`git-workflow` 若流程前段因開／清 worktree、交辦 git 操作或動 git index 已讀過，這裡不必重讀，否則到這一步一定要讀。**
 
+**APPROVE 之後剩下的低嚴重度 finding，commit 前先補完**：🟡 爽世 APPROVE 時若還附了不擋放行的低嚴重度項目
+（測試缺口、過時註解、邊角情況、命名），而且這些項目**不需要在方案之間取捨、也不改變對外行為**，預設
+由 🎀 愛音在 commit 前全部補完，再送回**同一位**審查者複驗；不要列出來問使用者要不要修。若補完的改動發生在 🟣 立希已全綠之後（例如 `/maigo:team` 的審查與驗證並行時），立希也要重跑，commit 以重跑結果為準（依 `commands/team.md` 的合流規則：受審內容有變就重跑爽世與立希）；`/maigo:go` 的順序是爽世 → 立希，補完與複驗發生在立希執行之前，立希只跑一次。需要取捨或會改變
+對外行為的項目不在此列，那類仍列給使用者決定，並寫進 summary 的「沒處理的」。實例：某個 hook 修正的複驗
+APPROVE 後還剩三個不擋放行的低嚴重度項目，orchestrator 沒派人改、列出來問使用者，使用者回「全部修完」；
+同一次裡「要不要讓某個委派過濾新事件」這類需要取捨的項目，才是該問的。
+
 Taki 全綠（或 `/maigo:team` 合流 APPROVED + PASS）後，若還有未 commit 的本次變更，
 依 [`skills/commit-message`](https://github.com/Lee-W/maigo/blob/main/skills/commit-message/SKILL.md) 從 diff 草擬一段 commit message 附在 final summary。
 
@@ -229,7 +236,7 @@ orchestrator 先依 [`pr-sync-check`](https://github.com/Lee-W/maigo/blob/main/s
 步驟 1 判定當前 branch 有沒有開啟中的 PR；尚無 PR 時依
 [`draft-bundle`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/references/draft-bundle.md)
 抓料（base 的決定與失敗處理照該檔「收尾情境」一節：**任何失敗只略過草稿並在 summary 印一行原因，
-不中斷 final summary**），另附 plan 路徑、🟡 爽世最後一輪的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
+不中斷 final summary**），另附 plan 路徑、🟡 爽世複驗後仍未處理的 Nit 與 Evidence pending、🟣 立希的驗證摘要，派 🩵 燈以
 describe-pr 模式產出草稿，依 [`commands/describe-pr.md`](https://github.com/Lee-W/maigo/blob/main/commands/describe-pr.md)
 步驟 3 的格式，在 final summary 給出可整段複製的 description 與 title。素材怎麼對應到
 Design rationale、Known limitations 與 Test Plan，見

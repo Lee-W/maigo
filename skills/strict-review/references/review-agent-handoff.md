@@ -61,6 +61,12 @@ text, not write report files`）。交辦文若叫它寫 `report-<N>.md`，有�
 這與 [`handback-content-missing.md`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/references/handback-content-missing.md)
 是不同問題：那裡是 handback 送達但內容遺失；這裡是內容的**載體**選錯。
 
+**重審時只改幾段：用「原文／新文」成對替換**：orchestrator 先把上一版 `review.md` 去掉檔頭後存成底稿（從第一個 H2 開始），請撰寫者回傳「原文／新文」成對的替換段落，由 orchestrator 套用；每段原文在底稿裡必須**恰好出現一次**，套用前先數。
+
+**續用同一位 agent（SendMessage）時，orchestrator 只收得到它最後一則回覆**：交辦文要求它把全部內容放在最後一則；它回「內容在我上一則訊息」的那一則不會送達。
+
+**交辦撰寫者之前先讀 `triggers` 含 `strict-review` 的記憶**：`/maigo:review` 開場沒有載入記憶，不先讀就交辦，同一個坑會再踩一次（曾在同一天發生兩次，兩位撰寫者都被擋）。
+
 ## 報告裡的實跑結論由誰重跑
 
 orchestrator 不重跑 subagent 的全部 PoC，但**發佈前至少獨立核對一兩個最容易驗證的承重

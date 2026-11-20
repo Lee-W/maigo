@@ -206,11 +206,19 @@ the code block, with this wording:
 
   ```
   ---
-  Drafted-by: <Agent Name and Version>; reviewed by @<github-handle> before posting
+  Drafted-by: Claude Code; reviewed by @<github-handle> before posting
   ```
 
-This convention is about replies only. The `draft.md` that `/maigo:review` writes keeps its
-own footer rule in `commands/review.md`, and PR descriptions follow
+In either template above, a review-body footer writes `Claude Code` exactly, with no model name
+or version, and the complete footer string goes in the delegation text instead of being left for
+each subagent to fill in: in one batch review, drafts written by different subagents produced four
+different footers and the checker twice asked the user to confirm. This replaces the
+`<Agent Name and Version>` placeholder above for review bodies only; replies in a discussion
+thread carry no footer.
+
+This convention is about replies, except that the review-body footer wording above also applies to
+the `draft.md` that `/maigo:review` writes; the rest of that draft's footer handling stays in
+`commands/review.md`. PR descriptions follow
 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md).
 
 ## Comment fetch & triage, and pre-apply verification (references)
