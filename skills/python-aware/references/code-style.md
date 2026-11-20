@@ -123,6 +123,12 @@ Name a threshold-style duration constant after the bound it encodes, not the pla
 
 One constant must not be the threshold for two different things. In apache/airflow #75847 the first version used one 1-hour constant both as a shortcut gate and as the look-back width, and both meanings were wrong. Two meanings, two constants, each named for its own bound.
 
+### Comments above constants, type aliases and attributes use plain `#`, not `#:`
+
+Write the comment above a constant, type alias or attribute with a plain `# ` prefix, not the
+Sphinx-style `#:`. This is a user preference with no reason given. When delegating code-writing to
+a subagent, put the rule in the delegation text.
+
 ## Validation and error handling
 
 ### Raise at construction instead of documenting a structural footgun

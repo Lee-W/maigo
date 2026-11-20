@@ -117,6 +117,12 @@ From AGENTS.md lines 75–78:
 - **Errors**: prefer error types from `commitizen/exceptions.py`; keep messages clear for CLI users.
 - **Output**: use `commitizen/out.py`; do not add noisy logging.
 
+Not from AGENTS.md:
+
+- **New settings**: declare a new setting in the `Settings` TypedDict in `commitizen/defaults.py`
+  and give it an explicit default in `DEFAULT_SETTINGS`; do not read it ad hoc with
+  `settings.get()` inside a command (maintainer inline review on #2119).
+
 ### 7. When unsure
 
 - Read tests and documentation first to understand expected behavior (AGENTS.md line 82).

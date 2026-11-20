@@ -5,7 +5,7 @@ type checker and a casual read but fail against a specific Python version, pydan
 library runtime behavior.
 Read this file when writing or reviewing a type- or version-sensitive construct:
 `Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int`, chained
-`.append()` on an ORM query result.
+`.append()` on an ORM query result, synchronous I/O in an `async def` route.
 
 ---
 
@@ -133,3 +133,16 @@ How to apply: before any relationship operation (append, remove, assignment) on 
 by `session.scalar()` / `session.get()` / a query, bind it to a local variable first; never chain
 `.relationship.xxx` directly onto the return value. When writing or reviewing tests and fixtures,
 rewrite this chained shape on sight. It is a language-level convention, valid in any SQLAlchemy repo.
+
+## A FastAPI `async def` route that does synchronous I/O blocks the whole event loop
+
+A FastAPI route declared `async def` that runs a synchronous DB or remote read (for example an
+XCom backend read) blocks the event loop for every request; a plain `def` route is run in a
+threadpool and is not affected. The diff shows only "one more read", so this is easy to miss in
+review. Case: apache/airflow #77198 — a HITL review plugin's `find_session` gained one XCom
+backend read per call, missed in one review round and caught by a second reviewer.
+
+How to apply: when reviewing or writing a route (or anything it calls) that gains I/O,
+(1) check whether the route is `async def` or plain `def`; (2) compare with the other endpoints in
+the same file to see which convention it follows; (3) if it is `async def` and does synchronous
+I/O, ask for a plain `def` or for the I/O to move into a threadpool.
