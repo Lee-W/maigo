@@ -5,6 +5,27 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.78.0 (2026-11-24)
+
+### Feat
+
+- **board**: keep taken-over PRs in the next-up section
+- **board**: show why and what for your own PRs in detail files
+- **skills**: have go and team attach screenshots or before/after output at wrap-up when a change is visible
+- **skills**: fold 17 recurring coding and review conventions from memory into the existing skills
+- **skills**: have go and team write a run summary at wrap-up
+- **scripts**: add a summary artifact kind that sits next to plan
+- **skills**: draft reply-to-reviewer text as one short sentence with no praise opener, no footer by default, and skip replies that need none
+- **board**: list every artifact file of an item in its detail file's fact section on refresh
+- **skills**: graduate eighteen recurring review, verification and delegation conventions from memory into skills
+
+### Fix
+
+- **board**: refresh resolved review threads and pending activity
+- **skills**: require every line under a detail file's notes section to carry its actual value, not a pointer to another file
+- **board**: squeeze blank-line runs and whitespace-only lines in a detail file's preserved area on refresh so it stays a formatter fixed point
+- **commands**: list worktrees before branches in repo-audit cleanup
+
 ## v0.77.0 (2026-11-17)
 
 ### Feat
