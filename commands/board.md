@@ -166,7 +166,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
      `board_sync.py drop --reason closed <url...>`，否則 `review/<id>/review.md` 還在時每次刷新都會補回。
    - ✅ 區老化清掉的行（別人的 PR 結案超過 3 天、自己的超過 7 天，或超出 10 行上限；待盤點未完成的行最多留到 30 天），清掉的同時呼叫 `board_sync.py drop --reason aged <url...>`。
    - **同步寫細節檔**：每項索引行寫回的同時，用回傳的 `detail_path` 建立或更新對應的
-     `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata），
+     `.maigo/i/<slug>.md`——只重寫事實區（標題行 ＋ 連結/規模/下一步/最後 review/已看完等 metadata；自己的 PR 另有對外、自用的為什麼與做了什麼，以及關聯 issue），
      `## 判斷` 與 `## 筆記` 依 work-board 硬規則保留（唯一例外見 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）；細節檔不存在才整份新建。格式規格見
      [`skills/work-board/references/format-spec.md` §1a](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)。
    - **孤兒 `i/` 檔就是 dd 訊號**：使用者在 nvim 用 `dd` 刪行後，細節檔還留著，`plan` 會把它判成 dd

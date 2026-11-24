@@ -163,6 +163,13 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 # <型別emoji> <狀態詞> — <title>
 
 - 連結：<https://github.com/OWNER/REPO/pull/NUMBER>
+- 對外（PR description）：（只有 🔀 且有內容時才寫）
+  - 為什麼：<PR description 的 Why 段，單行>
+  - 做了什麼：<PR description 的 What 段，單行>
+- 自用（`../pr/<ident>/summary.md`）：（只有 🔀 且有內容時才寫）
+  - 為什麼：<本地 run summary 的「為什麼做」，單行>
+  - 做了什麼：<本地 run summary 的「做了什麼」，單行>
+- 關聯 issue：#<n>、<owner>/<repo>#<n>（只有 🔀 且 PR 有 closing issue 時才寫）
 - 規模：Δ+A/-D ｜ 作者：<author>
 - 下一步：`<next_action>`
 - 載入：`<依 board-load.txt 樣板代入的指令；沒設定樣板就整行省略>`
@@ -197,6 +204,16 @@ docstring），所以不同 owner 的同名 repo（例如 `Lee-W/maigo` 與另�
   沒有報告或不是 👀 就省略整行。H1 不放結果（refresh 靠 H1 的狀態詞復原 prior 狀態）。
 - **最後 review / 已看完**：使用 report 的 `reviewed_at` / `acknowledged_at`，不能用
   board 刷新時間取代。沒有 report 時寫「尚未 review」；舊檔 mtime fallback 註明「舊檔時間推估」。
+- **對外（PR description）／自用／關聯 issue**：只有 🔀（自己的 PR）才寫，順序固定為對外、自用、關聯 issue，接在 `- 連結：` 之後、`- 規模：` 之前；各組沒有內容就整組省略（含組標題），不寫佔位字。
+  每一行都以 `- ` 或兩格縮排加 `- ` 開頭、來源文字一律單行化，所以事實區不會出現行首 `## `，仍是 formatter 不動點。
+  - **對外**：來源是 GitHub 上的 PR body。取標題文字（不分大小寫、層級與尾端冒號）為 `Why`／`為什麼`／`動機`／`Motivation`／`背景` 的第一段當「為什麼」，為 `What`／`做了什麼`／`Changes`／`Summary`／`變更` 的第一段當「做了什麼」；段落到下一個同層或更高層標題為止。
+    先清掉 fenced code、HTML 註解、表格行、圖片行、整行 HTML 與行內 HTML 標籤；段內清單項以 `；` 連接、其餘換行以空格連接；每欄上限 200 字元，超過取前 199 字加 `…`。
+    body 沒有 Why 也沒有 What 段時，退成一行 `  - 說明：`（清掉標題後的第一個段落）；body 空白或清理後為空就整組省略。
+  - **自用**：來源是本地 run summary 的 `## 為什麼做` 與 `## 做了什麼`；整個找不到 summary 時退回 plan 的 `## Goal`（只有「為什麼」）；兩者都沒有就整組省略。
+    找檔順序是 `pr/<ident>/`、再 `topic/<slug>/`（`<slug>` 是 PR 的 `headRefName` 經 [`artifact_path.slugify`](https://github.com/Lee-W/maigo/blob/main/scripts/artifact_path.py)，`/` 變成 `-`）；兩個目錄裡任一個有可用的 summary 就不看 plan。
+    同一目錄有多份時取編號最大者（`summary.md` 視為編號 1，編號相同取無後綴者）。組標題寫實際來源檔、相對於細節檔的路徑（例 `../topic/<slug>/summary.md`，plan 為 `../topic/<slug>/plan.md` 的 Goal），可用 `gf` 跳；`topic/` 底下的檔只讀來取文字，不列進 `相關檔案`。
+  - **關聯 issue**：來源是 `closingIssuesReferences`；同 repo 寫 `#12`、跨 repo 寫 `owner/repo#7`，以 `、` 連接、去重，至多 5 筆，超過寫 `…等 N 項`；不附 URL。
+  - **已知限制**：一個任務對多張 PR 時，同一份 summary 會出現在每張對得上的 PR；summary 的結果可能是部分完成或中止，不顯示；`topic/<slug>/` 被封存後自用組消失；在預設分支開工或用 `--slug` 指定的任務，`headRefName` 對不上 topic 目錄，只能靠 `pr/<ident>/`；整行以 `<` 開頭的 HTML 區塊會被丟掉；行內 `<tag>` 形式的文字（例如泛型 `Vec<T>`）也會被當 HTML 移除；PR body 裡無法以 UTF-8 編碼的字元（孤立 surrogate）換成 `?`；長度以字元計，截斷可能切在行內 markdown 中間；自用組只在刷新時更新。
 - **規模**：issue 省略整行（沒有 additions/deletions 可言）。
 - **載入**：只有設定了 `board-load.txt` 樣板（見〈排序〉之後的「載到本機的指令」）、且該項目是開著的同 repo PR 時才寫；
   🐛 issue、跨 repo 項目（`i/<repo>-<n>.md`）、✅ 結案項目、抓不到的列一律省略整行。delegate 命令寫細節檔時可省略這行，下一次刷新補上。

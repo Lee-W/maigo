@@ -40,7 +40,7 @@ description: This skill should be used whenever writing, templating or generatin
 
 本規範只約束**新寫入**的檔案。`.maigo/` 被 gitignore、多為一次性產物，既有檔案不回溯改寫；review 報告與 rubric 的 cache 區塊、細節檔事實區會在下次發佈或刷新時自然換成新格式。讀回端（`board_sync`、`review_report`、`pr_context_cache`、`migrate_legacy_artifacts`）同時接受裸 URL 與 `<URL>`；筆記裡舊的路徑寫法（相對 `.maigo/` 或 repo-root 相對）不會被 refresh 或其他命令改寫，新舊混用可接受；要整理時用 `scripts/rewrite_note_paths.py`（預設乾跑、印出改前改後整行，確認後才 `--apply`，見路徑規則第 6 條）。
 
-**保證的界線**：下列由 script 寫出、有測試鎖住——`board.md`、`i/<slug>.md` 的事實區與新建骨架（刷新時保留區只被壓掉 code fence 外的連續空行與純空白行（後接縮排 code block 的空行不動），其餘逐字保留）、`review.md` 檔頭、`rubric.md` 的 cache 區塊結構（欄位行、fence、marker 前後的空行）。cache 區塊裡 title、body、CI 狀態與 review thread／review／comment 的內容是 GitHub 原文逐字帶入，版面不保證（多行 body 會讓 formatter 在清單前補空行）。其餘（plan、`summary.md`、rubric 骨架、`review.md` 正文、`draft.md`、`inline-comments.md`、`pr-comments.md`、`reply-draft.md`）只靠範本約束，沒有機器擋，模型落筆時可能漂移；`scripts/review_report.py` 的 `publish` 不對正文做正規化，維持逐字寫入。
+**保證的界線**：下列由 script 寫出、有測試鎖住——`board.md`、`i/<slug>.md` 的事實區與新建骨架（刷新時保留區只被壓掉 code fence 外的連續空行與純空白行（後接縮排 code block 的空行不動），其餘逐字保留；自己的 PR 事實區帶入的 PR body 與本地 summary 已單行化、放在清單項內，仍屬保證範圍）、`review.md` 檔頭、`rubric.md` 的 cache 區塊結構（欄位行、fence、marker 前後的空行）。cache 區塊裡 title、body、CI 狀態與 review thread／review／comment 的內容是 GitHub 原文逐字帶入，版面不保證（多行 body 會讓 formatter 在清單前補空行）。其餘（plan、`summary.md`、rubric 骨架、`review.md` 正文、`draft.md`、`inline-comments.md`、`pr-comments.md`、`reply-draft.md`）只靠範本約束，沒有機器擋，模型落筆時可能漂移；`scripts/review_report.py` 的 `publish` 不對正文做正規化，維持逐字寫入。
 
 ## 「預設可用」的前提
 

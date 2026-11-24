@@ -35,6 +35,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 if __package__:
     from . import artifact_path, board_state, maigo_state, review_report
@@ -85,7 +86,7 @@ _DETAIL_H1_RE = re.compile(r"^# \S+ (?P<status>.+?) — ")
 PR_FIELDS = (
     "title,state,isDraft,mergedAt,closedAt,mergeable,reviewDecision,createdAt,"
     "updatedAt,headRefOid,headRefName,commits,reviews,comments,author,"
-    "statusCheckRollup,additions,deletions"
+    "statusCheckRollup,additions,deletions,body,closingIssuesReferences"
 )
 ISSUE_FIELDS = (
     "title,state,stateReason,closedAt,assignees,author,comments,createdAt,"
@@ -555,6 +556,251 @@ def collapse_blank_runs(text: str) -> str:
     return "\n".join(out)
 
 
+# --- own-PR why / what (PR description and local run summary) -------------------------
+#
+# Every source is free-form multi-line markdown, but the fact section may not hold a
+# line starting with `## ` and must stay a formatter fixed point. So source text is
+# always flattened to one line and only ever placed inside `- <field>：` list items
+# (or their two-space sub-items): no emitted line can start with `## `.
+
+BODY_FIELD_MAX = 200
+CLOSING_ISSUES_MAX = 5
+_WHY_HEADINGS = frozenset({"why", "為什麼", "動機", "motivation", "背景"})
+_WHAT_HEADINGS = frozenset({"what", "做了什麼", "changes", "summary", "變更"})
+_HEADING_LINE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+_HTML_TAG_RE = re.compile(r"</?(?![A-Za-z][A-Za-z0-9+.-]*:)[A-Za-z][^>]*>")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
+
+
+def _clean_body_lines(text: str) -> list[str]:
+    """Drop fenced code, HTML comments, table rows, image lines, whole-line HTML and
+    inline HTML tags from `text`; returns the remaining lines (headings kept)."""
+    kept: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        marker = _FENCE_LINE.match(line)
+        if marker:
+            if fence is None:
+                fence = marker[1]
+            elif (
+                marker[1][0] == fence[0]
+                and len(marker[1]) >= len(fence)
+                and not marker[2].strip()
+            ):
+                fence = None
+            continue
+        if fence is None:
+            kept.append(line)
+    decommented = _HTML_COMMENT_RE.sub("", "\n".join(kept))
+    out: list[str] = []
+    for line in decommented.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("|", "![", "<")):
+            continue
+        out.append(_HTML_TAG_RE.sub("", line))
+    return out
+
+
+def _encodable(text: str) -> str:
+    """`text` with characters UTF-8 cannot encode (lone surrogates from a JSON `\\ud800`
+    escape) replaced by `?`, so writing the detail file cannot raise."""
+    return text.encode("utf-8", "replace").decode("utf-8")
+
+
+def _one_line(text: str) -> str:
+    """Collapse every whitespace run (newlines, `\\r`, tabs included) to one space; the
+    single choke point every PR body / summary field passes through."""
+    return _encodable(" ".join(text.split()))
+
+
+def _clip(text: str | None) -> str | None:
+    """One-line `text` capped at `BODY_FIELD_MAX` characters; empty becomes `None`."""
+    if text is None:
+        return None
+    flat = _one_line(text)
+    if not flat:
+        return None
+    if len(flat) > BODY_FIELD_MAX:
+        return flat[: BODY_FIELD_MAX - 1] + "…"
+    return flat
+
+
+def _join_fragments(lines: Sequence[str]) -> str | None:
+    """List items each start a fragment; other lines continue the current one;
+    fragments are joined with `；`."""
+    fragments: list[list[str]] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        marker = _LIST_MARKER_RE.match(stripped)
+        if marker:
+            fragments.append([stripped[marker.end() :]])
+        elif fragments:
+            fragments[-1].append(stripped)
+        else:
+            fragments.append([stripped])
+    flat = [_one_line("\n".join(f)) for f in fragments]
+    joined = "；".join(f for f in flat if f)
+    return joined or None
+
+
+def _section_text(lines: Sequence[str], headings: frozenset[str]) -> str | None:
+    """Body of the first heading whose lowercased title (trailing colon dropped) is in
+    `headings`, up to the next heading of the same or a higher level; sub-heading lines
+    are dropped, their content kept. `None` when absent or empty."""
+    start: int | None = None
+    level = 0
+    for index, line in enumerate(lines):
+        match = _HEADING_LINE.match(line.strip())
+        if match and match[2].rstrip(":：").strip().lower() in headings:
+            start, level = index + 1, len(match[1])
+            break
+    if start is None:
+        return None
+    body: list[str] = []
+    for line in lines[start:]:
+        match = _HEADING_LINE.match(line.strip())
+        if match:
+            if len(match[1]) <= level:
+                break
+            continue
+        body.append(line)
+    return _join_fragments(body)
+
+
+def extract_why_what(
+    body: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    """`(why, what, summary)` from a PR description; `summary` (the first non-heading
+    paragraph) is only set when neither a Why nor a What section exists."""
+    if not body or not body.strip():
+        return None, None, None
+    lines = _clean_body_lines(body)
+    why = _clip(_section_text(lines, _WHY_HEADINGS))
+    what = _clip(_section_text(lines, _WHAT_HEADINGS))
+    if why or what:
+        return why, what, None
+    paragraph: list[str] = []
+    for line in lines:
+        if _HEADING_LINE.match(line.strip()):
+            continue
+        if line.strip():
+            paragraph.append(line)
+        elif paragraph:
+            break
+    return None, None, _clip(_join_fragments(paragraph))
+
+
+def format_closing_issues(refs: Sequence[dict] | None, url: str) -> str | None:
+    """`#12` for an issue in the PR's repo, `owner/repo#7` for another; de-duplicated in
+    order, at most `CLOSING_ISSUES_MAX` shown. `None` when there is nothing to show."""
+    if not isinstance(refs, list):
+        return None
+    match = _URL_RE.match(url)
+    own = (match["owner"].lower(), match["repo"].lower()) if match else None
+    seen: set[tuple[str, str, int]] = set()
+    shown: list[str] = []
+    for ref in refs:
+        number = ref.get("number") if isinstance(ref, dict) else None
+        if not isinstance(number, int) or isinstance(number, bool):
+            continue
+        repository = ref.get("repository") or {}
+        owner = (repository.get("owner") or {}).get("login")
+        name = repository.get("name")
+        if owner and name:
+            key = (owner.lower(), name.lower())
+        elif own:
+            key = own
+        else:
+            continue
+        if (*key, number) in seen:
+            continue
+        seen.add((*key, number))
+        shown.append(
+            f"#{number}" if key == own else _encodable(f"{owner}/{name}#{number}")
+        )
+    if not shown:
+        return None
+    text = "、".join(shown[:CLOSING_ISSUES_MAX])
+    if len(shown) > CLOSING_ISSUES_MAX:
+        text += f"…等 {len(shown)} 項"
+    return text
+
+
+@dataclass(frozen=True)
+class SelfNotes:
+    """The author's own why/what for a PR, from a local run summary or plan Goal.
+
+    `rel` is the source path relative to `.maigo/` (e.g. `pr/40/summary-2.md`)."""
+
+    rel: str
+    kind: Literal["summary", "plan"]
+    why: str | None
+    what: str | None
+
+
+def _read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _pick_latest(directory: Path, stem: str) -> Path | None:
+    """The newest `<stem>.md` / `<stem>-<n>.md` in `directory`: highest number wins
+    (the unnumbered file counts as 1 and wins a tie), so `-10` beats `-2`."""
+    pattern = re.compile(rf"^{re.escape(stem)}(?:-([1-9]\d*))?\.md$")
+    best: tuple[tuple[int, bool], Path] | None = None
+    try:
+        for path in directory.iterdir():
+            match = pattern.match(path.name)
+            if not match or not is_listable_name(path.name) or not path.is_file():
+                continue
+            key = (int(match[1] or 1), match[1] is None)
+            if best is None or key > best[0]:
+                best = (key, path)
+    except OSError:
+        return None
+    return best[1] if best else None
+
+
+def find_self_notes(
+    maigo_dir: Path, ident: str | None, head_ref: str | None
+) -> SelfNotes | None:
+    """Local why/what for a PR: `pr/<ident>/` first, then `topic/<slug>/` (slug from the
+    head branch via `artifact_path.slugify`). A summary (`## 為什麼做`／`## 做了什麼`)
+    anywhere beats any plan (`## Goal`, why only). Read-only; unreadable files count as
+    absent."""
+    directories: list[Path] = []
+    if ident:
+        directories.append(maigo_dir / "pr" / ident)
+    slug = artifact_path.slugify(head_ref) if head_ref else None
+    if slug:
+        directories.append(maigo_dir / "topic" / slug)
+    directories = [d for d in directories if is_listable_name(d.name)]
+    kinds: tuple[Literal["summary", "plan"], ...] = ("summary", "plan")
+    for kind in kinds:
+        for directory in directories:
+            path = _pick_latest(directory, kind)
+            text = _read_text(path) if path else None
+            if path is None or text is None:
+                continue
+            lines = _clean_body_lines(text)
+            if kind == "summary":
+                why = _clip(_section_text(lines, frozenset({"為什麼做"})))
+                what = _clip(_section_text(lines, frozenset({"做了什麼"})))
+            else:
+                why = _clip(_section_text(lines, frozenset({"goal"})))
+                what = None
+            if why or what:
+                return SelfNotes(
+                    path.relative_to(maigo_dir).as_posix(), kind, why, what
+                )
+    return None
+
+
 def render_detail_facts(
     *,
     type: str,  # noqa: A002
@@ -573,14 +819,41 @@ def render_detail_facts(
     result: str | None = None,
     related_files: Sequence[str] = (),
     review_threads: list[dict] | None = None,
+    pr_body: str | None = None,
+    closing_issues: Sequence[dict] | None = None,
+    self_notes: SelfNotes | None = None,
 ) -> str:
     """The fact section (everything before `## 判斷`), work-board references/format-spec.md §1a; ends with a blank line.
+
+    Only for `🔀` (own PR), between `- 連結：` and `- 規模：`: `pr_body` becomes the
+    `- 對外（PR description）：` group (Why/What), `self_notes` the `- 自用（…）：` group,
+    `closing_issues` the `- 關聯 issue：` line; each is left out when empty.
 
     `related_files` are paths relative to `.maigo/` in the order to print (see
     `sort_related_files`); each becomes a backticked, detail-file-relative sub-item of
     `- 相關檔案：`, and the field is left out when there are none.
     """
     lines = [f"# {type} {status} — {' '.join(title.split())}", "", f"- 連結：<{url}>"]
+    if type == "🔀":
+        why, what, summary = extract_why_what(pr_body)
+        if why or what or summary:
+            lines.append("- 對外（PR description）：")
+            if summary:
+                lines.append(f"  - 說明：{summary}")
+            if why:
+                lines.append(f"  - 為什麼：{why}")
+            if what:
+                lines.append(f"  - 做了什麼：{what}")
+        if self_notes and (self_notes.why or self_notes.what):
+            suffix = " 的 Goal" if self_notes.kind == "plan" else ""
+            lines.append(f"- 自用（`../{self_notes.rel}`{suffix}）：")
+            if self_notes.why:
+                lines.append(f"  - 為什麼：{self_notes.why}")
+            if self_notes.what:
+                lines.append(f"  - 做了什麼：{self_notes.what}")
+        closing = format_closing_issues(closing_issues, url)
+        if closing:
+            lines.append(f"- 關聯 issue：{closing}")
     is_pr = type != "🐛"
     if is_pr and additions is not None and deletions is not None:
         size = f"- 規模：Δ+{additions}/-{deletions}"
@@ -1388,6 +1661,13 @@ def build(
                 review_threads=meta.get("reviewThreads"),
                 result=row.get("result") if row["type"] == "👀" else None,
                 related_files=related,
+                pr_body=meta.get("body"),
+                closing_issues=meta.get("closingIssuesReferences"),
+                self_notes=(
+                    find_self_notes(maigo_dir, ident, meta.get("headRefName"))
+                    if row["type"] == "🔀"
+                    else None
+                ),
             )  # fmt: skip
         if old is None:
             preserved = NEW_PRESERVED
