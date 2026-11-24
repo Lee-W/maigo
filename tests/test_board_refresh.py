@@ -2966,3 +2966,334 @@ def test_thread_fetch_failure_keeps_the_existing_detail(
     monkeypatch.setattr(sync, "run", run)
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     assert detail.read_bytes() == before
+
+
+# --- own PR: why / what ------------------------------------------------------------
+
+PR_URL = "https://github.com/o/r/pull/40"
+
+
+def own_facts(type="🔀", **kw) -> str:
+    """`render_detail_facts` with boilerplate filled; also proves the result splits."""
+    args = dict(
+        type=type, status="等 review", title="t", url=PR_URL, additions=3,
+        deletions=1, author="me", next_action=None, number=40,
+        last_reviewed_at=None, review_time_source=None, acknowledged_at=None,
+    )  # fmt: skip
+    args.update(kw)
+    facts = refresh.render_detail_facts(**args)
+    assert refresh.split_detail(facts + refresh.NEW_PRESERVED)[0] == facts
+    assert not any(ln.startswith("## ") for ln in facts.splitlines())
+    return facts
+
+
+def write_note(root: Path, rel: str, text: str) -> Path:
+    path = root / ".maigo" / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
+SUMMARY = (
+    "# T\n\n## 為什麼做\n\n使用者想先知道來龍去脈。\n\n```text\n需求 → 缺口\n```\n\n"
+    "## 做了什麼\n\n- 多出摘要\n- 帶出 issue\n\n```text\nA → B\n```\n\n## 怎麼做\n\n其他\n"
+)
+
+
+class TestOwnPrWhyAndWhat:
+    def test_pr_fields_include_body_and_closing_issues(self):
+        fields = refresh.PR_FIELDS.split(",")
+        assert "body" in fields
+        assert "closingIssuesReferences" in fields
+        assert "headRefName" in fields
+
+    def test_why_and_what_become_nested_single_lines(self):
+        body = "## Why\n\nBoard 只顯示 title，\n看不出為什麼。\n\n## What\n\n- 新增欄位\n- 帶出 issue\n"
+        facts = own_facts(pr_body=body)
+        lines = facts.splitlines()
+        i = lines.index("- 對外（PR description）：")
+        assert lines[i + 1] == "  - 為什麼：Board 只顯示 title， 看不出為什麼。"
+        assert lines[i + 2] == "  - 做了什麼：新增欄位；帶出 issue"
+        assert "說明：" not in facts
+        assert (
+            lines.index(f"- 連結：<{PR_URL}>")
+            < i
+            < lines.index("- 規模：Δ+3/-1 ｜ 作者：me")
+        )
+
+    @pytest.mark.parametrize(
+        "why", ["### Why", "## WHY", "## 為什麼", "## Why:", "## Motivation"]
+    )
+    def test_heading_variants_are_found(self, why):
+        facts = own_facts(pr_body=f"{why}\n\nbecause\n")
+        assert "  - 為什麼：because" in facts.splitlines()
+
+    def test_only_what(self):
+        facts = own_facts(pr_body="## What\n\ndone it\n")
+        assert "  - 做了什麼：done it" in facts.splitlines()
+        assert "為什麼" not in facts
+
+    def test_no_headings_falls_back_to_first_paragraph(self):
+        body = (
+            "| a | b |\n|---|---|\n<div>x</div>\n![img](u)\n\n"
+            "First para\nsecond line\n\nSecond para\n"
+        )
+        facts = own_facts(pr_body=body)
+        lines = facts.splitlines()
+        assert "  - 說明：First para second line" in lines
+        assert "為什麼" not in facts and "做了什麼" not in facts
+        assert "|" not in facts and "div" not in facts and "img" not in facts
+
+    @pytest.mark.parametrize(
+        "body", [None, "", "   \n\n", "<!-- only a comment\nspanning lines -->"]
+    )
+    def test_empty_body_omits_the_group(self, body):
+        facts = own_facts(pr_body=body)
+        assert "對外" not in facts
+
+    def test_heading_like_lines_and_fenced_headings(self):
+        body = (
+            "## Why\n\nreason\n\n## 判斷\n\ntext\n\n```\n## What\nfenced\n```\n\n"
+            "## 其他\n\nx\n"
+        )
+        facts = own_facts(pr_body=body)
+        assert "  - 為什麼：reason" in facts.splitlines()
+        assert "fenced" not in facts
+
+    def test_one_line_handles_carriage_returns_and_inline_html(self):
+        facts = own_facts(
+            pr_body="## Why\r\n\r\nline <b>bold</b> a\r\nb <https://x.y/z>\r\n"
+        )
+        assert "  - 為什麼：line bold a b <https://x.y/z>" in facts.splitlines()
+
+    def test_length_cap(self):
+        facts = own_facts(
+            pr_body="## Why\n\n" + "字" * 500 + "\n\n## What\n\n" + "x" * 200
+        )
+        why = next(ln for ln in facts.splitlines() if "為什麼：" in ln)
+        value = why.split("：", 1)[1]
+        assert len(value) == 200 and value.endswith("…")
+        what = next(ln for ln in facts.splitlines() if "做了什麼：" in ln)
+        assert what.split("：", 1)[1] == "x" * 200
+
+    def test_inline_angle_brackets_are_removed_as_html_today(self):
+        # Known limitation (format-spec §1a): generics like `Vec<T>` lose the tag.
+        assert refresh.extract_why_what("Vec<T> fix") == (None, None, "Vec fix")
+
+    def test_lone_surrogates_from_json_escapes_cannot_break_the_write(self, tmp_path):
+        body = json.loads(
+            '"## Why\\n\\nbad \\ud800 reason\\n\\n## What\\n\\n- x \\udfff"'
+        )
+        facts = own_facts(pr_body=body, closing_issues=[ref(7, "x\ud800", "y")])
+        facts.encode("utf-8")
+        assert "  - 為什麼：bad ? reason" in facts.splitlines()
+
+    def test_summary_file_with_encoded_surrogate_counts_as_absent(self, tmp_path):
+        # Local files are read as strict UTF-8, so a surrogate can only come from JSON.
+        path = write_note(tmp_path, "pr/40/summary.md", "")
+        path.write_bytes(
+            "## 為什麼做\n\nbad \ud800 x\n".encode("utf-8", "surrogatepass")
+        )
+        assert refresh.find_self_notes(tmp_path / ".maigo", "40", None) is None
+
+    def test_subheading_content_is_kept_in_section(self):
+        facts = own_facts(pr_body="## What\n\n### Part\n\ninner\n\n## Next\n\nouter\n")
+        assert "  - 做了什麼：inner" in facts.splitlines()
+
+    def test_other_types_are_unchanged_by_the_new_arguments(self):
+        notes = refresh.SelfNotes("pr/40/summary.md", "summary", "w", "x")
+        extra = dict(
+            pr_body="## Why\n\nz\n", self_notes=notes,
+            closing_issues=[{"number": 1}],
+        )  # fmt: skip
+        for kind in ("👀", "🐛"):
+            assert own_facts(type=kind, **extra) == own_facts(type=kind)
+
+    def test_own_pr_without_new_arguments_has_no_new_fields(self):
+        facts = own_facts()
+        assert "對外" not in facts and "自用" not in facts and "關聯" not in facts
+
+    def test_group_order(self):
+        notes = refresh.SelfNotes("pr/40/summary.md", "summary", "w", None)
+        facts = own_facts(
+            pr_body="## Why\n\nz\n", self_notes=notes, closing_issues=[{"number": 1}]
+        )
+        lines = facts.splitlines()
+        marks = [
+            "- 對外（PR description）：",
+            "- 自用（`../pr/40/summary.md`）：",
+            "- 關聯 issue：#1",
+        ]
+        assert [lines.index(m) for m in marks] == sorted(lines.index(m) for m in marks)
+
+
+def ref(number, owner="o", name="r"):
+    """A `closingIssuesReferences` item as `gh pr view --json` returns it."""
+    return {
+        "id": f"I_{number}",
+        "number": number,
+        "repository": {
+            "id": f"R_{name}",
+            "name": name,
+            "owner": {"id": f"O_{owner}", "login": owner},
+        },
+        "url": f"https://github.com/{owner}/{name}/issues/{number}",
+    }
+
+
+class TestClosingIssues:
+    def test_same_and_cross_repo_keep_order(self):
+        refs = [ref(12), ref(7, "x", "y"), ref(3)]
+        assert refresh.format_closing_issues(refs, PR_URL) == "#12、x/y#7、#3"
+
+    def test_case_insensitive_same_repo(self):
+        assert refresh.format_closing_issues([ref(1, "O", "R")], PR_URL) == "#1"
+
+    def test_duplicates_collapse(self):
+        refs = [ref(12), ref(12), ref(12, "x", "y"), ref(12, "X", "Y")]
+        assert refresh.format_closing_issues(refs, PR_URL) == "#12、x/y#12"
+
+    def test_more_than_five(self):
+        out = refresh.format_closing_issues([ref(n) for n in range(1, 8)], PR_URL)
+        assert out == "#1、#2、#3、#4、#5…等 7 項"
+
+    def test_missing_repository_means_same_repo(self):
+        assert refresh.format_closing_issues([{"number": 4}], PR_URL) == "#4"
+
+    @pytest.mark.parametrize(
+        "refs", [None, [], [{"repository": {}}], [{"number": None}], "x"]
+    )
+    def test_nothing_to_show(self, refs):
+        assert refresh.format_closing_issues(refs, PR_URL) is None
+
+
+class TestSelfNotes:
+    def test_pr_dir_summary_is_found(self, tmp_path):
+        write_note(tmp_path, "pr/40/summary.md", SUMMARY)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", "feat/x")
+        assert notes == refresh.SelfNotes(
+            "pr/40/summary.md", "summary",
+            "使用者想先知道來龍去脈。", "多出摘要；帶出 issue",
+        )  # fmt: skip
+        facts = own_facts(self_notes=notes)
+        lines = facts.splitlines()
+        i = lines.index("- 自用（`../pr/40/summary.md`）：")
+        assert lines[i + 1] == "  - 為什麼：使用者想先知道來龍去脈。"
+        assert lines[i + 2] == "  - 做了什麼：多出摘要；帶出 issue"
+        assert "需求" not in facts and "A → B" not in facts
+
+    def test_cross_repo_ident(self, tmp_path):
+        write_note(tmp_path, "pr/r-40/summary.md", SUMMARY)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "r-40", None)
+        assert notes and notes.rel == "pr/r-40/summary.md"
+
+    def test_topic_dir_via_slugified_branch(self, tmp_path):
+        write_note(tmp_path, "topic/feat-my-board/summary.md", SUMMARY)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", "feat/my-board")
+        assert notes and notes.rel == "topic/feat-my-board/summary.md"
+        assert "- 自用（`../topic/feat-my-board/summary.md`）：" in own_facts(
+            self_notes=notes
+        )
+
+    def test_pr_dir_wins_over_topic(self, tmp_path):
+        write_note(tmp_path, "pr/40/summary.md", SUMMARY)
+        write_note(tmp_path, "topic/feat-x/summary.md", SUMMARY)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", "feat/x")
+        assert notes and notes.rel == "pr/40/summary.md"
+
+    @pytest.mark.parametrize(
+        ("ident", "head"), [("40", None), ("40", "中文"), (None, None), (None, "中文")]
+    )
+    def test_nothing_found(self, tmp_path, ident, head):
+        write_note(tmp_path, "pr/41/summary.md", SUMMARY)
+        assert refresh.find_self_notes(tmp_path / ".maigo", ident, head) is None
+        assert "自用" not in own_facts(
+            self_notes=refresh.find_self_notes(tmp_path / ".maigo", ident, head)
+        )
+
+    def test_plan_goal_only_has_why(self, tmp_path):
+        write_note(
+            tmp_path, "pr/40/plan.md", "# P\n\n## Goal\n\n做 X。\n\n## Steps\n\n1. a\n"
+        )
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", None)
+        assert notes == refresh.SelfNotes("pr/40/plan.md", "plan", "做 X。", None)
+        lines = own_facts(self_notes=notes).splitlines()
+        assert "- 自用（`../pr/40/plan.md` 的 Goal）：" in lines
+        assert "  - 為什麼：做 X。" in lines
+        assert not any("做了什麼" in ln for ln in lines)
+
+    def test_summary_anywhere_beats_plan(self, tmp_path):
+        write_note(tmp_path, "pr/40/plan.md", "## Goal\n\ng\n")
+        write_note(tmp_path, "topic/feat-x/summary.md", SUMMARY)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", "feat/x")
+        assert notes and notes.kind == "summary"
+
+    def test_empty_summary_falls_to_plan(self, tmp_path):
+        write_note(tmp_path, "pr/40/summary.md", "# T\n\n## 怎麼做\n\nx\n")
+        write_note(tmp_path, "pr/40/plan.md", "## Goal\n\ng\n")
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", None)
+        assert notes and notes.kind == "plan" and notes.why == "g"
+
+    def test_latest_numbered_summary_wins_numerically(self, tmp_path):
+        for name in ("summary.md", "summary-2.md", "summary-10.md"):
+            write_note(tmp_path, f"pr/40/{name}", f"## 為什麼做\n\n{name}\n")
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", None)
+        assert notes and notes.rel == "pr/40/summary-10.md"
+
+    def test_unnumbered_wins_a_tie_with_dash_one(self, tmp_path):
+        write_note(tmp_path, "pr/40/summary-1.md", "## 為什麼做\n\nold\n")
+        write_note(tmp_path, "pr/40/summary.md", "## 為什麼做\n\nnew\n")
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", None)
+        assert notes and notes.rel == "pr/40/summary.md"
+
+    def test_odd_content_stays_one_line_per_field(self, tmp_path):
+        text = (
+            "## 為什麼做\n\n| a | b |\n<div>x</div>\n## 判斷\nreal reason\n"
+            "<!-- c -->\n\n## 做了什麼\n\n1. one\n2. two\n"
+        )
+        write_note(tmp_path, "pr/40/summary.md", text)
+        notes = refresh.find_self_notes(tmp_path / ".maigo", "40", None)
+        assert notes and notes.what == "one；two"
+        own_facts(self_notes=notes)
+
+    def test_unreadable_files_count_as_absent(self, tmp_path):
+        path = write_note(tmp_path, "pr/40/summary.md", "x")
+        path.write_bytes(b"\xff\xfe\x00bad")
+        assert refresh.find_self_notes(tmp_path / ".maigo", "40", None) is None
+
+    def test_missing_directory(self, tmp_path):
+        assert refresh.find_self_notes(tmp_path / ".maigo", "40", "feat/x") is None
+
+
+class TestOwnPrEndToEnd:
+    def test_refresh_writes_both_groups_for_own_pr_only(self, tmp_path, gh):
+        write_board(
+            tmp_path,
+            board_text(
+                focus=[row(1, author="carol")],
+                wait=[row(3, icon="🔀", status="等 review", author="me")],
+            ),
+        )
+        for n in (1, 3):
+            put_detail(tmp_path, n)
+        write_note(tmp_path, "pr/3/summary.md", SUMMARY)
+        body = "## Why\n\nreason\n\n## What\n\n- a\n- b\n"
+        closing = [ref(12)]
+        gh.prs[1] = pr_meta(
+            1, author="carol", body=body, closingIssuesReferences=closing
+        )
+        gh.prs[3] = pr_meta(
+            3, author="me", body=body, closingIssuesReferences=closing,
+            headRefName="feat/x",
+        )  # fmt: skip
+        assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+        own = (tmp_path / ".maigo/i/3.md").read_text()
+        assert "  - 為什麼：reason" in own
+        assert "  - 做了什麼：a；b" in own
+        assert "- 自用（`../pr/3/summary.md`）：" in own
+        assert "- 關聯 issue：#12" in own
+        review = (tmp_path / ".maigo/i/1.md").read_text()
+        assert "對外" not in review and "自用" not in review and "關聯" not in review
+        before = own
+        assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+        assert (tmp_path / ".maigo/i/3.md").read_text() == before

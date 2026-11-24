@@ -185,6 +185,57 @@ class TestScriptArtifactsAreFixedPoints:
         assert "  - `../review/1/review.md`\n" in facts
         assert layout_violations(facts + refresh.NEW_PRESERVED) == []
 
+    def _own_pr_facts(self, **kw) -> str:
+        return refresh.render_detail_facts(
+            type="🔀",
+            status="等 review",
+            title="Own PR",
+            url="https://github.com/o/r/pull/1",
+            additions=3,
+            deletions=1,
+            author="me",
+            next_action=None,
+            number=1,
+            last_reviewed_at=None,
+            review_time_source=None,
+            acknowledged_at=None,
+            **kw,
+        )
+
+    def test_new_detail_file_for_own_pr_with_two_groups(self):
+        facts = self._own_pr_facts(
+            pr_body="## Why\n\nBoard 看不出原因。\n\n## What\n\n- 新增欄位\n- 帶出 issue\n",
+            closing_issues=[
+                {"number": 12, "repository": {"name": "r", "owner": {"login": "o"}}},
+                {"number": 7, "repository": {"name": "y", "owner": {"login": "x"}}},
+            ],
+            self_notes=refresh.SelfNotes(
+                rel="pr/1/summary.md", kind="summary", why="自己的原因", what="自己做的"
+            ),
+            related_files=["pr/1/summary.md"],
+        )
+        lines = facts.splitlines()
+        assert "- 對外（PR description）：" in lines
+        assert "  - 為什麼：Board 看不出原因。" in lines
+        assert "  - 做了什麼：新增欄位；帶出 issue" in lines
+        assert "- 自用（`../pr/1/summary.md`）：" in lines
+        assert "  - 為什麼：自己的原因" in lines
+        assert "- 關聯 issue：#12、x/y#7" in lines
+        assert layout_violations(facts + refresh.NEW_PRESERVED) == []
+
+    def test_own_pr_facts_with_pathological_sources_stay_fixed_point(self):
+        nasty = (
+            "## Why\n\n| a | b |\n|---|---|\n## 判斷\n\n```\n## code\n```\n"
+            "## 其他\n\ntext   with   gaps\n\n## What\n\n- x\n\n\n- y\n"
+        )
+        facts = self._own_pr_facts(
+            pr_body=nasty,
+            self_notes=refresh.SelfNotes(
+                rel="pr/1/summary.md", kind="summary", why="a | b", what="## 判斷"
+            ),
+        )
+        assert layout_violations(facts + refresh.NEW_PRESERVED) == []
+
     def test_old_preserved_area_is_normalised_on_refresh(self):
         old = "## 判斷\n\n\n## 筆記\n\n\n<!-- 手寫區 -->\n"
         assert layout_violations(old) != []
