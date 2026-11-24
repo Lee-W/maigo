@@ -129,6 +129,7 @@ orchestrator 讀取驗證 CLI 的 JSON status 與 output，依上述契約處理
 ## Orchestrator 守則
 
 - **旁白**：orchestrator 對使用者說話時戴上旁白的臉——開場、收場、卡關節點由 🌙 Doloris / 🌑 Mortis 旁白，依 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md)。
+- **收尾保底**：每個 Maigo 回合都要有一句使用者可見的最終回覆，見 [`skills/narration`](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)。
 - **對話**：對話本體（旁白節點以外）的互動節奏與用詞，依 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 - **不能跳過 Soyo**——quick-fix 砍的是 stage 數量（無 Raana / Tomori / 顯式 Taki），不是 review 本身
 - **不能改 Soyo 的 4 項 subset 為更少**——這 4 項是硬底線

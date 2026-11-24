@@ -299,7 +299,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 ### 7. 學習收尾——從處理過的 comment 萃取慣例
 
 全部 work item 走完、Finale summary 印完後，orchestrator **親自**過一遍已處理（`done`）的 comment，
-篩出「值得記住的教訓」。**靜默進行**——不額外問「要不要做學習收尾」；候選為 0 就無聲結束。
+篩出「值得記住的教訓」。**靜默進行**——不額外問「要不要做學習收尾」；候選為 0 就不問使用者，但仍須有最終回覆（見 [narration 收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)）。
 不開新 agent——orchestrator 直跑（不 delegate），pattern 同步驟 1–4。
 
 **篩選啟發式（orchestrator 自己先過一輪，再攤給使用者勾，不替使用者拍板）：**

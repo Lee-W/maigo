@@ -60,6 +60,8 @@ Orchestrator 守則（旁白、不自實作、不跳關、commit message draft�
 | NEEDS_CHANGES / BLOCKED | PASS | 回到愛音修 must-fix，**修完要重跑 Soyo + Taki**（不能假設 test 還會綠） |
 | NEEDS_CHANGES / BLOCKED | FAIL | 回到愛音兩邊一起修，重跑 Soyo + Taki |
 
+每個 Maigo 回合都要有一句使用者可見的最終回覆，見 [narration 收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)。
+
 合流時兩份結果必須對應同一份變更快照；以
 [`skills/failure-handling`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/SKILL.md)
 的驗證失敗規則判斷修復後哪些結果已失效。

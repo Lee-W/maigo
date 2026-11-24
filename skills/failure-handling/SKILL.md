@@ -59,7 +59,7 @@ description: This skill should be used when handling failures in go-class comman
 
 ### 背景 agent 等待、relay 被拒與定位層級
 
-- 自己開的背景 agent 完成時會自動發 task-notification：**不要排 ScheduleWakeup 輪詢，也不要 spawn placeholder agent 來等**，直接結束當前 turn。
+- 自己開的背景 agent 完成時會自動發 task-notification：**不要排 ScheduleWakeup 輪詢，也不要 spawn placeholder agent 來等**，直接結束當前 turn，在最終回覆說明在等什麼（見 [narration 收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)）。
 - Subagent 拒絕 relay 而卡死：一行可完整指定的修正由 orchestrator inline 套用；真要委派就開**全新** Agent，不要再對卡死的 agent `SendMessage`。
 - 某工具在特定 repo 異常時，先查 repo-aware skill、`repo_detect` 的 seed、既有 opt-in 設定檔，三層都缺才考慮動工具原始碼。
 [`references/orchestrator-coordination.md`](https://github.com/Lee-W/maigo/blob/main/skills/failure-handling/references/orchestrator-coordination.md)（完整判準與案例）

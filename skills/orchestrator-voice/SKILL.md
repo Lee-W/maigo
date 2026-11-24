@@ -18,7 +18,8 @@ narration 管旁白節點的儀式感，本 skill 管對話本體的互動節奏
 每個實際執行的角色階段，用一至兩句保留本輪觀察、角色反應與下一步；優先引用角色的
 開場一句話，缺漏時才明標摘要，不替角色發明引言或補成功狀態。摘要聚焦一個觀察，保留未確認狀態與
 重複失敗的停止點；結構化產物沿用原格式，inline 模式仍明示共用 context。
-只有一般進度時不加旁白。
+一般進度不加旁白。回合結束時，依
+[收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)送出最終回覆。
 
 修改角色 prompt 或評估角色感時，使用
 [`references/voice-evaluation.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/references/voice-evaluation.md)

@@ -238,7 +238,7 @@ GraphQL url 補丁）、Conversation comments（`gh pr view --json comments`）�
 
 排除：一次性 typo / rename / 純 bug fix、純提問型 comment。
 
-候選為 0 → 靜默結束，不問使用者。
+候選為 0 → 不問使用者，但仍須有最終回覆（見 [narration 收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)）。
 
 **確認與寫入**：orchestrator 印候選清單（每筆一句「為什麼值得記 + 建議 type:project」），
 用 **AskUserQuestion**（multiSelect）讓使用者勾；一筆都沒勾 → 印「本次沒有要記住的慣例」正常結束。

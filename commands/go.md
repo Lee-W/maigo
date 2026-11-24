@@ -37,6 +37,8 @@ description: MyGO!!!!! 跑一遍——樂奈先看、燈寫計畫、愛音動手
 準備截圖、前後對照的終端輸出，或擷取不到時的待截清單（純重構、只動測試、只改 skill 或 docs 的文字內容等沒有可見差異就整步略過），
 見 teammate-flow 的「Commit message draft + 落地」段。
 
+每個 Maigo 回合都要有一句使用者可見的最終回覆，見 [narration 收尾保底](https://github.com/Lee-W/maigo/blob/main/skills/narration/SKILL.md#收尾保底)。
+
 ## `--worktree`（opt-in，預設不開）
 
 帶這個旗標時，在 🐱 樂奈開始之前，orchestrator 親自跑：
