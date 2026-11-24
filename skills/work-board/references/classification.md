@@ -7,7 +7,7 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 
 1. URL → 直接解析 owner/repo + 型別 + 編號
 2. 裸編號 → `gh api repos/<owner>/<repo>/issues/<n>`，有 `pull_request` key ＝ PR
-3. PR 再看 `author.login` 是否等於 `gh api user --jq .login` → 🔀 vs 👀
+3. PR 再看 `author.login` 是否等於 `gh api user --jq .login` → 🔀 vs 👀；接棒清單裡的 PR 一律當 🔀，見 [format-spec](https://github.com/Lee-W/maigo/blob/main/skills/work-board/references/format-spec.md)
 4. `gh` 抓不到 → 狀態詞 `抓不到`（P0，orchestrator 指派），併進 🎯（🐛／🔀）或 👀（別人的 PR）最上面，附錯誤末行
 
 ### 刷新時抓的欄位
@@ -49,7 +49,7 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | 你最後活動後有別人新 comment | `有新回覆` → `/maigo:triage-issue <n>`（重判） | 🎯 | P2 |
 | prior `NEEDS_INFO` 或你留言後無新活動 | `NEEDS_INFO` | ⏳ | P8 |
 
-**🔀 你的 PR**（每次刷新純由 gh metadata 重算，不看 prior_status）：
+**🔀 你的 PR（含接棒）**（每次刷新純由 gh metadata 重算，不看 prior_status）：
 
 | 條件 | 狀態 | section | rank |
 |---|---|---|---|
@@ -62,6 +62,7 @@ echo '[{"type": "🐛", "gh_meta": {"state": "OPEN"}, "prior_status": null}]' \
 | `reviewDecision == APPROVED` 且 CI 綠 | `可合併` → `gh pr merge <n>` | 🎯 | P3 |
 | `statusCheckRollup` 有 PENDING（其餘正常） | `CI 等待` | ⏳ | P8 |
 | 其他（最後活動是你） | `等 review` | ⏳ | P8 |
+| 作者不是你（接棒）且落在上面最後兩列 | `接棒` | 🎯 | P5 |
 
 **👀 在審的 PR**：
 

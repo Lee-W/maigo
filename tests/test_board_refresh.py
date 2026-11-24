@@ -1440,6 +1440,19 @@ def test_skill_load_examples_parse():
     }
 
 
+def test_takeover_format_spec_example_parses():
+    text = SKILL_MD.read_text(encoding="utf-8")
+    start = text.index("# 接手的 PR\n")
+    fence = text.rindex("```text\n", 0, start) + len("```text\n")
+    example = text[fence : text.index("```", fence)]
+    assert set(refresh.parse_takeover(example, "format-spec.md", REPO)) == {
+        ("o", "r", 4821),
+        ("o", "r", 4822),
+        ("other-org", "other-repo", 17),
+        ("example", "project", 9),
+    }
+
+
 # --- board-weights: same-rank boost ---------------------------------------------
 
 EXAMPLE_WEIGHTS = """\
@@ -1575,6 +1588,228 @@ def test_w7_utf8_bom_at_file_start_is_ignored(tmp_path, gh):
     )
     assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
     assert focus_order(tmp_path) == [3, 1, 2, 4]
+
+
+# --- board-takeover: PRs taken over from someone else ---------------------------
+
+TAKEOVER_SAMPLE = """\
+# 接手的 PR
+76991  # 還沒決定 push 到作者 branch 或另開 PR
+#69849
+o/x#5
+https://github.com/Apache/Airflow/pull/7/
+# 7
+#note
+76991
+"""
+
+
+def put_takeover(root: Path, text: str) -> Path:
+    path = root / ".maigo" / "board-takeover.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
+def setup_takeover_pr(root, gh, *, icon="👀", status="待 review", mark=" ", **meta):
+    write_board(root, board_text(focus=[row(1, mark, icon=icon, status=status)]))
+    put_detail(root, 1)
+    gh.prs[1] = pr_meta(1, author="carol", **meta)
+
+
+def test_takeover_parse_grammar():
+    found = refresh.parse_takeover(TAKEOVER_SAMPLE, "t.txt", "o/r")
+    expected = {
+        ("o", "r", 76991),
+        ("o", "r", 69849),
+        ("o", "x", 5),
+        ("apache", "airflow", 7),
+    }
+    assert set(found) == expected
+    assert ("o", "r", 7) not in found  # `# 7` is a comment
+    assert found[("apache", "airflow", 7)] == "Apache/Airflow#7"
+
+
+def test_takeover_parse_empty_and_comment_only_is_empty():
+    assert refresh.parse_takeover("", "t.txt", "o/r") == {}
+    assert refresh.parse_takeover("# a\n\n  # b\n", "t.txt", "o/r") == {}
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "https://github.com/o/r/issues/5",
+        "abc",
+        "76991 extra",
+        "²",
+        "#²",
+    ],
+)
+def test_takeover_parse_rejects_bad_lines(bad):
+    with pytest.raises(refresh.RefreshError) as error:
+        refresh.parse_takeover(f"# ok\n{bad}\n", "board-takeover.txt", "o/r")
+    assert error.value.code == 1
+    assert "board-takeover.txt:2" in str(error.value)
+
+
+def test_takeover_moves_review_row_to_next(tmp_path, gh):
+    setup_takeover_pr(tmp_path, gh)
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    rows = section_rows(tmp_path)
+    assert len(rows["🎯"]) == 1 and "🔀 接棒 @carol" in rows["🎯"][0]
+    assert not rows.get("👀")
+
+
+def test_takeover_waiting_after_push_stays_next(tmp_path, gh):
+    setup_takeover_pr(
+        tmp_path,
+        gh,
+        statusCheckRollup=[{"status": "IN_PROGRESS"}],
+        comments=[
+            {"author": {"login": YOU}, "createdAt": "2026-09-20T00:00:00Z"},
+        ],
+    )
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    rows = section_rows(tmp_path)
+    assert len(rows["🎯"]) == 1 and "🔀 接棒" in rows["🎯"][0]
+
+
+def test_takeover_blocker_keeps_own_status(tmp_path, gh):
+    setup_takeover_pr(tmp_path, gh, statusCheckRollup=[{"conclusion": "FAILURE"}])
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    rows = section_rows(tmp_path)
+    assert len(rows["🎯"]) == 1 and "🔀 CI 紅" in rows["🎯"][0]
+
+
+def test_takeover_removed_from_list_reverts_to_review(tmp_path, gh):
+    setup_takeover_pr(tmp_path, gh, icon="🔀", status="接棒")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    rows = section_rows(tmp_path)
+    assert len(rows["👀"]) == 1 and "👀" in rows["👀"][0]
+    assert not rows.get("🎯")
+
+
+def test_takeover_own_pr_never_reverted(tmp_path, gh):
+    write_board(
+        tmp_path, board_text(focus=[row(1, icon="🔀", status="CI 紅", author=YOU)])
+    )
+    put_detail(tmp_path, 1, icon="🔀", status="CI 紅")
+    gh.prs[1] = pr_meta(1, author=YOU, statusCheckRollup=[{"conclusion": "FAILURE"}])
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    rows = section_rows(tmp_path)
+    assert len(rows["🎯"]) == 1 and "🔀" in rows["🎯"][0]
+
+
+def test_takeover_merged_keeps_own_retention(tmp_path, gh):
+    five_days = (NOW - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    done = [
+        row(1, " ", icon="👀", status="merged", numbered=False),
+        row(2, " ", icon="👀", status="merged", numbered=False),
+    ]  # unchecked: no learning-pending exemption from the 3-day review retention
+    write_board(tmp_path, board_text(done=done))
+    for n in (1, 2):
+        put_detail(tmp_path, n, status="merged")
+        gh.prs[n] = pr_meta(n, state="MERGED", mergedAt=five_days)
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    text = (tmp_path / ".maigo/board.md").read_text()
+    assert "i/1.md" in text  # listed: 7-day own retention
+    assert "i/2.md" not in text  # unlisted 👀: 3-day retention, aged out
+    assert "i/1.md" in "".join(section_rows(tmp_path)["✅"])
+
+
+def test_takeover_checked_row_skips_ack(tmp_path, gh):
+    published = _checked_review_setup(tmp_path, gh)
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "acknowledged_at" not in report.metadata(Path(published["path"]).read_text())
+    rows = section_rows(tmp_path)
+    assert rows["🎯"][0].startswith("1. [x]")
+
+
+def test_takeover_not_on_board_warns(tmp_path, gh, capsys):
+    setup_takeover_pr(tmp_path, gh)
+    put_takeover(tmp_path, "9\n")
+    before = board_lines(tmp_path)
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert any("o/r#9" in w and "不在板上" in w for w in summary["warnings"])
+    assert board_lines(tmp_path) == before
+
+
+def test_takeover_on_board_but_unreachable_warns_skip_not_missing(tmp_path, gh, capsys):
+    setup_takeover_pr(tmp_path, gh)
+    gh.fail = {1}
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    warnings = json.loads(capsys.readouterr().out)["warnings"]
+    assert any("o/r#1" in w and "本輪略過" in w for w in warnings)
+    assert not any("不在板上" in w for w in warnings)
+
+
+def test_takeover_listed_issue_warns_and_stays_issue(tmp_path, gh, capsys):
+    write_board(tmp_path, board_text(focus=[row(4, icon="🐛", status="待 triage")]))
+    put_detail(tmp_path, 4, kind="issues", icon="🐛", status="待 triage")
+    gh.issues[4] = issue_meta(4)
+    put_takeover(tmp_path, "4\n")
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    warnings = json.loads(capsys.readouterr().out)["warnings"]
+    assert any("o/r#4" in w and "是 issue" in w for w in warnings)
+
+
+def test_takeover_listed_dropped_item_warns(tmp_path, gh, capsys):
+    write_board(tmp_path, board_text(focus=[row(1)]))
+    put_detail(tmp_path, 1)
+    gh.prs[1] = pr_meta(1)
+    state = tmp_path / ".maigo" / "_internal" / "board"
+    state.mkdir(parents=True)
+    drop = {"url": url(1), "event": "drop", "reason": "drop", "at": _ago(days=1)}
+    (state / "dropped.jsonl").write_text(json.dumps(drop) + "\n")
+    put_takeover(tmp_path, "1\n")
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    warnings = json.loads(capsys.readouterr().out)["warnings"]
+    assert any("o/r#1" in w and "已被 drop" in w for w in warnings)
+
+
+def test_takeover_row_without_author_not_reverted(tmp_path, gh):
+    write_board(
+        tmp_path, board_text(focus=[row(1, icon="🔀", status="接棒", author="")])
+    )
+    put_detail(tmp_path, 1, icon="🔀", status="接棒")
+    meta = pr_meta(1, author="carol")
+    meta["author"] = None
+    gh.prs[1] = meta
+    g = refresh.gather(
+        tmp_path, REPO, YOU, now=NOW, add=[], max_new=50,
+        discovery=False, stale_days=14, jobs=1,
+    )  # fmt: skip
+    assert refresh.apply_takeover(g, {}) == []
+    entry = next(e for e in g.entries if e.line is not None)
+    assert entry.line["type"] == "🔀"
+
+
+def test_takeover_empty_you_never_reverts(tmp_path, gh):
+    setup_takeover_pr(tmp_path, gh, icon="🔀", status="接棒")
+    g = refresh.gather(
+        tmp_path, REPO, "", now=NOW, add=[], max_new=50,
+        discovery=False, stale_days=14, jobs=1,
+    )  # fmt: skip
+    assert refresh.apply_takeover(g, {}) == []
+    entry = next(e for e in g.entries if e.line is not None)
+    assert entry.line["type"] == "🔀"
+
+
+def test_takeover_bad_line_rejects_before_gh(tmp_path, gh, capsys):
+    setup_takeover_pr(tmp_path, gh)
+    path = put_takeover(tmp_path, "1\nabc\n")
+    before = tree_hash(tmp_path)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 1
+    assert f"{path}:2:" in capsys.readouterr().err
+    assert tree_hash(tmp_path) == before
+    assert not [c for c in gh.calls if c[:2] == ["gh", "pr"]]
 
 
 # --- T8 / T9: aging and closed artifacts ------------------------------------------

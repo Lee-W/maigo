@@ -140,6 +140,7 @@ class BoardStatus(str, Enum):
     MERGEABLE = "可合併"
     CI_PENDING = "CI 等待"
     AWAITING_REVIEW = "等 review"
+    TAKEN_OVER = "接棒"
 
     # 👀 在審的 PR
     OTHERS_DRAFT = "他人草稿"
@@ -269,6 +270,7 @@ _STATUS_META: dict[BoardStatus, StatusMeta] = {
     # P5：手上正在做
     BoardStatus.IN_PROGRESS: StatusMeta(Rank.P5, None),
     BoardStatus.WIP: StatusMeta(Rank.P5, None),
+    BoardStatus.TAKEN_OVER: StatusMeta(Rank.P5, None),
     # P6：沒判過
     BoardStatus.PENDING_TRIAGE: StatusMeta(
         Rank.P6, "/maigo:triage-issue <n>", "triage"
@@ -340,6 +342,7 @@ _OWN_PR_STATES = frozenset(
         BoardStatus.MERGEABLE,
         BoardStatus.CI_PENDING,
         BoardStatus.AWAITING_REVIEW,
+        BoardStatus.TAKEN_OVER,
     }
 )
 # 🔀 你的 PR 判定表完全不看 prior_status，每次刷新純由 gh_meta 重算——
@@ -382,6 +385,7 @@ ALLOWED_TRANSITIONS: dict[BoardStatus | None, frozenset[BoardStatus]] = {
     BoardStatus.MERGEABLE: _OWN_PR_ALL_TRANSITIONS,
     BoardStatus.CI_PENDING: _OWN_PR_ALL_TRANSITIONS,
     BoardStatus.AWAITING_REVIEW: _OWN_PR_ALL_TRANSITIONS,
+    BoardStatus.TAKEN_OVER: _OWN_PR_ALL_TRANSITIONS,
     # Review transitions are determined by current local/GitHub evidence.
     **{status: _REVIEW_TRANSITIONS for status in _REVIEW_STATES},
     # 終端狀態：無出邊（只能被 purge），自迴圈代表「刷新時原樣保留」
@@ -601,7 +605,10 @@ def _classify_issue(
     return prior_status or BoardStatus.PENDING_TRIAGE
 
 
+# 作者不是你的 🔀 ＝接棒清單裡的 PR，型別由 board_refresh.apply_takeover 維護
 def _classify_own_pr(gh_meta: dict, you: str) -> BoardStatus:
+    author = (gh_meta.get("author") or {}).get("login") or ""
+    taken_over = bool(author and you and author.lower() != you.lower())
     if gh_meta.get("state") == "MERGED" or gh_meta.get("mergedAt"):
         return BoardStatus.MERGED
     if gh_meta.get("state") == "CLOSED":
@@ -621,6 +628,8 @@ def _classify_own_pr(gh_meta: dict, you: str) -> BoardStatus:
         return BoardStatus.NEW_COMMENT
     if gh_meta.get("reviewDecision") == "APPROVED" and ci == "green":
         return BoardStatus.MERGEABLE
+    if taken_over:
+        return BoardStatus.TAKEN_OVER
     if ci == "pending":
         return BoardStatus.CI_PENDING
     return BoardStatus.AWAITING_REVIEW
