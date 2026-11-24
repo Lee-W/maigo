@@ -70,7 +70,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
 
 - URL 直接解析 owner / repo / issue-or-PR / number
 - 裸編號用 `gh api repos/<owner>/<repo>/issues/<n>`；有 `pull_request` key 就是 PR
-- PR 再比對 `gh api user --jq .login` 與 author，分成 🔀 你的 PR / 👀 在審的 PR
+- PR 再比對 `gh api user --jq .login` 與 author，分成 🔀 你的 PR / 👀 在審的 PR；在接棒清單（`.maigo/board-takeover.txt`）裡的 PR 一律 🔀
 - 抓不到就標狀態詞 `抓不到`（rank P0，併進 🎯 或 👀 最上面，依型別），附錯誤末行
 
 加入時以 `#<n>` 或 `owner/repo#<n>` 為 key upsert；既有 checkbox 與 `🧠` 狀態必須保留。
@@ -95,7 +95,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    - **exit 2**（CAS 衝突：board.md 或細節檔在刷新期間被改過；除了 review.md 的 ack 標記外未寫任何檔）→ 直接重跑一次；再撞到就停下，
      告訴使用者 board 正被別的 session 寫。**不要**改用 `Write`。
    - **exit 1**（前置條件拒絕）→ 依訊息分流：舊格式或 `review-board.md` → 走下面的「手動流程 fallback」
-     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權或載入樣板設定檔有壞行（訊息含檔名與行號）→ 回報原文。
+     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權、載入樣板或接棒清單設定檔有壞行（訊息含檔名與行號）→ 回報原文。
    - **exit 3**（寫入階段失敗）→ 回報備份路徑與錯誤，不 fallback。`--json` 的 `exit_reason` 是 `write_failed`
      ＝已從備份還原；是 `post_write_failed` ＝board 已是新版、只有 ledger／snapshot 沒寫成，把輸出列出的
      未寫事件回報給使用者，說明重跑是安全的。

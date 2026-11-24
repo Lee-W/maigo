@@ -70,6 +70,7 @@ BACKUP_KEEP = 10
 WEIGHTS_FILENAME = "board-weights.txt"
 WEIGHT_PREFIXES = ("author", "title")
 LOAD_FILENAME = "board-load.txt"
+TAKEOVER_FILENAME = "board-takeover.txt"
 # `board-load.txt` keys and the placeholders each one may use
 LOAD_KEYS = {"pr": {"number"}, "branch": {"branch", "number"}}
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
@@ -179,6 +180,61 @@ def load_weights(root: Path, explicit: Path | None = None) -> list[WeightRule]:
             raise RefreshError(1, f"{path}: 無法讀取加權檔（{error}）") from error
         rules.extend(parse_weights(text, str(path)))
     return rules
+
+
+def parse_takeover(text: str, source: str, repo: str) -> dict[tuple, str]:
+    """Parse one `board-takeover.txt`: one PR per line, `ref` then optional `# note`.
+
+    Returns `sync.ref_key` -> display `owner/repo#N`. A line starting with `#` is a
+    comment unless what follows `#` is all digits (`#76991` is a PR ref).
+    """
+    found: dict[tuple, str] = {}
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        token, *tail = line.split(None, 1)
+        rest = tail[0].strip() if tail else ""
+        if token.startswith("#") and not token[1:].isdigit():
+            continue
+        display: str | None = None
+        key: tuple | None = None
+        digits = token[1:] if token.startswith("#") else token
+        if digits.isdigit():
+            if not digits.isdecimal():  # `²`: isdigit() but int() raises
+                raise RefreshError(
+                    1, f"{source}:{number}: 無法解析接棒清單 {raw.strip()!r}"
+                )
+            display = f"{repo}#{int(digits)}"
+            key = sync.ref_key(f"https://github.com/{repo}/pull/{int(digits)}")
+        elif (short := _SHORT_REF_RE.match(token)) is not None:
+            display = f"{short['owner']}/{short['repo']}#{int(short['number'])}"
+            key = sync.ref_key(
+                f"https://github.com/{short['owner']}/{short['repo']}/pull/{short['number']}"
+            )
+        elif (url := sync._URL_RE.match(token)) is not None and url["kind"] == "pull":
+            display = f"{url['owner']}/{url['repo']}#{int(url['number'])}"
+            key = sync.ref_key(token)
+        if key is None or display is None or (rest and not rest.startswith("#")):
+            raise RefreshError(
+                1,
+                f"{source}:{number}: 無法解析接棒清單 {raw.strip()!r}"
+                "（只接受 76991、#76991、owner/repo#76991 或 PR URL）",
+            )
+        found.setdefault(key, display)
+    return found
+
+
+def load_takeover(root: Path, repo: str) -> dict[tuple, str]:
+    """Repo-layer `.maigo/board-takeover.txt` only; absent file means no take-overs."""
+    path = root / ".maigo" / TAKEOVER_FILENAME
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeDecodeError) as error:
+        raise RefreshError(1, f"{path}: 無法讀取接棒清單（{error}）") from error
+    return parse_takeover(text, str(path), repo)
 
 
 def parse_load_templates(text: str, source: str) -> dict[str, str]:
@@ -1078,6 +1134,54 @@ def gather(
 # --- classify and render (no writes) --------------------------------------------
 
 
+def apply_takeover(g: Gathered, takeover: dict[tuple, str]) -> list[str]:
+    """Rewrite PR types in memory from the take-over list; returns warnings.
+
+    Listed 👀 -> 🔀; a 🔀 whose author is not you and that left the list -> 👀.
+    """
+    warnings: list[str] = []
+    live: set = set()
+    excluded: set = set()
+    unreachable: set = set()
+    you = (g.you or "").lower()
+    for entry in g.entries:
+        key = entry.key
+        listed = key is not None and key in takeover
+        if entry.excluded:
+            if key is not None and listed:
+                excluded.add(key)
+            continue
+        if "gh_meta" not in entry.fetch:
+            if key is not None and listed:
+                unreachable.add(key)
+            continue
+        holder = entry.line if entry.line is not None else entry.fetch
+        current = holder.get("type")
+        if key is not None and listed:
+            live.add(key)
+            if current == "🐛":
+                warnings.append(f"接棒清單的 {takeover[key]} 是 issue，略過")
+            elif current == "👀":
+                holder["type"] = "🔀"
+        elif current == "🔀":
+            author = (entry.fetch["gh_meta"].get("author") or {}).get("login") or ""
+            if author and you and author.lower() != you:
+                holder["type"] = "👀"
+    for key, display in takeover.items():
+        if key in live:
+            continue
+        if key in excluded:
+            warnings.append(f"接棒清單的 {display} 已被 drop，清單不會讓它回來")
+        elif key in unreachable:
+            warnings.append(f"接棒清單的 {display} 這輪抓不到 gh 資料，本輪略過")
+        else:
+            warnings.append(
+                f"接棒清單的 {display} 不在板上"
+                f"（用 `/maigo:board {display}` 加入；已結案可從清單移除）"
+            )
+    return warnings
+
+
 def run_acks(g: Gathered, *, dry_run: bool) -> list[dict]:
     items = []
     for entry in g.entries:
@@ -1786,10 +1890,12 @@ def run_refresh(
     now = now or _now()
     rules = load_weights(root, weights_file)  # bad lines reject before any gh call
     load_templates = load_load_templates(root)
+    takeover = load_takeover(root, repo)  # bad lines reject before any gh call
     g = gather(
         root, repo, you, now=now, add=add, max_new=max_new, discovery=discovery,
         stale_days=stale_days, jobs=jobs,
     )  # fmt: skip
+    takeover_warnings = apply_takeover(g, takeover)  # before run_acks: no ack for 🔀
     with refresh_lock(root) if apply else contextlib.nullcontext():
         if (
             apply and _read_hash(g.board_path) != g.board_hash
@@ -1798,6 +1904,7 @@ def run_refresh(
         ack_results = run_acks(g, dry_run=not apply)
         built = build(g, ack_results, rules, load_templates)
         summary = summarize(g, built)
+        summary["warnings"] += takeover_warnings
         summary["applied"] = apply
         if not apply:
             diff = difflib.unified_diff(

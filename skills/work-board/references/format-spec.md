@@ -243,6 +243,7 @@ rank 決定排序與所在 section，10 級由緊急到不急：P0 最急，P9 �
 | 🔀 你的 PR | `可合併` | P3 |
 | 🔀 你的 PR | `CI 等待` | P8 |
 | 🔀 你的 PR | `等 review` | P8 |
+| 🔀 你的 PR | `接棒`（作者不是你、在接棒清單裡，原本會是 `CI 等待`／`等 review`） | P5 |
 | 👀 在審的 PR | `他人草稿` | P8 |
 | 👀 在審的 PR | `待 review` | P4 |
 | 👀 在審的 PR | `↩︎ 回你的球` | P2 |
@@ -307,6 +308,24 @@ review verdict 沿用 [`strict-review`](https://github.com/Lee-W/maigo/blob/main
   # 載到本機的指令樣板（範例）
   pr:wt switch pr:{number}
   branch:wt switch {branch}
+  ```
+- **接棒清單（`board-takeover.txt`）**：你接手別人開的 PR 自己做完時，把它登記在
+  `<maigo-root>/.maigo/board-takeover.txt`（只有 repo 層，沒有使用者層）。清單內且還開著的 PR 刷新時一律當 🔀
+  （「你負責做完」），落在 🎯；作者不是你、原本會落 ⏳ 的情況（`CI 等待`、`等 review`）改顯示 `接棒`（P5），
+  衝突、CI 紅、有新 comment 等卡住的狀態照舊。結案後照 🔀 的 7 天保留進 ✅。從清單拿掉後，作者不是你的 🔀
+  下次刷新自動回 👀。清單裡有、板上沒有的 PR 只在摘要警告，不會自動加入（用 `/maigo:board <ref>` 加）。
+  是 issue 的項目略過並警告。
+
+  格式一行一個 PR，空行忽略；ref 可以是 `76991`、`#76991`（綁定的 repo）、`owner/repo#76991` 或 PR URL，
+  ref 後面可接 `#` 開頭的行尾註解；`#` 後面不是純數字的行是註解，`#76991` 是一筆 PR。重複的 PR 合併成一筆。
+  無法解析的行（含 issue URL）以 `檔名:行號` 大聲失敗（`refresh` exit 1，未寫任何檔）。範例（虛構編號）：
+
+  ```text
+  # 接手的 PR
+  4821  # 還沒決定 push 到作者 branch 或另開 PR
+  #4822
+  other-org/other-repo#17
+  https://github.com/example/project/pull/9
   ```
 - ⏳ / ✅ 區：自己的（🔀／🐛）在前、👀 在後，各群內 `updatedAt` 降序（這兩區是查閱，不是待辦）。
 - ✅ 區在刷新時自動清掉過期與超量的行，清掉時同時寫入排除紀錄（`reason: aged`，§3a）。規則依序是：

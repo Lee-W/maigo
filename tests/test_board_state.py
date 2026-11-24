@@ -221,6 +221,51 @@ class TestClassifyOwnPr:
         assert result.section is bs.Section.WAITING
         assert result.rank is bs.Rank.P8
 
+    @staticmethod
+    def _meta(author="carol", **extra):
+        meta = {
+            "state": "OPEN",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "statusCheckRollup": [],
+            "createdAt": "2026-01-01T00:00:00Z",
+        }
+        if author is not None:
+            meta["author"] = {"login": author}
+        meta.update(extra)
+        return meta
+
+    def test_other_author_awaiting_review_is_taken_over(self):
+        result = _classify(bs.ItemType.OWN_PR, self._meta(), None)
+        assert result.status is bs.BoardStatus.TAKEN_OVER
+        assert result.section is bs.Section.NEXT
+        assert result.rank is bs.Rank.P5
+
+    def test_other_author_ci_pending_is_taken_over(self):
+        gh_meta = self._meta(
+            statusCheckRollup=[{"status": "IN_PROGRESS"}],
+            comments=[{"author": {"login": YOU}, "createdAt": "2026-01-02T00:00:00Z"}],
+        )
+        result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
+        assert result.status is bs.BoardStatus.TAKEN_OVER
+        assert result.section is bs.Section.NEXT
+
+    def test_other_author_ci_red_keeps_ci_red(self):
+        gh_meta = self._meta(statusCheckRollup=[{"conclusion": "FAILURE"}])
+        result = _classify(bs.ItemType.OWN_PR, gh_meta, None)
+        assert result.status is bs.BoardStatus.CI_RED
+        assert result.rank is bs.Rank.P1
+
+    def test_missing_author_stays_awaiting_review(self):
+        result = _classify(bs.ItemType.OWN_PR, self._meta(author=None), None)
+        assert result.status is bs.BoardStatus.AWAITING_REVIEW
+        assert result.section is bs.Section.WAITING
+
+    def test_empty_you_stays_awaiting_review(self):
+        result = bs.classify(bs.ItemType.OWN_PR, self._meta(), None, you="")
+        assert result.status is bs.BoardStatus.AWAITING_REVIEW
+        assert result.section is bs.Section.WAITING
+
 
 # ---------------------------------------------------------------------------
 # 👀 在審的 PR — rebuilt table
@@ -667,6 +712,14 @@ _OWN_PR_GH_META_SCENARIOS = [
         "author": {"login": YOU},
         "createdAt": "2026-01-01T00:00:00Z",
     },
+    {
+        "state": "OPEN",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "statusCheckRollup": [],
+        "author": {"login": "carol"},
+        "createdAt": "2026-01-01T00:00:00Z",
+    },
 ]
 _OWN_PR_PRIOR_CANDIDATES = [
     None,
@@ -678,6 +731,7 @@ _OWN_PR_PRIOR_CANDIDATES = [
     bs.BoardStatus.MERGEABLE,
     bs.BoardStatus.CI_PENDING,
     bs.BoardStatus.AWAITING_REVIEW,
+    bs.BoardStatus.TAKEN_OVER,
     bs.BoardStatus.UNREACHABLE,
 ]
 
