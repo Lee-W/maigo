@@ -199,14 +199,31 @@ limit——單一 session 內可能撞多次不同重置點，每次都有整批
   整輪驗證停擺，換成 `-verify` 路徑重派才跑通。）
 
 - 平行派出的 agent 若對同一個 repo 跑 `git fetch`，**一律 fetch 到含 target repo 的具名 ref**（例如
-  `git -C <target-root> fetch <matching-remote> +pull/<N>/head:refs/review/<owner>/<repo>/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
-  「不要用 `FETCH_HEAD`」。**refspec 開頭要有 `+`**：重審時早先 session 留下的同名 ref 已存在，
+  `git -C <target-root> fetch --no-prune --no-tags <matching-remote> +pull/<N>/head:refs/review/<owner>/<repo>/pr-<N>-latest`），或直接用裸 SHA，交辦 prompt 裡要寫明
+  「不要用 `FETCH_HEAD`」。**指令要帶 `--no-prune`**：使用者的 git 若設了 `fetch.prune=true`，fetch 會把目的命名空間
+  （`refs/review/...`）下這次沒抓到的 ref 當成遠端已刪除而清掉，先前或別隻 agent 抓好的 PR ref 就不見了。一次要抓多顆時，
+  把所有 refspec 放在同一個 `git fetch` 指令裡；fetch 後除了比對 SHA，也確認其他顆的 ref 還在（`git for-each-ref refs/review/`）。
+  （實例：2026-11-24，批次抓 30 顆 PR 的 head 時，先抓好的 ref 被後面的 fetch 清掉，加上 `--no-prune` 重抓才齊。）
+  **refspec 開頭要有 `+`**：重審時早先 session 留下的同名 ref 已存在，
   沒有 `+` 會被 `! [rejected] (non-fast-forward)` 拒絕、ref 靜默留在舊 head，後面的 worktree 與
   所有派工就對著舊 head 審（實例：重審時 `review-pr-<N>` 仍指著舊 head，PR 實際 head 早已前進）。fetch 後一律拿 `git rev-parse <ref>` 與
   `gh pr view <canonical-PR-url> --json headRefOid` 比對，不一致就停下重抓。`FETCH_HEAD` 是整個 repo 共用的單一檔案，後跑的 fetch 會覆寫先跑的，
   讀到的可能是別隻 agent 的 PR。實例（2026-10-01）：一隻探索 agent 拿 `git diff main FETCH_HEAD`
   看到另一顆 PR 的 snowflake 改動，就誤判成「main 在 session 中途被 fast-forward」；查 `git reflog`
   才確認 main 根本沒動。
+
+- **`.maigo` 指向專案目錄之外時，派出的 agent 不直接寫 `.maigo`**。集中 state root 的設定下，
+  `.maigo` 是指到專案外的 symlink（`/bin/ls -la <repo-root>/.maigo` 會顯示 `->` 與目標路徑）；背景 agent 對那裡的
+  `Edit`／`Write` 會停在權限確認上，而 orchestrator 看不到那個提示。徵兆是 agent 跑很久、目標檔的 mtime
+  沒動、送訊息也不回。這時交辦改成：
+  - agent 把產出寫到 scratchpad 的獨立檔（rubric 的增補寫成 `rubric-delta.md`，草稿寫到
+    `<scratchpad>/t<PR號>/out/`），既有的 `rubric.md`、`draft.md`、`inline-comments.md` 只讀不改；
+  - 全部回報後由 orchestrator 一次落地到 `.maigo`，落地前先把原檔備份到 scratchpad；草稿要通過查核才落地；
+  - 先派一隻確認這條路走得通，再整批派；已經卡住的 agent 直接停掉重派，不要等。
+
+  命令文件裡「燈寫 rubric」「重審時用 `Edit` 改既有草稿」在這個設定下由 orchestrator 落地時完成，
+  底稿仍是既有檔。agent 用 Bash 執行的 script 寫同一個目錄不受影響（publisher、`board_sync.py`）。
+  （實例：2026-11-24，8 隻燈被交辦 `Edit` 既有 rubric，全部停了十幾分鐘沒有產出；改寫增補檔後重派才完成。）
 
 ## 立希的驗證 worktree（單 PR 與批次共用）
 
@@ -253,6 +270,24 @@ PR URL 的 target repo 決定讀碼與驗證 checkout，入口的 home repo 決�
      再對**同一個路徑**執行 `git -C <target-root> worktree remove --force <path>`；內容不像驗證產物就不要強制，照下一條回報。
    - 仍移除失敗，或流程中途中斷（session 結束、立希失敗、停手）：不刪其他任何東西，
      在最終報告列出 target checkout、殘留 worktree 路徑與 `refs/review/<owner>/<repo>/pr-<N>-latest`，讓使用者決定。
+
+### 不在 PR 範圍的失敗：在 base 上跑一次對照
+
+立希回報的失敗落在 PR 沒有改到的檔案時，報告不能只寫「未歸因」就發佈。批次裡只要有一顆出現這種失敗，
+orchestrator 在 publish 之前另建一個 base 的 detached worktree（`.worktrees/review-<owner>-<repo>-main-baseline`，
+HEAD 是當下的 `<remote>/main`），派一隻立希用**同樣的指令與環境設定**重跑那幾組，結果寫到 scratchpad 的
+`tbaseline/`，各顆報告共用。
+
+- 每組的結論只有三種：base 上同樣失敗（訊息相同）、base 上通過、base 上失敗但訊息不同。比對要有依據
+  （錯誤行逐行比對，或失敗的 test ID 集合相同），不是只比數量。
+- base 上同樣失敗的，報告寫「在 `<base 短 SHA>` 上以同樣的指令重現、訊息相同，不是這顆 PR 造成的」；
+  不推論成因，也不延伸成 CI 上的結果。base 上通過的，回頭查是哪顆 PR 造成的，那是 finding。
+- 同一個 worktree 先後跑不同 project 的測試時，後者用 `uv run --exact`：殘留的套件會讓缺依賴的失敗消失，
+  對照就不成立。
+- 對照做一次就夠；同一批裡多顆 PR 出現同一組失敗時，不要每顆各跑一次。
+
+（實例：2026-11-24，24 份報告裡有多份把本機的型別檢查錯誤與 provider 測試失敗標成未歸因；事後在 main 上
+跑五組對照約四分鐘，全部重現，並因此重發了四份報告。先跑對照就不必重發。）
 
 ## 持久 Work Board（跨 session 追蹤）
 
