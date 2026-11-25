@@ -170,3 +170,41 @@ branch added, and leave same-kind lines that already exist on the target branch.
 - 🟡 Soyo reads the per-test base-branch result and the worktree-removal proof; she does not
   open a worktree herself.
 - List changed files that the plan's subject does not mention.
+
+---
+
+## Companion questions for new failure, cancel and concurrency paths
+
+Not a sixth sweep; a short list of questions to ask yourself about new code before a PR
+opens, for diffs that add a feature rather than fix a line. Two feature PRs came back from
+local self-review with zero must-fix, and human reviewers then raised several substantive
+problems between them (apache/airflow #76000, #71072; the same shapes recurred in #76799,
+#76797 and #76999). Every one came from asking "what if X fails, is cancelled, or runs
+twice at once" rather than from reading the happy path. For each new `try`/`except`,
+`finally`, flag, cache, merged configuration and per-loop query, answer:
+
+- **An exception is swallowed: what does the code degrade to?** A failed annotation lookup
+  should fall back to "names only" instead of failing the whole call; a failed credential
+  fetch should let a fallback chain move to its next member rather than end the chain
+  (apache/airflow #76799, #76797).
+- **Cancelled or timed out: who cleans up?** A `finally` that closes only the stream can
+  leave the remote side's turn running, and a re-entry then lands in the new run's state;
+  starting a server with its default logging configuration can disable every other log
+  handler in the process (apache/airflow #76000).
+- **Two scheduler instances at once: is each state flag valid on its own?** A flag reset by
+  only one scheduler is reset at the wrong time for the others; "the fetch came back empty"
+  and "the fetch came back short" both fail to prove the backlog is drained. Also decide
+  deliberately whether one row per scheduler is acceptable and write the decision in a
+  comment (apache/airflow #71072).
+- **A passed-in configuration: does it replace the whole structure or merge per key?** A
+  nested mapping may replace a whole section while dotted keys override one entry at a time;
+  check against the real tool, not the docstring (apache/airflow #76000).
+- **A claim in docs or a docstring that is broader than the code paths behind it.** See
+  "Behaviour claims in docs" in
+  [`airflow-aware/references/docs-conventions.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/docs-conventions.md)
+  (apache/airflow #76999).
+- **Cost on a hot path.** A new `GROUP BY` in code that runs on every scheduler loop is paid
+  at steady state every loop; move it to a periodic callback (apache/airflow #71072).
+
+How to apply: put these questions in the self-review prompt itself; checking the diff only
+against a rule list found none of them in the two PRs above.

@@ -233,6 +233,84 @@ verify with a mutation canary (see the "Mutation test 作為修法驗證證據" 
 
 ---
 
+## Tests that stay green when the implementation is wrong
+
+Before calling a test done, imagine the most likely wrong implementation (a clause
+dropped, an argument not bound, two loops swapped, a field renamed) and ask whether the
+test would turn red. Each shape below is a way a test keeps passing through that change.
+Confirm every fix with one mutation: make the wrong change, and the new case must be the
+one that turns red.
+
+- **Compound condition: one case per clause.** For `if A and B:`, a parametrized test
+  that varies only `A` and hard-codes `B` as true in every case locks nothing about `B`;
+  deleting `B` from the condition leaves it green. List the clauses and make sure each
+  has a case where only that clause is false. Look first at inputs hard-coded in the test
+  body rather than in the parametrize fields: the clause they feed is the untested one.
+  Add only the missing case, not every combination. Example: a "login is `token` and a
+  password is present" check had three cases that all carried a password, so dropping the
+  password clause was invisible and an empty password would be sent as a literal
+  `Bearer None` (apache/airflow #76797).
+- **A group of members: assert every member's own setting.** When a chain (fallback
+  chain, middleware stack, handler list) holds members that each carry their own
+  configuration, and the scenario is "first fails, second answers", reading only the
+  answering member's marker leaves the failed member's configuration unchecked; building
+  it wrong (an identifier of `None`) stays green. Assert over the whole group, for
+  example compare `[m.attr for m in members]` with the expected list. If the member type
+  is only a base class statically, filter with `isinstance` first; a member of the wrong
+  type shortens the list and the same assertion still fails (apache/airflow #76801).
+- **Drop a version `skipif` once the dependency floor covers it.** A
+  `skipif(<field missing>)` written for an old dependency version never fires after the
+  declared lower bound guarantees the field. Worse, its condition still probes for the
+  field, so when upstream renames it the test is skipped while production code that
+  depends on the old name (a `pop("<field>")`, say) silently stops working. When you
+  raise a dependency's floor, search the tests for `skipif`, `importorskip` and `hasattr`
+  branches conditioned on that dependency's fields or APIs and delete the ones the new
+  floor makes dead; don't write a new one the floor already covers. Afterwards confirm
+  the test is PASSED rather than SKIPPED, and that no import is left unused
+  (apache/airflow #76801).
+- **A documented call form is tested the documented way.** When the docs tell users to
+  pass a class or function as a factory or callable, the test passes it the same way.
+  Bind test-only arguments (a mock transport) with `functools.partial(X, transport=...)`,
+  not a lambda that re-maps the arguments by hand: the lambda never exercises the real
+  signature, so renaming a parameter that the caller passes by keyword would break the
+  documented usage while the test stayed green. Check whether the caller invokes the
+  factory positionally or by keyword and keep that form (apache/airflow #76802).
+- **Ordering, loop order, swallowed exceptions.** Test data for a sort should be
+  deliberately arranged so the wrong ordering differs from the expected one; names that
+  already sort alphabetically make a test pass when only the sort key is wrong
+  (apache/airflow #71072). When two nested loops decide precedence (specific rule before
+  catch-all), arrange the data so swapping the loops turns the test red (apache/airflow
+  #76999). A test for "the exception is swallowed so the flow continues" must assert that
+  the flow did continue (the next tick still created its run), not only that nothing
+  raised (apache/airflow #71072). Negative `caplog` or structured-log assertions need the
+  full event string; see the structured-log capture note in the log-assertion section
+  below.
+- **Reviewing someone else's test.** Name the one-line change that would leave the test
+  green (for example "this passes if `== 404` is loosened to `>= 400`") and ask for the
+  extra case, with the concrete case spelled out (apache/airflow #73926, #76918). A gap
+  that is pure mock plumbing (a mocked helper would pass even if a flag were dropped) was
+  marked non-blocking by the maintainer who raised it (apache/airflow #76806). That is a
+  single data point, so whether a plumbing-only gap should be a nit or a must-fix is not
+  settled; treat the nit as the default and raise it to must-fix only when a flag's
+  default would make the behaviour go silently wrong.
+
+---
+
+## Once logic moves to a shared helper, delete the caller tests that repeat it
+
+After logic is extracted into a shared helper that has its own test module, delete the
+tests in each caller's module that repeat the helper's cases one for one. Keep only the
+assertions specific to the caller, such as which step its message names. A test with no
+assertion of its own that runs the same path as every other test in its class goes too.
+
+How to apply: when a refactor creates a shared helper plus tests for it, grep the caller
+test modules for cases that now duplicate the helper's and remove them in the same PR.
+A fallback for error detail that moved into a shared utility with its own test class,
+while the caller kept a parametrized test with the same four cases, was flagged for
+removal (apache/airflow #76802).
+
+---
+
 ## Prose-guard tests need a bounded window and both directions
 
 Tests that guard "does this documentation section list the right N items"

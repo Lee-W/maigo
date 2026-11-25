@@ -64,6 +64,30 @@ conversation's table, the 動作 column says `貼` or `不必回覆` per item.
 
 ---
 
+## A reply to a substantive fix gives root cause, change and added test, then any remaining caveat
+
+Sort each thread first. A mechanical fix gets the short reply ("Done."). A fix for a real
+problem the reviewer found is the "write more" case in `SKILL.md`'s voice baseline, and it
+has three parts, each one short:
+
+1. **Root cause**: one sentence on the mechanism that made it wrong, not a retelling of the
+   diff.
+2. **The change**: what was changed.
+3. **What was added**: the test or docs case that now pins it.
+
+When the fix leaves a limitation, add a last paragraph that says so plainly: list what the
+fix now handles and what it still does not, so the reviewer does not read the fix as
+complete.
+
+Why: the reply is the design record inside the thread. A reviewer can decide whether to
+approve without rereading the diff, and is not led to think the fix is more complete than it
+is (apache/airflow #76801).
+
+How to apply: cite only symbols that are already committed, add no attribution footer to a
+reply to a reviewer, and keep the caveat to what is actually still true after the change.
+
+---
+
 ## Design-discussion replies pitch differentiation, not self-critique
 
 When drafting a reply in a PR design discussion, focus on what the proposal would provide once

@@ -101,7 +101,7 @@ from scheduler/worker internals. Cross-boundary changes need extra scrutiny — 
 ### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 During a **review task** (🟡 Soyo running `strict-review` on an Airflow diff), read `references/review-checks.md` and append its sub-checks as items 10+, with the severity each states.
-Its "Contents" list enumerates 10.1–10.40 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the 10.x sub-checks and the unnumbered release-tag and DB portability sections (also review-only); the file's other sections (e.g. uv.lock drift diagnostic, `uv` version pin churn, example-Dag policy, migration PR conventions, secrets-masker tests) are read when the task matches them, per the index table below.
+Its "Contents" list enumerates 10.1–10.41 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the 10.x sub-checks and the unnumbered release-tag and DB portability sections (also review-only); the file's other sections (e.g. uv.lock drift diagnostic, `uv` version pin churn, example-Dag policy, migration PR conventions, secrets-masker tests) are read when the task matches them, per the index table below.
 
 ### 11. CLI / REST / docs / backport conventions
 
@@ -116,7 +116,7 @@ Its "Contents" list enumerates 10.1–10.40 plus the unnumbered release-tag chec
 | `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, third-party dependency floors, Dag authoring, example-Dag imports that need an extra of their own |
 | `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle, embedded-server logging reset |
 | `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds (incl. baseline-worktree rule); same-process Sphinx test leaks; attribution; relock pin-back to the documented version; docs screenshot procedure |
-| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims and before a doc's "on Airflow X and later" claim. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests; 10.39 cross-provider extra vs root `[tool.uv] conflicts`, 10.40 skip-retry exception for errors retrying cannot fix |
+| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims and before a doc's "on Airflow X and later" claim. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests; 10.39 cross-provider extra vs root `[tool.uv] conflicts`, 10.40 skip-retry exception for errors retrying cannot fix, 10.41 an agent co-author trailer on someone else's PR is only a non-blocking reminder |
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
 | `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity, provider public-surface compatibility, adapter config merge vs required settings |
 | `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs (incl. third-party class vs declared version floor), docs examples |
@@ -133,6 +133,6 @@ Its "Contents" list enumerates 10.1–10.40 plus the unnumbered release-tag chec
 Builds on [`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/SKILL.md) (Layering above); pairs with [`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md).
 
 **Review scenario** — run `strict-review`'s 9-item base checklist, then apply these as Airflow supplements: convention 2 (naming) → base item 4; 4 and 5 (style, correctness) → items 5–6;
-6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.40) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
+6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.41) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
 
 **Quick-fix / refactor scenario** — use conventions 3–7 as background. Flag violations you notice, but do not run the full `strict-review` checklist unless the task calls for it; §10 is review-only.

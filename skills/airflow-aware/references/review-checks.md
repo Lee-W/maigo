@@ -54,6 +54,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.38** Deferrable path: validate hook support on the worker before deferring, and prove parity with the synchronous path through real serialization (Request changes, scope-gated to diffs that touch `deferrable`, a trigger, or `execute_complete`)
 - **10.39** A cross-provider extra that pulls in another provider's extra can collide with root `[tool.uv] conflicts` and block users from installing a conflicting extra alongside it; check the conflicts table, prefer docs or a dedicated extra over widening (Request changes, scope-gated to a diff that adds or widens a cross-provider extra)
 - **10.40** An error that retrying cannot fix (corrupt data, configuration error) should raise a skip-retry exception from the `AirflowFailException` family; transient failures stay retryable (Request changes, scope-gated to a diff that adds or changes an exception path in task execution, hook or trigger-resume code)
+- **10.41** Someone else's PR with an agent `Co-Authored-By` trailer: a non-blocking one-line reminder, once per author per batch, never a must-fix (judgment gate, scope-gated to reviews of another contributor's PR)
 - **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim; includes a variant for provider docs that say "on Airflow X and later"). The author-side counterpart is sweep (c) in [`strict-review/references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
@@ -1347,6 +1348,34 @@ failure (an interrupted I/O call, a timeout) must stay retryable; confirm it doe
 skip-retry exception.
 
 Source: apache/airflow #76381 (missed in one review round, caught by a second reviewer).
+
+## 10.41 Someone else's PR with an agent `Co-Authored-By` trailer: a non-blocking reminder, not a must-fix *(judgment gate — only when reviewing another contributor's apache/airflow PR; never for your own commits)*
+
+The repo's contributor instructions say never to list an agent as a commit co-author. When a
+commit in someone else's PR carries an agent's `Co-Authored-By` trailer, do not list it as
+must-fix and do not let it change the verdict. Mention it in the review body as one
+non-blocking sentence. When the same author has several PRs in one batch and each carries the
+trailer, mention it on one of them only and leave the rest silent. The reason is that Airflow
+merges by squash, so the committer can drop the trailer from the merge message.
+
+How to apply:
+
+- When delegating the review of another contributor's Airflow PR, say explicitly that an agent
+  co-author trailer is a nit and does not affect the verdict.
+- For a batch of PRs by one author, the orchestrator checks all of them once
+  (`git log --format='%h %(trailers:only)' <merge-base>..<head>`) and decides the single place
+  to mention it, instead of letting each reviewer find it separately.
+- This covers only other people's PRs. The author's own commits still never carry an agent
+  trailer, so this note does not relax that rule. The generic "commit content violation is
+  must-fix" line in
+  [`strict-review/references/review-judgment.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-judgment.md)
+  §5 defers to this entry for the trailer case.
+
+Source: apache/airflow #77024, #76982 and #76750 (same author, every commit carried the
+trailer; the reviewer flagged it as must-fix on only one of the three, so the standard was
+inconsistent). The "non-blocking, once per batch" choice was inferred from one maintainer
+decision in that batch, not from a stated project rule; revise it if the maintainer decides
+otherwise.
 
 ## Before calling a symbol "already released" or a change "breaking", check the release tags *(judgment gate — when a review comment or recommendation rests on a compatibility claim)*
 

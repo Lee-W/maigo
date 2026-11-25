@@ -68,6 +68,22 @@ a new reader-facing docs page counts as user-facing for the PR template's screen
 requirement, even though "it's just docs." Don't wait for a reviewer to ask. See the
 screenshot procedure in `verification-tooling.md` §6.
 
+## A new-feature PR is run for real before it opens, with a screenshot or demo attached
+
+Before opening a PR that adds a feature (a new adapter, a new toolset capability, a new
+hook), run an example Dag for it in breeze or against a real workspace, and attach a
+screenshot, a gif or the log output to the PR description or the first comment. On three
+consecutive provider feature PRs a maintainer asked for a demo of a working Dag after the PR
+was opened (apache/airflow #76799, #76000, #76797); supplying it up front saves that round
+trip. That it is asked of every new-feature PR is a generalisation from those three, not a
+stated project rule.
+
+The same evidence rule governs what the docs may say, and is kept with the docs rules in
+`docs-conventions.md`: example output is pasted from a real run, a "tested with" or
+"measured" sentence needs a source the reader can check or is deleted, and a published guide
+carries no "never run live" note (run it, then remove the note). See "Example outputs and
+measurements in docs come from a real run" and "Status claims in provider docs" there.
+
 ## Don't prefix a doc-only commit's subject with `Docs:`
 
 The subject of a doc-only commit must not start with `Docs:`. `docs` is

@@ -632,7 +632,7 @@ a worktree root, not to `--project` itself.
 
 ### Sub-project `uv run` quirks that look like the PR broke something
 
-Three setup failures in sub-projects look like a regression in the PR but are the scratch environment:
+Four setup failures in sub-projects look like a regression in the PR but are the scratch environment:
 
 - `dev/registry` has no `uv.lock`, so `uv run --project dev/registry pytest …` must **not** carry `--frozen`. The local
   command that works is `uv run --python 3.12 --no-project --with pytest --with packaging --with pydantic --with pyyaml
@@ -642,9 +642,17 @@ Three setup failures in sub-projects look like a regression in the PR but are th
   `PYTHONPATH` lists every `shared/<dist>/src` directory (expand the glob; `PYTHONPATH` does not; the docs-build entry below makes the same point about every
   `<worktree>/shared/*/src`).
 - Breeze's own tests run as `uv run --project dev/breeze pytest …` (inferred from its `uv.lock` existing, not run, so `--frozen` should work there).
+- A freshly created verification worktree builds its venv with whatever interpreter `uv` picks, which can be newer than the
+  one the main checkout uses (3.15 against 3.12 in the observed case). On that newer version `pyarrow` and
+  `confluent-kafka` have no wheels, so every check dies in the build step before `ruff` or `pytest` starts. For a
+  `--project` target that has a `uv.lock`, always run `uv run --python 3.12 --frozen --project <PROJECT> …`, and do so for
+  `ruff` as well. The `dev/registry` entry above is the exception: it has no lockfile, so it keeps `--python 3.12` but takes
+  no `--frozen` and uses `--no-project`. Without `--project`, `uv` builds the root workspace and fails on `confluent-kafka`.
+  Put the interpreter, lock and project flags in the delegation brief up front instead of after the first verifier fails
+  (observed once in a 10-PR batch, where one verifier lost three checks and two more hit it before the fix was relayed).
 
-When delegating verification to 🟣 Taki, write the sub-project's exact command (including the `PYTHONPATH` and the
-absence of `--frozen`) into the brief; otherwise the verifier reports the environment error as a PR defect or burns a
+When delegating verification to 🟣 Taki, write the sub-project's exact command into the brief (including the `PYTHONPATH`,
+and `--frozen` only for a project that has a `uv.lock`); otherwise the verifier reports the environment error as a PR defect or burns a
 round rediscovering it.
 
 ### `verify_completion` in this repo

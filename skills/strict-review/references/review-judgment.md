@@ -125,6 +125,10 @@ These are pre-merge artefacts that vanish on merge.
 - Commit messages that contain content violations (e.g. a forbidden
   `Co-Authored-By: <agent>` line, or a body that misstates the scope of the
   change) — these are content problems, not history shape problems.
+  Exception: when reviewing someone else's apache/airflow PR, an agent
+  `Co-Authored-By` trailer is a non-blocking reminder, not a must-fix; see
+  [`airflow-aware/references/review-checks.md`](https://github.com/Lee-W/maigo/blob/main/skills/airflow-aware/references/review-checks.md)
+  §10.41.
 
 ---
 
@@ -872,22 +876,26 @@ recommended option:
    bar.
 2. **A nit goes in only with run or read-the-code evidence.** Skip points
    that another reviewer already marked "acceptable / non-blocking / pure
-   suggestion" and that carry no evidence of their own.
+   suggestion" and that carry no evidence of their own. This is the order for
+   nits that are sent at all; in a round whose local report has a must-fix,
+   the sent inline comments carry only the must-fix items (see
+   [`review-templates.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md),
+   "When the local report has a must-fix").
 
 Why: in an apache/airflow batch review (#74272, #74334, #74355, #74296,
 #68517) the maintainer picked this default for every gate option — all
-must-fix into the review, evidence-only nits, and Request changes kept even
+must-fix into the review, evidence-only nits (among the nits that are sent at all), and Request changes kept even
 where an approval existed (#68517's approval was on a commit that was gone;
 #74334's approval came after the offload concern).
 
 How to apply: when listing the gate's options, mark this as Recommended
-first; collapse a PR with many nits (e.g. 14 on #68517) to the few with
-evidence. This coexists with "a missing changelog/newsfragment is not a
+first; for the nits that are sent (a round with no must-fix, see item 2),
+collapse a PR with many nits (e.g. 14 on #68517) to the few with evidence. This coexists with "a missing changelog/newsfragment is not a
 blocker" (airflow-aware `review-checks.md` 10.6): the missing file alone is
 not a blocker, but a newsfragment whose *content* would mislead users can
 still be a must-fix.
 
-Calibration (someone else's PR; this narrows §32 item 1, it does not replace it): every **evidenced** finding goes into the review (item 2 still applies to nits, and the "collapse nits" rule above still holds), but Request changes is reserved for an error the PR **newly introduces**. A pre-existing problem the PR merely exposes, a rare risk, or a convention-style improvement is submitted as a comment / suggestion and does not block, because gradual improvement is worth having. The severity in your report and the submitted verdict can differ; do not drop an evidenced suggestion just because the verdict is Approve.
+Calibration (someone else's PR; this narrows §32 item 1, it does not replace it): in a round with no must-fix, every **evidenced** finding goes into the review (item 2 still applies to nits, and the "collapse nits" rule above still holds); in a round whose local report has a must-fix, only the must-fix items are sent and the exception in item 2 applies. Request changes is reserved for an error the PR **newly introduces**. A pre-existing problem the PR merely exposes, a rare risk, or a convention-style improvement is submitted as a comment / suggestion and does not block, because gradual improvement is worth having. The severity in your report and the submitted verdict can differ; in a round with no must-fix, do not drop an evidenced suggestion just because the verdict is Approve.
 
 ---
 

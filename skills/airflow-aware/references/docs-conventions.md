@@ -572,6 +572,75 @@ it down.")
 
 ---
 
+## Behaviour claims in docs: check every branch before writing them
+
+A sentence of the form "when X happens the system does Y" in a user doc, a docstring or a
+behaviour table is usually written from the author's main path. When the code dispatches to
+several implementations (authentication methods, synchronous vs deferrable, backends), the
+sentence often holds on only some of them and the others do the opposite. Three rules, for
+both writing and reviewing:
+
+1. **Write: list the branches first.** Find the dispatch point (the function that picks the
+   implementation from configuration) and list each branch. For every branch answer "does
+   this sentence hold here?" with a `file:line`. A branch you cannot answer for is not named;
+   the sentence uses wording that does not name it. When the claim holds on only some
+   branches, state which ones and add one sentence about what the rest do. Docs and the
+   docstring usually carry the same claim, so change both. Example: a doc said that an
+   unreachable token endpoint fails over to the backup connection, but the failover depends
+   on a signal that the hook's own retry produces; the path that gets its token through a
+   third-party credential library never goes through that retry, so there an unreachable
+   endpoint fails the task. Reading the dispatch function showed the true scope was finer
+   than the reviewer's suggested narrowing: one path the reviewer thought did not hold did,
+   and within one login method the first half held and the second did not. Copying the
+   suggested wording would have produced a second inaccurate sentence, so check a reviewer's
+   proposed narrowing against the same branch list and, when it differs, say in the reply
+   where (apache/airflow #76797).
+2. **Review a behaviour table cell by cell.** Docs that describe "what happens after this
+   operation" (for example what clearing a task does to its stored state and to an external
+   job) get read as guarantees. For each cell ask "when is this not true?" and answer from
+   the code: synchronous vs deferrable (a deferrable run may not write state, and its
+   `on_kill` may cancel the external run so "the old run is still going" fails), a default
+   parameter that rules the case out (a concurrency limit of one means no second run),
+   a configuration switch that overrides the cell (a clear-on-success setting defeats a
+   "keep" option), a parameter that acts first (cancel-previous-runs), and the version
+   that introduced each behaviour (a hook that exists only from one minor version, a
+   behaviour only some UI paths have). Ask for an "unless" clause or a version note, or
+   narrow the table to the synchronous mode and add one line for the other mode. Phrase
+   the comment as a question with the code path or parameter named: "Can this cell say
+   that?" (apache/airflow #76968, raised by a maintainer on another author's PR).
+3. **A multi-page rewrite: diff against the old text, then make the sibling pages
+   agree.** When several pages carry the same structured paragraph and are rewritten
+   together, diff the new text against the old and list the how-to that disappeared (a UI
+   checkbox, a request parameter, a configuration name); a rewrite that leaves only the
+   claim without the way to get it is a regression. When one page has a problem, grep the
+   other pages for the same sentence and name every page in the comment, and the author
+   applies the fix to all of them. Give wording fixes as a suggestion block the author can
+   apply directly. This sits next to the previous section: that one keeps the full
+   explanation in the how-to; this one keeps it from being lost in a rewrite
+   (apache/airflow #76968).
+
+---
+
+## Reviewing docs and example snippets: walk them through as a fresh copy-paste
+
+When reviewing a docs or example-Dag PR, run each snippet in your head in a clean
+environment as the reader would: every variable has a visible source, every command can be
+copied as written, and every version requirement is stated where the reader will see it.
+
+- A fallback or migration snippet that uses a variable never defined in the snippet leaves
+  the migration path broken; point the author back to the guide's own fallback.
+- A command inside a literal block must not wrap onto two lines: after copying, the second
+  line runs as a separate shell command. Use one line, or a literal block that keeps it
+  whole.
+- A change that needs a newer Airflow (an example rewritten as `async def`, say) must state
+  the version requirement in every affected example, not in one of them. Check the files one
+  by one.
+
+Mark these as nits with the concrete fix (one line, or a literal block). Source: a docs and
+example-Dag review, three separate comments on one PR (apache/airflow #77071).
+
+---
+
 ## `.rst` docs spell-check rejects coined nouns — literals are exempt, autoapi-generated pages count too
 
 Airflow runs a spell-check lint over `.rst` docs that rejects words not in
@@ -690,6 +759,14 @@ plus a fifth caught while fixing them).
   to in the code, or a run that exercised them. A column name or method that
   merely looks right (a MySQL catalog column, in the case above) is the
   typical miss.
+- **A published guide carries no "this was never run live" note.** Run the
+  code against a real workspace first, then remove the note instead of
+  leaving it as a disclaimer (apache/airflow #76797, where a maintainer asked
+  for a real-workspace run and the author ran it and deleted the note). A
+  sentence such as "tested with <version>" that cannot be verified is
+  deleted rather than reworded. See also item 4 of "Status claims in provider
+  docs" above (a verifiable tested version is written as both versions), and
+  the rule against test-status statements in "When to use X vs Y" below.
 
 ## "When to use X vs Y" comparison docs
 
