@@ -33,32 +33,43 @@ here?". Count the reviewer's points first, make the draft match, then tighten ea
 
 ---
 
-## List every thread; draft only the ones that need a reply
+## List every thread; every thread with something to act on gets a pasteable reply
 
 At the `/maigo:address-comments` Finale, the draft file lists **every numbered item still open** in
 the triage list — including threads already replied to but unresolved, and threads the reviewer
 pasted twice. A thread the reviewer has already resolved is not listed at all (step 6 re-fetches
 thread state first); it is mentioned only in the one summary line. Listing is not pre-filtering:
-the user still sees every open thread and decides. What changes is whether an entry gets reply text.
+the user still sees every open thread and decides.
 
-**No reply needed** — the reviewer's point was simply done, resolving after the fix is enough, and
-there was no question and no trade-off worth explaining. The entry keeps its heading, location and
-original-comment link, and its reply line reads `不必回覆：改完 resolve 即可` with no fenced block, so
-there is nothing to copy by mistake. A comment with no question and no requested change (praise,
-agreement) is also 不必回覆 — the reply line says `不必回覆：無需處理`. If the change was not actually
-run, the 不必回覆 entry still carries a `備註` line saying so.
+**Every reviewer inline thread gets a pasteable reply** in a fenced `text` block, including a nit
+that was simply done. A reviewer who gets no reply cannot tell whether the point was handled, so
+the user should not have to write even the trivial ones.
 
-**Draft a reply** when any of these holds: the reviewer asked a question; the change differs from
-what they suggested; the point was deliberately not changed; the work is deferred (follow-up PR,
-later). A "Done." / "Updated." reply is drafted only when the reviewer asked to be told (a question, or
-"let me know when it is done") or the user asks for it; otherwise a done nit is 不必回覆.
+**A done-as-asked point gets a very short reply**: usually one word to one short sentence
+(`removed`, `dropped it`, `updated`, or one line saying what it became). No explanation, no
+pleasantries. The other conventions are unchanged: describe the change rather than citing a commit
+SHA, cite only symbols that are committed, no footer, no `@`.
 
-Why: an earlier rule drafted every thread, including resolved ones (those are now not listed); across one PR with 15 resolved
-threads the maintainer posted none of the 13 drafts, and in general the posted replies were far
-shorter than the drafts or absent.
+**A point that needs substance** keeps the normal wording and length rules: the reviewer asked a
+question; the change differs from what they suggested; the point was deliberately not changed; the
+work is deferred (follow-up PR, later).
 
-How to apply: for an already-replied item that is still unresolved and needs nothing more, write the
-`不必回覆` entry with a note of why ("already replied to"). For a
+**No reply needed** is kept only for two cases: (a) a comment with nothing to act on and nothing to
+answer (praise, plain agreement); (b) a thread the author has already replied to (do not draft a
+duplicate reply; the entry notes "already replied to"). The entry keeps its heading, location and original-comment link, and its
+reply line reads `不必回覆：無需處理` with no fenced block, so there is nothing to copy by mistake. If
+the change was not actually run, every entry (including 不必回覆) still carries a `備註` line saying so.
+
+Why: an earlier rule drafted long replies for every thread, including resolved ones (those are now
+not listed); across one PR with 15 resolved threads the maintainer posted none of the 13 drafts, and
+in general the posted replies were far shorter than the drafts or absent. The conclusion is that a
+draft must be shorter, not that it can be skipped: a later rule skipped replies for done-as-asked
+nits, and on a PR with 9 inline threads 8 had no draft, so the user wrote `removed`, `dropped it`
+and `yes, missed this one. updated` by hand. Done-as-asked replies are therefore one word or one
+short sentence.
+
+How to apply: for case (b), an already-replied item that is still unresolved and needs nothing more,
+write the `不必回覆` entry with a note of why ("already replied to"). For a
 duplicated thread, give a short draft (e.g. pointing back to the main thread). In the
 conversation's table, the 動作 column says `貼` or `不必回覆` per item.
 

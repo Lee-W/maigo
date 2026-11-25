@@ -299,7 +299,7 @@ PR title **不套** conventional commits 格式（user-impact 句子就好）；
 | 3 | Orchestrator | 列出意見，使用者挑哪些要處理 |
 | 4 | Orchestrator | 寫 `.maigo/pr/<id>/pr-comments.md`（別人的 PR 是 `review/<id>/`），分組 work item + 提路由計畫，AskUserQuestion 確認 |
 | 5 | (route) | 逐 work item 跑 `/maigo:quick` / `/maigo:go` / `/maigo:team` 的完整流程 |
-| 6 | Orchestrator | finale——處理對照 + 回覆草稿寫進 `reply-draft.md`（不送出，每則標明在哪裡回；不必回覆的只列一節不擬稿）+ commit message 草稿 |
+| 6 | Orchestrator | finale——處理對照 + 回覆草稿寫進 `reply-draft.md`（不送出，每則標明在哪裡回；每個 inline thread 都擬一句可貼回覆，照改的極短；純稱讚／同意或作者已回覆過的才只列一節不擬稿）+ commit message 草稿 |
 | 7 | Orchestrator | 學習收尾——萃取 convention 形狀 comment → 確認 → 寫 type:project 記憶 |
 
 **路由原則：** 單檔機械性修正 → `quick`；跨檔 / 動行為 → `go`；大且低風險想省牆鐘 → `team`。**預設盡量走 `quick`**，不確定偏 `go`。

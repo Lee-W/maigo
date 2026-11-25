@@ -258,7 +258,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
 全部 work item 走完後，orchestrator 給一份 summary：
 
 1. **處理對照**：每條選中的 comment → 對應 work item → `done` / `blocked` + 改了哪些檔。
-2. **回覆草稿（不自動送出）**：為每條已處理的 comment 擬回覆；不需要回覆的（照做、改完 resolve 即可，沒有提問也沒有要說明的取捨）只在草稿檔列一節、標「不必回覆」，不寫內文——address-comments **不替使用者回覆、不 resolve thread、不 push**。草稿**寫成檔案**，檔案是正本，不是只印在對話裡：
+2. **回覆草稿（不自動送出）**：為 reviewer 的每個 inline thread 都擬一句可貼的回覆；照改的意見回覆極短（一個詞或一句，例如 `removed`），有提問、改法不同、刻意沒改或延後的才寫完整；只有純稱讚、單純同意這類沒有任何要處理的 comment，或作者已在該 thread 回覆過的，才在草稿檔列一節、標「不必回覆」，不寫內文——address-comments **不替使用者回覆、不 resolve thread、不 push**。草稿**寫成檔案**，檔案是正本，不是只印在對話裡：
 
    - **產草稿前重抓一次 thread 狀態，已 resolve 的不列**：步驟 2 的抓取到這裡已隔了整個實作階段
      （可能數小時、數個 work item、一次 rebase），reviewer 很可能在期間按了 resolve。重跑步驟 2 的
@@ -273,10 +273,10 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
    - 檔案內容依
      `skills/github-reply-draft/references/comment-fetch-and-triage.md`「回覆草稿檔模板」：
      每則 comment 一節，寫明**在哪裡回**（inline thread / PR conversation 底部）、原始 comment 連結、
-     位置、前置條件（例如「先 push 再貼」）與 thread 狀態，其下接一個可一鍵複製的 fenced code block，內含純回覆內文（標「不必回覆」的節除外，它沒有 block）。
+     位置、前置條件（例如「先 push 再貼」）與 thread 狀態，其下接一個可一鍵複製的 fenced code block，內含純回覆內文（只有標「不必回覆」的純稱讚／同意／已回覆節沒有 block）。
      fenced block 規則依 [`skills/copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)
      （內文若可能含三個 backtick 就用四個 backtick 外層，不加 `>` blockquote）。
-   - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設一句話（約 20 個英文字）、不用稱讚或認錯開場、驗證範圍聲明不寫進回覆內文（寫在 block 外的 `備註`，並在下方對話提到）、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、預設不加 attribution footer（使用者要求才加）。「要擬稿／不必回覆」的判準見 `skills/github-reply-draft/references/draft-shape.md`。
+   - 每則回覆草稿的措辭依 [`skills/github-reply-draft`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/SKILL.md)：預設一句話（約 20 個英文字）、不用稱讚或認錯開場、驗證範圍聲明不寫進回覆內文（寫在 block 外的 `備註`，並在下方對話提到）、不引 commit SHA、只提最終 diff 裡存在的 symbol、一 thread 一則、不過度宣稱已解決、預設不加 attribution footer（使用者要求才加）。「回覆長度與不必回覆」的判準見 `skills/github-reply-draft/references/draft-shape.md`。
    - **對話裡只印檔案路徑，加一張對照表，不重貼回覆內文**（這行是印給終端機的 repo-root 相對路徑，不是 `gf` 的對象；
      要把回覆草稿記進細節檔 `## 筆記` 時寫檔案相對的 `../pr/<id>/reply-draft.md`〔別人的 PR 是 `../review/<id>/reply-draft.md`〕，獨立成清單項；`## 筆記` 的每一行都要帶實際值——路徑放反引號（`.maigo` 內的產物用相對於該檔自己的路徑，原始碼用 repo-root 相對路徑，repo 外與 worktree 用絕對路徑），記 worktree 就寫該 worktree 的絕對路徑，不寫「見某某檔」這種只指向別處的指標行，沒有實際值可寫就不要寫那一行）：
 
@@ -288,7 +288,7 @@ triage 檔全欄位骨架（selected 意見 + work items）與路由判斷表（
      |---|------|----------|------|----------|
      | C1 | 貼 | inline thread（src/auth.py:42） | <url> | 先 push 再貼 |
      | C2 | 貼 | PR conversation 底部（@reviewer，引用該段） | <url> | 無 |
-     | C3 | 不必回覆 | 改完 resolve 即可（src/auth.py:77） | <url> | 無 |
+     | C3 | 不必回覆 | 純稱讚，無需處理（src/auth.py:77） | <url> | 無 |
      ```
 
      表後另起一行列出所有 `備註`（未驗證的事等給使用者看的話），沒有就省略；要不要對 reviewer 說由使用者決定。

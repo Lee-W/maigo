@@ -234,5 +234,5 @@ touches a line you didn't write — it may be a reviewer-directed change
 already landed via `fixup!`.
 
 Draft-shape rules (GitHub `suggestion` blocks for concrete fixes, one bullet per reviewer point,
-every thread listed but only those needing a reply drafted, design replies that pitch differentiation) live in
+every thread listed, every reviewer inline thread given a pasteable reply (one word to one short sentence for done-as-asked points; only pure praise, plain agreement, or a thread the author already replied to is marked 不必回覆), design replies that pitch differentiation) live in
 [`references/draft-shape.md`](https://github.com/Lee-W/maigo/blob/main/skills/github-reply-draft/references/draft-shape.md).
