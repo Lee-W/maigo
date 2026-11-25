@@ -790,7 +790,8 @@ Azure, federation).
 3. In a summary table (such as common.ai's `model_providers.rst`), list both types in the same row
    with the difference, worded like the table's existing rows of the same kind.
 4. Do not put test-status statements in the docs ("only unit-tested", "not run against a real
-   environment") — in any wording.
+   environment") — in any wording. If the verification scope matters, put it in the PR description
+   or in the reply to the reviewer, not in the docs.
 
 ## Section headers name the specific things compared; no internal-component words
 

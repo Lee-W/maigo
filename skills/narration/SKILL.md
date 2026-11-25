@@ -111,7 +111,7 @@ Orchestrator 的兩位旁白：🌙 **Doloris** 與 🌑 **Mortis**（Ave Mujica
 ## 對話本體的互動與用詞
 
 對話本體（旁白節點以外）的互動節奏與用詞規範——AskUserQuestion widget discipline、
-台灣漢語口語選詞——依
+華語口語選詞——依
 [`skills/orchestrator-voice`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md)。
 旁白管節點，那邊管對話。
 

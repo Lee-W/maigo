@@ -179,7 +179,7 @@ Test Plan 取自立希的 command 與 exit code（立希的未驗項目併成最
 ## Honoured memory（optional，有相關 project / user entry 才加）
 
 - 使用者偏好 integration test 而非 mock（project）→ Step 3 要求 Anon 不用 mock
-- 使用者語言偏好：漢語溝通（user）→ 本 plan 用漢語寫說明
+- 使用者語言偏好：華語溝通（user）→ 本 plan 用華語寫說明
 
 ## Steps
 

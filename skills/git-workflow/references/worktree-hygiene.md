@@ -59,6 +59,16 @@ separate mental model. [`/maigo:repo-audit`](https://github.com/Lee-W/maigo/blob
 merged-worktree cleanup section works off `git worktree list --porcelain`, so
 it catches worktrees regardless of where they actually live.
 
+When you hand the user a copy-pasteable command to load a PR or branch locally,
+give the worktree-manager form if the user uses one, not `gh pr checkout` (which
+switches the branch of the worktree you run it in). With worktrunk:
+`wt switch pr:<N>` for a GitHub PR, `wt switch <branch>` for an existing branch
+(creates the worktree; makes a local tracking branch when only the remote branch
+exists), `wt switch --create <branch> [--base <ref>]` for a new branch. Don't
+hard-code `wt` for everyone: the Work Board's load line comes from the user's own
+`board-load.txt` template (see `work-board`'s format spec), and a user who has no
+worktree manager gets a plain `git worktree add` command.
+
 The target repo needs `.worktrees/` excluded from git before a worktree is
 created there — via the repo's own `.gitignore`,
 `$(git rev-parse --git-dir)/info/exclude`, or a global `core.excludesfile`

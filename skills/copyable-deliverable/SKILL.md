@@ -60,6 +60,10 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 後續任何一筆過期（例如又落地一支 commit，讓 PR description 與 diff 脫鉤）→ **整份重發**，
 不要只補變動的那一筆。使用者手上沒有「最新的那份在哪」的索引，只補差異會逼他自己拼。
 
+同一份 deliverable 重新產生或修訂過（standup、PR 描述、回覆草稿）時也一樣：貼**完整的新版**單一 code block，
+不要只貼改動的段落再加一句「其餘相同」。使用者要直接複製整份，片段得自己拼。哪裡改了用一兩句話寫在
+block 外面。
+
 deliverable 數量多時，每筆前面給一行標題與來源連結（哪條 comment / 哪個檔），
 讓使用者能對照著逐筆處理；標題與連結放在 fenced block **外面**，block 內只留純內文。
 

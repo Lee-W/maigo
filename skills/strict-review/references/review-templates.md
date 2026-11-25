@@ -194,6 +194,8 @@ When a review of another contributor's PR ends as "approve with nits" and nothin
 
 How to apply: if the user explicitly asks for the nits to be in the review, do that. Opening the follow-up worktree and pushing it is the user's action; stack it on the PR head only when the edit depends on the PR's change.
 
+**When the only defect is an inaccurate sentence in the PR description or commit message, the verdict is not NEEDS_CHANGES.** If the code, the tests and the docs are all correct and every must-fix item concerns the wording of the description or commit message, send the review as APPROVE (or COMMENT) and move the wording point into the non-blocking section. The description becomes the squash commit's body, so it is worth pointing out, but it should not block correct code from merging. Keep NEEDS_CHANGES for defects in behavior, tests or documentation correctness. Evidence is one ruling by the user (apache/airflow #77159, where an independent maintainer also approved and raised the same wording point), so apply it to description-wording-only cases and do not stretch it further; a description claim that would mislead what the reviewer checks stays a must-fix under the "PR title/description is a contract" pattern in `recurring-patterns.md`.
+
 **When the local report has a must-fix, the sent inline comments carry only the must-fix items.** Nits, and inferred problems from reading the code that cannot be shown to be reachable, stay in the local report and are not sent; reconsider them in the next round, after the must-fix items are handled. Compared with what was actually sent, two PRs showed the same trade-off: on #74583 (local verdict BLOCKED) 6 of 7 must-fix items were sent and none of the 5 nits or 2 inferred problems; on #77529, 1 of 2 must-fix items and none of the 5 nits. With no must-fix, the default above still holds: nits-only means an APPROVE draft without nits. The `commands/review.md` §4.5 gate is still asked item by item; this rule only sets which option is listed first.
 
 The must-fix items that were left out in those two PRs (a clear-boundary case in one, a PR-description claim in the other) share no feature, so the user decides each one; do not infer a rule from them. One possible reading, from a single data point (#77529): the omitted must-fix there was a PR-description claim that held only on one version, which might mean wording-type findings are also not sent. That is an inference by whoever compiled this note, not a rule the user stated.
@@ -228,7 +230,7 @@ batch 內最後一個 PR 跑完後，orchestrator 把「Queue 還剩...」那行
 正文最前面加 Taiwanese Mandarin 快結（位於共用檔頭之後） + horizontal rule，後面接既有英文 detail（`**PR:**` 行實際寫出的是 `<URL>` autolink，下方 `<PR URL>` 只是占位符）：
 
 ```markdown
-## 台灣漢語快速結論
+## 華語快速結論
 
 **PR:** <PR URL>
 

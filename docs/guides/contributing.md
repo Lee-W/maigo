@@ -92,8 +92,8 @@ ignore_missing_imports = true
    user-facing utility skills **SHOULD** be written in Taiwanese Mandarin unless
    portability is required.
    - 工程知識、架構設計、開發規範（如 `strict-review`、`airflow-aware`、`commit-message`）→ 英文：工程技能具可移植性
-   - 個人工具、流程 utility（如 `teammate-flow`、`failure-handling`、`narration`）→ 台灣漢語：強依賴個人語境
-   - 稱呼語言時全稱「台灣漢語」、語境清楚時簡稱「漢語」（英文 Taiwanese Mandarin）；不混用「華語 / 台灣華語」，避免「繁體中文 / Traditional Chinese」——繁體是字形，不是語言
+   - 個人工具、流程 utility（如 `teammate-flow`、`failure-handling`、`narration`）→ 華語：強依賴個人語境
+   - 稱呼語言時中文一律寫「華語」、英文寫 Taiwanese Mandarin；不寫「漢語」「中文」「Chinese」，避免「繁體中文 / Traditional Chinese」——繁體是字形，不是語言
 7. **角色刻畫以動機為主**——Characterization is conveyed primarily through motivation,
    value hierarchy, and conflict handling; catchphrases, emoji, punctuation, and verbal
    tics are secondary signals only.

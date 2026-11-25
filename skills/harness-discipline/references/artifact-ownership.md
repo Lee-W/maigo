@@ -120,7 +120,9 @@ Read this file when 你要在 `.maigo/` 寫入這類 markdown 產物、或需要
   （例：`=====BODY START=====` ／ `=====BODY END=====`；草稿與 inline 留言各用自己的
   一組標記），由 orchestrator 從該 agent 的 task transcript（JSONL 輸出檔）用小腳本抽出，
   再交給發佈 script，不要重打一遍文字。抽取時挑「以 `## ` 開頭」的那一則——之後只提到
-  兩個標記字樣的短訊息也會匹配。被拒的 agent 應該停下回報，不要改用 Bash 繞過；
+  兩個標記字樣的短訊息也會匹配。task transcript 是 session 的 `tasks/<agentId>.output`
+  （JSONL），抽取腳本遞迴找出同時含兩個標記的字串；抽完只印行數、首尾行、H1 數與 fence 數
+  來確認，不把全文印進主對話。被拒的 agent 應該停下回報，不要改用 Bash 繞過；
   交辦文保留這句。
 - 兩種情況的下一棒前置檢查相同：spawn 下一棒前對交棒檔跑 `ls`＋`wc -l`＋`head -3`，
   確認它存在、行數合理、不是只寫指標。

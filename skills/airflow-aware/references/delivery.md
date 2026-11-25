@@ -183,6 +183,16 @@ this section only adds the Airflow default and the timing.
   terminal ([`worktree-hygiene.md`](https://github.com/Lee-W/maigo/blob/main/skills/git-workflow/references/worktree-hygiene.md)).
 - Example: across one three-round fixup sequence, the user squashed and pushed twice on their own.
 
+## Taking over or rebasing an old PR: run the mypy hook before changing anything
+
+Scope gate: applies to a PR branch opened before apache/airflow #77494 ("Support SQLAlchemy 2.1 type hints", merged 2026-11-25) that is now being rebased onto a `main` containing it, or taken over from its author.
+
+After #77494, the type checker reads a single-column select as `Select[int]`, not `Select[tuple[int]]`. A branch written earlier that annotates `Select[tuple[X]]` rebases without conflict, and pytest and ruff stay green, but `mypy-airflow-core` fails with `arg-type` / `return-value` errors on annotations the PR already had. Otherwise the first commit made on the branch is blocked by the commit-time mypy hook for a reason unrelated to that commit, or the failure surfaces only in CI after the push.
+
+1. Right after the rebase or takeover, before editing anything, run `prek run mypy-airflow-core --files <the airflow-core files the PR changes>` and confirm `Run mypy for airflow-core` shows Passed. For provider files use `breeze run mypy <files>` (the prek mypy hooks do not cover `providers/`).
+2. For a `Select[tuple[X]]` mismatch, change the annotation to `Select[X]` as #77494 does, and write new annotations in that shape.
+3. Land the fix as its own commit, apart from any review-comment change, and say in the summary to the user that the rebase surfaced it.
+
 ## Review-time diff basis: `origin` may be a stale fork, and a stacked PR's base is not `main`
 
 Scope gate: applies when reviewing or addressing comments on a local branch, or when a PR's base branch is not `main`.
@@ -205,3 +215,12 @@ Scope gate: applies when reviewing or addressing comments on a local branch, or 
   - Review the parent PR separately.
   - If the parent later squash-merges, the child needs `rebase --onto`; a local review normally doesn't simulate
     that, so list it as unverified.
+
+## When `origin` is a fork: PR heads and `main` live on `upstream`, and maigo scripts take `--repo apache/airflow`
+
+Scope gate: applies in a checkout where `origin` is a personal or organization fork of `apache/airflow` and `upstream` is `apache/airflow` itself (check with `git remote -v`).
+
+- **Build the review worktree from `upstream`.** The PR heads of an apache PR exist only on `upstream`:
+  `git fetch upstream pull/<n>/head:refs/remotes/upstream/pr/<n>`, then
+  `git worktree add --detach .worktrees/review-<n> upstream/pr/<n>`. Take the merge-base against `upstream/main`, not `origin/main`. `git fetch origin pull/<n>/head` fails with `couldn't find remote ref`.
+- **Pass `--repo apache/airflow` to maigo's scripts.** For `review_report.py`, `artifact_path.py` and the like, use the value `gh repo view` returns (`apache/airflow`), not the fork's `<owner>/airflow` taken from `origin`. With the fork's name the artifact path is computed as `review/airflow-<N>` instead of the `apache/airflow` path, and `check-coverage` reports `report_missing_or_legacy` for a report that exists.

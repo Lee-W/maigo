@@ -51,6 +51,10 @@ observed removed), including optional extras. Tests then flip from pass to **ski
 red, so nothing alerts you. State it in the delegation prompt: `uv sync` is forbidden, use only
 `uv run --frozen --project <pkg> ...`; after the run, check that the skipped count didn't jump.
 
+## Running different projects' tests in one worktree: add `--exact` to the later `uv run`
+
+When you run `uv run --project <A> ...` and then `uv run --project <B> ...` in the same worktree (for example a baseline comparison across two packages), give the later one `--exact`. Without it, packages the earlier run installed into the shared `.venv` stay, and a failure that is really a missing dependency disappears. In one baseline comparison, a leftover `pyarrow` made 30 tests that should have failed pass; with `--exact` the same run showed 38 failures. When a clean environment lacks a package the tests need, add it explicitly with `--with <pkg>` and write in the verification record what was added.
+
 ## A script that a hook runner executes directly: `requires-python` without an upper cap, and keep the shebang
 
 For a new script that a hook runner execs directly, write the PEP 723 inline

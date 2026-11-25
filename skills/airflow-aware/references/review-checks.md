@@ -1614,6 +1614,12 @@ the repo pinned `0.11.29`; `uv lock --upgrade-package ruff` produced a
 **356-line** diff, and re-locking with `uvx uv@0.11.29` produced **40
 lines** — nothing about the resolution itself differed.
 
+When the repo's `.venv/bin/uv` and the `uv` on `PATH` report different
+versions, the repo venv's binary is the one to use (`.venv/bin/uv lock`,
+then `.venv/bin/uv lock --check`). If `uv.lock` still shows changed lines
+unrelated to the change, do not hand-edit them away and do not commit them;
+compare `uv --version` with `.venv/bin/uv --version` first.
+
 **How to apply:**
 
 1. "Only one `version =` line changed" is the *wrong* check — it passes

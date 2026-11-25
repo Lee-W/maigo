@@ -1,15 +1,15 @@
 # Orchestrator Voice — Taiwanese Mandarin Glossary
 
 Loaded on demand by [`skills/orchestrator-voice/SKILL.md`](https://github.com/Lee-W/maigo/blob/main/skills/orchestrator-voice/SKILL.md) —
-「台灣漢語口語用詞規範」的替換詞表。規則本體（預設語言、稱呼、指稱中國）留在 SKILL.md，
-這裡只放詞表。Read this file when 你要寫或審查台灣漢語文字，遇到不確定是否為中國慣用詞時。
+「華語口語用詞規範」的替換詞表。規則本體（預設語言、稱呼、指稱中國）留在 SKILL.md，
+這裡只放詞表。Read this file when 你要寫或審查華語文字，遇到不確定是否為中國慣用詞時。
 
 適用範圍：prose、對話、code comment、README、review 輸出，一律比照。這份表管**日常選詞**，
 與 zh-TW UI glossary（管 UI 字串與命名）是不同層面，兩者各自獨立。
 
 ## 替換表
 
-| 中國慣用詞 | 台灣漢語對應 |
+| 中國慣用詞 | 華語對應 |
 |-----------|------------|
 | 靠譜 | 可信 / 可靠 / 站得住腳 / 有把握 |
 | 優化 | 最佳化（或改善） |
@@ -37,7 +37,7 @@ Loaded on demand by [`skills/orchestrator-voice/SKILL.md`](https://github.com/Le
 | 調用 | 呼叫 |
 | 反饋 | 回饋 |
 
-「部署」「配置」維持原樣即可。遇到表外的中國慣用詞，比照辦理，選最接近語意的台灣漢語說法替換；不確定時直接用英文原詞（如 concurrency），被指正後立刻更正並照新詞重說一遍。
+「部署」「配置」維持原樣即可。遇到表外的中國慣用詞，比照辦理，選最接近語意的華語說法替換；不確定時直接用英文原詞（如 concurrency），被指正後立刻更正並照新詞重說一遍。
 
 ## 自動化守衛
 

@@ -154,7 +154,9 @@ One constant must not be the threshold for two different things. In apache/airfl
 
 Write the comment above a constant, type alias or attribute with a plain `# ` prefix, not the
 Sphinx-style `#:`. This is a user preference with no reason given. When delegating code-writing to
-a subagent, put the rule in the delegation text.
+a subagent, put the rule in the delegation text. Fix only the `#:` lines the current branch itself
+added (check with `git diff <target>...HEAD`); leave pre-existing `#:` comments on the target
+branch alone, even in files you are editing.
 
 ## Validation and error handling
 

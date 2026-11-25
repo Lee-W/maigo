@@ -130,6 +130,37 @@ every match including nested ones, and attach the judgment list to the
 review output so the enumeration itself is auditable, not just the
 conclusion.
 
+## Refactor PRs: a removed `order_by` / filter / limit needs the author's explanation, asked as a question
+
+In a refactor diff, scan the **removed** lines for ordering, filtering and
+limiting clauses (`order_by`, `.where(...)`, `limit`) as well as the added
+ones. A refactor is supposed to preserve behaviour, so a deleted `order_by`
+that the description and commit body never mention cannot be assumed
+irrelevant: result order, which rows get picked and how many are fetched may
+all have depended on it. The author has to account for it.
+
+Also check every variable, parameter or attribute whose **content changed type
+in the refactor but kept its old name** (for example a name that used to hold
+an id and now holds a SQL clause). State plainly what the name no longer
+matches ("this holds a clause, not an id"); this one is a direct statement,
+not a question. The "Naming review" section above (enumerate the new defs
+mechanically) covers new definitions only, so it does not catch these
+renamed-in-content cases.
+
+Send the finding as a **question, not a verdict**: "why do we remove X?" asks
+the author to explain without presuming a defect, and it is the form an
+experienced maintainer used on apache/airflow #69849 (two short comments, one
+on a misleading name and one on a dropped `order_by`). Do not mark such an item
+NEEDS_CHANGES on the removal alone; the answer decides whether it is a defect.
+
+The same question form fits an **unreachable branch or a redundant optional
+parameter**. When the local report concludes "the only production caller always
+passes a value, so this branch is unreachable, and the parameter became
+optional only to avoid editing existing tests", the comment that goes out is one
+question, e.g. "When will `asset_id` be None?" (apache/airflow #74583), not the
+conclusion. If there is a real caller, the author names it; if not, the author
+reaches the conclusion themselves.
+
 ## Python diffs: grep added lines for local imports and bare mocks
 
 Reviewers of a Python PR repeatedly flag two things by eye that a mechanical

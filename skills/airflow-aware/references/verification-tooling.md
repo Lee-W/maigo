@@ -54,6 +54,16 @@ ruff-format, and similar hooks all report clean while mypy simply never ran.
 A provider PR's acceptance criteria must list pytest **and** mypy as
 separate items; `prek` alone cannot stand in for the type-check gate.
 
+Run the provider type-check **per work item, before that item's commit** —
+`breeze run mypy <the changed files>`, in the same gate as pytest and ruff —
+not once at the end of the whole task. Green pytest and ruff say nothing about
+types: in one batch two work items were each committed after pytest and ruff
+passed, the closing `breeze run mypy` then found two errors, and a
+type-fix commit had to be added that earlier checking would have avoided.
+When a base hook method's return annotation is `X | None` and the caller needs
+`X`, narrow it the way the same provider already does (the Databricks provider
+uses `cast("str", ...)`); do not invent a new idiom.
+
 ### The UI compile hook doesn't rebuild `dist/`
 
 `ts-compile-lint-ui` runs `eslint --fix`, `prettier --write`, and `tsc` in
@@ -292,6 +302,13 @@ Running `uv run --frozen --project airflow-core pytest ...` on the host has two 
 - **Non-English host locale.** A host with a non-English `LANG` (for example `LANG=zh_TW.UTF-8`) makes `cron_descriptor` emit localized text, which turns `test_valid_cron_expression` and `test_dom_and_dow_conflict` red. Always run with `LC_ALL=C.UTF-8`.
 
 Put the per-worktree `UV_PROJECT_ENVIRONMENT`, `LC_ALL=C.UTF-8`, an isolated `AIRFLOW_HOME` and `PYTHONDONTWRITEBYTECODE=1` together in `.claude/test-command`, so every verifier runs the same environment. Found via #75847, where the first verification round was red on the host and green once isolated.
+
+### A PoC test file under `tests/` must be named `test_*`, and a non-UTC host needs `TZ=UTC`
+
+Two more traps that make a verifier report a failure it did not earn:
+
+- **PoC filenames.** A throwaway test file placed inside a repo's `tests/` tree must have a name starting with `test_`. The conftest fails at setup with `All test method files in tests/ must start with 'test_'`, so the PoC never runs and every verifier that was handed a differently named file burns a round. Name the file in the delegation brief.
+- **Host timezone.** Some tests compute an expected time against the machine's local zone (for example assertions on a timestamp computed from the local zone, which come out off by the zone's UTC offset on a non-UTC host). When the host timezone is not UTC, prefix the pytest command with `TZ=UTC`. A red that disappears under `TZ=UTC` is usually the test's sensitivity to the host, not the PR; say in the report that the base branch was not compared under the local zone.
 
 ### A fresh worktree has no UI `node_modules`, and naive install can destroy an existing one
 
@@ -654,6 +671,17 @@ Four setup failures in sub-projects look like a regression in the PR but are the
 When delegating verification to 🟣 Taki, write the sub-project's exact command into the brief (including the `PYTHONPATH`,
 and `--frozen` only for a project that has a `uv.lock`); otherwise the verifier reports the environment error as a PR defect or burns a
 round rediscovering it.
+
+### `task-sdk` serde tests need the Kubernetes provider's project environment
+
+`task-sdk/tests/task_sdk/serde/` (`test_serde.py`, `test_serializers.py`) imports `kubernetes`, which the `task-sdk` project environment does not install. Under `--project task-sdk` they die at import with `ModuleNotFoundError: No module named 'kubernetes'` — a collection error, so no test runs. To verify a Kubernetes serializer change, run them from a workspace member that already depends on it:
+
+`uv run --project providers/cncf/kubernetes --python 3.12 --frozen pytest task-sdk/tests/task_sdk/serde/`
+
+- Before the run, print `kubernetes.__version__` and `airflow.sdk.serde.__file__` and confirm the path is the verification worktree's, not another checkout's.
+- In a brand-new worktree, sync once first with `uv run --project task-sdk --python 3.12 --frozen python -c "import numpy"`; otherwise the provider environment lacks `numpy` and collection dies the same way.
+- The pandas and deltalake serde tests can still fail in that environment because `pyarrow` / `deltalake` are missing. Call them unrelated to the PR only after the same tests were run on the base branch.
+- Do not add packages ad hoc with `uv run --with <package>`; a subagent doing that is stopped by the permission classifier.
 
 ### `verify_completion` in this repo
 

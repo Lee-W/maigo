@@ -83,6 +83,18 @@ grep、「沒搜到某個詞」都不構成相符的證據——它只證明已�
 （實例：某 address-comments 收尾只 grep 了幾個關鍵字就回報「描述不需要更新」，使用者追問後才完整讀全文
 對照 branch diff；結論剛好相同，但第一次下結論時證據並不成立。）
 
+## 補了新 commit 之後：回覆草稿、PR 描述、board 三樣一起核對
+
+在一個**已經產過回覆草稿**（`.maigo/pr/<n>/reply-draft.md`）的 branch 上又補了 commit 時，收尾不能只回報「commit 好了」就停。主動核對三樣東西有沒有過期，並在回報裡**逐一各說一句狀態**，不等使用者問：
+
+1. **回覆草稿**：有沒有哪一則回覆的說法被新 commit 推翻（例如草稿寫「I couldn't try it」，新 commit 已經實測過）；檔頭的 Local HEAD 也要更新到新的 commit。過期的當場改草稿。
+2. **PR 描述**：有沒有句子過期、有沒有新行為要補，沿用上面步驟 2–4 的做法。只產草稿交給使用者，邊界不變：不執行 `gh pr edit`。
+3. **Work Board 上那一行**：board 的狀態來自 GitHub，commit 還沒 push、回覆還沒貼出去時不用改，但回報要明說「沒改、為什麼」。
+
+做法：commit 之後、回報之前，先 `/bin/ls .maigo/pr/<n>/` 看有沒有 `reply-draft.md`；有就用這次改動的關鍵詞 grep 它與 `gh pr view <n> --json body`（grep 只用來找候選，結論仍依步驟 4 逐句對照）。worktree 裡的 `.maigo` 可能是本地目錄，而 board 在主 repo 的集中狀態目錄，兩邊都要看。
+
+不核對的代價：照舊草稿貼出去的回覆會與已 push 的內容矛盾，reviewer 讀到的是過期說法。
+
 ## What this skill does NOT cover
 
 - 開 PR 本身（`gh pr create`）——那是 [`skills/github-title-description`](https://github.com/Lee-W/maigo/blob/main/skills/github-title-description/SKILL.md) 的 Inputs 前提，不是本 skill 的事。
