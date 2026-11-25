@@ -20,6 +20,7 @@ append `{"event":"drop","reason":"dd"}`。第一次跑（沒有 snapshot）時�
 
 **重新指名 → 復活**：要同時滿足 (1) URL 出現在本輪 `user-review-requested:@me` 結果；(2) timeline 有
 `review_requested` 事件、`requested_reviewer.login` 是你，且 `created_at` 晚於最後一次 drop 的時間。
+你自己開的 PR 不適用：被排除後 discovery 不補回、也不查 timeline；要回來用 `/maigo:board <targets>`。
 抓取 timeline 失敗時 fail-closed：維持排除並列進 `errors`。使用者明確把被排除的項目重新加進 board
 （`/maigo:board <targets>`）時，先跑 `board_sync.py revive --reason manual <url...>`，只對目前被排除的
 key 寫 `revive` 事件。`dd` 事件的時間記為 snapshot 的 `written_at`（沒有 snapshot 才用現在），所以
@@ -37,9 +38,9 @@ snapshot 有項目但 board.md 不存在或沒有任何項目行時略過整個 
 頂層 `plan-*`、`topic/<slug>/plan.md`、舊固定檔名、`unregistered` 的 `.md`、metadata `source` 不是 URL 的本地 review、
 `<repo>-<n>` 形式的 id 沒有可靠對應，只列入 `unattributed`。孤兒 i/ 檔是 `dd` 訊號，不是補行來源。
 
-**Discovery**：在 board repo 跑兩次 `gh search prs --state open`（`user-review-requested:@me`、
-`--reviewed-by @me` 加 `-author:@me`），依 key 合併；bot PR 照常收；作者是你本人的項目給 `🔀` 提示。
-**筆數**：`--max-new`（預設 50）限制單次新增的項目數，排序「被指名 → 審過 → artifact」，同類內
+**Discovery**：在 board repo 跑三次 `gh search prs --state open`（`user-review-requested:@me`、
+`--reviewed-by @me` 加 `-author:@me`、`author:@me`，含 draft），依 key 合併；bot PR 照常收；作者是你本人的項目一律給 `🔀`。
+**筆數**：`--max-new`（預設 50）限制單次新增的項目數，排序「你開的 → 被指名 → 審過 → artifact」（自己的 PR 也計入 `--max-new`），同類內
 `updatedAt` 由舊到新；超過的放進 `overflow`，在對話列出、下次刷新接著補。結果數等於 `gh search` 的
 `--limit 200` 時在 `errors` 註明「可能截斷」。
 

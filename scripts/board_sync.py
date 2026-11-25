@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-`/maigo:board` 的對帳層：解析 board.md、對帳 `.maigo/` 產物、discovery review PR、
+`/maigo:board` 的對帳層：解析 board.md、對帳 `.maigo/` 產物、discovery review PR 與自己開的 PR、
 dd 排除紀錄、`[x]` 勾選轉換。stdlib-only CLI，用 `python3` 直接執行。
 
 `plan` / `ack` / `drop` / `revive` / `snapshot` **不寫 `board.md` 與 `.maigo/i/*.md`**——只輸出 JSON
@@ -504,12 +504,13 @@ def _json_stream(text: str) -> list:
 
 
 def discover(repo: str, you: str) -> tuple[dict, list[str]]:
-    """Two `gh search prs` runs merged by key. Returns ({key: candidate}, errors)."""
+    """Three `gh search prs` runs merged by key. Returns ({key: candidate}, errors)."""
     candidates: dict = {}
     errors: list[str] = []
     queries: tuple[tuple[str, list[str], str], ...] = (
         ("requested", [], "user-review-requested:@me"),
         ("reviewed", ["--reviewed-by", "@me"], "-author:@me"),
+        ("authored", [], "author:@me"),
     )
     for flag, extra, query in queries:
         cmd = [
@@ -544,6 +545,7 @@ def discover(repo: str, you: str) -> tuple[dict, list[str]]:
                     "isDraft": bool(result.get("isDraft")),
                     "requested": False,
                     "reviewed": False,
+                    "authored": False,
                     "type_hint": "🔀" if login.lower() == you.lower() else "👀",
                 },
             )
@@ -778,7 +780,9 @@ def plan_refresh(
         for key, candidate in found.items():
             state = exclusions.get(key)
             if state and state.get("excluded"):
-                if not candidate["requested"]:
+                # Own PRs that were dd'd / dropped are never added back by discovery:
+                # no timeline lookup, no revive. Only `/maigo:board <n>` brings them back.
+                if candidate["authored"] or not candidate["requested"]:
                     continue
                 try:
                     again = is_rerequested(
@@ -801,7 +805,11 @@ def plan_refresh(
                 pool.append(
                     {
                         **candidate,
-                        "source": "requested" if candidate["requested"] else "reviewed",
+                        "source": (
+                            "authored"
+                            if candidate["authored"]
+                            else ("requested" if candidate["requested"] else "reviewed")
+                        ),
                     }
                 )
 
@@ -815,7 +823,7 @@ def plan_refresh(
         pool.append({**artifact, "source": "artifact", "updatedAt": ""})
         pooled.add(key)
 
-    order = {"requested": 0, "reviewed": 1, "artifact": 2}
+    order = {"authored": 0, "requested": 1, "reviewed": 2, "artifact": 3}
     pool.sort(key=lambda item: (order[item["source"]], item.get("updatedAt", "")))
     additions, overflow = pool[:max_new], pool[max_new:]
 

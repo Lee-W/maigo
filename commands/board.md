@@ -23,7 +23,7 @@ Work Board 是跨 session 的工作看板：issue triage / 接工、自己的 PR
 
 ```
 /maigo:board <targets...>   # 混貼 issue/PR 編號或 URL；入板後刷新全板、印 🎯 與 👀
-/maigo:board                # 無參數：對帳 .maigo/ 產物＋discovery 該 repo 指名你審的 PR，刷新全板、印 🎯 與 👀 + 其他區計數
+/maigo:board                # 無參數：對帳 .maigo/ 產物＋discovery 該 repo 指名你審、你審過，以及你自己開的 open PR（含 draft），刷新全板、印 🎯 與 👀 + 其他區計數
 /maigo:board --all          # 刷新後印整板
 /maigo:board --reviews      # 只顯示現在需要我看的 PR（標題、貢獻者、最後 review）
 /maigo:board --reviewed <n...> # 等同在 board 勾 [x]：本地 ack 這版 report、勾上、加 🔖；不送 GitHub
@@ -107,7 +107,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
 `gh pr view` 抓料與 `Edit` 寫回。以下 `<root>` 是 `.maigo/` 所在的存活 worktree：
 
 1. **規劃**——讀現檔 board、`i/*.md` 的 `- 連結：`、snapshot、排除紀錄與 `.maigo/` 產物型錄，
-   再用 `gh search` 找出該 repo 指名你審或你審過的 PR。`--dry-run` 不寫任何檔：
+   再用 `gh search` 找出該 repo 指名你審、你審過，與你自己開的 open PR。`--dry-run` 不寫任何檔：
 
    ```bash
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py plan --maigo-root <root> --repo <owner/name> --you <login> \

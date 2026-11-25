@@ -74,9 +74,10 @@ def pr(n: int, *, author="carol", is_bot=False, updated="2026-09-30T00:00:00Z"):
 
 
 class FakeGh:
-    def __init__(self, requested=(), reviewed=(), timeline=None, fail=()):
+    def __init__(self, requested=(), reviewed=(), authored=(), timeline=None, fail=()):
         self.requested = list(requested)
         self.reviewed = list(reviewed)
+        self.authored = list(authored)
         self.timeline = timeline or {}
         self.fail = set(fail)
         self.calls: list[list[str]] = []
@@ -85,7 +86,12 @@ class FakeGh:
         self.calls.append(cmd)
         assert cmd[0] == "gh"
         if cmd[1] == "search":
-            kind = "requested" if "user-review-requested:@me" in cmd else "reviewed"
+            if "user-review-requested:@me" in cmd:
+                kind = "requested"
+            elif "author:@me" in cmd:
+                kind = "authored"
+            else:
+                kind = "reviewed"
             if kind in self.fail:
                 raise RuntimeError("rate limited")
             assert cmd[cmd.index("--repo") + 1] == REPO
@@ -576,6 +582,7 @@ class TestDiscover:
     def test_merges_overlapping_results_with_flags(self, gh):
         gh.requested = [pr(1), pr(2, author="bot", is_bot=True)]
         gh.reviewed = [pr(2, author="bot", is_bot=True), pr(3)]
+        gh.authored = [pr(4, author="me")]
         found, errors = sync.discover(REPO, YOU)
         assert errors == []
         assert (
@@ -585,7 +592,27 @@ class TestDiscover:
         both = found[sync.ref_key(url(2))]
         assert both["requested"] and both["reviewed"] and both["is_bot"]
         assert found[sync.ref_key(url(3))]["reviewed"]
-        assert {c[-1] for c in gh.calls} == {"user-review-requested:@me", "-author:@me"}
+        own = found[sync.ref_key(url(4))]
+        assert own["authored"] and not own["requested"] and not own["reviewed"]
+        assert {c[-1] for c in gh.calls} == {
+            "user-review-requested:@me",
+            "-author:@me",
+            "author:@me",
+        }
+
+    def test_authored_search_finds_own_drafts_as_own_type(self, gh):
+        gh.authored = [{**pr(4, author="me"), "isDraft": True}]
+        found, errors = sync.discover(REPO, YOU)
+        assert errors == []
+        own = found[sync.ref_key(url(4))]
+        assert own["isDraft"] and own["type_hint"] == "🔀" and own["authored"]
+
+    def test_authored_search_failure_is_an_error_not_a_crash(self, gh):
+        gh.fail = {"authored"}
+        gh.requested = [pr(1)]
+        found, errors = sync.discover(REPO, YOU)
+        assert any("authored" in e for e in errors)
+        assert sync.ref_key(url(1)) in found
 
     def test_own_pr_gets_review_pr_type_hint_flipped_to_own(self, gh):
         gh.requested = [pr(1, author="Me"), pr(2)]
@@ -828,7 +855,7 @@ class TestPlanDeletion:
 
 
 class TestPlanDiscovery:
-    def test_additions_ordered_requested_reviewed_artifact_then_by_age(
+    def test_additions_ordered_authored_requested_reviewed_artifact_then_by_age(
         self, tmp_path, gh
     ):
         make_board(tmp_path, row(1), details=(1,))
@@ -839,16 +866,60 @@ class TestPlanDiscovery:
             pr(11, updated="2026-09-01T00:00:00Z"),
         ]
         gh.reviewed = [pr(20)]
+        gh.authored = [pr(40, author="me", updated="2026-09-03T00:00:00Z")]
         result = plan(tmp_path)
         assert [a["url"] for a in result["additions"]] == [
+            url(40),
             url(11),
             url(10),
             url(20),
             url(30),
         ]
         assert [a["source"] for a in result["additions"]] == [
-            "requested", "requested", "reviewed", "artifact",
+            "authored", "requested", "requested", "reviewed", "artifact",
         ]  # fmt: skip
+
+    def test_max_new_counts_authored_first(self, tmp_path, gh):
+        make_board(tmp_path, row(1), details=(1,))
+        gh.authored = [pr(40, author="me")]
+        gh.requested = [pr(10)]
+        gh.reviewed = [pr(20)]
+        result = plan(tmp_path, max_new=2)
+        assert [a["url"] for a in result["additions"]] == [url(40), url(10)]
+        assert [a["url"] for a in result["overflow"]] == [url(20)]
+
+    def test_excluded_own_pr_is_not_added_back_and_timeline_not_read(
+        self, tmp_path, gh
+    ):
+        make_board(tmp_path, row(1), details=(1,))
+        sync.append_event(
+            state_dir(tmp_path) / "dropped.jsonl", url(5), "drop", "dd",
+            "2026-09-30T00:00:00+00:00",
+        )  # fmt: skip
+        gh.authored = [pr(5, author="me")]
+        result = plan(tmp_path)
+        assert result["additions"] == [] and result["revived"] == []
+        assert len(ledger_events(tmp_path)) == 1
+        assert all(c[1] == "search" for c in gh.calls)
+
+    def test_own_pr_never_revives_even_if_also_requested(self, tmp_path, gh):
+        make_board(tmp_path, row(1), details=(1,))
+        sync.append_event(
+            state_dir(tmp_path) / "dropped.jsonl", url(5), "drop", "dd",
+            "2026-09-30T00:00:00+00:00",
+        )  # fmt: skip
+        gh.authored = [pr(5, author="me")]
+        gh.requested = [pr(5, author="me")]
+        gh.timeline = {5: [TestIsRerequested.event(YOU, "2026-10-01T01:00:00Z")]}
+        result = plan(tmp_path)
+        assert result["additions"] == [] and result["revived"] == []
+        assert ledger_events(tmp_path)[-1]["event"] == "drop"
+        assert all(c[1] == "search" for c in gh.calls)
+
+    def test_own_pr_already_on_board_is_not_added(self, tmp_path, gh):
+        make_board(tmp_path, row(1), details=(1,))
+        gh.authored = [pr(1, author="me")]
+        assert plan(tmp_path)["additions"] == []
 
     def test_max_new_caps_and_overflow_keeps_priority_order(self, tmp_path, gh):
         make_board(tmp_path, row(1), details=(1,))
@@ -861,6 +932,7 @@ class TestPlanDiscovery:
     def test_no_discovery_skips_gh_but_still_reconciles_artifacts(self, tmp_path, gh):
         make_board(tmp_path, row(1), details=(1,))
         publish_report(tmp_path, 30)
+        gh.authored = [pr(40, author="me")]
         result = plan(tmp_path, discovery=False)
         assert gh.calls == []
         assert [a["url"] for a in result["additions"]] == [url(30)]
