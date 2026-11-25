@@ -5,6 +5,13 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.79.0 (2026-11-25)
+
+### Feat
+
+- **board**: refresh from the central state directory without flags
+- **board**: discover your own open PRs, drafts included
+
 ## v0.78.0 (2026-11-24)
 
 ### Feat
