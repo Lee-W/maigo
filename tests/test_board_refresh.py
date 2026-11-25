@@ -7,6 +7,7 @@ import json
 import re
 import os
 import subprocess
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -2799,6 +2800,154 @@ def test_apply_refuses_maigo_symlink_outside_state_root(tmp_path, capsys):
 
     assert tree_hash(outside) == before
     assert "outside the maigo state root" in capsys.readouterr().err
+
+
+# --- refreshing from the central state directory ------------------------------------
+
+
+@pytest.fixture
+def state_board(tmp_path, monkeypatch, gh):
+    """A board that lives only in `<state>/o/r`; the checkout `ck` is not a worktree."""
+    state = tmp_path / "state"
+    repo_dir = state / "o" / "r"
+    repo_dir.mkdir(parents=True)
+    monkeypatch.setenv("MAIGO_STATE_HOME", str(state))
+    scratch = tmp_path / "tmp"
+    scratch.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(scratch))
+    ck = tmp_path / "ck"
+    ck.mkdir()
+    (ck / ".maigo").symlink_to(repo_dir, target_is_directory=True)
+    write_board(ck, board_text(focus=[row(1)]))
+    put_detail(ck, 1)
+    gh.prs[1] = pr_meta(1)
+    return repo_dir
+
+
+def test_refresh_from_state_dir_without_flags(
+    state_board, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(state_board)
+    assert sync.main(["refresh", "--no-discovery", "--you", YOU]) == 0
+    assert "board.md (refreshed)" in capsys.readouterr().out
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_refresh_from_state_subdir_resolves_board_dir(state_board, monkeypatch):
+    monkeypatch.chdir(state_board / "i")
+    assert sync.main(["refresh", "--no-discovery", "--you", YOU]) == 0
+
+
+def test_explicit_maigo_root_state_dir(state_board, tmp_path):
+    assert run_cli(state_board, "--no-discovery") == 0
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_apply_from_state_dir_writes_state_and_cleans_temp(
+    state_board, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(state_board)
+    before = (state_board / "board.md").read_text()
+    code = sync.main(["refresh", "--apply", "--no-discovery", "--json", "--you", YOU])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert (state_board / "board.md").read_text() != before
+    assert (state_board / "_internal" / "board" / "snapshot.json").exists()
+    backup = json.loads(out)["backup"]
+    assert backup is not None
+    assert backup.startswith(os.path.realpath(state_board))
+    assert Path(backup).exists()
+    assert not (state_board / "_internal" / "board" / ".refresh-write-lock").exists()
+    assert list((tmp_path / "tmp").iterdir()) == []
+    state = tmp_path / "state"
+    assert [p for p in state.rglob("*") if p.is_symlink()] == []
+
+
+def test_apply_from_state_dir_respects_lock_held_by_checkout_entry(
+    state_board, tmp_path, monkeypatch, capsys
+):
+    (state_board / "_internal" / "board" / ".refresh-write-lock").mkdir(parents=True)
+    monkeypatch.chdir(state_board)
+    before = tree_hash(state_board)
+    assert sync.main(["refresh", "--apply", "--no-discovery", "--you", YOU]) == 2
+    err = capsys.readouterr().err
+    assert os.path.realpath(state_board) in err
+    assert str(tmp_path / "tmp") not in err
+    assert os.path.realpath(tmp_path / "tmp") not in err
+    assert tree_hash(state_board) == before
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_state_dir_post_write_failure_reports_real_backup_path(
+    state_board, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(state_board)
+
+    def broken(*args, **kwargs):
+        raise OSError("snapshot disk full")
+
+    monkeypatch.setattr(sync, "write_snapshot", broken)
+    code = sync.main(["refresh", "--apply", "--no-discovery", "--json", "--you", YOU])
+    out = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert out["exit_reason"] == "post_write_failed"
+    assert out["backup"] is not None
+    assert out["backup"].startswith(os.path.realpath(state_board))
+    assert Path(out["backup"]).exists()
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_state_dir_failure_midway_cleans_temp(
+    state_board, tmp_path, gh, monkeypatch, capsys
+):
+    monkeypatch.chdir(state_board)
+    gh.prs[9] = pr_meta(9)
+    gh.fail = {9}
+    (state_board / "i" / "9.md").write_text("# x\n\n- 連結：" + url(9) + "\n")
+    before = tree_hash(state_board)
+    code = sync.main(
+        ["refresh", "--apply", "--no-discovery", "--you", YOU, "--add", url(9)]
+    )
+    assert code == 1
+    assert "## 判斷" in capsys.readouterr().err
+    assert tree_hash(state_board) == before
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(refresh, "run_refresh", boom)
+    with pytest.raises(RuntimeError):
+        sync.main(["refresh", "--no-discovery", "--you", YOU])
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_state_root_or_backup_dir_is_not_a_board_dir(state_board, tmp_path):
+    state = tmp_path / "state"
+    backup = state / "_migration-backup" / "x"
+    backup.mkdir(parents=True)
+    (backup / "board.md").write_text("board", encoding="utf-8")
+    (state / "o" / "r2").mkdir()
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "board.md").write_text("board", encoding="utf-8")
+    for path in (state, state / "o", backup, outside, state / "o" / "r2"):
+        assert refresh.state_board_dir(path) is None
+    expected = Path(os.path.realpath(state_board))
+    assert refresh.state_board_dir(state_board / "i") == expected
+    assert refresh.state_board_dir(state_board) == expected
+
+
+def test_state_dir_without_header_repo_requires_repo_flag(
+    state_board, tmp_path, gh, monkeypatch, capsys
+):
+    (state_board / "board.md").write_text("# Work Board\n", encoding="utf-8")
+    assert sync.parse_header((state_board / "board.md").read_text())["repo"] is None
+    monkeypatch.chdir(state_board)
+    assert sync.main(["refresh", "--no-discovery", "--you", YOU]) == 1
+    assert "請指定 --repo" in capsys.readouterr().err
+    assert not any(call[:3] == ["gh", "repo", "view"] for call in gh.calls)
+    assert list((tmp_path / "tmp").iterdir()) == []
 
 
 # --- review verdict replaces the action on 👀 rows ---------------------------------

@@ -86,7 +86,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
 [`skills/work-board` §3(b)](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）：
 
 1. 跑 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_sync.py refresh --apply --json [--add <targets>] [--max-new N] [--no-discovery] [--weights <file>]`
-   （在 board 所在 repo 的任一 worktree 內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷；
+   （在 board 所在 repo 的任一 worktree 內，或集中狀態目錄 `<state>/<owner>/<repo>`（含其子目錄）內跑即可；`--maigo-root`／`--repo`／`--you` 沒給時自動判斷；
    `--weights <file>` 指定同 rank 內加權檔、覆寫預設的 repo 層與使用者層設定，格式見
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）。
 2. 依 exit code 分流：
@@ -95,7 +95,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    - **exit 2**（CAS 衝突：board.md 或細節檔在刷新期間被改過；除了 review.md 的 ack 標記外未寫任何檔）→ 直接重跑一次；再撞到就停下，
      告訴使用者 board 正被別的 session 寫。**不要**改用 `Write`。
    - **exit 1**（前置條件拒絕）→ 依訊息分流：舊格式或 `review-board.md` → 走下面的「手動流程 fallback」
-     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權、載入樣板或接棒清單設定檔有壞行（訊息含檔名與行號）→ 回報原文。
+     做整檔正規化後重跑；找不到 board 或有多份 → 問使用者；board 有壞行／細節檔缺 `## 判斷`／加權、載入樣板或接棒清單設定檔有壞行（訊息含檔名與行號）→ 回報原文；狀態目錄刷新缺 `--repo` → 問使用者 repo。
    - **exit 3**（寫入階段失敗）→ 回報備份路徑與錯誤，不 fallback。`--json` 的 `exit_reason` 是 `write_failed`
      ＝已從備份還原；是 `post_write_failed` ＝board 已是新版、只有 ledger／snapshot 沒寫成，把輸出列出的
      未寫事件回報給使用者，說明重跑是安全的。
@@ -198,6 +198,10 @@ python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply   # 寫回
 的任一 worktree 內都可以，script 會用 `git worktree list` 自動找到唯一一份 `.maigo/board.md`
 （共用同一個集中 `.maigo/` 的 worktree 算同一份；找不到或有多份不同的就拒絕，用 `--maigo-root` 指定）；`--repo` 預設取 board 第一行 header，`--you` 預設取
 `gh api user`。可用旗標：`--add <url|n>...`、`--max-new`、`--no-discovery`、`--stale-days`、`--jobs`、`--json`。
+
+cwd 在 `$MAIGO_STATE_HOME`（預設 `~/.local/share/maigo/state`）底下的 `<owner>/<repo>` 或其子目錄時，
+直接用那份 board；`--maigo-root` 也可指向該目錄。此時 board header 沒有 repo 就要給 `--repo`。script
+會在系統暫存目錄建一個暫時的 root、結束即清，不在狀態目錄或 checkout 留任何東西。
 
 在 nvim 裡開著 board 時：先 `:w`，再 `:!python3 "$MAIGO_HOME/scripts/board_sync.py" refresh --apply`，最後
 `:e` 重新載入。script 讀的是磁碟，refresh 之後沒 `:e` 就存檔會用舊 buffer 蓋掉刷新結果（nvim 會先跳

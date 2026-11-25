@@ -5,7 +5,7 @@
 
 - 不帶 `--apply` ＝預覽：整套流程照算（含 gh 抓料），但一個檔都不寫、不建 `_internal/`、
   不 append ledger、不寫 snapshot、**不 ack**（ack 只模擬）。輸出 board.md 的 unified diff。
-- `--apply`：取得 state root 的刷新鎖後，依序 CAS 預檢 #1 → ack → 渲染 → CAS 預檢 #2 →
+- `--apply`：取得該 repo 狀態目錄 `_internal/board/` 下的刷新鎖後，依序 CAS 預檢 #1 → ack → 渲染 → CAS 預檢 #2 →
   備份 → 寫細節檔 → 寫 board.md →
   刪老化細節檔 → append ledger → 寫 snapshot。CAS 不一致（別人動過檔）→ exit 2，除了 ack 已寫的
   review.md 標記外不寫任何檔；寫細節檔／board 失敗 → 從備份還原、exit 3（`write_failed`）；
@@ -15,6 +15,9 @@
 `skills/work-board/references/format-spec.md` §1 / §1a 文法的程式鏡像，由 `tests/test_board_refresh.py`
 的 round-trip 守著。外部指令一律走 `board_sync.run`（以 module attribute 存取，
 測試只要 monkeypatch 那一個 seam）。
+
+cwd 或 `--maigo-root` 在集中狀態目錄 `<state>/<owner>/<repo>`（或其子目錄）時，以系統暫存目錄合成
+root（內含指向該目錄的 `.maigo` symlink），結束即清；不在狀態目錄或 checkout 留任何東西。
 
 exit code：0 成功（含無變動）／預覽；1 前置條件拒絕；2 CAS 衝突或另一輪刷新持鎖；3 寫入階段失敗。
 """
@@ -30,6 +33,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -2328,6 +2332,53 @@ def format_summary(summary: dict) -> str:
 # --- CLI defaults ---------------------------------------------------------------
 
 
+def state_board_dir(path: Path) -> Path | None:
+    """`<state>/<owner>/<repo>` containing a board.md when *path* is that dir or below it."""
+    state = Path(os.path.realpath(maigo_state.get_state_root()))
+    resolved = Path(os.path.realpath(path))
+    if not resolved.is_relative_to(state):
+        return None
+    parts = resolved.relative_to(state).parts
+    if len(parts) < 2:
+        return None
+    owner, repo = parts[0], parts[1]
+    if owner == maigo_state.BACKUP_DIRNAME:
+        return None
+    if not (
+        maigo_state._is_valid_segment(owner) and maigo_state._is_valid_segment(repo)
+    ):
+        return None
+    candidate = state / owner / repo
+    return candidate if (candidate / "board.md").is_file() else None
+
+
+@contextlib.contextmanager
+def _synthetic_root(board_dir: Path) -> Iterator[Path]:
+    """A temp root whose `.maigo` points at *board_dir*; only the symlink is removed."""
+    tmp = Path(tempfile.mkdtemp(prefix="maigo-board-root-"))
+    try:
+        (tmp / ".maigo").symlink_to(board_dir, target_is_directory=True)
+        yield tmp
+    finally:
+        try:
+            link = tmp / ".maigo"
+            if link.is_symlink():
+                link.unlink()
+            tmp.rmdir()
+        except OSError as error:
+            print(f"warning: 無法移除暫存目錄 {tmp}：{error}", file=sys.stderr)
+
+
+def _unalias(obj, alias: str, real: str):
+    if isinstance(obj, str):
+        return obj.replace(alias, real)
+    if isinstance(obj, dict):
+        return {key: _unalias(value, alias, real) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [_unalias(value, alias, real) for value in obj]
+    return obj
+
+
 def find_maigo_root(cwd: Path) -> Path:
     try:
         out = sync.run(["git", "-C", str(cwd), "worktree", "list", "--porcelain"])
@@ -2358,7 +2409,9 @@ def find_maigo_root(cwd: Path) -> Path:
     return found[0]
 
 
-def resolve_repo(root: Path, explicit: str | None) -> str:
+def resolve_repo(
+    root: Path, explicit: str | None, *, allow_gh_fallback: bool = True
+) -> str:
     header_repo = None
     with contextlib.suppress(OSError, UnicodeDecodeError):
         header_repo = sync.parse_header(
@@ -2372,6 +2425,8 @@ def resolve_repo(root: Path, explicit: str | None) -> str:
         return explicit
     if header_repo:
         return header_repo
+    if not allow_gh_fallback:
+        raise RefreshError(1, "從狀態目錄刷新時 board header 沒有 repo，請指定 --repo")
     previous = Path.cwd()
     try:
         os.chdir(root)
@@ -2419,35 +2474,51 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def cli(args: argparse.Namespace, *, now: datetime | None = None) -> int:
-    try:
-        root = (args.maigo_root or find_maigo_root(Path.cwd())).resolve()
-        if args.apply:
-            try:
-                maigo_state.check_maigo_link_trusted(root / ".maigo")
-            except ValueError as error:
-                raise RefreshError(1, str(error)) from error
-        repo = resolve_repo(root, args.repo)
-        you = resolve_you(args.you)
-        summary = run_refresh(
-            root, repo, you, apply=args.apply, add=args.add, max_new=args.max_new,
-            discovery=not args.no_discovery, stale_days=args.stale_days,
-            jobs=args.jobs, weights_file=args.weights, now=now,
-        )  # fmt: skip
-    except RefreshError as error:
-        reason = (
-            error.reason
-            or {1: "rejected", 2: "cas_conflict", 3: "write_failed"}[error.code]
-        )
-        print(f"board_refresh: {error.message}", file=sys.stderr)
+    board_dir = None
+    if not (args.maigo_root and (args.maigo_root / ".maigo" / "board.md").exists()):
+        board_dir = state_board_dir(args.maigo_root or Path.cwd())
+    alias = real = ""
+    with contextlib.ExitStack() as stack:
+        try:
+            if board_dir is not None:
+                root = stack.enter_context(_synthetic_root(board_dir)).resolve()
+                alias, real = str(root / ".maigo"), str(board_dir)
+            else:
+                root = (args.maigo_root or find_maigo_root(Path.cwd())).resolve()
+            if args.apply:
+                try:
+                    maigo_state.check_maigo_link_trusted(root / ".maigo")
+                except ValueError as error:
+                    raise RefreshError(1, str(error)) from error
+            repo = resolve_repo(root, args.repo, allow_gh_fallback=board_dir is None)
+            you = resolve_you(args.you)
+            summary = run_refresh(
+                root, repo, you, apply=args.apply, add=args.add, max_new=args.max_new,
+                discovery=not args.no_discovery, stale_days=args.stale_days,
+                jobs=args.jobs, weights_file=args.weights, now=now,
+            )  # fmt: skip
+        except RefreshError as error:
+            reason = (
+                error.reason
+                or {1: "rejected", 2: "cas_conflict", 3: "write_failed"}[error.code]
+            )
+            message = error.message
+            extra = error.extra
+            if board_dir is not None:
+                message = _unalias(message, alias, real)
+                extra = _unalias(extra, alias, real)
+            print(f"board_refresh: {message}", file=sys.stderr)
+            if args.json:
+                payload = {"exit_reason": reason, "message": message, **extra}
+                print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return error.code
+        if board_dir is not None:
+            summary = _unalias(summary, alias, real)
         if args.json:
-            payload = {"exit_reason": reason, "message": error.message, **error.extra}
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return error.code
-    if args.json:
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
-    else:
-        print(format_summary(summary))
-    return 0
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+        else:
+            print(format_summary(summary))
+        return 0
 
 
 def main(argv: list[str] | None = None) -> int:
