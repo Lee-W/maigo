@@ -5,6 +5,12 @@ All notable changes to Maigo are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## v0.80.0 (2026-11-26)
+
+### Feat
+
+- **board**: uncheck your own PR when new comments arrive after you ticked it
+
 ## v0.79.0 (2026-11-25)
 
 ### Feat
