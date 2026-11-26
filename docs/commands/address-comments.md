@@ -16,7 +16,7 @@ flowchart TD
     Quick --> Finale[Orchestrator finale<br/>處理對照 + 回覆草稿 + commit msg]
     Go --> Finale
     Team --> Finale
-    Finale --> Draft[寫 pr/&lt;id&gt;/reply-draft.md<br/>每則標明在哪裡回<br/>不必回覆的只列一節]
+    Finale --> Draft[寫 pr/&lt;id&gt;/reply-draft.md<br/>每則標明在哪裡回<br/>每個 inline thread 都有一句可貼回覆；純稱讚或已回覆過的只列一節]
     Draft --> Learn
     Learn[Orchestrator step 7<br/>靜默萃取 convention 候選]
     Learn -- 0 候選 --> Done([完成])
