@@ -34,6 +34,9 @@ optional `checked`（bool，現檔勾選）、`checkbox_change`（`checked`/`unc
 來自 `board_sync.py plan`）、`prior_badges`（list）：（任一出現才輸出）多三個欄位——`checked`（最終勾選，
 沒帶 `checked` 時為 `null`＝不要動 checkbox）、`learn_pending`（👀 剛被勾、且沒有 🧠）、
 `acked_current`（report 已由你在目前 head 之後 ack）。規則見 `checkbox_after_refresh()`。
+🔀 另可帶 `prior_checked`（上次 snapshot 的勾選）、`prior_others_activity_at`、
+`snapshot_written_at`：三個條件同時成立（見 `should_reset_own_pr_checkbox()`）時輸出
+`reset_checkbox: true` 並把 `checked` 清成 false；`others_activity_at` 是別人最新活動時間。
 stdout：JSON 陣列；含 section/rank/status/next_action/short_action/result/shows_result/size/badges/detail_path、title/author、
 last_reviewed_at/review_time_source/acknowledged_at、needs_review 與 index_entry。
 `--reviews` 僅輸出待看 PR 並依 rank 排序；不可拿過濾後的結果覆寫整份 board。
@@ -545,10 +548,16 @@ def _posted_by_you_since(reviews: list[dict], you: str, since: datetime | None) 
     return False
 
 
+def _is_others_event(author: str, you: str) -> bool:
+    return author != you
+
+
 def _has_others_activity_after(
     events: list[tuple[str, str]], you: str, since: datetime
 ) -> bool:
-    return any(author != you and _parse_ts(ts) > since for author, ts in events)
+    return any(
+        _is_others_event(author, you) and _parse_ts(ts) > since for author, ts in events
+    )
 
 
 def _ci_status(rollup: list[dict]) -> str:
@@ -835,19 +844,63 @@ def acked_current(review: dict, you: str, head: str | None) -> bool:
     )
 
 
+def latest_others_activity(events: list[tuple[str, str]], you: str) -> datetime | None:
+    """別人（非 `you`）最新一次活動的時間；沒有別人的活動回 None。"""
+    timestamps = [
+        _parse_ts(ts) for author, ts in events if _is_others_event(author, you)
+    ]
+    return max(timestamps) if timestamps else None
+
+
+def resolve_checkbox_baseline(
+    prior_others_at: str | None, snapshot_written_at: str | None
+) -> datetime | None:
+    """
+    🔀 勾選重置的比較基準：上次存的 `others_activity_at`，沒有（或解析不了）就退回
+    snapshot 的 `written_at`；兩者都用不了（第一次刷新）回 None。
+    """
+    for raw in (prior_others_at, snapshot_written_at):
+        if not raw:
+            continue
+        try:
+            return _parse_ts(raw)
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return None
+
+
+def should_reset_own_pr_checkbox(
+    status: BoardStatus,
+    prior_checked: bool,
+    others_latest: datetime | None,
+    baseline: datetime | None,
+) -> bool:
+    """
+    自己的 🔀 行是否要把舊的 `[x]` 重置：上次 snapshot 就已勾、現在是 `有新 comment`、
+    且別人最新活動晚於基準（見 `resolve_checkbox_baseline()`）。沒有基準一律不重置。
+    """
+    if not (prior_checked and status is BoardStatus.NEW_COMMENT and others_latest):
+        return False
+    return baseline is not None and others_latest > baseline
+
+
 def checkbox_after_refresh(
     item_type: ItemType,
     checked_now: bool,
     acked_current: bool,
     needs_review: bool,
+    reset_on_new_comment: bool = False,
 ) -> bool:
     """
     刷新後的最終 checkbox。👀：`(acked_current or checked_now) and not needs_review`
-    （回你的球／待 review 自動取消勾，`--reviewed` 之後一定是勾）；🐛/🔀 是純學習訊號，
+    （回你的球／待 review 自動取消勾，`--reviewed` 之後一定是勾）；🔀 原樣保留，只有
+    `reset_on_new_comment`（見 `should_reset_own_pr_checkbox()`）時清勾；🐛 純學習訊號，
     原樣保留。
     """
     if item_type is ItemType.REVIEW_PR:
         return (acked_current or checked_now) and not needs_review
+    if item_type is ItemType.OWN_PR and reset_on_new_comment:
+        return False
     return checked_now
 
 
@@ -951,9 +1004,40 @@ def evaluate_items(
         current_ack = item_type is ItemType.REVIEW_PR and acked_current(
             review, you, gh_meta.get("headRefOid")
         )
+        others_latest = (
+            latest_others_activity(_activity_events(gh_meta), you)
+            if item_type is ItemType.OWN_PR
+            else None
+        )
+        baseline = resolve_checkbox_baseline(
+            item.get("prior_others_activity_at"), item.get("snapshot_written_at")
+        )
+        reset_checkbox = (
+            item_type is ItemType.OWN_PR
+            and bool(item.get("checked"))
+            and should_reset_own_pr_checkbox(
+                result.status, bool(item.get("prior_checked")), others_latest, baseline
+            )
+        )
+        # 被別的狀態遮住（CI 紅、衝突…）而沒重置的新活動，不能推進基準，
+        # 否則之後狀態轉回 `有新 comment` 時舊的勾會永遠留著。
+        hold_baseline = (
+            item_type is ItemType.OWN_PR
+            and bool(item.get("checked"))
+            and bool(item.get("prior_checked"))
+            and not reset_checkbox
+            and others_latest is not None
+            and baseline is not None
+            and others_latest > baseline
+        )
+        stored_others_at = baseline if hold_baseline else others_latest
         checked = (
             checkbox_after_refresh(
-                item_type, bool(item["checked"]), current_ack, needs_review
+                item_type,
+                bool(item["checked"]),
+                current_ack,
+                needs_review,
+                reset_checkbox,
             )
             if "checked" in item
             else None
@@ -988,6 +1072,10 @@ def evaluate_items(
                 "checked": checked,
                 "learn_pending": learn_pending,
                 "acked_current": current_ack,
+                "reset_checkbox": reset_checkbox,
+                "others_activity_at": stored_others_at.isoformat()
+                if stored_others_at
+                else None,
             }
         results.append(
             {

@@ -358,6 +358,8 @@ crystallize 要 spawn 愛音寫 skill，不塞進本 flow。
   `## 判斷` 區視卡點寫（例：「哪個 work item 卡住——需要你決定」），不寫死固定句子
 
 回寫時必須保留原 checkbox 與 `🧠` 標記；maigo 自己處理的項目不自動勾 checkbox。
+checkbox 的重置由 `/maigo:board` 刷新負責，這裡不自行判斷；若這條 PR 行帶著 `[x]`、而這一輪處理的是新的 review 意見，
+收場總結提醒使用者一句：這個勾若是在別人最新的活動之前留下的，下次 `/maigo:board` 刷新會取消它。
 
 ### 收場總結重印回覆草稿的位置
 

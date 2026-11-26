@@ -12,8 +12,9 @@ compare-and-swap 守住同一件事：別人動過檔案就中止、不寫（見
 
 - `dropped.jsonl`：排除紀錄，每行一個事件 `{"url","event":"drop"|"revive","reason","at"}`，
   只 append；讀取時依序 fold，最後一筆事件決定狀態。
-- `snapshot.json`：`{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at"}}}`，
+- `snapshot.json`：`{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at","others_activity_at"}}}`，
   上次刷新結束時 board 上的項目、勾選與報告版本；原子寫入。舊版缺 `reviewed_at` 時須重新確認。
+  `others_activity_at` 只在自己的 🔀 行有值（別人最新活動時間，可省略）；缺欄位的舊 snapshot 照常讀取。
 - `backup/<UTC ts>/`：`refresh --apply` 寫回前複製的 `board.md` 與細節檔，只留最新 10 份。
 
 另外 `ack` 子命令會透過 `review_report.acknowledge` 寫 review.md 的 ack 標記；`archive` 子命令
@@ -832,8 +833,8 @@ def plan_refresh(
         [(ref_key(item["url"]), item["checked"]) for item in lines if item["url"]],
         snapshot,
     )
-    displayed_reviews = {
-        ref_key(url): info.get("reviewed_at")
+    snapshot_info = {
+        ref_key(url): info
         for url, info in (snapshot or {}).items()
         if isinstance(info, dict)
     }
@@ -841,6 +842,7 @@ def plan_refresh(
     for line in lines:
         key = ref_key(line["url"]) if line["url"] else None
         change = changes.get(key, {"change": None, "inferred": False})
+        prior = snapshot_info.get(key) or {}
         out_lines.append(
             {
                 "line_no": line["line_no"],
@@ -854,13 +856,16 @@ def plan_refresh(
                 "checked": line["checked"],
                 "checkbox_change": change["change"],
                 "inferred": change["inferred"],
-                "reviewed_at": displayed_reviews.get(key),
+                "reviewed_at": prior.get("reviewed_at"),
+                "snapshot_checked": bool(prior.get("checked")),
+                "others_activity_at": prior.get("others_activity_at"),
                 "excluded": key in excluded_now,
             }
         )
     return {
         "dry_run": dry_run,
         "first_run": snapshot is None,
+        "snapshot_written_at": snapshot_at,
         "lines": out_lines,
         "removed": [
             {
@@ -1102,6 +1107,7 @@ def write_snapshot(
     now: datetime | None = None,
     checked_overrides: dict[str, bool | None] | None = None,
     reviewed_at_overrides: dict[str, str | None] | None = None,
+    others_activity_overrides: dict[str, str | None] | None = None,
 ) -> dict:
     """Re-read the current board.md (not the plan-time copy) and persist it.
 
@@ -1111,6 +1117,8 @@ def write_snapshot(
     if a new report was published between rendering and snapshot creation. Keys
     are matched to board rows by `ref_key`, so URL spelling does not matter; keys
     that match no 👀 row come back in `unmatched_reviewed_at`.
+    `others_activity_at` (latest non-you activity on an own PR) is carried over from the
+    previous snapshot; `others_activity_overrides[url]` replaces it (`None` = drop it).
     """
     maigo_dir = maigo_root / ".maigo"
     # Lenient: a snapshot only needs url/checked/detail, never the author.
@@ -1146,6 +1154,19 @@ def write_snapshot(
         except (OSError, ValueError) as error:
             items[url]["reviewed_at"] = None
             errors.append(f"{url}: 無法記錄 report 版本（{error}）")
+    state_dir = _state_dir(maigo_root)
+    previous, _, _ = _load_snapshot(state_dir / SNAPSHOT_NAME)
+    for url, entry in items.items():
+        prior = (previous or {}).get(url)
+        if isinstance(prior, dict) and prior.get("others_activity_at"):
+            entry["others_activity_at"] = prior["others_activity_at"]
+    for override_url, others_at in (others_activity_overrides or {}).items():
+        if override_url not in items:
+            continue
+        if others_at is None:
+            items[override_url].pop("others_activity_at", None)
+        else:
+            items[override_url]["others_activity_at"] = others_at
     for override_url, value in (checked_overrides or {}).items():
         if override_url not in items:
             continue
@@ -1153,7 +1174,6 @@ def write_snapshot(
             del items[override_url]
         else:
             items[override_url]["checked"] = value
-    state_dir = _state_dir(maigo_root)
     state_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "version": 1,
