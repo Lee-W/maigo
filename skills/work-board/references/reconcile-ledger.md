@@ -9,7 +9,7 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
 | 檔案 | 格式 | 寫法 | 用途 |
 |---|---|---|---|
 | `dropped.jsonl` | 每行 `{"url","event":"drop"\|"revive","reason","at"}` | 單次 append 一行，只增不改 | 持久排除紀錄；以 canonical URL（`(owner, repo, number)` 小寫，`pull`/`issues` 同一項）為 key，依事件順序 fold，最後一筆決定狀態 |
-| `snapshot.json` | `{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at"}}}` | tempfile ＋ replace 原子寫入 | 上次刷新結束時 board 上的項目、勾選與實際顯示的報告版本，用來偵測 `dd` 與勾選變化 |
+| `snapshot.json` | `{"version":1,"written_at","items":{<url>:{"checked","detail","reviewed_at","others_activity_at"}}}` | tempfile ＋ replace 原子寫入 | 上次刷新結束時 board 上的項目、勾選與實際顯示的報告版本，用來偵測 `dd` 與勾選變化。`others_activity_at` 只在自己的 🔀 行有值（別人最新活動時間，可省略；缺欄位的舊 snapshot 照常讀取，version 不升），🔀 勾選重置以它為基準，沒有就退回 `written_at` |
 | `backup/<UTC ts>/` | 與 board.md 相同的目錄結構（`board.md`、`i/*.md`） | `refresh --apply` 寫回前複製要改／刪的檔，只留最新 10 份 | 寫入失敗時還原；也是誤刪細節檔後的救援來源 |
 
 **`dd` → 排除**：`removed = (snapshot 的 URL ∪ 孤兒 i/ 檔的 URL) − board 現有行 − 已排除`，成立就

@@ -142,7 +142,11 @@ Loaded on demand by [`skills/work-board/SKILL.md`](https://github.com/Lee-W/maig
   手改行時請維持 `— <title> <路徑>` 的形狀。
 - **checkbox**：👀 行的 `[x]` ＝「我看完目前這份報告了」——使用者在 nvim 勾上，下次刷新會 ack 該
   report；有新 commit／作者留言（回你的球）或待 review 時**自動取消勾**。🐛/🔀 行的 `[x]` ＝「這項我
-  **親自**處理過了」，純學習閘門訊號（見 §5），不 ack、不自動取消勾；與所在 section 正交。
+  **親自**處理過了」，純學習閘門訊號（見 §5），不 ack；與所在 section 正交。🐛 行不自動取消勾；
+  🔀 行只有一種例外：上次刷新已勾、之後別人有新活動（晚於 snapshot 的 `others_activity_at`，沒有就用 `written_at`）、
+  且現在是 `有新 comment` 時，刷新取消勾並在沒有 `🧠` 時補 `🔖`（這輪意見還沒處理，舊的勾不能留著）。
+  別人的新活動若被更前面的狀態（CI 紅、衝突、CHANGES_REQUESTED、WIP）遮住而沒重置，`others_activity_at`
+  不前進，等狀態轉回 `有新 comment` 時仍會重置；使用者自己取消勾後才照常前進。
 - **🧠 標記**：學習盤點已完成，不重複學。
 - **🔖 標記**：待學習盤點——👀 行被勾（含 `--reviewed`）時加上，跨刷新保留，所以後來自動取消勾也
   不會吃掉學習訊號；`--learn` 完成後換成 `🧠`。

@@ -3681,3 +3681,239 @@ class TestOwnPrEndToEnd:
         before = own
         assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
         assert (tmp_path / ".maigo/i/3.md").read_text() == before
+
+
+# --- own-PR checkbox reset on a new comment -------------------------------------
+
+SNAPSHOT_AT = datetime(2026, 9, 20, 0, 0, tzinfo=timezone.utc)
+STORED_OTHERS_AT = "2026-09-25T00:00:00+00:00"
+
+
+def _own_pr_line(mark: str, badges: str = "") -> str:
+    return f"1. [{mark}] 🔀 有新 comment @me{badges} i/1.md — Title 1"
+
+
+def _seed_own_pr(
+    root: Path,
+    *,
+    snapshot_mark: str,
+    board_mark: str = "x",
+    badges: str = "",
+    others_at: str | None = STORED_OTHERS_AT,
+    legacy: bool = False,
+) -> Path:
+    """Board + snapshot as the previous refresh left them, then the board as edited now."""
+    write_board(root, board_text(focus=[_own_pr_line(snapshot_mark, badges)]))
+    put_detail(root, 1, icon="🔀", status="有新 comment")
+    sync.write_snapshot(root, REPO, SNAPSHOT_AT)
+    path = root / ".maigo/_internal/board/snapshot.json"
+    data = json.loads(path.read_text())
+    if legacy:
+        for item in data["items"].values():
+            item.pop("others_activity_at", None)
+    elif others_at:
+        data["items"][url(1)]["others_activity_at"] = others_at
+    path.write_text(json.dumps(data))
+    write_board(root, board_text(focus=[_own_pr_line(board_mark, badges)]))
+    return path
+
+
+def _commented_pr(commented_at: str) -> dict:
+    return pr_meta(
+        1, author="me",
+        comments=[{"author": {"login": "carol"}, "createdAt": commented_at}],
+    )  # fmt: skip
+
+
+def _own_pr_line_on_board(root: Path) -> str:
+    return next(ln for ln in board_lines(root) if "i/1.md" in ln and "[" in ln[:8])
+
+
+def test_refresh_unchecks_own_pr_with_newer_comment_and_marks_it_for_learning(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[ ]" in line and "🔖" in line and "🧠" not in line
+    snapshot = json.loads(
+        (tmp_path / ".maigo/_internal/board/snapshot.json").read_text()
+    )["items"][url(1)]
+    assert snapshot["checked"] is False
+    assert snapshot["others_activity_at"].startswith("2026-09-29T00:00:00")
+
+
+def test_refresh_unchecks_own_pr_without_adding_learn_mark_when_already_learned(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x", badges=" 🧠")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[ ]" in line and "🧠" in line and "🔖" not in line
+
+
+def test_refresh_keeps_own_pr_check_when_no_comment_is_newer_than_the_last_one_seen(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x")
+    gh.prs[1] = _commented_pr("2026-09-24T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[x]" in line and "🔖" not in line
+
+
+def test_refresh_keeps_a_check_first_seen_in_this_round_even_with_newer_comment(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark=" ", board_mark="x")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "[x]" in _own_pr_line_on_board(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "commented_at,reset",
+    [("2026-09-29T00:00:00Z", True), ("2026-09-10T00:00:00Z", False)],
+)
+def test_refresh_reads_a_legacy_snapshot_and_falls_back_to_its_written_at(
+    tmp_path, gh, commented_at, reset
+):
+    path = _seed_own_pr(tmp_path, snapshot_mark="x", legacy=True)
+    assert "others_activity_at" not in path.read_text()
+    gh.prs[1] = _commented_pr(commented_at)
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert ("[ ]" in _own_pr_line_on_board(tmp_path)) is reset
+    snapshot = json.loads(path.read_text())
+    assert snapshot["version"] == 1
+    assert "others_activity_at" in snapshot["items"][url(1)]
+
+
+def test_refresh_preview_reports_the_own_pr_checkbox_reset_and_writes_nothing(
+    tmp_path, gh, capsys
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    before = tree_hash(tmp_path)
+    assert run_cli(tmp_path, "--no-discovery", "--json") == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert tree_hash(tmp_path) == before
+    assert any("#1" in w and "取消舊的勾選" in w for w in summary["warnings"])
+    assert f"-{_own_pr_line('x')}\n" in summary["diff"]
+    assert "\n+1. [ ] 🔀 有新 comment @me 🔖 " in summary["diff"]
+
+
+def _snapshot_item(root: Path) -> dict:
+    data = json.loads((root / ".maigo/_internal/board/snapshot.json").read_text())
+    return data["items"][url(1)]
+
+
+def test_refresh_keeps_own_pr_check_when_newest_activity_equals_the_baseline(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x")
+    gh.prs[1] = _commented_pr("2026-09-25T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "[x]" in _own_pr_line_on_board(tmp_path)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_refresh_does_not_advance_the_baseline_while_another_status_masks_the_comment(
+    tmp_path, gh, legacy
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x", legacy=legacy)
+    commented = "2026-09-29T00:00:00Z"
+    gh.prs[1] = _commented_pr(commented)
+    gh.prs[1]["reviewDecision"] = "CHANGES_REQUESTED"
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[x]" in line and "🔖" not in line
+    assert _snapshot_item(tmp_path)["others_activity_at"] < "2026-09-29"
+    gh.prs[1] = _commented_pr(commented)  # same activity, now plain 有新 comment
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[ ]" in line and "🔖" in line
+    assert _snapshot_item(tmp_path)["others_activity_at"].startswith("2026-09-29")
+
+
+def test_refresh_advances_the_baseline_when_the_user_unticked_during_a_masked_round(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x", board_mark=" ")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    gh.prs[1]["reviewDecision"] = "CHANGES_REQUESTED"
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _snapshot_item(tmp_path)["others_activity_at"].startswith("2026-09-29")
+
+
+def test_refresh_treats_an_unparsable_stored_others_activity_as_missing(tmp_path, gh):
+    _seed_own_pr(tmp_path, snapshot_mark="x", others_at="garbage")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert "[ ]" in _own_pr_line_on_board(tmp_path)
+
+
+def test_refresh_leaves_a_hand_unticked_own_pr_alone_despite_new_comment(
+    tmp_path, gh, capsys
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x", board_mark=" ")
+    gh.prs[1] = _commented_pr("2026-09-29T00:00:00Z")
+    assert run_cli(tmp_path, "--apply", "--no-discovery", "--json") == 0
+    summary = json.loads(capsys.readouterr().out)
+    line = _own_pr_line_on_board(tmp_path)
+    assert "[ ]" in line and "🔖" not in line
+    assert not any("取消舊的勾選" in w for w in summary["warnings"])
+
+
+def test_refresh_keeps_the_stored_others_activity_of_an_unreachable_own_pr(
+    tmp_path, gh
+):
+    _seed_own_pr(tmp_path, snapshot_mark="x")
+    gh.fail = {1}
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    assert _snapshot_item(tmp_path)["others_activity_at"] == STORED_OTHERS_AT
+
+
+def test_write_snapshot_carries_over_others_activity_for_the_snapshot_command(
+    tmp_path,
+):
+    path = _seed_own_pr(tmp_path, snapshot_mark="x")
+    argv = ["snapshot", "--maigo-root", str(tmp_path), "--repo", REPO, "--you", YOU]
+    assert sync.main(argv) == 0
+    assert json.loads(path.read_text())["items"][url(1)]["others_activity_at"] == (
+        STORED_OTHERS_AT
+    )
+    sync.write_snapshot(tmp_path, REPO, NOW, others_activity_overrides={url(1): None})
+    assert "others_activity_at" not in json.loads(path.read_text())["items"][url(1)]
+
+
+def test_refresh_does_not_apply_the_own_pr_reset_to_review_or_issue_rows(tmp_path, gh):
+    write_board(
+        tmp_path,
+        board_text(
+            focus=[
+                row(2, "x", status="已看完"),
+                row(3, "x", icon="🐛", status="待 triage", author="rep"),
+            ]
+        ),
+    )
+    put_detail(tmp_path, 2)
+    put_detail(tmp_path, 3, kind="issues", icon="🐛", status="待 triage")
+    sync.write_snapshot(tmp_path, REPO, SNAPSHOT_AT)
+    gh.prs[2] = pr_meta(
+        2,
+        reviews=[
+            {"author": {"login": YOU}, "state": "APPROVED",
+             "submittedAt": "2026-09-15T00:00:00Z", "body": "ok"},
+        ],
+        comments=[{"author": {"login": "dave"}, "createdAt": "2026-09-29T00:00:00Z"}],
+    )  # fmt: skip
+    gh.issues[3] = issue_meta(3)
+    gh.issues[3]["comments"] = [
+        {"author": {"login": "dave"}, "createdAt": "2026-09-29T00:00:00Z"}
+    ]
+    assert run_cli(tmp_path, "--apply", "--no-discovery") == 0
+    lines = [ln for ln in board_lines(tmp_path) if "i/2.md" in ln or "i/3.md" in ln]
+    assert len(lines) == 2
+    assert all("[x]" in ln and "🔖" not in ln for ln in lines)

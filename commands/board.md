@@ -114,7 +114,7 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
      [--dry-run] [--max-new 50] [--no-discovery]
    ```
 
-   輸出 JSON：`lines`（每行的 `url` / `checked` / `checkbox_change` / `inferred` / `reviewed_at` / `excluded`）、
+   輸出 JSON：`lines`（每行的 `url` / `checked` / `checkbox_change` / `inferred` / `reviewed_at` / `snapshot_checked` / `others_activity_at` / `excluded`）、`snapshot_written_at`、
    `removed`（偵測到被 `dd` 的項目，已寫進排除紀錄）、`revived`（重新被指名而復活）、
    `additions` / `overflow`、`unattributed`、`pending_orphans`、`excluded_detail_files`、`errors`。
    board 仍是舊版格式時 `plan` 直接失敗：先依 §1 整檔正規化再重跑。
@@ -155,7 +155,8 @@ board 上的一般行，結案超過保留期（別人的 PR 3 天、自己的 7
    [`skills/work-board` 排序](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)）
    ＋ 同 rank 同加權內 `updatedAt` 升序寫回 🎯 與 👀 的編號清單（兩區各自從 1 編號；🔀／🐛 進 🎯、👀 進 👀）
    （`⏳`/`✅` 自己的在前、👀 在後，各群內 `updatedAt` 降序、無編號）；行內容用 `index_entry`（行動區已含 `→動作`（👀 區與 🔀 `有新 comment` 是 review 結果）與 `+A/-D`；細節檔路徑是最後一欄：`… — <title> <細節檔路徑>`），加最終 checkbox、badge、編號；✅ 行另加結案日期 `MM-DD`。
-   - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）。checkbox 一律以 `board_state` 回傳
+   - `learn_pending` 為 true 的行加 `🔖`（跨刷新保留，跟 `🧠` 一樣）；🔀 行 `reset_checkbox` 為 true
+     （上次已勾、別人有更新的活動、現為 `有新 comment`）時 `checked` 已是 false，沒有 `🧠` 就同樣補 `🔖`。checkbox 一律以 `board_state` 回傳
      的 `checked` 為準：👀 勾了卻回 `no_report` 或 `head_changed`，若分類結果仍是待看
      （`needs_review`），該行自動取消勾，並在對話警告「#n 沒有本版 report／head 已變，未標記已看完；
      請先 `/maigo:review <n>`」；但 GitHub 已送出你的 review、又沒有 report 時，該行不在待看清單，
@@ -323,7 +324,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board_index.py [--repo-list ~/.config/maig
 - **orchestrator 直跑**：不要 delegate 五人；`gh view --json` 抓料可並行，但輸出要有界。
 - **board 是唯一真相層**：`.maigo/board.md` 保留 checkbox 與 `🧠`；maigo 不提供任何呈現層，
   nvim 直接開檔即讀即改。
-- **回寫照 upsert 合約**：行存在就替換整行並保留 checkbox / `🧠`；行不存在才 append 到對應 section。
+- **回寫照 upsert 合約**：行存在就替換整行並保留 checkbox / `🧠`（🔀 `有新 comment` 的重置只由刷新做，見 `skills/work-board`，回寫時不自行判斷）；行不存在才 append 到對應 section。
   **整行替換時對應細節檔（`.maigo/i/<slug>.md`）必須跟著同步更新，不可只改索引行漏改細節檔**
   ——兩者是同一次寫回的兩個產物。同步更新＝只重寫事實區，`## 判斷` 與 `## 筆記`
   依 [`skills/work-board`](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md)

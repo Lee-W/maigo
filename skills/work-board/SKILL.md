@@ -98,7 +98,7 @@ board 在那之後又被別的 session 加了一項、改了另一項、計數�
 ## 3. 各命令回寫合約
 
 **upsert 規則**：以 `#<n>`（含 repo 全稱時用全稱）為 key；行存在→整行替換
-（**保留原 checkbox 與 🧠 狀態**；publish 新報告時重置該 PR 的 checkbox），不存在→append 到對應 section；board 檔不存在就先建骨架。
+（**保留原 checkbox 與 🧠 狀態**；publish 新報告時重置該 PR 的 checkbox；自己的 🔀 行上次刷新已勾、之後別人又有新活動且現為 `有新 comment` 時，刷新也重置為 `[ ]`，沒有 🧠 就補 🔖；重置由刷新 script 判斷，upsert 不自行判斷），不存在→append 到對應 section；board 檔不存在就先建骨架。
 **整行替換時，對應細節檔（`.maigo/i/<slug>.md`）必須跟著整份重寫，不可只改索引行漏改
 細節檔**——索引行與細節檔是同一次寫回的兩個產物，不允許其中一個落後。
 **例外：board 還是舊格式時這條無從執行**——舊行文法把 URL / 規模 / 產物路徑都內嵌在索引行裡，

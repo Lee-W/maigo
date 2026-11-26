@@ -1616,6 +1616,13 @@ def build(
                 "prior_badges": list(line["badges"]) if line else [],
                 "title": line["title"] if line else "",
                 "author": line["author"] if line else "",
+                "prior_checked": entry.plan_line["snapshot_checked"]
+                if entry.plan_line
+                else False,
+                "prior_others_activity_at": entry.plan_line["others_activity_at"]
+                if entry.plan_line
+                else None,
+                "snapshot_written_at": g.plan.get("snapshot_written_at"),
             }
         )
     try:
@@ -1656,7 +1663,7 @@ def build(
             continue
         prior = set(line["badges"]) if line else set()
         badges = {b for b in "🧠🔖" if b in prior}
-        if r.get("learn_pending"):
+        if r.get("learn_pending") or (r.get("reset_checkbox") and "🧠" not in prior):
             badges.add("🔖")
         if "💤" in r["badges"]:
             badges.add("💤")
@@ -1682,6 +1689,7 @@ def build(
                 else bool(r["checked"]),
                 "section": r["section"], "rank": r["rank"],
                 "updated_at": entry.fetch["gh_meta"].get("updatedAt"),
+                "others_activity_at": r.get("others_activity_at"),
                 "mode": "write", "gh_meta": entry.fetch["gh_meta"], "r": r,
             }
         )  # fmt: skip
@@ -1868,6 +1876,13 @@ def build(
             n = _URL_RE.match(entry.url)
             warnings.append(
                 f"#{n['number'] if n else '?'} 的勾選變更還沒處理（抓不到），下次刷新會再處理"
+            )
+    for row in all_rows:
+        if (row.get("r") or {}).get("reset_checkbox"):
+            n = _URL_RE.match(row["url"])
+            warnings.append(
+                f"#{n['number'] if n else '?'} 有新 comment，已取消舊的勾選"
+                + ("" if "🧠" in row["badges"] else "（補 🔖 待盤點）")
             )
     for row in all_rows:
         if row["status"] == UNREACHABLE and row["mode"] != "write":
@@ -2132,10 +2147,19 @@ def _apply_refresh(g: Gathered, built: Built) -> dict:
                     if record.get("review_time_source") == "report"
                     else None
                 )
+    others_activity_overrides = {
+        row["url"]: row["others_activity_at"]
+        for rows in built.rows_by_section.values()
+        for row in rows
+        if row["type"] == "🔀"
+        and row["mode"] == "write"
+        and "others_activity_at" in row
+    }
     try:
         sync.write_snapshot(
             root, g.repo, g.now, checked_overrides=built.snapshot_overrides,
             reviewed_at_overrides=reviewed_at_overrides,
+            others_activity_overrides=others_activity_overrides,
         )  # fmt: skip
     except (OSError, ValueError) as error:
         raise RefreshError(

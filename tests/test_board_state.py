@@ -1583,6 +1583,109 @@ class TestCheckboxAfterRefresh:
     def test_reviewed_is_always_checked(self):
         assert bs.checkbox_after_refresh(bs.ItemType.REVIEW_PR, False, True, False)
 
+    @pytest.mark.parametrize(
+        "item_type,expected",
+        [
+            (bs.ItemType.OWN_PR, False),
+            (bs.ItemType.ISSUE, True),
+            (bs.ItemType.REVIEW_PR, True),
+        ],
+    )
+    def test_reset_on_new_comment_only_clears_own_pr(self, item_type, expected):
+        assert bs.checkbox_after_refresh(item_type, True, True, False, True) is expected
+
+
+class TestShouldResetOwnPrCheckbox:
+    NEWER = bs._parse_ts("2026-09-29T00:00:00Z")
+
+    @pytest.mark.parametrize(
+        "status,prior_checked,others,prior_at,written_at,expected",
+        [
+            (
+                bs.BoardStatus.NEW_COMMENT,
+                True,
+                NEWER,
+                "2026-09-25T00:00:00Z",
+                None,
+                True,
+            ),
+            (
+                bs.BoardStatus.NEW_COMMENT,
+                True,
+                NEWER,
+                None,
+                "2026-09-20T00:00:00Z",
+                True,
+            ),
+            (
+                bs.BoardStatus.NEW_COMMENT,
+                True,
+                NEWER,
+                "2026-09-30T00:00:00Z",
+                None,
+                False,
+            ),
+            (
+                bs.BoardStatus.NEW_COMMENT,
+                False,
+                NEWER,
+                "2026-09-25T00:00:00Z",
+                None,
+                False,
+            ),
+            (bs.BoardStatus.CI_RED, True, NEWER, "2026-09-25T00:00:00Z", None, False),
+            (
+                bs.BoardStatus.NEW_COMMENT,
+                True,
+                None,
+                "2026-09-25T00:00:00Z",
+                None,
+                False,
+            ),
+            (bs.BoardStatus.NEW_COMMENT, True, NEWER, None, None, False),
+        ],
+    )
+    def test_conditions(
+        self, status, prior_checked, others, prior_at, written_at, expected
+    ):
+        assert (
+            bs.should_reset_own_pr_checkbox(
+                status,
+                prior_checked,
+                others,
+                bs.resolve_checkbox_baseline(prior_at, written_at),
+            )
+            is expected
+        )
+
+    @pytest.mark.parametrize(
+        "prior_at,written_at,expected",
+        [
+            ("2026-09-25T00:00:00Z", "2026-09-20T00:00:00Z", "2026-09-25"),
+            (None, "2026-09-20T00:00:00Z", "2026-09-20"),
+            ("not a time", "2026-09-20T00:00:00Z", "2026-09-20"),
+            (123, "2026-09-20T00:00:00Z", "2026-09-20"),
+            ("not a time", None, None),
+            (None, None, None),
+        ],
+    )
+    def test_baseline_prefers_stored_value_and_survives_garbage(
+        self, prior_at, written_at, expected
+    ):
+        got = bs.resolve_checkbox_baseline(prior_at, written_at)
+        assert (got.date().isoformat() if got else None) == expected
+
+    def test_latest_others_activity_ignores_your_events(self):
+        events = [
+            ("me", "2026-09-30T00:00:00Z"),
+            ("carol", "2026-09-10T00:00:00Z"),
+            ("dave", "2026-09-12T00:00:00Z"),
+        ]
+        assert bs.latest_others_activity(events, "me") == bs._parse_ts(
+            "2026-09-12T00:00:00Z"
+        )
+        assert bs.latest_others_activity([("me", "2026-09-30T00:00:00Z")], "me") is None
+
 
 class TestMainCheckboxFields:
     URL = "https://github.com/o/r/pull/7"
