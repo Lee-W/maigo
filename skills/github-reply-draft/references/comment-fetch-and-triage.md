@@ -103,12 +103,12 @@ or writing the triage file.
 由 `scripts/artifact_path.py reply-draft --owner mine|others` 算出。`status: same_topic` 時以既有檔為底稿：先讀、用 `Edit` 局部更新，不整份 `Write`；仍成立的條目逐字保留，只更新事實，
 新的 comment 附加在後，要移除的先在對話列出再移除（見 `commands/address-comments.md` 步驟 6）。
 
-版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)；回覆內文放在 `text` fenced block 裡，一段一行（不手動斷行）。
+版面規範見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)；回覆內文放在 `text` fenced block 裡（外層 4 個反引號，回覆內含 `suggestion` 區塊時才不會被截斷），一段一行（不手動斷行）。
 需要不只一句時，block 內的形狀是「結論一行、空一行、細節一行」（見 `SKILL.md` 的 Voice baseline）：「一段一行」管的是單一段落不折行，不是整則回覆只能有一段，兩者不衝突。
 reviewer 的每個 inline thread 都給一個可貼的 `text` block；照改的意見回覆極短（一個詞或一句，例如 `removed`），不省略。只有純稱讚、單純同意這類沒有任何要處理或回答的 comment，或作者已在該 thread 回覆過的（備註「已回覆」），才列一節、標題尾端加 `· 不必回覆`，「回覆」欄寫 `不必回覆：無需處理`、不放 fenced block；判準見 `references/draft-shape.md`。改動沒有實跑時，每一節（含不必回覆的）都要有 `備註`。
 要給使用者看、不貼給 reviewer 的話（例如「這則的改動沒有實跑 X」）寫在 block **外面**的 `備註` 欄。預設不加 attribution footer（見 `SKILL.md` Convention 6）。
 
-````markdown
+`````markdown
 # Reply drafts: <PR title> (#<number>)
 
 - **PR**: <https://github.com/OWNER/REPO/pull/NUMBER>
@@ -123,9 +123,9 @@ reviewer 的每個 inline thread 都給一個可貼的 `text` block；照改的�
 - **Thread 狀態**：unresolved（產稿時重抓）
 - **備註**：（可省略）給使用者看的話，例如這則的改動沒有實跑 X；不貼給 reviewer
 
-```text
+````text
 <回覆內文>
-```
+````
 
 ## C2 — review 摘要 · REQUEST_CHANGES · @reviewer
 
@@ -135,9 +135,9 @@ reviewer 的每個 inline thread 都給一個可貼的 `text` block；照改的�
 - **前置條件**：無
 - **Thread 狀態**：n/a
 
-```text
+````text
 @reviewer 關於「error path 缺測試」——…
-```
+````
 
 ## C3 — conversation · @reviewer
 
@@ -147,9 +147,9 @@ reviewer 的每個 inline thread 都給一個可貼的 `text` block；照改的�
 - **前置條件**：無
 - **Thread 狀態**：n/a
 
-```text
+````text
 <回覆內文>
-```
+````
 
 ## C4 — inline · `src/auth.py:77` · @reviewer
 
@@ -160,9 +160,9 @@ reviewer 的每個 inline thread 都給一個可貼的 `text` block；照改的�
 - **Thread 狀態**：unresolved（產稿時重抓）
 - **備註**：（可省略）改動沒有實跑 X 時寫在這裡
 
-```text
+````text
 removed
-```
+````
 
 ## C5 — inline · `src/auth.py:90` · @reviewer · 不必回覆
 
@@ -170,7 +170,7 @@ removed
 - **位置**：`src/auth.py:90`
 - **回覆**：不必回覆：無需處理（純稱讚）
 - **Thread 狀態**：unresolved（產稿時重抓）
-````
+`````
 
 「在哪裡回」依來源寫死，不換說法：
 
