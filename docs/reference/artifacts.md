@@ -78,7 +78,8 @@ identity 的所有 worktree 共用一份；路徑仍寫成 `.maigo/...`，下面
 ### `inline-comments.md` 格式
 
 - 路徑：別人的 PR 在 `.maigo/review/<id>/inline-comments.md`，自己的 PR 在 `.maigo/pr/<id>/inline-comments.md`。
-- 第一行寫明所依據的 head SHA；其後每則留言一個 `## <repo 相對路徑>:<行號>` 標題；標題後空一行是該位置的 Files 分頁連結，寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(路徑)>R<行號>`；再空一行後是要貼上的留言內文。
+- 第一行寫明所依據的 head SHA；其後每則留言一個 `## <repo 相對路徑>:<行號>` 標題；標題後空一行是該位置的 Files 分頁連結，寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(路徑)>R<行號>`；再空一行後是一個 fenced block，block 內是要貼上的留言內文。
+- 每則恰好一個最外層 fenced block，info string 為 `text`（與 `reply-draft.md` 的回覆區塊一致）；外層反引號數取 4 與（內文中最長連續反引號數＋1）兩者中較大者（內文有 ```` ```suggestion ```` 內層區塊時用四個）。block 內是逐字要貼的內文，包含寫給作者看的開頭（`Nit:`、`Non-blocking:`）；只給自己看的分類標籤、備註與連結都在 block 外。舊形狀（內文沒有 fence）的既有檔不遷移，重審時舊條目逐字保留，只有新附加與改寫的條目用新形狀。這樣編輯器可以一次複製游標所在的區塊。`draft.md` 整份就是 review 內文，所以不包 fence。
 - 標題的行號只供你定位貼上；內文以 symbol 指涉、不寫行號。作者再 push 後要對新 head 重核行號並重產連結。
 - 每則 1 到 3 句。
 - 重審同一顆 PR 以既有檔為底稿，先讀再用 Edit 修改（不整份 Write）：仍成立的條目逐字保留，只更新行號、head SHA 與連結，新條目附加在後，要移除的先在對話列出；不留 `.bak-<日期>`、`.old` 或加後綴的副本、不另開檔；沒有可貼的 comment 時，head 那行下補一行原因。

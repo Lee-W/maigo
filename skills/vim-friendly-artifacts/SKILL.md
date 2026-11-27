@@ -105,6 +105,10 @@ description: This skill should be used whenever writing, templating or generatin
 
 [`copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md) 的「一段一行」與「不用表格」兩條，在這裡延伸到 `.maigo/` 所有人讀產物，不限於要貼去別處的 deliverable。規則本文仍只存在於 copyable-deliverable，這份 skill 不重抄；兩邊要的是同一件事，只是理由不同（貼上之後不碎、在 nvim 裡讀改不費力）。另立一套會讓同一條規則有兩份本文、日後漂移。
 
+## 要貼出去的內容：最外層 fenced block
+
+`.maigo/` 產物裡，要貼到別處的內容（`inline-comments.md` 的每則留言、`reply-draft.md` 的每則回覆）一律是**最外層 fenced block**，block 內就是要貼的文字、逐字；標題、連結、備註留在 block 外。理由：編輯器可以用「複製游標所在區塊」這類按鍵一次取走整個 block 的內容，不必手動選取。maigo 自己不提供這樣的按鍵，也不替使用者寫編輯器設定，只保證檔案長這個形狀；fence 長度規則見 [`copyable-deliverable`](https://github.com/Lee-W/maigo/blob/main/skills/copyable-deliverable/SKILL.md)，`inline-comments.md` 的具體形狀見 [`commands/review.md`](https://github.com/Lee-W/maigo/blob/main/commands/review.md)。整份檔案本來就是內文的 `draft.md` 不包 fence。
+
 ## 與 work-board §6 的關係
 
 [`work-board` §6](https://github.com/Lee-W/maigo/blob/main/skills/work-board/SKILL.md) 是本規範在 board.md 與 i/ 細節檔上的具體應用（操作步驟、`gf`／`gx`／`/` 搜尋怎麼用）。§6 的 nvim 行為宣稱依本規範的實測為準；兩邊矛盾時以這裡為準並回頭修 §6。

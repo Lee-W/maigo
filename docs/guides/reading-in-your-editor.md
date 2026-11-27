@@ -72,6 +72,7 @@ nvim .maigo/board.md
 - **存檔時自動格式化**：`board.md` 與細節檔的事實區由 script 產生，版面是常見 markdown formatter 的不動點，存檔時自動格式化不會改它們（PR description 與 summary 的文字先單行化才寫入）。
   報告正文與 agent 寫的其他檔只靠範本約束，沒有機器保證，formatter 可能會調整這些部分。
 - **刷新會換掉檔案**：`/maigo:board` 以換檔方式寫入 `board.md`。在 Neovim 預設設定下，buffer 沒改過時，下次 Neovim 檢查檔案（例如 `:checktime`）會自動重新載入，沒有提示；你已經改了 buffer 還沒存時，會出現 W12 警告並保留你的修改，存檔時還會再警告一次。刷新期間不要存檔，等它跑完先 `:e` 重新載入再編輯。
+- **要貼到 GitHub 的內容**：`inline-comments.md` 的每則留言、`reply-draft.md` 的每則回覆都放在一個最外層 fenced block 裡，block 內就是要貼的文字，標題與連結在 block 外。你的編輯器若有「複製游標所在區塊」的做法，就能一次取走一則；maigo 不提供這個按鍵，也不替你寫編輯器設定。`draft.md` 整份都是要送的 review 內文，所以不包 fence。
 
 ## 5. 刷新與重審
 

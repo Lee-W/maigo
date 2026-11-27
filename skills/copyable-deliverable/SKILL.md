@@ -29,7 +29,7 @@ commit message 草稿、`gh` 指令草稿、PR title / description。
 
 **Deliverable 一律放進單一 fenced code block，內含 raw markdown。**
 （例外：`/maigo:address-comments` 步驟 6 的回覆草稿以 `reply-draft.md` 檔為正本，block 放在檔案裡，
-對話只印路徑與「在哪裡回」對照表，不重貼內文。）
+對話只印路徑與「在哪裡回」對照表，不重貼內文。另外，`/maigo:review` 的 `inline-comments.md` 檔案裡，每則留言內文各是一個最外層 block，標題與連結在 block 外；`draft.md` 整份就是 review 內文，檔案本身是裸檔、不包 fence。這兩句只描述檔案形狀，不規範對話輸出。）
 
 - 外層 fence 用**四個 backtick**（```` ```` ````）——deliverable 內部若有三-backtick
   code block（例：Test Plan 的指令）才不會把外層截斷。

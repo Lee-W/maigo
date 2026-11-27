@@ -164,19 +164,34 @@ board 的 `待送出` 下一步會把整個 `draft.md` 當 `gh pr review --body-
 要貼上去的 review 內文（含 attribution footer）；說明標題、「不收錄的 finding」清單、inline comment 的
 工作筆記不要混進去，否則會原樣貼上 GitHub。版面依 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)（版面、HTML 與路徑規則）。
 
-inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題，標題後空一行放該位置的 Files 分頁連結（寫成 `<URL>`），再空一行接要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號並重產連結。
+inline comment 草稿另寫到同目錄的 `inline-comments.md`（Markdown，不產 JSON payload）：開頭一行寫明所依據的 head SHA，之後每則一個 `## <repo 相對路徑>:<行號>` 標題，標題後空一行放該位置的 Files 分頁連結（寫成 `<URL>`），再空一行放一個 fenced block，block 內是要貼上去的留言內文。標題的行號是該 head 上 diff 新增行的位置，只供使用者定位貼上；留言內文照上面的規則以 symbol 指涉，不寫行號。作者再 push 後要先對新 head 重新核對行號並重產連結。
 
-連結寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(repo 相對路徑)>R<行號>`（hash 是路徑字串的 SHA-256 hex），獨立成行、不放進標題——放進標題會讓標題太長難讀。範例：
+**每則內文恰好包在一個最外層 fenced block 裡**，讓編輯器能用「複製游標所在區塊」一次取走（見 [`vim-friendly-artifacts`](https://github.com/Lee-W/maigo/blob/main/skills/vim-friendly-artifacts/SKILL.md)）：
 
-```markdown
+- **fence 長度**：外層反引號數取 4 與（內文中最長連續反引號數＋1）兩者中較大者（內文含 ```` ```suggestion ```` 這類三個反引號的內層區塊就用四個；內文含四個就用五個），否則內層會把外層提早關閉。info string 用 `text`，與 `reply-draft.md` 的回覆區塊一致（同一個複製動作）。
+- **fence 內是逐字要貼的內文**：包含寫給作者看的開頭（`Nit:`、`Non-blocking:`）；只給自己看的分類標籤、備註、連結都不放進 fence，block 內不夾說明或工作筆記。
+- **每則恰好一個最外層 fence**：不拆成多塊，也不在 fence 外另放一段要貼的文字。
+- **標題與 `<URL>` 連結在 fence 外。**
+
+連結寫成 `<URL>`，其中 URL 是 `https://github.com/<owner>/<repo>/pull/<n>/files#diff-<sha256(repo 相對路徑)>R<行號>`（hash 是路徑字串的 SHA-256 hex），獨立成行、不放進標題——放進標題會讓標題太長難讀。範例（內文含一個 `suggestion` 內層區塊，所以外層用四個反引號；下面的五個反引號是文件為了把整個範例原樣顯示而多包的一層，不屬於 `inline-comments.md`）：
+
+`````markdown
 ## providers/common/ai/docs/tool_approval.rst:260
 
 <https://github.com/apache/airflow/pull/76882/files#diff-cdba9dcc211e01826fce2f72acddddd2b4416513506ca40d8a42104f8f96ca18R260>
 
-Must-fix (docs): ...
-```
+````text
+The example sets a 30s timeout, which equals the default. Could the doc show a non-default value instead?
 
-**重審同一顆 PR：以既有的 `draft.md`、`inline-comments.md`、`rubric.md` 為底稿，先讀再用 `Edit` 修改，不整份 `Write`**——使用者可能手改過。仍成立的 finding 逐字保留，只更新行號、head SHA 與連結；新的 finding 附加在後；要移除的（已解）先在對話列出再移除。共用規則見 [`review-templates` 的 Draft hygiene 第 2 條](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
+```suggestion
+timeout: 60
+```
+````
+`````
+
+`draft.md` 不套這條：整份檔案就是 `gh pr review --body-file` 的內文，所以維持裸檔、不包 fence。
+
+**重審同一顆 PR：以既有的 `draft.md`、`inline-comments.md`、`rubric.md` 為底稿，先讀再用 `Edit` 修改，不整份 `Write`**——使用者可能手改過。仍成立的 finding 逐字保留，只更新行號、head SHA 與連結；新的 finding 附加在後；要移除的（已解）先在對話列出再移除。共用規則見 [`review-templates` 的 Draft hygiene 第 2 條](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-templates.md)。**不留 `.bak-<日期>`、`.old` 或加後綴的副本，也不為同一顆 PR 另開檔**；歷史靠 `review.md` 的已解／未解清單與 git。既有的 `inline-comments.md` 若還是舊形狀（內文沒有 fence），舊條目照舊逐字保留、不整份改寫；新附加與本輪改寫的條目用新形狀；fence 形狀的查核只對新形狀條目套用。`inline-comments.md` 沒有可貼的 comment 時，head 那行下面補一行原因（例如「無新 finding；3 個 nit 上輪已貼」），不要只留 head 一行。
 
 **同一個 head、草稿還沒送、其他 reviewer 之後留了意見：只做去重，不重審。** 條件三項都要成立：PR 的 `headRefOid` 等於既有 `review.md` 的 reviewed commit、`draft.md` 還沒送出、上次 review 之後有別人的 review 或 comment。這時不重跑樂奈、燈、爽世、立希，也不重新 publish `review.md`（重發會把審查時間蓋成今天）；即使舊報告沒有 coverage metadata 也適用，因為被審的 commit 沒變。要做的是：抓對方的 inline 意見，逐則對照草稿，已被講過的整則移除、講了一部分的縮成只剩沒講到的部分，`draft.md` 內文改成附議而不重述；修改後照下面的查核流程走一輪，查核項目加上「沒有重複其他 reviewer 的點，且每個『already raised』都找得到對應的那一則」；最後刷新 board。回覆使用者時明講這一輪沒有重審程式碼、verdict 沿用上次，並列出每則草稿的處置。head 有變就不適用，走一般重審或 [delta 重審](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/review-modes.md)。（2026-11-19 實例：#77073 的 7 則 inline 去重後剩 5 則，查核另外抓到一句過頭的說法。）
 
@@ -184,17 +199,19 @@ Must-fix (docs): ...
 
 **錨點落在引入被批評行為的那一行**：`## <path>:<line>` 要指向 diff 裡真正引入該行為的 `+` 行，不是附近任一個有改到的行。寫進 inline comment 的行號引用與「只有 X」「沒有 Y」這類斷言，落筆前用 `git show <head>:<file>` 對照 reviewed head 逐一確認。（2026-11-12 實例：#76862 的 must-fix 錨在只多傳一個參數的 `journal.py:556`，被質疑「沒有這個改動」；內文引的 `:538` 其實是一行 log，「唯一寫入者」也漏了 `pause`。）
 
-**inline comment 的命名類 finding 只給 `suggestion` block，不附規則說明**：每個要改名的函式各一則，錨在該函式 `def` 那一行（必須是 diff 的 `+` 行），內文只有一個 `suggestion` block，內容是原本整行 `def`（含縮排）只換掉名字；改名後超過該 repo 的行長上限時照 formatter 的方式折行。不寫「依命名規則應以動詞開頭」這類解釋，也不把多個改名併成一則文字清單。同名的 Protocol stub 與實作都在 diff 裡時兩處都給，否則改一半會破壞配對。suggestion 只改 `def` 行，呼叫端不在範圍內。範例：
+**inline comment 的命名類 finding 只給 `suggestion` block，不附規則說明**：每個要改名的函式各一則，錨在該函式 `def` 那一行（必須是 diff 的 `+` 行），內文只有一個 `suggestion` block，內容是原本整行 `def`（含縮排）只換掉名字（外層 fenced block 與其他 inline comment 相同，`suggestion` 是它的內層區塊）；改名後超過該 repo 的行長上限時照 formatter 的方式折行。不寫「依命名規則應以動詞開頭」這類解釋，也不把多個改名併成一則文字清單。同名的 Protocol stub 與實作都在 diff 裡時兩處都給，否則改一半會破壞配對。suggestion 只改 `def` 行，呼叫端不在範圍內。範例：
 
-````markdown
+`````markdown
 ## providers/common/ai/src/airflow/providers/common/ai/operators/agent.py:278
 
 <https://github.com/apache/airflow/pull/76882/files#diff-97860ef93cc1e228b433cb355ce258bfe2083ff7787994a54e2f16130eecfb7eR278>
 
+````text
 ```suggestion
 def _fingerprint_call_content(call: ToolCallPart) -> str | None:
 ```
 ````
+`````
 
 （2026-11-12 實例：五份草稿的命名 nit 原本都是一則「`a` → `b`、`c` → `d`……」的文字清單，使用者要的是可一鍵套用的 suggestion。）
 
@@ -204,6 +221,7 @@ def _fingerprint_call_content(call: ToolCallPart) -> str | None:
 - Files 分頁連結的 hash 等於該路徑字串的 SHA-256，行號與標題一致。
 - 草稿裡每句事實陳述都能在 `review.md` 找到，措辭不超過報告的證據等級（實跑、讀碼推論、未驗證），也沒有重複其他 reviewer 已提過的點。
 - 上面各段的格式規則（1–3 句、內文不寫行號與 SHA、命名只給 `suggestion` block、footer 只在 `draft.md`）。
+- `inline-comments.md` 每則恰好一個最外層 fenced block：外層反引號數取 4 與（內文最長連續反引號數＋1）中較大者、info string 為 `text`、fence 內只有要貼的文字（`Nit:`／`Non-blocking:` 開頭屬內文；沒有自用分類標籤、備註、連結），標題與 `<URL>` 連結在 fence 外。
 
 有任何一項不過就修正，再送回查核，到通過為止；修正本身也會出錯。向使用者列送出清單時，沒走過查核的草稿要標明。（2026-11-15 實例：15 份草稿多數第一輪沒過；#74421 修正時把測試涵蓋範圍寫過頭，複驗才抓到。）
 
