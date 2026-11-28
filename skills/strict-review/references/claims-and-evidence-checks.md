@@ -179,6 +179,15 @@ execution mode, through one entry point, or under one set of defaults. Before ap
    may say "asks" and "usually"; write what the other side does as fact only after confirming it. Case: a page stated
    that an external tool issues calls in order, while the adapter only passed a flag, and another passage of the same
    page said whether it takes effect was unconfirmed.
+6. When a doc says "we do X, so the result is Y", read every early-return, already-exists and skip
+   path in the code for one that does not do X. Limit Y to the case where X actually ran, and say
+   what decides the result on the skip path (the existing state). Describe the skip path exactly:
+   "sends no create request" is not "sends nothing" when the path still sends a lookup. Case
+   (apache/airflow #76802): a page said a resource stays loaded until it is removed by hand,
+   because the create request carries no expiry; the code lists existing resources first and skips
+   the create when one exists, and that existing one keeps the expiry it was created with, so it
+   can still expire. For each universal sentence in a doc ask: "and when the code does not perform
+   this action?"
 
 **Why.** Prose written from one reading of the code passes review when the reviewer reads the same path. These misses
 were found by a second reviewer in earlier rounds (three separate PRs).

@@ -54,6 +54,23 @@ SHA, cite only symbols that are committed, no footer, no `@`.
 question; the change differs from what they suggested; the point was deliberately not changed; the
 work is deferred (follow-up PR, later).
 
+**A suggestion outside this PR's scope, or a preventive change with no evidence behind it** (a
+refactor across files, an index or optimisation nobody has seen being needed) is a point that needs
+substance. This is a default for when there is no record of how this user usually answers such
+suggestions; if their earlier replies show another habit, follow that instead. Draft one of two
+answers: "agreed, I'll do it in a follow-up PR" (when the reviewer says a follow-up is fine, or the
+change would touch code this PR leaves alone), or "there is no evidence this is a problem now; we
+can add it if it shows up". Give the reason in the reply, and put the deliberate omission where the
+next reader will see it, in a code comment or a docs line, so it does not read as an oversight. Do
+not default to applying every suggestion.
+
+Why: in one user's replies across two PRs (apache/airflow #76000, #71072) four cases went this way:
+extracting a duplicated helper was deferred to a follow-up so the PR would not touch another
+adapter; an index was held off until it proved to be a problem; duplicate audit rows written by
+each scheduler under HA were accepted, with the comment rewritten to say the duplication is
+intended; and a flag was kept with a docs note that its effect is unconfirmed, rather than
+conceding the reviewer's doubt that it is needed. It keeps the PR narrow without ignoring the reviewer.
+
 **No reply needed** is kept only for two cases: (a) a comment with nothing to act on and nothing to
 answer (praise, plain agreement); (b) a thread the author has already replied to (do not draft a
 duplicate reply; the entry notes "already replied to"). The entry keeps its heading, location and original-comment link, and its

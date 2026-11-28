@@ -78,6 +78,14 @@ stdout 第 1 行 `owner: mine|others`，記下來——下面所有 `artifact_pa
 AskUserQuestion 問使用者「這顆 PR 是你的還是別人的？」，用答案當 `--owner`。本地 branch / range
 省略 `--owner`（預設 `mine`）。
 
+**這顆 PR 以前審過或討論過時，先讀使用者留下的判斷**：`.maigo/review/<id>/`（自己的 PR 是 `.maigo/pr/<id>/`）或
+`.maigo/i/<id>.md` 已存在，就在派樂奈之前讀細節檔的 `## 判斷` 與 `## 筆記`，並列出審查目錄下 `draft.md` 以外的草稿
+（例如 `draft-design.md`、`reconcile.md`）。筆記裡若有設計層的結論（不收某個參數、要求縮小範圍、兩份草稿立場相反待決定），
+而這一輪的要求與它方向不同，先用 AskUserQuestion 問使用者以哪個為準，再開工；把結論與那些草稿的路徑交給 🩵 燈寫進 rubric，
+也交給起草 review 的那一棒。不要等到回寫 board 才讀細節檔。
+（實例：一次同 head 的從嚴重審，rubric、審查與 14 則 inline 都照「參數保留」的前提做完，回寫 board 時才讀到筆記裡
+「不收這個參數」的設計結論與另一份立場相反的草稿，只能在收尾提醒使用者。）
+
 ### 1. 🐱 樂奈 (Raana) — 抓變更 + 周邊 context。「看完了。相關的在這三個檔案。」
 
 **先套 [`skills/pr-context-cache`](https://github.com/Lee-W/maigo/blob/main/skills/pr-context-cache/SKILL.md)**：跑 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_context_cache.py" <source>`——context 寫入本次 review rubric 檔（stdout 的 `rubric:` 路徑）開頭的 `<!-- pr-context-cache:start v1 -->` 段。PR 每次刷新 diff、metadata、CI 與討論；本地 branch／range 才在同 source 且 diff sha 未變時還原快取。script 跑不起來，或 `status: conflict`（exit 3） → 依下面指令手動抓（不寫 cache）。`status: owner_unknown`（exit 4，查不到 PR 作者）→ 依上面「判斷 owner」問使用者後，用 `--rubric <path>`（路徑由 `artifact_path.py review-rubric --owner …` 算出）重跑。
