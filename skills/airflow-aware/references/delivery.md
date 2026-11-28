@@ -84,6 +84,32 @@ The same evidence rule governs what the docs may say, and is kept with the docs 
 carries no "never run live" note (run it, then remove the note). See "Example outputs and
 measurements in docs come from a real run" and "Status claims in provider docs" there.
 
+## Deprecating a provider class: migrate its example Dags in the same PR
+
+When a PR makes a provider class emit `AirflowProviderDeprecationWarning`, it also moves every
+example Dag that still constructs that class to the replacement.
+
+Why: an example Dag's `@dag` function is called at module level, so the class is constructed when
+the Dag is parsed, not when a task runs. The root `pyproject.toml` lists
+`AirflowProviderDeprecationWarning` in `forbidden_warnings`, which turns it into an error, so
+`airflow-core/tests/unit/always/test_example_dags.py::test_should_be_importable` records the file as
+an import error. Case: a review's real run caught a provider-class deprecation where one example had
+been migrated and another still constructed the class. The other route, adding the file to
+`IGNORE_AIRFLOW_PROVIDER_DEPRECATION_WARNING` in that test module, costs more than migrating: its
+comment says such entries should be resolved quickly and need a GitHub issue.
+
+How to apply:
+
+- Before adding the warning, search the whole provider's `example_dags/` for imports and
+  constructions of the old class and migrate each hit, not only the example named after it.
+- After migrating, run `test_should_be_importable` (select the affected example files with `-k`)
+  and confirm it passes.
+- A test file that must still construct the old class narrows the warning with a
+  `pytest.mark.filterwarnings("ignore:<start of the message>:airflow.exceptions.AirflowProviderDeprecationWarning")`
+  whose message condition is specific; do not ignore the whole category.
+- If the old class builds another instance of itself internally (for example a method that returns
+  a copy), avoid warning the user twice for one construction.
+
 ## Don't prefix a doc-only commit's subject with `Docs:`
 
 The subject of a doc-only commit must not start with `Docs:`. `docs` is

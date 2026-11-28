@@ -146,3 +146,16 @@ How to apply: when reviewing or writing a route (or anything it calls) that gain
 (1) check whether the route is `async def` or plain `def`; (2) compare with the other endpoints in
 the same file to see which convention it follows; (3) if it is `async def` and does synchronous
 I/O, ask for a plain `def` or for the I/O to move into a threadpool.
+
+## A forked child's event loop depends on the Python version: check the lowest supported one
+
+From Python 3.12 a child process created by fork resets the current event loop; on 3.11 it does
+not, and the child inherits the parent's loop. A fork guard (code that makes a forked child safe
+to run asyncio in) written and tested on a newer Python can therefore leave the oldest supported
+version unprotected. Case (apache/airflow #77384): a provider's `requires-python` still included
+3.11, the gap was raised in review and confirmed on 3.11, and the fix added the guard for it and a fork test.
+
+How to apply: when a diff touches `asyncio`, fork, or a thread-local event loop, read the package's
+`requires-python` first and judge the behaviour on its lowest version, not only on the version you
+run locally. If that version is below 3.12, ask that the fork guard cover the inherited-loop case
+and that a fork test exercise it.

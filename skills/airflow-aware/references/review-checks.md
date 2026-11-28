@@ -55,6 +55,7 @@ Sub-checks in this file (the item numbers below are the 10.x numbers `SKILL.md` 
 - **10.39** A cross-provider extra that pulls in another provider's extra can collide with root `[tool.uv] conflicts` and block users from installing a conflicting extra alongside it; check the conflicts table, prefer docs or a dedicated extra over widening (Request changes, scope-gated to a diff that adds or widens a cross-provider extra)
 - **10.40** An error that retrying cannot fix (corrupt data, configuration error) should raise a skip-retry exception from the `AirflowFailException` family; transient failures stay retryable (Request changes, scope-gated to a diff that adds or changes an exception path in task execution, hook or trigger-resume code)
 - **10.41** Someone else's PR with an agent `Co-Authored-By` trailer: a non-blocking one-line reminder, once per author per batch, never a must-fix (judgment gate, scope-gated to reviews of another contributor's PR)
+- **10.42** Lazy supervisor comms must not make their first call inside a coroutine: resolve the value at a synchronous point before user code runs, since a blocking `SUPERVISOR_COMMS.send()` on the loop thread stalls every coroutine (and could raise `DeadlockImminentError` before #76545) (Request changes, scope-gated to diffs that add or change `asyncio` use or `SUPERVISOR_COMMS` calls)
 - **Release-tag check** (unnumbered section): before calling a symbol "already released" or a change "breaking", find the release tags that contain it with `git tag --contains` / `git ls-tree <tag>` (judgment gate, scope-gated to reviews resting on a compatibility claim; includes a variant for provider docs that say "on Airflow X and later"). The author-side counterpart is sweep (c) in [`strict-review/references/pre-pr-sweeps.md`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/references/pre-pr-sweeps.md)
 - **DB portability and concurrency** (unnumbered section): scheduler timer `non_fatal=True`, `DELETE` source as `.subquery()` not CTE, psycopg3 `sqlstate` vs psycopg2 `pgcode`, unique-race retry of the whole get-or-create (Request changes, scope-gated to scheduler timers, DELETE-from-subquery, Postgres error-code handling, unique-constraint get-or-create)
 
@@ -1376,6 +1377,26 @@ trailer; the reviewer flagged it as must-fix on only one of the three, so the st
 inconsistent). The "non-blocking, once per batch" choice was inferred from one maintainer
 decision in that batch, not from a stated project rule; revise it if the maintainer decides
 otherwise.
+
+## 10.42 Lazy supervisor comms must not make their first call inside a coroutine *(narrow — only when a diff adds or changes `asyncio` use, or code that talks to the supervisor through `SUPERVISOR_COMMS`; Request changes)*
+
+When a Task SDK accessor defers its supervisor query until the first read, ask where that first
+read can happen. If it can happen inside a coroutine, it uses the blocking
+`SUPERVISOR_COMMS.send()` on the loop's thread. On current `main`, while an `asend()` is in flight
+that call waits for the other request's round trip and stalls every coroutine on the loop;
+`DeadlockImminentError` is raised only by a `send()` on a thread that is itself in the middle of a
+request (`CommsDecoder.send` in `task-sdk/src/airflow/sdk/execution_time/comms.py`). Before
+apache/airflow #76545 the loop-thread case could raise it as well. Require the lookup to finish at
+a synchronous point before user code runs, so the first read never has to talk to the supervisor.
+
+How to check: for each lazily evaluated value the diff touches, trace the first read to its caller
+and note whether that caller is `async`; if it is, ask for the value to be resolved ahead of time.
+
+Source: apache/airflow #75751 — a reviewer pointed it out in review and the author changed the
+code to resolve the value during preparation, before user code runs. The version-floor half of
+reviewing async and fork code (does the event loop reset after a fork on the oldest supported
+Python?) is language-level and lives in
+[`python-aware/references/runtime-gotchas.md`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/references/runtime-gotchas.md).
 
 ## Before calling a symbol "already released" or a change "breaking", check the release tags *(judgment gate — when a review comment or recommendation rests on a compatibility claim)*
 

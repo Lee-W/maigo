@@ -670,7 +670,12 @@ Four setup failures in sub-projects look like a regression in the PR but are the
 
 When delegating verification to 🟣 Taki, write the sub-project's exact command into the brief (including the `PYTHONPATH`,
 and `--frozen` only for a project that has a `uv.lock`); otherwise the verifier reports the environment error as a PR defect or burns a
-round rediscovering it.
+round rediscovering it. A command to copy into the brief (drop `--frozen` for a project without its own `uv.lock`):
+
+```bash
+cd <worktree> && env AIRFLOW_HOME=<fresh-dir> PYTHONPATH=shared/secrets_masker/src \
+  uv run --frozen --python 3.12 --project <PROJECT> pytest <test-file> -q
+```
 
 ### `task-sdk` serde tests need the Kubernetes provider's project environment
 
@@ -1102,6 +1107,36 @@ delegation prompt, not just in your own head):
   image from the registry and running `uv run --project <pkg> pytest` inside it. It is not
   breeze and not the CI environment, so say so in the report; and tests that need Linux skip
   wholesale on macOS, so a macOS green doesn't verify them.
+
+### A delegated breeze run leaves a worktree watcher, and the agent's later hand-backs get rejected
+
+Once a subagent has run breeze in a worktree, a long-lived
+`dev/breeze/src/airflow_breeze/utils/worktree_watcher.py` process stays behind (parent PID 1).
+The harness counts it as the agent's own background work still running: the completion notice
+says the agent is waiting on its own background work, and the reports it sends after a
+follow-up message are rejected, because only one report per result is accepted until that
+background work ends.
+
+Why: observed once, an implementation agent's full report was lost on two follow-up rounds and
+the only signal was a notice that the second report was rejected. It is easy to misread that as
+the agent still editing the worktree, or to wait for a process that never exits.
+
+How to apply:
+
+- When the notice says the agent is waiting on its own background work, list processes with
+  `/bin/ps -axo pid,ppid,etime,command` and find those that point at that worktree. If only
+  `worktree_watcher.py` is left, it is not the agent's work and there is nothing to wait for.
+- When a report is rejected, recover it with a script that reads the agent's output file (JSONL)
+  line by line and prints only the text of the last `type == "assistant"` message that has text content. Do not read or
+  `tail` the transcript file itself: that pours the whole transcript into the orchestrator's
+  context.
+- Treat the recovered text as a claim: check `git status --porcelain`, `git log` and `ListAgents`
+  yourself before relying on it.
+- A brief that says "report once, after all background work has finished" does not help here,
+  because the watcher never finishes. When a task needs several round trips, expect to recover the
+  report from the output file from the second round on.
+- An agent that never ran breeze (a read-only review, for example) is not affected; its follow-up
+  reports arrive normally.
 
 ### Reproducing a providers Compat job locally (common.ai as the example)
 

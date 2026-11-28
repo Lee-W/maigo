@@ -252,6 +252,32 @@ separate axis covered by the SDK/Core release-state framing memory
 (check release tags via `git tag --contains <sha>` **and** `git show
 <tag>:<file>` to confirm).
 
+### A closed value set is a `str, Enum` on both sides, not `str | None` plus a hand-written tuple
+
+A field whose legal values form a closed set (a policy, a mode, a direction) that is declared
+`str | None` next to a hand-written tuple of allowed strings is a **must-fix**.
+
+Why: a string-typed field for such a set accepts anything (apache/airflow #74583). A real run
+showed the consequence: an unknown string passed core's construction,
+serialization and deserialization, and was later read differently by two consumers (one tested its
+truthiness, the other compared it with a literal), so the same stored value meant two behaviours.
+
+The fix follows `Window.Direction` — a nested `class Direction(str, Enum)` in both
+`airflow-core/src/airflow/partition_mappers/window.py` and
+`task-sdk/src/airflow/sdk/definitions/partition_mappers/window.py`:
+
+- Define one `str, Enum` in the SDK and one in core. The SDK cannot import core, so two copies
+  are expected, not duplication to remove.
+- Type the field with a converter that builds the enum, so an unknown value is rejected at
+  construction. On the core side the same converter rejects it during deserialization.
+- Serialize `.value`, not the member.
+- Add one test that asserts the two enums have the same members, so the copies cannot drift.
+- `Literal[...]` is not enough: it is erased at runtime and never rejects an unknown value.
+
+How to check: when reviewing a new or changed field of this kind, list the declared type at every
+layer (SDK definition, core model, serialized form, each place the scheduler or another consumer
+reads it, the tests) instead of reading one definition.
+
 ## CLI and REST design consistency
 
 Before designing a new CLI command's semantic, filter, or default, **grep

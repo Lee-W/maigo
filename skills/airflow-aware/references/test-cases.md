@@ -206,3 +206,52 @@ A DST test suite built only from whole-hour-shift zones (Europe/Berlin, America/
 - `Antarctica/Troll` — a 2-hour fold; per tzdata 2020–2030 it is the largest pure DST shift (Casey's 3-hour change is a standard-time re-definition, not DST).
 
 apache/airflow #75847: a maintainer review caught the "gap under one hour never crosses DST" threshold with Lord_Howe, which the existing whole-hour zones had all passed.
+
+---
+
+## DB tests: no hard-coded primary keys, and all three backends run the whole file
+
+Airflow-only case (no python-aware counterpart). Applies when a change touches SQL semantics,
+primary-key or sequence numbering, or rows that a test leaves behind. Source: apache/airflow #69849,
+where the first CI failure was MySQL-only and the fix then failed on Postgres.
+
+### Do not hard-code primary keys or depend on other rows in the table
+
+- A scheduler test hard-coded event ids 1000 and 2000, while the code under test used a table-wide
+  `max(id)` as its upper bound. Earlier tests in the same module committed events that their cleanup
+  could not delete; on a backend whose auto-numbering never goes back, the leftover ids passed 2000,
+  the bound rose, and the test failed only in the MySQL job while local SQLite stayed green. The
+  reviewer asked for both sides to change: the test must not depend on a fixed id, and the code
+  must not scan the whole table.
+- When writing or reviewing a DB test, for every hard-coded primary key ask: "if the table already
+  holds a row with a larger id, does this assertion still hold?" Module-level tests have no
+  class-level table-clearing fixture, so they pick up leftovers most easily.
+- Fix such a test by letting it create the foreign condition itself (for example insert an unrelated
+  row with the largest id), so it pins the behaviour deterministically on every backend instead of
+  passing by luck.
+- Do not read the current `max(id)` and add to it either. An explicit id larger than anything the DB
+  has handed out does not advance a Postgres sequence, so when the table is not cleared, a later test
+  that relies on auto-numbering collides on the primary key. (This is how the Postgres job failed
+  after the first fix; MySQL and SQLite did not.) When the test needs an id that is "smaller but
+  inserted later", insert a placeholder row so the DB assigns a number, note its id, delete the
+  placeholder once the larger id exists, and reuse that id.
+- `session.scalar(select(func.max(...)))` is typed as possibly `None`, so arithmetic on it fails
+  mypy; use `session.scalars(...).one()`.
+- The production side follows the same rule: an aggregate such as `max()` over a user-data table is
+  limited to the rows this operation concerns, not the whole table.
+
+### Verify on SQLite, Postgres and MySQL, running the whole test file
+
+- Before pushing a change in this area, run each backend:
+  `breeze run --backend <sqlite|postgres|mysql> --python 3.11 pytest <the whole test file> -p no:randomly`
+  (add `--mysql-version 8.0` for MySQL). Run them one after another, not in parallel, so two breeze
+  instances never start at once.
+- Run the whole file, not only the target test: in #69849 the tests that broke were two later tests
+  in the same file, which a target-only run cannot show. Checking only the backend that failed moves
+  the problem to the next backend.
+- A backend marked "not verified" is not a state to push in. If a backend cannot run, tell the user
+  before pushing.
+- When delegating the verification, write the acceptance condition as one line per backend, judged
+  by breeze's outer exit code and pytest's summary line. Case: #69849's first fix was pushed with
+  Postgres marked "not verified", and the Postgres CI job then failed; all three supported
+  databases have to be checked.

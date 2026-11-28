@@ -79,7 +79,10 @@ and any call signature, so a typo or wrong call still passes. A bare
 `MagicMock()` is acceptable only for a logger attribute replaced via
 `instance._log = mock.MagicMock()`; asserting its `.mock_calls` is fine, as in
 the logger pattern below. Every other mock the test configures or asserts
-against needs `spec` / `autospec`.
+against needs `spec` / `autospec`. When a fixture already gives the test an instance, use it as
+the spec (`MagicMock(spec=session)`); it still rejects attributes the instance lacks, so the
+class need not become a runtime import just for the spec when the test uses it only in
+annotations (apache/airflow #71072).
 
 ---
 
@@ -285,6 +288,31 @@ one that turns red.
   raised (apache/airflow #71072). Negative `caplog` or structured-log assertions need the
   full event string; see the structured-log capture note in the log-assertion section
   below.
+- **A process shutdown order is pinned with a fake process, not a real child.** To lock an
+  ordering such as "after terminating the process, read its stdout to EOF, then `wait()`",
+  a test that launches a real subprocess is not deterministic: the outcome depends on OS
+  scheduling and pipe buffer size. Under mutation (the three lines that read to EOF removed)
+  such a test stayed green on two runs and gave different results across three, until the
+  verification hit its retry limit. Build the fake from
+  `create_autospec(asyncio.subprocess.Process)` with its `stdout` from
+  `create_autospec(asyncio.StreamReader)`, and make `wait()` complete only after stdout has
+  returned `b""`, so "wait without reading", "wait before reading" and "read only once" all
+  time out. Patch the shutdown timeout constant to a small value (it only bounds how long a
+  failure takes) and assert the end state (terminated, EOF read, `wait()` finished) with no
+  timing threshold. Do not mock the shutdown function under test; replace only the process
+  object and the function that sends signals. A real-subprocess integration test may stay, but
+  is not the only guard for this behaviour. Confirm with one mutation: remove the pinned lines
+  and the fake-process test fails on every one of several consecutive runs.
+- **`pytest.raises(match=...)` that must prove nothing was appended anchors the end.**
+  `match` uses `re.search`, so it matches a substring. When the implementation appends content
+  to a message under a condition (`if body.get("error"): message += ...`) and the test covers
+  the side where the condition is false, a short fragment such as `NoneType` also matches the
+  longer message, so removing the condition leaves the test green. For the cases without the
+  appended part, write the whole message ending in `$` (escape the periods), for example
+  `r"'items' of type NoneType, expected a list\.$"`. Mixing substring and anchored patterns in
+  one parametrize is fine; change only the params that must lock the end. Confirm with one
+  mutation: make the condition unconditional and the anchored case must fail (apache/airflow
+  #76802, where a reviewer showed two cases passing with the condition removed).
 - **Reviewing someone else's test.** Name the one-line change that would leave the test
   green (for example "this passes if `== 404` is loosened to `>= 400`") and ask for the
   extra case, with the concrete case spelled out (apache/airflow #73926, #76918). A gap

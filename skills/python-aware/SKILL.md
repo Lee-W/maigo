@@ -53,7 +53,7 @@ A repo-aware skill that wants to change a default here must say so explicitly
 |---|---|
 | `references/code-style.md` | Writing or reviewing Python style: import placement and aliasing, naming and constants, raise-vs-document validation, `ContextVar` in async generators, mypy narrowing, docstring conventions, subprocess `returncode` checks |
 | `references/test-conventions.md` | Writing or reviewing tests and one of the named patterns below applies (mock assertions, parametrize, reject-path shapes, tripwires, class-attribute / stub-shape / codespell traps, unix-socket path length…) — full rationale and recipes |
-| `references/runtime-gotchas.md` | Code that passes a type checker and a casual read but misbehaves at runtime: pydantic `Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int`, chained `.append()` on an ORM query result (weak identity map), synchronous I/O inside an `async def` route |
+| `references/runtime-gotchas.md` | Code that passes a type checker and a casual read but misbehaves at runtime: pydantic `Annotated` constraints, nested enums, subscripted generics, `Decimal` → `int`, chained `.append()` on an ORM query result (weak identity map), synchronous I/O inside an `async def` route, a forked child's event loop on the oldest supported Python |
 | `references/tooling.md` | Dependency-floor bumps that make a stale venv go red, several agents sharing one worktree `.venv`, a script a hook runner executes directly, measuring coverage with `--cov`, or a `uv lock --upgrade` vulnerability fix that leaves an old-Python fork on the bad version |
 
 ## Coding rules

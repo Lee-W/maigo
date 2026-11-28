@@ -70,13 +70,14 @@ prek run --all-files   # prek, not pre-commit: the runner upstream specifies
 A user-facing feature (new public class / SDK symbol / scheduling behaviour) ships **all three** in one PR: (1) **implementation + tests**; (2) an **example Dag** folded into an
 **existing** example file, reusing its block style and objects — no new example file or bare new `with DAG(...)` block; (3) a **docs update** to the relevant `.rst`
 (prose uses "Dag"; known limits are constraints, not `# TODO`). Adding or removing a public symbol also updates `task-sdk/docs/api.rst` and the `airflow-core/docs/` autoapi entries
-together with `__init__.py` / `__all__` / the lazy-import table — both the removal and the addition. QA-plan and status-doc conventions: `references/delivery.md`.
+together with `__init__.py` / `__all__` / the lazy-import table — both the removal and the addition. QA-plan and status-doc conventions, and migrating a deprecated provider class's example Dags in the same PR: `references/delivery.md`.
 A PR that changes a per-call scheduler hot path (cron `_get_next` / `_get_prev`, next-dagrun computation) also attaches same-machine before/after µs and says whether the new branch runs on ordinary days — `references/design-integrity.md`.
 
 ### 7. Testing
 
 - **Airflow override**: **do not use `caplog`** — see the "Testing" section of `AGENTS.md` for the prescribed pattern (typically a mock log handler asserted directly).
 - **DB-touching tests must be marked `@pytest.mark.db_test`**.
+- **A change touching SQL semantics, primary-key numbering or rows a test leaves behind**: no hard-coded primary keys in tests, and run the whole test file on SQLite, Postgres and MySQL before pushing — `references/test-cases.md`.
 - **Test paths mirror source paths**: `airflow-core/src/airflow/foo/bar.py` ↔ `airflow-core/tests/unit/foo/test_bar.py`.
 - **Timetable / DST / fold changes**: DST tests must include a non-whole-hour-shift zone and a 2-hour fold zone, not only Berlin / Chicago — `references/test-cases.md`.
 - pytest-only, `spec=`/`autospec=True`, time-travel library, mock-assertion style: `python-aware`.
@@ -96,12 +97,13 @@ A PR that changes a per-call scheduler hot path (cron `_get_next` / `_get_prev`,
 from scheduler/worker internals. Cross-boundary changes need extra scrutiny — read `code-review.instructions.md` (its §1) first.
 **Core ↔ SDK paired classes** (same name in `airflow-core/` and `task-sdk/`): drift on a same-named attribute is a **bug**, not a nit — fix it in the current PR
 (compare constructor signature, post-`__init__` type, normalization, eager-raise; `references/design-integrity.md`).
+A **closed value set** (policy, mode, direction) is a `str, Enum` on each side with a rejecting converter, never `str | None` plus a tuple of strings (must-fix) — `references/design-integrity.md`.
 **Provider public surface** (trigger / hook / operator signatures, capability flags, serialized payloads): new parameters get defaults and keep the old call shape, capabilities are explicit class attributes, a serialized-content change is a compatibility change, module-only helpers are `_private`, factory parameters are keyword-only Protocols (`references/design-integrity.md`, "Provider public-surface compatibility").
 
 ### 10. Review-time-only checks *(loaded as strict-review item 10+)*
 
 During a **review task** (🟡 Soyo running `strict-review` on an Airflow diff), read `references/review-checks.md` and append its sub-checks as items 10+, with the severity each states.
-Its "Contents" list enumerates 10.1–10.41 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the 10.x sub-checks and the unnumbered release-tag and DB portability sections (also review-only); the file's other sections (e.g. uv.lock drift diagnostic, `uv` version pin churn, example-Dag policy, migration PR conventions, secrets-masker tests) are read when the task matches them, per the index table below.
+Its "Contents" list enumerates 10.1–10.42 plus the unnumbered release-tag check and DB portability and concurrency sections. The file also holds the Airflow case studies backing `strict-review`'s recurring must-fix patterns. Outside a review, skip the 10.x sub-checks and the unnumbered release-tag and DB portability sections (also review-only); the file's other sections (e.g. uv.lock drift diagnostic, `uv` version pin churn, example-Dag policy, migration PR conventions, secrets-masker tests) are read when the task matches them, per the index table below.
 
 ### 11. CLI / REST / docs / backport conventions
 
@@ -115,12 +117,12 @@ Its "Contents" list enumerates 10.1–10.41 plus the unnumbered release-tag chec
 |---|---|
 | `references/code-style.md` | Airflow-specific style: optional-extra import guard, naming (action verbs, AIP-21, private modules), provider hooks, maintainer preferences, core-symbol version-floor checks, third-party dependency floors, Dag authoring, example-Dag imports that need an extra of their own |
 | `references/runtime-gotchas.md` | attrs eq/hash, (de)serialization field reads, scoped-session lifecycle, embedded-server logging reset |
-| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds (incl. baseline-worktree rule); same-process Sphinx test leaks; attribution; relock pin-back to the documented version; docs screenshot procedure |
-| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims and before a doc's "on Airflow X and later" claim. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests; 10.39 cross-provider extra vs root `[tool.uv] conflicts`, 10.40 skip-retry exception for errors retrying cannot fix, 10.41 an agent co-author trailer on someone else's PR is only a non-blocking reminder |
+| `references/verification-tooling.md` | Before trusting a prek / pytest "Passed"; local false reds (incl. baseline-worktree rule); same-process Sphinx test leaks; attribution; relock pin-back to the documented version; docs screenshot procedure; a delegated breeze run's leftover worktree watcher blocking the agent's later hand-backs |
+| `references/review-checks.md` | Review tasks: items 10+ (Contents at the top); release-tag check before "released"/"breaking" claims and before a doc's "on Airflow X and later" claim. Any task: uv.lock drift diagnostic, `uv` pin churn, migration PR conventions, example-Dag policy, secrets-masker tests; 10.39 cross-provider extra vs root `[tool.uv] conflicts`, 10.40 skip-retry exception for errors retrying cannot fix, 10.41 an agent co-author trailer on someone else's PR is only a non-blocking reminder, 10.42 lazy supervisor comms whose first call lands inside a coroutine |
 | `references/registry-conventions.md` | A diff touches `dev/registry/` or `registry/`, or adds a `provider.yaml` section |
 | `references/design-integrity.md` | Hot-loop extension surfaces, Core ↔ SDK symmetry, CLI/REST consistency, range-API granularity, provider public-surface compatibility, adapter config merge vs required settings |
 | `references/docs-conventions.md` | Writing or reviewing docs prose, provider docs (incl. third-party class vs declared version floor), docs examples |
-| `references/test-cases.md` | Writing or reviewing Airflow tests: Airflow instances and Airflow-specific facts behind the python-aware test-conventions rules (read alongside the rule) |
+| `references/test-cases.md` | Writing or reviewing Airflow tests: Airflow instances and Airflow-specific facts behind the python-aware test-conventions rules (read alongside the rule); DB tests: hard-coded primary keys, three-backend runs |
 | `references/ui-conventions.md` | `airflow-core/src/airflow/ui` changes; zh-TW translation rules |
 | `references/naming.md` | The naming hook fires, or editing a historical archival file |
 | `references/delivery.md` | Finishing a feature, QA / status docs, docs-page PRs, doc-only commit subjects, backports |
@@ -133,6 +135,6 @@ Its "Contents" list enumerates 10.1–10.41 plus the unnumbered release-tag chec
 Builds on [`python-aware`](https://github.com/Lee-W/maigo/blob/main/skills/python-aware/SKILL.md) (Layering above); pairs with [`strict-review`](https://github.com/Lee-W/maigo/blob/main/skills/strict-review/SKILL.md).
 
 **Review scenario** — run `strict-review`'s 9-item base checklist, then apply these as Airflow supplements: convention 2 (naming) → base item 4; 4 and 5 (style, correctness) → items 5–6;
-6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.41) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
+6 (delivery completeness) → item 1; 7 (testing) → items 2–3. **§10 sub-checks (10.1–10.42) become items 10+**, with Block / Request-changes severity inherited from each sub-section.
 
 **Quick-fix / refactor scenario** — use conventions 3–7 as background. Flag violations you notice, but do not run the full `strict-review` checklist unless the task calls for it; §10 is review-only.
